@@ -1047,15 +1047,13 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
         bodyWeightLb: payload.current_weight ?? null,
         sex: payload.sex ?? null,
         daysAsked,
-        /* How careful the rate of advance should be, 0 to 1. Sent, and at the
-           time of writing NOT READ: plan.mjs destructures four named fields off
-           `person` and this is not one of them, so the increment in
-           calibrate.mjs and the returning restart in load.mjs are both written,
-           tested and dark. Three call sites in plan.mjs light them (the
-           `person` destructure, the `calibrate` call and the `prescribeLoad`
-           call), and that file is owned by somebody else this week. It is sent
-           anyway so the day it is read nothing else has to change, and so this
-           comment is where the next person finds out. */
+        /* How careful the rate of advance should be, 0 to 1. Read by plan.mjs
+           at the `person` destructure, the `calibrate` call and the
+           `prescribeLoad` call since 2026-09-12, so it reaches the increment in
+           calibrate.mjs and the returning restart in load.mjs. It was sent and
+           not read for a while before that, and this comment said so until
+           2026-09-19, a week after it stopped being true; an audit spent a
+           morning on it. `meta.age.rampApplied` below is the live answer. */
         ageCaution: rampCaution,
         /* How long they want one session to be, from profiles.session_minutes.
            Absent, null, zero and nonsense all mean "never answered" and the

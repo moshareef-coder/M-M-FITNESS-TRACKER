@@ -181,7 +181,7 @@ test("earning one movement earns nothing else", () => {
   assert.equal(earned.has("romanian deadlift"), false);
 });
 
-test("observedCapacity is null under eight sessions and a number past it", () => {
+test("observedCapacity is null under eight sessions inside a fortnight and a number past it", () => {
   const low = deriveTrainingAge({ logs: history({ n: 5 }) });
   assert.equal(observedCapacity(low), null);
   const enough = deriveTrainingAge({ logs: history({ n: 20 }) });
@@ -4694,6 +4694,59 @@ test("cutTakenRecently reads the cut marker off saved plans and forgets it after
   });
   assert.notEqual(spent.summary.action, "volume-cut");
   assert.equal(spent.responses.filter((r) => r.action !== "wait").length, 3, "the per lift answers run once the cut is spent");
+});
+
+test("buildPlan without an age climbs at the rate production ships, not the young one", () => {
+  /* The adapter reads an unknown age as caution 1 (CONTRACT.md: the
+     age-unknown default looks like the older-adult default). buildPlan
+     defaulted to 0, so the sweep, the demo and every harness calling it
+     measured a squat going up 10 lb a week where production gives 5. */
+  const logs = history({ n: 70 });
+  const dates = [day(-2), day(-5)];
+  const plans = dates.map((d) => ({
+    entry_date: d, completed_at: `${d}T18:00:00Z`,
+    exercises: [{ name: "Barbell Back Squat", sets: 3, reps: 5, targetWeight: 295 }],
+  }));
+  const easy = dates.map((d) => ({ entry_date: d, exercise_name: "Barbell Back Squat", sets: 3, reps: 5, weight: 295 }));
+  const squatIn = (person) => {
+    const plan = buildPlan({ goal: { bubble: "get-stronger", child: "strong-a-lift" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 4, ...person }, logs: logs.concat(easy), plans });
+    return plan.week.flatMap((d) => d.exercises).find((e) => e.name === "Barbell Back Squat")?.weight;
+  };
+  const silent = squatIn({}), careful = squatIn({ ageCaution: 1 }), young = squatIn({ ageCaution: 0 });
+  assert.ok(typeof silent === "number", "the squat is in the week");
+  assert.equal(silent, careful, `no age given: ${silent}; caution 1: ${careful}`);
+  assert.ok(young > careful, `caution 0 gave ${young} and caution 1 gave ${careful}`);
+  assert.equal(young - careful, 5, "the difference is one rung on a squat, 10 lb against 5");
+});
+
+test("one session a week reads as one a week after three weeks, not after two months", () => {
+  /* Eight sessions at one a week is eight weeks, and for all of them a person
+     who asked for four days got a full four day week. Three weeks of window
+     with three sessions in it is one a week, and that is enough to say so. */
+  const today = new Date("2026-09-18T12:00:00Z");
+  const one = deriveTrainingAge({ logs: trainingHistory(3, 1, today), today });
+  assert.equal(observedCapacity(one), 1, `${one.recentSessions} sessions over ${one.windowWeeks} weeks read as ${observedCapacity(one)}`);
+  /* Still nothing inside the first fortnight, whatever the count: the
+     window has not existed long enough to be a rhythm. */
+  const early = deriveTrainingAge({ logs: trainingHistory(2, 1, today), today });
+  assert.equal(observedCapacity(early), null);
+  const keen = deriveTrainingAge({ logs: trainingHistory(1, 4, today), today });
+  assert.equal(observedCapacity(keen), null, "four sessions in week one is not a capacity read");
+});
+
+test("the person doing one of four hears the true sentence within a month", () => {
+  const weeks = replayLife({
+    payload: { goal_bubble: "build-muscle", challenge_target: 4, current_weight: 175, sex: "Male" },
+    weeks: 6, does: 1, log: hitsEverything,
+  });
+  const congratulated = weeks.filter((w) => w.plan.dayNotes.some((n) => n === "Everything landed last week. Loads are up."));
+  assert.deepEqual(congratulated.map((w) => w.week), [], `"Everything landed" on weeks ${congratulated.map((w) => w.week).join(", ")}`);
+  const honest = weeks.filter((w) => w.plan.dayNotes.some((n) => /you did 1 of 4/.test(n)));
+  assert.ok(honest.length >= 3, `the honest sentence appeared on weeks ${honest.map((w) => w.week).join(", ")}`);
+  const capacity = weeks.filter((w) => w.plan.dayNotes.some((n) => /doing about 1\b/.test(n)));
+  assert.ok(capacity.length && capacity[0].week <= 4, `the capacity note first appeared on week ${capacity[0]?.week}`);
+  /* And the week shrinks to what they do, rather than staying a full four days. */
+  assert.ok(weeks[5].plan.week.filter((d) => d.short).length >= 3, "the days past capacity are kept short");
 });
 
 test("the capacity read is the rhythm they are actually keeping", () => {

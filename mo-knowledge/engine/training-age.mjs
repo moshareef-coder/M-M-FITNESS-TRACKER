@@ -39,7 +39,15 @@ export const THRESHOLDS = {
      beginner who keeps restarting, and they need the beginner plan each time. */
   resetGapDays: 84,
   /* Away this long and the next session is a return, not a continuation.
-     research/02: connective tissue and skill both need a ramp back. */
+     research/02: connective tissue and skill both need a ramp back. Four
+     weeks is the one sourced number: mo-knowledge/sources.md, `barbend-return`,
+     "50% loads after 4+ weeks off", which is also where load.mjs's restart
+     comes from. Whether three weeks should count was asked on 2026-09-19 and
+     left alone on purpose: sources.md's own list of what still needs a real
+     literature pass has "detraining timelines" at number three, with "no
+     number I trust", and knowledge/ carries none either. Lowering this on a
+     guess would hand a lighter block to somebody who took a fortnight's
+     holiday. The day there is a number, it goes here with its citation. */
   layoffDays: 28,
   /* Weeks of history to read for current rhythm. Long enough to survive one bad
      week, short enough to notice somebody falling off. */
@@ -366,6 +374,15 @@ export function deriveTrainingAge({ logs: given = [], today = new Date() } = {})
   );
   const perWeek = +(recent / windowWeeks).toFixed(1);
   const sessionsPerWeek = Number.isFinite(perWeek) ? perWeek : 0;
+  /* Distinct training days in the seven days before today, for the week note
+     in plan.mjs: "everything landed" has to know how much of the week there
+     was. Today itself is left out, because a plan built in the morning is
+     about the week behind it and a session logged an hour ago is this week. */
+  const weekAgo = new Date(parse(todayStr) - 7 * DAY);
+  const sessionsLastWeek = effectiveDays.filter((d) => {
+    const t = parse(d);
+    return t >= weekAgo && t < parse(todayStr);
+  }).length;
 
   const prog = linearProgress(logs.filter((l) => {
     const d = rowDate(l);
@@ -404,6 +421,10 @@ export function deriveTrainingAge({ logs: given = [], today = new Date() } = {})
 
   return {
     confidence, sessions, effectiveSessions, sessionsPerWeek, weeksTraining,
+    /* The two numbers sessionsPerWeek was made from, published so that
+       observedCapacity can tell "few sessions because it is early" from "few
+       sessions because that is the rhythm". */
+    recentSessions: recent, windowWeeks: +windowWeeks.toFixed(2), sessionsLastWeek,
     daysSinceLast, longestGapDays, returning, restarting,
     stillLinear: prog.stillLinear, progressJudged: prog.judged, progressClimbing: prog.climbing,
     /* Jawa's contribution, see detectPlateau above. Reported rather than folded into the
@@ -415,9 +436,30 @@ export function deriveTrainingAge({ logs: given = [], today = new Date() } = {})
 }
 
 /* What they actually did per week, which research/09 argues should beat what they
-   said they would do. Returns null when there is not enough history to disagree. */
+   said they would do. Returns null when there is not enough history to disagree.
+
+   Two ways to have enough. Eight sessions, which is where this started, and it
+   is the right bar for somebody turning up often: it is reached inside a
+   fortnight at four a week, and the window above is what keeps that fortnight
+   from reading as a shortfall. But at one session a week eight sessions is two
+   months, and for those two months a person who asked for four days got a full
+   four day week and "everything landed" every Monday, while somebody doing
+   three of four got the honest sentence at once. So a window three weeks wide
+   holding three or more sessions also counts: three weeks is long enough that
+   the window is measuring a rhythm rather than a start, and three sessions in
+   it is one a week, which is the number the person is actually keeping. The
+   week-three protection in the comment above is untouched, because that was
+   about the window being counted before the person existed, and a window
+   three weeks wide has, by construction, existed for three weeks. */
+export const CAPACITY_MIN_SESSIONS = 8;
+export const CAPACITY_WINDOW_WEEKS = 3;
+export const CAPACITY_WINDOW_SESSIONS = 3;
+
 export function observedCapacity(trainingAge) {
-  if (!trainingAge || trainingAge.confidence === "none") return null;
-  if (trainingAge.effectiveSessions < 8) return null;
+  if (!trainingAge) return null;
+  const many = trainingAge.effectiveSessions >= CAPACITY_MIN_SESSIONS;
+  const settled = (Number(trainingAge.windowWeeks) || 0) >= CAPACITY_WINDOW_WEEKS
+    && (Number(trainingAge.recentSessions) || 0) >= CAPACITY_WINDOW_SESSIONS;
+  if (!many && !settled) return null;
   return Math.max(1, Math.round(trainingAge.sessionsPerWeek));
 }

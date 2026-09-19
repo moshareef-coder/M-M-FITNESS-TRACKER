@@ -1075,7 +1075,13 @@ export function buildPlan({
   goal, person = {}, logs: rawLogs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
   limits = null, avoid = [],
 } = {}) {
-  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null, ageCaution = 0 } = person;
+  /* `ageCaution` defaults to 1, the careful end, and not 0. The adapter reads
+     an unknown age as 1 (CONTRACT.md: the age-unknown default looks like the
+     older-adult default), so 1 is what production ships to everybody who has
+     not filled the field in. Until 2026-09-19 this defaulted to 0, and every
+     direct caller of buildPlan, the sweep, the demo, the harnesses, measured
+     an engine climbing 10 lb a week on a squat where production gives 5. */
+  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null, ageCaution = 1 } = person;
 
   /* A log row is an object or it is not a row. Eight passes in this file, plus
      load.mjs, training-age.mjs, calibrate.mjs and preferences.mjs, read fields
@@ -1196,7 +1202,17 @@ export function buildPlan({
     dayNotes.push("Last week read as a struggle across several lifts, so this one is a touch lighter. "
       + "That is the plan working, not you failing.");
   } else if (calibration.overall === "push") {
-    dayNotes.push("Everything landed last week. Loads are up.");
+    /* "Everything landed" is a claim about the week, and calibrate.mjs only
+       ever saw the sessions that happened. Somebody doing one of four heard
+       it every Monday for two months. Under about three quarters of the
+       planned days the true sentence is the one that says how many. */
+    const did = trainingAge.sessionsLastWeek;
+    if (did != null && did < Math.ceil(days * 0.75)) {
+      dayNotes.push(`The sessions you did all landed, and you did ${did} of ${days}. `
+        + `Loads are up on what you trained.`);
+    } else {
+      dayNotes.push("Everything landed last week. Loads are up.");
+    }
   }
 
   /* ---- pass 4's decision, taken here because it changes pass 2 ----
