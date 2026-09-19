@@ -36,7 +36,8 @@ somebody on day zero who has answered nothing, and it does.
 | `gym_days_this_week` | number | engine | fallback day count when `challenge_target` is absent |
 | `challenge_target` | number | engine | days per week they chose themselves, 2 to 6. Beats everything else |
 | `session_minutes` | number | engine | **new.** How long one session should take, in minutes. Absent, `null`, `0` and nonsense all mean "never answered" and the goal's own session length runs. A real answer replaces it: the week is built to fit the number, in both directions. Clamped to 15 and 120, and the clamp is said in `notes`. **2026-09-12**: a longer answer than the plan needs buys two things that cost no recovery: the rest the clock took back, if a lighter week left room for it, and a ten minute stretching block instead of five. It never buys hard sets past the weekly ceiling, and when there is nothing left to buy it still says so. Ramp sets are NOT among them: they are warm-up, they are on every day that has something to ramp, and no session length decides them |
-| `train_styles` | text[] | engine | **new.** What the person agreed to do, from onboarding: `lifting`, `home`, `running`, `cycling`, `walking`, `pilates`, `yoga`, plus `swimming`, `rowing`, `classes`, `hiking`, `sports`. Strict opt in by product decision: a style not in the list is never planned and there is no floor putting resistance training back. `null`, an empty list and a list of nothing recognisable all mean "never asked" and build exactly the plan built before this column existed. Two resistance styles: `lifting` means a gym and narrows nothing, `home` without `lifting` means bodyweight and dumbbells only and folds into the equipment limit rather than opening a second path through the builder. A limit set by hand on the limits sheet survives the merge. A person who ticked no resistance style gets the cardio session they asked for, built from `knowledge/exercise-library/cardio.mjs` (see `workout.cardio`); where that cannot be built, a yoga-only week or a mode with nothing at their level, the lifting day stands and `meta.styles.honoured` is false with a sentence saying so |
+| `train_styles` | text[] | engine | **new.** What the person agreed to do, from onboarding: `lifting`, `home`, `running`, `cycling`, `walking`, `pilates`, `yoga`, plus `swimming`, `rowing`, `classes`, `hiking`, `sports`. Strict opt in by product decision: a style not in the list is never planned and there is no floor putting resistance training back. `null`, an empty list and a list of nothing recognisable all mean "never asked" and build exactly the plan built before this column existed. Two resistance styles: `lifting` means a gym and narrows nothing, `home` without `lifting` means bodyweight and dumbbells only and folds into the equipment limit rather than opening a second path through the builder. A limit set by hand on the limits sheet survives the merge. A person who ticked no resistance style gets the day they asked for: a cardio session built from `knowledge/exercise-library/cardio.mjs` (see `workout.cardio`), or a yoga or Pilates class built from those libraries (see `workout.flow`), alternating by date when they ticked both kinds. Where nothing in what they ticked can be built, which today means Sports or a cardio mode with nothing at their level, the lifting day stands and `meta.styles.honoured` is false with a sentence saying so |
+| `for_date` | text | engine | **new 2026-09-19.** The day this plan is being written onto, `YYYY-MM-DD`. Read by ONE thing: the seed for the session a no-lifting week gets (`workout.cardio`, `workout.flow`). Without it that seed is the moment of the call, so planning Thursday and Friday in one sitting came back as the same run twice and never turned the cardio/flow ring. Anything that is not an ISO day, this field included when absent, means "today", which is what every client that predates it sends. It changes nothing about a lifting week |
 | `focus` | text | engine | a day name ("Push day"), which day of the week they want. Beats the rotation |
 | `focus_groups` | text[] | engine | the body map pick, now with a priority tier on each entry. `"chest:3"` is red, `"chest:2"` yellow, `"chest:1"` green, and a bare `"chest"` with no tier is yellow, which is what every pick saved before 2026-09-12 means. Muscle group keys or the finer piece keys the zoomed view uses; both are flattened to the app's fourteen groups. The single entry `"all"` is "select my whole body" and expands to every group at green. A jsonb object, `{"chest":3}`, is accepted too, so the column can become jsonb later without the engine changing |
 | `focus_chosen_at` | timestamptz | engine | when that pick was made. Older than 60 days comes back as `meta.focus.stale` |
@@ -105,7 +106,7 @@ inside it are dropped in silence.
 }
 ```
 
-### `workout.cardio`, the one day that is not a lifting day
+### `workout.cardio`, a day that is not a lifting day
 
 New 2026-09-18. When `train_styles` holds no resistance style and the cardio
 library has a session in a mode they picked, the workout is that session and
@@ -129,16 +130,70 @@ workout: {
 
 `meta.session.estimatedMinutes` is the run's own length and
 `meta.stretching` is zeroed, so nothing in the response describes the lifting
-day that was dropped.
+day that was dropped. `notes` drops the plan's own sentences for the same
+reason: a warning about ramp-up sets on a Goblet Squat is about a session this
+response did not hand over. The focus merge's sentences and the styles sentence
+both stay.
 
 Before this the engine returned the lifting day regardless, set
 `meta.styles.honoured` to false, attached a note saying "this week is cardio
 only", and left it to the caller to throw the day away and build its own. Two
 claims in one response, one of them false, and whether anybody ever saw a run
-depended on a caller remembering to. Where the session cannot be built (a
-yoga-only week, or a mode with nothing at their level) the lifting day still
-stands, `honoured` is false, and `meta.styles.note` says so in a sentence
-beginning "This is a lifting session".
+depended on a caller remembering to. Where no session can be built (a mode with
+nothing at their level, or a tick no library can name, which today is Sports)
+the lifting day still stands, `honoured` is false, and `meta.styles.note` says
+so in a sentence beginning "This is a lifting session".
+
+### `workout.flow`, the other one
+
+New 2026-09-19. The same road, for the week somebody ticks Yoga or Pilates and
+no resistance style. Until this the engine refused that week and said so out
+loud, which was honest and was still a person being handed five lifts they had
+told us they do not do.
+
+```
+workout: {
+  focus: "Yoga",              // the training's plain label, never the style or a class name. See below
+  flow: {                     // present ONLY on a flow day, absent on every other kind
+    training: "yoga",         // "yoga" or "pilates"
+    label: "Yoga",
+    style: { key: "vinyasa", label: "Vinyasa / Flow" },   // the library's first style, or null
+    level: "beginner",        // from how many of THESE they have logged, not from how much they lift
+    minutes: 30,              // what the class was built to
+    seconds: 1800,            // what the moves actually come to, which is never more than minutes * 60
+    rounds: 3,                // the sequence repeats. These libraries are small and the note says so
+    moves: [
+      { name: "Mountain Pose", seconds: 45, perSide: false, round: 1, category: "Standing poses", cue: null }
+    ],
+    notes: ["3 rounds of the same sequence. Yoga has about 14 min of moves at this level, and a class repeats them."]
+  },
+  exercises: [],              // ALWAYS empty on a flow day. A pose is not a set and must never be logged as one
+  warmup: [], cooldown: []    // a mobility session is its own warm-up. Nothing is bolted to the front of it
+}
+```
+
+Three notes with teeth:
+
+**`focus` is exactly `"Yoga"` or `"Pilates"`.** The app's activity table matches
+that string to open the right timer, `exercise_logs.exercise_name` is written
+from it, and Progress counts sessions back by it. A prettier name breaks all
+three quietly.
+
+**The length.** `session_minutes`, when the person actually answered it, clamped
+to a 60 minute ceiling; 30 when they did not. 30 is the number the app's own
+activity sheet opens on and the number `buildActivitySession` defaults to, so a
+planned class and one started from the timer are the same class. The ceiling is
+a refusal to overpromise: these libraries hold about fourteen minutes of unique
+beginner yoga and eight of Pilates, so an hour is already several rounds and two
+hours would be one short sequence run eight times. What was asked for is said in
+`flow.notes` when it was cut.
+
+**A week with cardio AND a flow style in it alternates.** Both were ticked and
+both are meant. The ticked kinds go in a ring turned by the date, so consecutive
+days are different kinds and the same day asked twice is the same day. When one
+kind cannot be built the next in the ring is tried, which is why a beginner who
+ticked Swimming and Yoga gets the yoga class rather than the refusal the swim
+alone would have earned.
 
 ### `workout.rampSets`, and the one rule the app must not break
 
@@ -256,7 +311,7 @@ bodyweight only pull day honestly has no curl in it).
 | `stretching.why` | text[] | **new.** Plain sentences: what was picked, for which groups, and what a joint limit left out |
 | `session.budgetMinutes` | number | **new.** The clock THIS day was costed against. A short day is six tenths of the week's budget, so this is not always the same number as `session.asked` |
 | `session.source` | text | **new.** `asked` when `session_minutes` set the budget, `goal` when the goal's own session length did. Every plan built before this column existed reads `goal` |
-| `styles` | object | **new.** What `train_styles` changed. Always present, like every other key here: `asked` is false when the column was null or empty, and the rest is the no-opinion answer. `picked` is the normalised list, `resistance` whether a lifting day was allowed, `honoured` whether this response really is the week they asked for, measured after the day is built and not predicted from the tick list, `equipmentMissing` what the style choice subtracted in `limits` vocabulary, `cardioModes` and `flowTrainings` what the caller should spend against the cardio, yoga and pilates libraries, and `note` the one sentence to show, which is "this week is cardio only" when the choice was honoured and "this is a lifting session, not the week you picked" when it could not be. Both also arrive in `notes`. `honoured: false` is the engine admitting it could not build the asked-for week at all, and the note is then the apology rather than a claim about the week |
+| `styles` | object | **new.** What `train_styles` changed. Always present, like every other key here: `asked` is false when the column was null or empty, and the rest is the no-opinion answer. `picked` is the normalised list, `resistance` whether a lifting day was allowed, `honoured` whether this response really is the week they asked for, measured after the day is built and not predicted from the tick list, `equipmentMissing` what the style choice subtracted in `limits` vocabulary, `cardioModes` and `flowTrainings` what was ticked against the cardio, yoga and pilates libraries (the engine now spends them itself, and they stay here because a screen still has to say what was picked), and `note` the one sentence to show, which is "this week is cardio only" or "this week is mobility work only" when the choice was honoured and "this is a lifting session, not the week you picked" when it could not be. Both also arrive in `notes`. `honoured: false` is the engine admitting it could not build the asked-for week at all, and the note is then the apology rather than a claim about the week |
 | `session.asked` | number or null | **new.** What arrived before the clamp, so a screen can tell a clamp from a coincidence. Null when nothing was sent |
 | `session.goalMinutes` | number | **new.** What the goal would have chosen on its own. Equal to `budgetMinutes` when `source` is `goal`. **Changed 2026-09-12**: every one of these grew, by 3 minutes where the goal's mains are at 5 reps or fewer and by 1 everywhere else, so the number covers the ramp-up sets the session now includes. 45 became 46, 60 became 61 or 63, 40 became 41, 50 became 51, 30 became 31. The one that did not move is "I have no time", which stays at 25 because 26 would change the session-length chip the app suggests from 20 to 30. **Nothing else crosses a chip boundary**: on 20/30/45/60/90 with ties going to the shorter, every moved goal still suggests the chip it suggested before |
 | `session.estimatedMinutes` | number | **new.** What this day really comes to: sets times reps time, plus the rest between them, plus the warm-up. Both halves of the warm-up: `stretching.warmupMinutes` AND `session.rampMinutes` are counted inside it. There is deliberately no `totalMinutes` here: the whole visit is this plus `stretching.cooldownMinutes`, and carrying the sum would make `meta` move when `skip_stretching` moves. **2026-09-14, costed honestly.** A set was a flat thirty seconds plus its rest and nothing else in the visit was counted, so a five lift beginner day read 21 minutes over a real half hour. A set is now ten seconds of setup plus four a rep, plus ten to log it; the rest is charged between sets, (sets - 1) of them; and every exercise carries a 75 second transition to the next station. plan.mjs `REP_SECONDS` has the worked example. **And the clock is the whole visit**: every trim, fill and ramp decision measures `estimatedMinutes` plus the nominal five minute cool-down against the budget, so `session_minutes: 30` builds a visit of about 30, not a working session of 30 with a cool-down on top. **Corrected 2026-09-15**: only when a person named the clock. `P.sessionMin` is not a statement about how long anybody is in a gym, it is the warm-up plus the ramp plus the sets, which is how goal-engine.mjs derived it and what its own note on the 2026-09-12 increase adds up, so five minutes of stretching were being charged against a number that never contained them. Across the sweep that alone cost 15% of the week: intermediate groups under 0.8 of their weekly target went 18.2% to 39.0% and advanced 15.1% to 36.8%, on a matrix with no stated session length in it, which is nearly every real user. A day now carries `clockReserve`, the cool-down when the clock is theirs and nothing when it is the goal's, and the goal path is back to 36.3% and 33.5%. The rest of that gap is the honest costing itself against session lengths that predate it, which is a number to re-derive and not a bug to fix here. The app's `sessionEstimateMinutes` mirrors the same five numbers |

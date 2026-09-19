@@ -40,7 +40,7 @@ const MAX_ROWS = 2000;
 const MAX_TEXT = 200;
 const TEXT_FIELDS = [
   "focus", "goal", "goal_detail", "goal_bubble", "goal_child",
-  "activity_level", "sex", "focus_chosen_at",
+  "activity_level", "sex", "focus_chosen_at", "for_date",
 ];
 /* Dropped before anything reads the payload. The client no longer sends
    these, but a phone running a service-worker-cached older build still

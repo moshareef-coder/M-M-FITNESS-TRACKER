@@ -26,7 +26,7 @@ const LIB_OUT = join(fn, "_library");
 
 /* Only what the function runs. demo, test and bakeoff are node-only and would
    fail Deno's import of node:fs on the way in. */
-const ENGINE_FILES = ["adapter.mjs", "plan.mjs", "goal-engine.mjs", "training-age.mjs", "load.mjs", "calibrate.mjs", "pair.mjs", "alternatives.mjs", "focus.mjs", "preferences.mjs", "plateau-response.mjs", "limits.mjs", "styles.mjs", "joint-load.mjs", "recovery.mjs", "mobility.mjs"];
+const ENGINE_FILES = ["adapter.mjs", "plan.mjs", "goal-engine.mjs", "training-age.mjs", "load.mjs", "calibrate.mjs", "pair.mjs", "alternatives.mjs", "focus.mjs", "preferences.mjs", "plateau-response.mjs", "limits.mjs", "styles.mjs", "activity-session.mjs", "joint-load.mjs", "recovery.mjs", "mobility.mjs"];
 
 rmSync(ENGINE_OUT, { recursive: true, force: true });
 rmSync(LIB_OUT, { recursive: true, force: true });
@@ -37,9 +37,9 @@ let count = 0;
 for (const f of ENGINE_FILES) {
   let src = readFileSync(join(ENGINE_SRC, f), "utf8");
   /* The imports that leave the engine directory. Any file in the library, not
-     just index.mjs: styles.mjs reaches cardio.mjs directly, because the cardio
-     session builder needs `cardioFor` and index.mjs re-exports only the
-     trainings list. The whole library directory is copied below either way, so
+     just index.mjs: styles.mjs reaches cardio.mjs, yoga.mjs and pilates.mjs
+     directly, because the session builders need `cardioFor` and the two flow
+     libraries by name, and index.mjs re-exports only the trainings list. The whole library directory is copied below either way, so
      this is a path rewrite and never a question of what is present. */
   src = src.replace(/["']\.\.\/\.\.\/knowledge\/exercise-library\/([A-Za-z0-9_-]+)\.mjs["']/g, '"../_library/$1.mjs"');
   if (/^\s*import\b[^\n]*["']node:/m.test(src)) throw new Error(`${f} imports node:, it cannot run in the function`);

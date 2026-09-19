@@ -18,7 +18,7 @@
  * alias table below is hand written rather than loaded from goal-tree.json.
  */
 import { buildPlan } from "./plan.mjs";
-import { readStyles, mergeStyleLimits, cardioSessionFor } from "./styles.mjs";
+import { readStyles, mergeStyleLimits, styleDayFor } from "./styles.mjs";
 import { parseFocus, mergePriority, focusFreshness } from "./focus.mjs";
 import { normalizeLimits } from "./limits.mjs";
 /* Read only, for one field. See the focus block in generateFromPayload. */
@@ -861,6 +861,18 @@ function logsFromHistory(history, today) {
  *                          which is what engine-lab.html exists to show.
  * @returns {{ workout: object, honest: string|null, meta: object, plan?: object }}
  */
+/* `for_date`, the day a plan is being written onto, as a Date. Strict: an ISO
+   day and nothing else, because the only thing this is allowed to do is move a
+   seed, and a half parsed string that lands on the wrong day would make the
+   same day asked twice come back different. Anything else is null and the
+   caller falls back to today, which is what every client that has never heard
+   of this field sends. */
+function styleDayDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const d = new Date(`${value}T12:00:00`);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
 export function generateFromPayload(rawPayload = {}, { today = new Date(), includePlan = false } = {}) {
   let step = "start";
   try {
@@ -1060,23 +1072,57 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
        asked for, the note said it was, and the only thing that saved anybody
        was a caller remembering to throw the day away and build its own.
 
-       So the session is built here, from the same library the caller would have
-       used, and the lifting day is dropped. `honoured` is then a measurement
-       and not a wish: true when the response really is the week they asked for.
-       Where it cannot be built (see cardioSessionFor: a mode the library does
-       not know, or a yoga-only week, which needs a move list this shape has
-       nowhere to put) the lifting day stands, `honoured` stays false, and the
-       refusal sentence says so in words rather than leaving it to a flag. */
+       So the session is built here, from the same libraries the caller would
+       have used, and the lifting day is dropped. `honoured` is then a
+       measurement and not a wish: true when the response really is the week
+       they asked for. Where it cannot be built (see styleDayFor: a Sports-only
+       week, which names no session in any library we have, or a library that
+       comes back empty) the lifting day stands, `honoured` stays false, and the
+       refusal sentence says so in words rather than leaving it to a flag.
+
+       A yoga-only week used to land in that second case and it no longer does.
+       It came back as a lifting day under a note reading "mobility work is not
+       something this plan can build for you yet", which was true of this file
+       and never true of the repo: the moves were in the library and
+       activity-session.mjs could already build the class. Since 2026-09-19 a
+       flow day comes back as `workout.flow`, the same road `workout.cardio`
+       travels, and the only weeks still refused are the ones nothing can be
+       built for. */
+    /* The day being BUILT, not the day it is being built on.
+       `today` is when the call happened, and the session pickers are seeded
+       off a date: seeded off this one, planning Thursday and Friday in one
+       sitting hands back the same run twice and never turns the cardio/flow
+       ring. The app already learned this the hard way on its own side
+       (cardioDayForStyles in index.html) and fixed it the same way. Only the
+       seed moves. Every other use of `today` in this function is genuinely
+       about now: how old a focus is, how fresh a muscle is, what to calibrate
+       against. */
+    const forDate = styleDayDate(payload.for_date) || today;
     const styleSession = styles.asked && !styles.resistance
-      ? cardioSessionFor(styles, {
-        level: plan.level, today,
+      ? styleDayFor(styles, {
+        level: plan.level, today: forDate, logs,
         /* The same clock the lifting week was built to, so a person who said
            thirty minutes is not handed an hour long walk. */
         minutes: plan.week[dayIndex]?.minutes ?? plan.sessionBudget?.minutes ?? null,
+        /* The flow half wants a different number, and the difference is the
+           point. A cardio session comes out of the library at the length it
+           was written for, so the clock is a filter; a flow class is BUILT to
+           a length, so the clock is the spec. And the only clock worth
+           spending on it is one the person set: `sessionBudget.minutes` with
+           source "goal" is how long a LIFTING session should be for that goal,
+           which is a number about sets and rest and says nothing about how
+           long anybody wants to be on a mat. Null hands the decision to
+           styles.mjs, which has a default and a reason for it. */
+        askedMinutes: plan.sessionBudget?.source === "asked" ? plan.sessionBudget.minutes : null,
       })
       : null;
     const workout = styleSession || liftWorkout;
     const stylesHonoured = !styles.asked || styles.resistance || !!styleSession;
+    /* How long the day that came back actually is, whichever kind it is. Read
+       once here rather than three times below, because the three readers under
+       `meta` disagreeing about the length of one session is the class of bug
+       this whole branch exists to stop. */
+    const styleMinutes = styleSession ? (styleSession.cardio?.minutes ?? styleSession.flow?.minutes ?? null) : null;
 
     const missing = [...(plan.missing || [])];
     if (logsSource === "history") {
@@ -1104,8 +1150,17 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
          renders is a fact nobody has. Whichever of the two is true of THIS
          response: what they are holding when we honoured the choice, and what
          we could not do when we did not. */
+      /* And on a day we replaced, the plan's own sentences go. Every one of
+         them is about the lifting day that was dropped: the ramp-up sets on a
+         Goblet Squat, the rest that came down to fit the clock, the movements
+         a bad knee cost. Printed over a yoga class they are the response
+         talking about a session it did not hand over, which is the exact
+         failure the styles work exists to end, one field along. The session
+         that WAS handed over carries its own notes, on `workout.cardio` and
+         `workout.flow`. `merged.notes` stays: the focus merge is about what
+         they asked for rather than about the day. */
       notes: [
-        ...(Array.isArray(plan.dayNotes) ? plan.dayNotes : []), ...merged.notes,
+        ...(styleSession ? [] : (Array.isArray(plan.dayNotes) ? plan.dayNotes : [])), ...merged.notes,
         ...(styles.asked && !styles.resistance ? [stylesHonoured ? styles.note : styles.refusal] : []),
       ],
       /* Same object the day was cut from, not a second build of it, so a lab
@@ -1223,12 +1278,12 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
           source: plan.sessionBudget?.source ?? "goal",
           asked: plan.sessionBudget?.asked ?? null,
           goalMinutes: plan.sessionBudget?.goalMinutes ?? null,
-          /* A cardio day carries its own length, out of the library, and the
-             lifting day's estimate would be a number for a session nobody is
-             doing: 45 minutes printed over a 25 minute run. `budgetMinutes`
-             above is left alone on purpose, it is the clock the WEEK was built
-             to and that is still true. */
-          estimatedMinutes: styleSession ? styleSession.cardio.minutes : (dayBuilt?.estimatedMinutes ?? null),
+          /* A cardio or flow day carries its own length, and the lifting
+             day's estimate would be a number for a session nobody is doing: 45
+             minutes printed over a 25 minute run. `budgetMinutes` above is
+             left alone on purpose, it is the clock the WEEK was built to and
+             that is still true. */
+          estimatedMinutes: styleSession ? styleMinutes : (dayBuilt?.estimatedMinutes ?? null),
           /* What the ramp-up sets cost, so a screen can print the whole visit
              without summing `workout.rampSets` itself. Zero on every day that
              did not buy any, which is every day of every plan built without a
@@ -1247,11 +1302,14 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
           /* On a cardio day the question is whether the RUN fits the clock, not
              whether the lifting day that was dropped did. The library's
              sessions run from a 20 minute row to a 60 minute walk, so the
-             answer is not always yes. */
+             answer is not always yes. A flow day is built to a length rather
+             than chosen at one, so it only fails this when the budget is under
+             the class we built, which is the hour ceiling meeting a shorter
+             week. */
           fits: styleSession
             ? (() => {
               const budget = plan.week[dayIndex]?.minutes ?? plan.sessionBudget?.minutes ?? null;
-              return budget == null || styleSession.cardio.minutes <= budget;
+              return budget == null || styleMinutes == null || styleMinutes <= budget;
             })()
             : !(plan.volumeNotes?.overBudget || []).some((o) => o.day === (dayBuilt?.name)),
           /* Repaid entries do not count. The fill pass can hand the minutes back
@@ -1263,15 +1321,23 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
         /* The warm-up and cool-down in three numbers and a reason, so the
            reveal can say "plus five minutes after" without reading the arrays,
            and so support can tell a skipped block from an empty library. */
-        /* Zeroed on a cardio day rather than reported off the lifting day that
-           was dropped. The arrays on that workout are empty (see
-           cardioSessionFor on why a bench press warm-up must not ride along on
-           a run), and a meta block claiming five minutes of prep the response
+        /* Zeroed on a cardio or flow day rather than reported off the lifting
+           day that was dropped. The arrays on that workout are empty (see
+           styles.mjs on why a bench press warm-up must not ride along on a
+           run), and a meta block claiming five minutes of prep the response
            does not contain is the same contradiction this whole change is
-           about, one field down. */
+           about, one field down.
+
+           Two reasons rather than one, because they are two different reasons.
+           A run comes with its preparation written into the library's cue. A
+           yoga class does not need a stretch block bolted to the front of it:
+           it IS the stretch block, and saying otherwise would be the app not
+           knowing what it just prescribed. */
         stretching: styleSession
           ? { included: false, warmupMinutes: 0, cooldownMinutes: 0, mobilityGoal: false,
-              why: ["This is a cardio session and it comes with its own warm-up in the cue."] }
+              why: [styleSession.flow
+                ? "This is a mobility session, so it is its own warm-up and cool-down."
+                : "This is a cardio session and it comes with its own warm-up in the cue."] }
           : {
             included: !skipStretching,
             warmupMinutes: skipStretching ? 0 : Math.round(mob.warmupSeconds / 60),

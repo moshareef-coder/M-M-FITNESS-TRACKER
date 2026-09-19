@@ -24949,7 +24949,7 @@ let LAST_GEN_WORKOUT = null;
    alternatives by running the very same engine on the very same inputs, in the
    browser. Two payloads assembled in two places would drift, and the sheet
    would then offer days the real generate would never have built. */
-function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null, limits = null, focusGroups = null } = {}) {
+function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null, limits = null, focusGroups = null, forDate = null } = {}) {
   const history = Object.entries(personalRecords(ME).best).map(([exercise_name, weight]) => ({ exercise_name, weight }));
   const recentWeight = entriesFor(ME).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
   const recentGymDays = gymDaysThisWeek(ME);
@@ -25030,6 +25030,12 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
        asked and builds exactly the plan it built before this column existed,
        which is what every account made before onboarding asked gets. */
     train_styles: MY_PROFILE?.train_styles ?? null,
+    /* Which day this plan is FOR, which is not always today. The engine seeds
+       the run or the class it builds for a no-lifting week off a date, and
+       without this it seeds off the moment of the call: planning Thursday and
+       Friday in one sitting handed back the same run twice. Only that seed
+       reads it. */
+    for_date: forDate || todayStr(),
     history,
     logs: recentLogs,
     plans: recentPlans,
@@ -25093,6 +25099,9 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
     sessionMinutes,
     limits,
     focusGroups,
+    /* Already validated above: a real ISO day or today. The engine seeds the
+       session it builds for a no-lifting week off it. */
+    forDate: target,
   });
 
   try {
@@ -25120,12 +25129,13 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       return false;
     }
     if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
-    /* A cardio day HAS no exercises and that is its contract, not a failure:
-       the session is carried in `workout.cardio` and a run has no sets to put
-       in this column. Guarding on the array alone rejected the one answer the
-       styles question exists to produce, so somebody who ticked only Running
-       got "Coach returned an empty workout" instead of their run. */
-    if (!data.workout?.exercises?.length && !data.workout?.cardio) throw new Error("Coach returned an empty workout");
+    /* A cardio or yoga day HAS no exercises and that is its contract, not a
+       failure: the session is carried in `workout.cardio` or `workout.flow`,
+       and neither a run nor a pose has sets to put in this column. Guarding on
+       the array alone rejected the one answer the styles question exists to
+       produce, so somebody who ticked only Running got "Coach returned an
+       empty workout" instead of their run. */
+    if (!data.workout?.exercises?.length && !data.workout?.cardio && !data.workout?.flow) throw new Error("Coach returned an empty workout");
 
     /* meta.goals is the engine's read-back of what each extra goal actually
        bought, and an empty `effect` means it bought nothing. It names ids, not
@@ -25212,8 +25222,17 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
          a field nothing reads yet. The weekly half is written and no longer
          read: the note that printed it came off the plan screen on Mo's note
          of 2026-09-19, and `session` is the half the screen still uses. */
-      cardio: (data.meta?.cardio || data.workout.cardio)
-        ? { ...(data.meta?.cardio || {}), ...(data.workout.cardio ? { session: data.workout.cardio } : {}) }
+      /* And since 2026-09-19 a third shape, `flow`, for the day that is a yoga
+         or Pilates class: the moves, their seconds and the rounds. It rides in
+         this column rather than in `mobility` because this is where the app
+         already looks for "the session this day is", and `mobility` has a
+         reader that rebuilds the object key by key and would drop it on the
+         next Skip stretching. The column's name is now the weakest thing about
+         it, and 20260919_ai_workouts_flow_session.sql says so out loud. */
+      cardio: (data.meta?.cardio || data.workout.cardio || data.workout.flow)
+        ? { ...(data.meta?.cardio || {}),
+            ...(data.workout.cardio ? { session: data.workout.cardio } : {}),
+            ...(data.workout.flow ? { flow: data.workout.flow } : {}) }
         : null,
       completed_at: null,
       duration_sec: null,
@@ -32303,6 +32322,101 @@ function openActivityInstead(date, dayWord) {
   });
 }
 
+/* What a planned day actually IS when it has no lifts on it, off the row.
+
+   Two shapes in one column, told apart by their own keys, which is how
+   ai_workouts.cardio has worked since the weekly prescription and the run
+   started sharing it. `session` is a cardio session out of the library: a
+   name, minutes, an effort and a cue. `flow` is a yoga or Pilates class: the
+   moves with their seconds and their rounds. The weekly `sessions`/`minutes`
+   half belongs to the goal and is true of every day alike, so it is not a
+   session and is not returned here.
+
+   Null on every lifting day, and the caller must go on reading `exercises` for
+   those: this is the day the engine built INSTEAD of a lifting day, not an
+   extra thing hanging off one. */
+function planActivitySession(plan) {
+  const c = plan?.cardio;
+  if (!c || typeof c !== "object") return null;
+  if (c.flow && Array.isArray(c.flow.moves) && c.flow.moves.length) return { kind: "flow", flow: c.flow };
+  if (c.session && c.session.name) return { kind: "cardio", card: c.session };
+  return null;
+}
+
+/* The same session, opened as a clock. Today only: a day that has not arrived
+   cannot be started, only read, which is the rule startCardioInsteadOfPlan
+   already sets out for a swap.
+
+   `instead` is deliberately NOT set. That field stands a LIFTING plan down
+   once a swap really gets under way, and here the plan IS the session:
+   archiving it would take the day off the week for doing it. */
+function startPlannedActivity(plan) {
+  const s = planActivitySession(plan);
+  if (!s) return;
+  if (csnRunning()) { openCardioSession(); return; }
+  const act = s.kind === "flow"
+    ? CARDIO_ACTS.find((a) => a.training === s.flow.training)
+    : CARDIO_ACTS.find((a) => a.cardio === s.card.mode);
+  CARDIO_SES = {
+    /* Straight to the reveal carrying the session itself, for the same reason
+       a swap does: what was planned is what starts. The setup screen would
+       rebuild a session from the minutes and could hand back a different one
+       than the plan screen just showed. */
+    state: "reveal",
+    act: act?.key || "other",
+    minutes: Number(s.kind === "flow" ? s.flow.minutes : s.card.minutes) || 30,
+    pref: defaultActivityPref(),
+    accum: 0,
+    since: null,
+    /* The engine's `flow` block is the shape buildGuidedPlan returns, field for
+       field, which is not a coincidence: both come out of
+       engine/activity-session.mjs. */
+    plan: s.kind === "flow" ? s.flow : null,
+    card: s.kind === "cardio" ? s.card : null,
+    instead: null,
+  };
+  csnSave();
+  openCardioSession();
+}
+
+/* What an activity day looks like on the plan screen. The list of moves is the
+   point: "Yoga, on the clock" is a word and a timer, and somebody reading the
+   day before they start it wants to know what is in it. Eight and a count,
+   the same cut the session's own reveal card makes, because a forty move
+   vinyasa is three rounds of the same thing and the first round is the news. */
+function activityDayHTML(s) {
+  if (!s) return "";
+  if (s.kind === "cardio") {
+    const c = s.card;
+    return `
+      <div class="act-facts" style="margin:4px 0 14px;">
+        <div class="act-fact"><span>Minutes</span><b>${Number(c.minutes) || 0}</b></div>
+        ${c.effort ? `<div class="act-fact"><span>Effort</span><b>${Number(c.effort)} of 10</b></div>` : ""}
+      </div>
+      ${c.cue ? `<p class="csn-guided">${icon("wand", 15)} <span>${escapeHtml(c.cue)}</span></p>` : ""}
+      ${c.structure ? `<p class="csn-guided">${icon("info", 15)} <span>${escapeHtml(c.structure)}</span></p>` : ""}`;
+  }
+  const f = s.flow;
+  const moves = Array.isArray(f.moves) ? f.moves : [];
+  return `
+    <div class="act-facts" style="margin:4px 0 14px;">
+      <div class="act-fact"><span>Minutes</span><b>${Number(f.minutes) || 0}</b></div>
+      <div class="act-fact"><span>Moves</span><b>${moves.length}</b></div>
+      ${f.rounds > 1 ? `<div class="act-fact"><span>Rounds</span><b>${f.rounds}</b></div>` : ""}
+    </div>
+    <div class="act-moves">
+      ${moves.slice(0, 8).map((m, i) => `<div class="act-move">
+        <span class="act-move-n">${i + 1}</span>
+        <span class="act-move-b"><b>${escapeHtml(m.name)}</b><i>${Number(m.seconds) || 0}s${m.perSide ? " a side" : ""}${m.category ? ` &middot; ${escapeHtml(m.category)}` : ""}</i></span>
+      </div>`).join("")}
+      ${moves.length > 8 ? `<p class="act-move-more">and ${moves.length - 8} more</p>` : ""}
+    </div>
+    ${/* The session engine says out loud that the sequence repeats and how
+          little unique work there was to repeat. It is the most useful line on
+          the card and it is the one an app would be tempted to hide. */ ""}
+    ${(f.notes || []).map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}`;
+}
+
 /* A day that has just been written, put into ALL_PLANS without going back to
    the database for it.
 
@@ -33429,8 +33543,14 @@ function renderPlanPreview(opts) {
   /* A planned activity is a real plan with no lifts in it: the name is in
      `focus` and `exercises` is empty, which is the shape the generator already
      writes for a week with no resistance training in it. There is no list to
-     show and nothing to add to it. */
-  const activityDay = review && !total;
+     show and nothing to add to it.
+
+     Today counts as one too, but only when the row really carries a session.
+     "No exercises" on its own is also what a plan looks like after somebody
+     removes the last lift off it, and that day is a lifting day they have
+     emptied rather than a class. */
+  const actSession = planActivitySession(plan);
+  const activityDay = (review || !!actSession) && !total;
 
   /* Everything the reveal screen used to carry into this moment, now that this
      screen IS the moment. Keyed by the day, so a warning about Thursday's plan
@@ -33443,7 +33563,11 @@ function renderPlanPreview(opts) {
      with you" and can block somebody from ever getting a plan. By here the plan
      exists, so the answer can only make it safer. null means never asked. Only
      on a plan that was just built, because that is the moment it is about. */
-  const askLimits = !!justMade && !isCoachedClient() && MY_PROFILE?.limits == null;
+  /* Never on a day with no lifts on it. "Anything that hurts, or gear you
+     don't have" is a question about how a LIFTING day gets built, and asking
+     it under a yoga class is the app not reading its own screen. It comes
+     round again on the next day that has lifts on it. */
+  const askLimits = !!justMade && !isCoachedClient() && MY_PROFILE?.limits == null && !activityDay;
 
   /* A plan made moments ago is untouched even when it happens to name something
      already logged this morning, so it keeps its grips, its remove buttons and
@@ -33583,7 +33707,9 @@ function renderPlanPreview(opts) {
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
     ${dayList}
     ${overview}
-    ${review ? "" : `
+    ${/* Not on an activity day: "0/0" over a class is a progress bar for a
+          list that does not exist, and the clock is what measures this one. */ ""}
+    ${review || activityDay ? "" : `
     <div class="workout-progress-row">
       <span>Progress</span>
       <span class="workout-progress-count">${doneCount}/${total}</span>
@@ -33591,6 +33717,11 @@ function renderPlanPreview(opts) {
     <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>`}
     ${timeRow}
     ${activityDay ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
+    ${/* What the session actually is, which the line above does not say. A day
+          the generator built as a class or a run carries it on the row; one
+          somebody planned by hand carries only the name, and there the line
+          above is the whole truth. */ ""}
+    ${activityDay ? activityDayHTML(actSession) : ""}
     ${(justMade?.warnings || []).map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}
     ${stretchBlockHTML("warmup", finished, plan)}
     <div class="reorder-list" id="planRows">${rows}</div>
@@ -33603,6 +33734,12 @@ function renderPlanPreview(opts) {
     ${review ? reviewActions : finished
       ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
          <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
+      : activityDay
+      ? `${/* An activity day is started by the clock, not by the set logger.
+              Without this the one button on the screen was "Start today's
+              plan", which answered "Add an exercise first": the app refusing
+              to start the session it had just prescribed. */ ""}
+         <button type="button" class="btn-primary" id="planStartActBtn" style="margin-top:12px;">${icon("play", 17)} Start ${escapeHtml(displayFocus(plan.focus, exercises).toLowerCase())}</button>`
       : `${PARTNER_EMAIL ? `<button type="button" class="wp-open" id="planPrivacyBtn">
              <span class="wp-open-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 16)}</span>
              <span class="wp-open-txt"><b>Advanced</b><i>${escapeHtml(privacySummary())}</i></span>
@@ -33697,6 +33834,7 @@ function renderPlanPreview(opts) {
   // These three are mutually exclusive depending on how far the workout got.
   if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
+  if ($("planStartActBtn")) $("planStartActBtn").onclick = () => startPlannedActivity(plan);
   /* Regenerate overwrites today's row outright, so it says what goes with it.
      There is no undo once the new plan is written. */
   if ($("planRegenBtn")) {
