@@ -673,6 +673,78 @@ test("an ordinary guess from a similar lift is not capped and does not gain a ca
   assert.doesNotMatch(r.note, /held here/);
 });
 
+/* The audit of 2026-09-19. Every hinge was filed under one pattern ratio, so a
+   logged Deadlift 3x8 at 315 prescribed a Romanian Deadlift at 300, a Good
+   Morning at 300 and a Cable Pull-Through at 240, all under "a similar lift".
+   Three rows behind the guess so the size ceiling does not bind and the ratio
+   table is the only thing under test; every bound is in pounds off the
+   prescription against the coaching range the table was built from. */
+const threeRowsOf = (name, weight) =>
+  [3, 6, 9].map((n) => ({ entry_date: day(-n), exercise_name: name, weight, reps: 8, sets: 3 }));
+const guessFrom = (logs, name, bodyWeightLb = 180) =>
+  prescribeLoad({ exercise: { name, equipment: "barbell" }, reps: 8, bodyWeightLb, sex: "Male", logs });
+
+test("a hinge is priced as its own movement and never as the deadlift it was guessed from", () => {
+  const logs = threeRowsOf("Deadlift", 315);
+  const bounds = {
+    "Romanian Deadlift": [0.6, 0.8], "Stiff-Leg Deadlift": [0.6, 0.8], "Good Morning": [0.3, 0.45],
+    "Cable Pull-Through": [0.2, 0.4], "Hip Thrust": [0.85, 1.2], "Back Extension": [0.05, 0.25],
+    "Kettlebell Swing": [0.15, 0.35], "Single-Leg Romanian Deadlift": [0.2, 0.4],
+  };
+  for (const [name, [lo, hi]] of Object.entries(bounds)) {
+    const r = guessFrom(logs, name);
+    assert.equal(r.basis, "a similar lift", `${name} was not guessed from the deadlift`);
+    assert.equal(r.capped, false, `${name} hit the ceiling, so the ratio was not what priced it`);
+    assert.ok(r.weight <= 315 * hi && r.weight >= 315 * lo, `${name} from a 315 deadlift came to ${r.weight}`);
+  }
+});
+
+test("from a heavier deadlift the ceiling holds every hinge under its own ratio", () => {
+  const logs = threeRowsOf("Deadlift", 405);
+  const ratio = { "Romanian Deadlift": 0.8, "Good Morning": 0.45, "Cable Pull-Through": 0.4, "Hip Thrust": 1.2, "Back Extension": 0.25 };
+  for (const [name, hi] of Object.entries(ratio)) {
+    const r = guessFrom(logs, name);
+    assert.ok(r.weight <= 405 * hi, `${name} from a 405 deadlift came to ${r.weight}`);
+  }
+  /* And the ceiling is a movement's ceiling: the Good Morning is held well
+     under the 365 a deadlift-shaped ceiling used to hand back. */
+  assert.ok(guessFrom(logs, "Good Morning").weight <= 160);
+});
+
+test("the other families carry their own ratios too", () => {
+  const front = guessFrom(threeRowsOf("Barbell Back Squat", 315), "Front Squat");
+  assert.ok(front.weight <= 315 * 0.8 && front.weight >= 315 * 0.6, `front squat from a 315 squat came to ${front.weight}`);
+  const landmine = guessFrom(threeRowsOf("Barbell Bench Press", 225), "Landmine Press");
+  assert.ok(landmine.weight <= 225 * 0.5, `landmine press from a 225 bench came to ${landmine.weight}`);
+  const upright = guessFrom(threeRowsOf("Barbell Row", 185), "Upright Row");
+  assert.ok(upright.weight <= 185 * 0.5, `upright row from a 185 row came to ${upright.weight}`);
+  const supported = guessFrom(threeRowsOf("Barbell Row", 185), "Chest-Supported Row");
+  assert.ok(supported.weight <= 185 * 0.8, `chest-supported row from a 185 row came to ${supported.weight}`);
+});
+
+test("single joint work is only ever priced from its own family", () => {
+  /* A leg curl and a lateral raise are both "isolation" to patternFor, and one
+     used to price the other. */
+  const fromLegCurl = guessFrom(threeRowsOf("Leg Curl", 120), "Lateral Raise");
+  assert.equal(fromLegCurl.basis, "unknown");
+  assert.equal(fromLegCurl.weight, null);
+  const hammer = guessFrom(threeRowsOf("Dumbbell Curl", 35), "Hammer Curl");
+  assert.equal(hammer.basis, "a similar lift");
+  assert.ok(hammer.weight >= 25 && hammer.weight <= 40, `hammer curl from a 35 curl came to ${hammer.weight}`);
+});
+
+test("the typo rail knows a good morning is not a deadlift", () => {
+  const one = (name, weight) => [{ entry_date: day(-4), exercise_name: name, weight, reps: 8 }];
+  const gm = prescribeLoad({ exercise: { name: "Good Morning", equipment: "barbell" }, reps: 8, bodyWeightLb: 180, sex: "Male", logs: one("Good Morning", 600) });
+  assert.equal(gm.capped, true);
+  assert.ok(gm.weight <= 180 * 2, `a 600 lb good morning row was handed back as ${gm.weight}`);
+  /* The same row on the deadlift itself is under the four-times rail and is
+     handed straight back: the rail tightens per movement and never loosens. */
+  const dl = prescribeLoad({ exercise: { name: "Deadlift", equipment: "barbell" }, reps: 8, bodyWeightLb: 180, sex: "Male", logs: one("Deadlift", 600) });
+  assert.equal(dl.weight, 600);
+  assert.equal(dl.capped, false);
+});
+
 /* CONTRACT.md: targetWeight is a number the app does arithmetic on, 0 means
    bodyweight or unknown, never a string and never null. A log weight of 1e308 is
    valid JSON, overflows a pattern ratio to Infinity, and JSON.stringify writes
