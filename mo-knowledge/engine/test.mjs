@@ -37,6 +37,7 @@ import { JOINTS, JOINT_LOAD, defaultJointLoad } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
+import { readStyles, normalizeStyles, cardioSessionFor, mergeStyleLimits } from "./styles.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -3303,6 +3304,138 @@ test("the one goal whose session length did not move, and why", () => {
   assert.ok(WAS, "kept so the mapping above reads as a table rather than a list");
 });
 
+
+/* ---- what somebody actually gets for the styles they ticked ----
+ *
+ * Every one of these asserts the WEEK, not the flag. `meta.styles.honoured` and
+ * `resistance` were both correct for the whole time the bug was live: the
+ * engine set honoured to false, computed resistance as false, wrote a sentence
+ * saying the week was cardio only, and then handed back Push-Up, Lat Pulldown,
+ * Machine Shoulder Press and an Inverted Row. A test on either flag would have
+ * passed every day of it.
+ */
+
+const stylePayload = (train_styles, extra = {}) => ({
+  goal_bubble: "lose-weight", days_per_week: 4, current_weight: 180, sex: "male",
+  train_styles, ...extra,
+});
+
+test("somebody who ticked only Running gets a run, not a lifting day", async () => {
+  const out = await generateFromPayload(stylePayload(["running"]));
+  assert.equal(out.workout.exercises.length, 0, "a run has no sets and no reps, so nothing goes in exercises");
+  assert.ok(out.workout.cardio, "the session itself comes back");
+  assert.equal(out.workout.cardio.mode, "running", "and it is the mode they picked");
+  assert.ok(out.workout.cardio.minutes > 0 && out.workout.cardio.cue, "with a length and a cue somebody can act on");
+  /* The flag now measures the response rather than predicting it. */
+  assert.equal(out.meta.styles.honoured, true);
+  assert.equal(out.meta.styles.resistance, false);
+  /* And the sentence on the response is the one that is true of it. */
+  assert.match(out.meta.styles.note, /cardio only/);
+  assert.ok(out.notes.includes(out.meta.styles.note), "it reaches the caller's notes, not only meta");
+  /* The whole point, stated as the thing a person would notice. */
+  assert.equal(out.meta.session.estimatedMinutes, out.workout.cardio.minutes,
+    "the day is costed at the run's length, not the lifting day's");
+  assert.equal(out.meta.stretching.warmupMinutes, 0, "and it does not claim a bench press warm-up");
+});
+
+test("every cardio mode a beginner can be given builds its own session", async () => {
+  for (const [style, mode] of [["running", "running"], ["cycling", "cycling"], ["walking", "walking"], ["rowing", "rowing"], ["hiking", "hiking"]]) {
+    const out = await generateFromPayload(stylePayload([style]));
+    assert.equal(out.workout.exercises.length, 0, `${style} came back as lifting`);
+    assert.equal(out.workout.cardio.mode, mode, `${style} should plan ${mode}`);
+  }
+});
+
+test("a mode with nothing at their level is refused, not quietly substituted", async () => {
+  /* Swimming and Classes are both ticks on the onboarding sheet and the cardio
+     library's only swim and only HIIT session are tagged intermediate, so there
+     is nothing to give a beginner who picks either. `cardioFor` answers a mode
+     it cannot serve with everything else at that level, so unfiltered a
+     beginner who ticked Swimming got an Easy Spin on a stationary bike under a
+     note reading "this week is cardio only, because that is what you picked".
+     See mo-knowledge/LIBRARY-REQUESTS.md: the real answer is a beginner
+     session in each of those two modes, and until there is one, saying we
+     could not build it beats building something else and using their word for
+     it. */
+  for (const style of ["swimming", "classes"]) {
+    const beginner = await generateFromPayload(stylePayload([style]));
+    assert.equal(beginner.meta.styles.honoured, false, `${style} has nothing at beginner level`);
+    assert.ok(!beginner.workout.cardio, `${style} must not come back as some other mode`);
+    assert.match(beginner.meta.styles.note, /^This is a lifting session/);
+  }
+
+  /* And once they have earned the level, the same tick builds the session. */
+  const swimmer = await generateFromPayload(stylePayload(["swimming"], { logs: manySessions(80) }));
+  assert.equal(swimmer.workout.cardio?.mode, "swimming", "an intermediate swimmer gets their swim");
+});
+
+test("a cardio day respects the session length they gave us", async () => {
+  /* The library runs from a 20 minute row to a 60 minute walk and nothing was
+     reading the clock, so somebody who said they have half an hour and ticked
+     Walking was handed an hour long walk. Narrowed rather than trimmed: the
+     length of an easy walk is part of what it is, and a 60 minute one cut to 30
+     is a different session, not a shorter one. */
+  for (const minutes of [20, 30, 45]) {
+    const out = await generateFromPayload(stylePayload(["walking"], { session_minutes: minutes }));
+    assert.ok(out.workout.cardio.minutes <= minutes,
+      `asked for ${minutes} minutes and got a ${out.workout.cardio.minutes} minute ${out.workout.focus}`);
+    assert.equal(out.meta.session.fits, true);
+  }
+});
+
+test("the same day asked twice is the same session", async () => {
+  const a = await generateFromPayload(stylePayload(["cycling"]));
+  const b = await generateFromPayload(stylePayload(["cycling"]));
+  assert.equal(a.workout.focus, b.workout.focus);
+});
+
+test("a week we cannot build says so in a sentence, and does not claim otherwise", async () => {
+  /* Yoga and Pilates are a move list with no sets, and the workout shape this
+     engine returns has nowhere honest to put one. So the lifting day stands,
+     which is the OLD behaviour, and the difference is that the response now
+     says what it is instead of attaching a note claiming the week is mobility
+     work only. That note is what somebody who ticked Yoga used to be shown
+     over five barbell lifts. */
+  for (const styles of [["yoga"], ["pilates"], ["yoga", "pilates"]]) {
+    const out = await generateFromPayload(stylePayload(styles));
+    assert.ok(out.workout.exercises.length >= 4, "the lifting day is still what we have to offer");
+    assert.equal(out.meta.styles.honoured, false, "and the response does not pretend otherwise");
+    assert.match(out.meta.styles.note, /^This is a lifting session/, "the first clause says what they are holding");
+    assert.ok(!/^This week is/.test(out.meta.styles.note), "never the sentence for a week that has no lifting in it");
+    assert.ok(out.notes.includes(out.meta.styles.note), "and it reaches the notes a caller renders");
+  }
+});
+
+test("a mode the cardio library does not know is refused rather than guessed at", async () => {
+  /* "Sports" is a real tick on the onboarding sheet and there is no such thing
+     as a sports session in the library. `cardioFor` answers a modeless ask with
+     everything it has, so building from it would hand a five a side player an
+     Easy Run and call it their choice. */
+  const out = await generateFromPayload(stylePayload(["sports"]));
+  assert.ok(out.workout.exercises.length >= 4);
+  assert.equal(out.meta.styles.honoured, false);
+  assert.match(out.meta.styles.note, /^This is a lifting session/);
+});
+
+test("ticking a resistance style leaves the week exactly as it was", async () => {
+  /* The regression this pair guards: none of the above may reach anybody who
+     did tick lifting, and least of all anybody who was never asked. */
+  for (const styles of [["lifting"], ["home"], ["lifting", "running"], ["home", "yoga"], null, []]) {
+    const out = await generateFromPayload(stylePayload(styles));
+    assert.ok(out.workout.exercises.length >= 4, `${JSON.stringify(styles)} should still lift`);
+    assert.equal(out.meta.styles.honoured, true);
+    assert.equal(out.meta.styles.note, null);
+  }
+});
+
+test("cardioSessionFor builds nothing rather than something wrong", () => {
+  assert.equal(cardioSessionFor(readStyles(["yoga"]), {}), null, "a flow week has no cardio session in it");
+  assert.equal(cardioSessionFor(readStyles(["sports"]), {}), null, "and neither has a mode the library cannot name");
+  assert.equal(cardioSessionFor(readStyles(null), {}), null, "never asked means never overridden");
+  const run = cardioSessionFor(readStyles(["running"]), { level: "beginner", today: new Date("2026-09-18") });
+  assert.deepEqual(run.exercises, [], "a run is never a list of sets");
+  assert.deepEqual([run.warmup, run.cooldown], [[], []], "and never carries a lifting day's mobility");
+});
 
 /* ---- how much core work a split actually buys ----
  *
