@@ -137,8 +137,21 @@ Deno.serve(async (req) => {
     }
 
     /* Rate limit. Counted and written with the service role so a client
-       cannot read, forge or clear its own quota. */
-    const DAILY_LIMIT = 15;
+       cannot read, forge or clear its own quota.
+
+       15 was the right number when a generation was a paid call to a model.
+       It is the wrong number now: that path is gone (see the header), the
+       engine is deterministic and costs nothing per workout, and 15 became a
+       wall somebody hits doing ordinary things. Generating the rest of a week
+       is one call per empty day, so a single tap can spend five of them, and
+       every swap, rebuild and "give me a different day" spends another. Mo
+       hit it just using the app, which is the only evidence this needed.
+
+       Still a limit, because the endpoint is public to any signed-in account
+       and a loop hammering it costs invocations and a row per call. 200 in a
+       rolling day is far past anything a person training can reach and still
+       stops a script dead. */
+    const DAILY_LIMIT = 200;
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const svcHeaders = {
       apikey: SERVICE_KEY!,
@@ -155,7 +168,7 @@ Deno.serve(async (req) => {
 
     if (used >= DAILY_LIMIT) {
       return new Response(
-        JSON.stringify({ error: `Daily limit reached (${DAILY_LIMIT} workouts). Try again tomorrow.` }),
+        JSON.stringify({ error: `That is ${DAILY_LIMIT} workouts built in a day. Something is generating on a loop; the count clears as the oldest ones pass 24 hours.` }),
         { status: 429, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
       );
     }
