@@ -321,3 +321,55 @@ person's level, or holding the same pose for longer to fill the minutes, would
 both be the engine inventing content it does not have. The rounds are stated in
 `workout.flow.rounds` and in a note, which is honest and is still a thinner
 class than the person deserves.
+
+---
+
+## 11. Five cardio modes have exactly one session each (2026-09-19)
+
+The level gate came off the app's three cardio pickers today. Until then the
+plan generator asked `cardio.mjs` for `MY_PROFILE.level`, a column that does not
+exist, so it asked at "beginner" for every person who has ever used the app.
+Measured against the library as it ships, that meant ticking Running produced
+Easy Run on all seven days of a week, and ticking Swimming, HIIT, Stairs or Jump
+Rope produced a session in some **other** mode every single day, because
+`cardioFor` answers a mode it cannot serve with everything else it has.
+
+Asking the way `cardioSessionFor` already does, at the intermediate ceiling and
+filtered by mode on the way out, fixes the wrong-mode half outright. What it
+cannot fix is how thin some of the modes are. Distinct sessions a week can now
+contain, per mode:
+
+| mode | rows in the library | distinct sessions across a week |
+|---|---|---|
+| running | 7 | 6 |
+| cycling | 6 | 6 |
+| walking | 4 | 4 |
+| rowing | 3 | 2 |
+| elliptical | 2 | 2 |
+| **swimming** | **1** | **1** |
+| **hiit** | **1** | **1** |
+| **stairs** | **1** | **1** |
+| **jump rope** | **1** | **1** |
+| **hiking** | **1** | **1** |
+
+Five of the ten modes on the onboarding sheet are a single row. Somebody who
+ticks Swimming gets Easy Swim on Monday and Easy Swim on Sunday and Easy Swim
+next month, and the three-way Easy / Steady / Hard segment on the activity sheet
+returns the same session for all three answers, because there is nothing else to
+return. The app says that out loud rather than dressing it up, which is the
+right behaviour and still a thin week.
+
+**Asked for:** an easy, an interval and a long row in each of swimming, stairs,
+jump rope and HIIT, so each of those modes has a three-way choice that is
+actually a choice. Swimming is the most urgent: it is a mode people train
+seriously and exclusively, and it is the only one of the five where a person is
+likely to tick it and tick nothing else. Hiking is the least urgent, since a
+hike is genuinely one kind of thing.
+
+**Also worth having:** a non-machine HIIT and jump rope row. Both are tagged
+`indoor: true`, and the venue filter on the activity sheet therefore has to
+relax itself and print an apology for somebody skipping in a garden.
+
+**Why we did not work around it:** the only workarounds available are inventing
+sessions the library does not have, or handing somebody a different mode from
+the one they ticked. The second is exactly the bug this change removes.

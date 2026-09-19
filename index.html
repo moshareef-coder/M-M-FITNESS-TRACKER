@@ -21120,36 +21120,44 @@ function ensureCardioLibrary() {
    thing that changes. Returning null rather than an empty day is deliberate:
    the worst outcome here is somebody opening a session that has nothing in it.
 
-   Seeded by date so the same day asked twice comes back the same, which is the
-   rule every other picker in this file follows. */
+   This used to be a second implementation of `cardioSessionFor`, and being a
+   second implementation is what went wrong with it. The engine settled this
+   question on 2026-09-19 and this copy did not hear: it was still asking the
+   library for `MY_PROFILE.level`, a column that does not exist, so it asked at
+   "beginner" for every person who has ever used the app. Measured against the
+   library as it ships, that meant ticking Running produced Easy Run on all
+   seven days of a week, and ticking Swimming, HIIT, Stairs or Jump Rope
+   produced a session in some OTHER mode every single day, because `cardioFor`
+   answers a mode it cannot serve with everything else it has.
+
+   What replaces the level gate is the engine's answer and it is three things,
+   none of them a classification of the person:
+     - the mode is a promise, so it is filtered again on the way out and an
+       unserveable mode returns null rather than a walk,
+     - the ceiling is a property of the REQUEST. They named a mode, not a
+       difficulty, so everything short of advanced is open and Sprint Intervals
+       and a Threshold Row stay out of a week nobody asked that of,
+     - minutes are the real dial. Forty five seconds on and thirty off is not a
+       hard day at fifteen minutes, and the clock is the one thing this app
+       actually knows.
+
+   Seeded by date, still, so the same day asked twice comes back the same, and
+   by the day being BUILT rather than the day it is being built on, so one press
+   of Generate week does not hand back the same run seven times. That is the
+   same YYYYMMDD seed `cardioSessionFor` uses, so a week built here and a week
+   built by the generator agree. */
 async function cardioDayForStyles(st, forDate) {
-  const mod = await ensureCardioLibrary();
-  if (!mod) return null;
-  const level = (MY_PROFILE?.level || "beginner");
-  const modes = Array.isArray(st.cardioModes) ? st.cardioModes : [];
-  if (modes.length) {
-    const picks = mod.cardioFor({ modes, level });
-    if (!picks.length) return null;
-    /* The day being built, not the day it is being built ON. Generating a
-       whole week from one button used to seed every day off today and hand
-       back the same run seven times. */
-    const seed = Number(String(forDate || todayISO()).replace(/-/g, "")) || 0;
-    const s = picks[seed % picks.length];
-    return {
-      focus: s.name,
-      /* `mode` rides along because it is what says WHICH activity this is:
-         the screen picks the icon off it and the timer logs under that
-         activity's name, so without it a planned run is saved as "Other" and
-         never reaches the running line on Progress. The engine's own cardio
-         day carries it for the same reason (CONTRACT.md, workout.cardio). */
-      cardio: { name: s.name, mode: s.mode, minutes: s.minutes, effort: s.effort, cue: s.cue, structure: s.structure || null },
-      /* Sets and reps is the contract for this field and a run has neither, so
-         it stays empty and the session is carried in `cardio`. Writing "Easy
-         Run" in here would be logged as a set and would light the heat map. */
-      exercises: [],
-    };
-  }
-  return null;
+  /* `ensureStylesModule` is defined down with the week generator, which is the
+     only caller of this function; it was written and then never used, and this
+     is what it was for. */
+  const mod = await ensureStylesModule();
+  if (!mod?.cardioSessionFor) return null;
+  /* Local midnight rather than the bare ISO string. `new Date("2026-09-21")` is
+     UTC midnight, which is still the 20th anywhere west of Greenwich, and the
+     seed is built out of getDate(). */
+  const day = new Date(`${forDate || todayStr()}T00:00:00`);
+  const minutes = Number(MY_PROFILE?.session_minutes) || null;
+  return mod.cardioSessionFor(st, { today: day, minutes }) || null;
 }
 
 /* Same seed rule the session engine keeps: the day plus the activity, so today
@@ -21209,30 +21217,30 @@ function defaultActivityPref() {
        treadmill still wants the run sessions.
    And then there is the third answer, which is that the library has nothing for
    this machine. That is printed too. A made up session would be worse. */
-/* Hard reaches one level past where the logs put somebody, and only Hard.
+/* How hard is a question this screen already asks, in the segment sitting right
+   above the card, and reading a second and hidden difficulty out of somebody's
+   log count and applying it on top of their answer was the level system doing
+   its damage here. The library hands back everything at or BELOW a level, so a
+   person with no runs logged had a running pool of exactly one session, Easy
+   Run, and got it for Easy and for Steady alike. A three way choice that
+   returns the same session twice is not a choice.
 
-   The library hands back everything at or BELOW a level, which means a
-   beginner's running pool is exactly one session, Easy Run, and a three way
-   choice that returns the same session three times is not a choice. Somebody
-   who taps Hard has asked for a step up in so many words, so they get one:
-   beginner reaches intermediate, which is Tempo Run and Run Intervals, not
-   Sprint Intervals. Two levels is never reached, because "harder than I
-   usually go" is not "flat out with no warm up", and Easy and Steady never
-   reach at all. The session says on the reveal that it is above your level. */
-const ACT_LEVEL_UP = { beginner: "intermediate", intermediate: "advanced", advanced: "advanced" };
-
-function cardioPoolFor(lib, act, level, prefKey) {
-  if (prefKey === "hard") level = ACT_LEVEL_UP[level] || level;
+   So the pool is the whole mode now, up to the tier nobody asked for. Advanced
+   is two rows, Sprint Intervals and a Threshold Row, and it opens only for
+   Hard, which is the one answer that asks for it in so many words. That is the
+   same ceiling `cardioSessionFor` draws in engine/styles.mjs and it is drawn for
+   the same reason: they named a mode, not a difficulty. */
+function cardioPoolFor(lib, act, prefKey) {
   if (!lib?.cardioFor || !act?.cardio) return { pool: [], note: null };
   const named = actTitle(act).toLowerCase();
-  const byMode = (lvl) => lib.cardioFor({ modes: [act.cardio], level: lvl })
-    .filter((e) => e.mode === act.cardio);
+  /* Filtered again on the way out, and this is not belt and braces. `cardioFor`
+     answers a mode it cannot serve with everything ELSE it has, which is the
+     right call for a week planner choosing among several modes and the wrong
+     one here: it is how somebody standing on a stair master was handed an Easy
+     Run. A pool that empties says so on screen instead. */
   let note = null;
-  let pool = byMode(level);
-  if (!pool.length) {
-    pool = byMode("advanced");
-    if (pool.length) note = `The library has no ${named} session at your level yet, so this one is a step up.`;
-  }
+  let pool = lib.cardioFor({ modes: [act.cardio], level: prefKey === "hard" ? "advanced" : "intermediate" })
+    .filter((e) => e.mode === act.cardio);
   if (!pool.length) {
     return { pool: [], note: `The library has no ${named} session yet. Start the clock and I'll count the minutes.` };
   }
@@ -21271,34 +21279,43 @@ function pickCardioSession(pool, prefKey, actKey) {
 
 /* What the library holds for an activity, cached per activity for the life of
    the screen, so the picker can print the honest note under a machine BEFORE
-   somebody presses Generate and finds out. Keyed by activity and level; cleared
-   when the sheet closes, because a level can move between sessions. */
+   somebody presses Generate and finds out. Cleared when the sheet closes. */
 let ACT_LIB_NOTES = {};
 
 async function buildCardioCard(act, prefKey) {
   if (!act?.cardio) return null;
-  const [lib, engine] = await Promise.all([ensureCardioLibrary(), ensureSessionEngine()]);
+  const lib = await ensureCardioLibrary();
   if (!lib?.cardioFor) return null;
-  /* Mileage, the same blunt input the move libraries use, because there is no
-     test of cardio fitness in this app either. */
-  const done = activityCounts(ME, 365)[act.key] || 0;
-  const level = engine?.levelFromSessions ? engine.levelFromSessions(done) : "beginner";
   const pref = prefKey || defaultActivityPref();
-  const { pool, note } = cardioPoolFor(lib, act, level, pref);
+  const { pool, note } = cardioPoolFor(lib, act, pref);
   ACT_LIB_NOTES[act.key] = note || "";
   const pick = pickCardioSession(pool, pref, act.key);
   /* Nothing in the library rather than null, so the caller can say which
      machine came up empty instead of showing a generic failure. */
-  if (!pick) return { missing: true, note, level };
-  /* Said out loud when the session is above where the logs put them, because it
-     is the one thing about this pick a person could be caught out by. */
-  const stretch = pick.level !== level
-    ? `This one is an ${pick.level} session and your logs put you at ${level}. You asked for hard.`
+  if (!pick) return { missing: true, note };
+  /* Said out loud when Hard reached into the tier the other two segments do not
+     open, because the top of this library is a genuinely different kind of day
+     and it is the one thing about this pick a person could be caught out by.
+     It compares the SESSION against the answer they gave, not against a
+     classification of the person: there is no longer any such thing here, and
+     the sentence this replaces could read "This one is an beginner session and
+     your logs put you at advanced. You asked for hard." to somebody who had
+     asked for easy. */
+  const stretch = pick.level === "advanced" && pref === "hard"
+    ? `${pick.name} is the hardest session the library has for this. Warm up properly first.`
     : null;
   return {
     name: pick.name, effort: pick.effort, cue: pick.cue,
     structure: pick.structure, minutes: pick.minutes,
-    level: pick.level || level, note: note || stretch,
+    /* The library's own category, which is what the third fact on the reveal
+       says now. It used to say the session's difficulty tag, and that was the
+       level label surviving in the one place a person actually reads: it told
+       somebody "Intermediate" about themselves, which is the classification
+       Mo removed, and it did not fit. Measured at 390: "Intermediate" is 103px
+       of text in a 101px tile, and it only ever fitted before because the level
+       gate meant almost everybody saw the word "Beginner". "Intervals" is the
+       longest category and it says something a person can act on. */
+    kind: pick.categoryKey || "", note: note || stretch,
   };
 }
 
@@ -21308,11 +21325,9 @@ async function buildCardioCard(act, prefKey) {
 async function loadActivityNote(act) {
   if (!act?.cardio || ACT_LIB_NOTES[act.key] !== undefined) return;
   ACT_LIB_NOTES[act.key] = "";
-  const [lib, engine] = await Promise.all([ensureCardioLibrary(), ensureSessionEngine()]);
+  const lib = await ensureCardioLibrary();
   if (!lib?.cardioFor) return;
-  const done = activityCounts(ME, 365)[act.key] || 0;
-  const level = engine?.levelFromSessions ? engine.levelFromSessions(done) : "beginner";
-  const { note } = cardioPoolFor(lib, act, level);
+  const { note } = cardioPoolFor(lib, act);
   ACT_LIB_NOTES[act.key] = note || "";
   /* Only if they are still looking at the same activity on the same screen. */
   if (CARDIO_SES?.state === "setup" && CARDIO_SES.act === act.key) renderCardioStage();
@@ -21746,8 +21761,13 @@ function renderCardioStage() {
         : "";
     const cue = card?.cue || (plan?.notes || [])[0] || "";
     const named = (v) => { const t = String(v || ""); return t ? t[0].toUpperCase() + t.slice(1) : ""; };
+    /* A flow day still says Level, and that one is earned: it is read off how
+       many yoga or Pilates sessions are in the log and it decides which poses
+       the sequence can use. A cardio session's level was a difficulty tag on a
+       library row worn as a label about the person, so it says what shape of
+       session this is instead. */
     const facts = card
-      ? [["Minutes", `${card.minutes}`], ["Effort", `${card.effort} of 10`], ["Level", named(card.level)]]
+      ? [["Minutes", `${card.minutes}`], ["Effort", `${card.effort} of 10`], ["Type", named(card.kind)]]
       : [["Minutes", `${plan.minutes}`], ["Moves", `${plan.moves.length}`], ["Level", named(plan.level)]];
     stage.innerHTML = `
       <div class="csn-head">
@@ -24877,7 +24897,6 @@ async function switchRemainderToBodyweight() {
   if (!mod) { toast("Couldn't reach the exercise library. Try again."); return null; }
 
   const pool = strengthLibraryPool();
-  const level = MY_PROFILE?.level || "beginner";
   // Seeded with every name already on the plan so two switched exercises
   // never land on the same bodyweight movement, the same guard scoreAlternatives
   // gives a single swap's "Search all exercises" list for free.
@@ -24895,8 +24914,12 @@ async function switchRemainderToBodyweight() {
     const libEx = findStrengthLibraryExercise(ex.name);
     if (!libEx || !NO_GYM_EQUIPMENT.has(libEx.equipment)) return;
 
+    /* No `level`. It was `MY_PROFILE.level`, a column that does not exist, and
+       scoreAlternatives does not take a level anyway: it ranks a substitute
+       against the LIFT being replaced, not against the person. A dead read of a
+       phantom column, passed into an options bag that ignores it. */
     const alts = mod.scoreAlternatives({
-      exercise: libEx, pool, level, equipment: ["bodyweight"],
+      exercise: libEx, pool, equipment: ["bodyweight"],
       exclude: [...usedNames], count: 1,
     });
     if (!alts.length) { noAlt++; return; }
@@ -25135,7 +25158,6 @@ const CARDIO_ACT_FOR_MODE = {
 async function buildSessionAlternatives(current, date) {
   const out = [];
   const currentFocus = (current?.focus || "").trim().toLowerCase();
-  let level = "beginner";
 
   const engine = await ensurePlanEngine();
   if (engine) {
@@ -25145,19 +25167,6 @@ async function buildSessionAlternatives(current, date) {
          they are looking at. */
       const { plan, meta } = engine.generateFromPayload(workoutEnginePayload(), { includePlan: true });
       const week = plan?.week || [];
-      /* Read for the cardio half below whether or not any day is offered: the
-         library filters its sessions by level, and beginner-by-default would
-         quietly hide every interval session from somebody who trains.
-
-         `plan.level` went with `meta.level` on 2026-09-18: there is no training
-         level in the engine's answer any more, so this read had gone silently
-         undefined and every cardio swap sheet was offering beginner sessions
-         to everybody. The cardio library still ranks by a level, so the count
-         the label used to summarise is turned into one here, with the same
-         ladder activity-session.mjs already uses for every other library
-         rather than a second one invented on this screen. */
-      const sessionEngine = await ensureSessionEngine();
-      level = sessionEngine?.levelFromSessions?.(meta?.experience?.sessions || 0) || level;
       if (optedIntoBuiltSessions()) {
         /* Start from the day AFTER the one on screen, so the first offer is the
            session that would come next rather than whichever day the week
@@ -25208,7 +25217,17 @@ async function buildSessionAlternatives(current, date) {
     const lib = await ensureCardioLibrary();
     if (lib) {
       const byCategory = new Map();
-      for (const s of lib.cardioFor({ modes, level })) {
+      /* Asked for at the same ceiling `cardioSessionFor` uses, which is a
+         property of the request and not of the person: they ticked these modes
+         by name, so everything short of the advanced tier is theirs. It used to
+         ask at a level derived from how many LIFTING sessions the engine had
+         seen, which is somebody's bench press history deciding whether they may
+         be offered a swim.
+
+         Filtered by mode on the way out for the reason cardioPoolFor is:
+         cardioFor answers a mode it cannot serve with everything else it has,
+         so a swimmer's swap sheet was offering an Easy Spin. */
+      for (const s of lib.cardioFor({ modes, level: "intermediate" }).filter((s) => modes.includes(s.mode))) {
         if (!byCategory.has(s.categoryKey)) byCategory.set(s.categoryKey, []);
         byCategory.get(s.categoryKey).push(s);
       }
@@ -25407,7 +25426,7 @@ function startCardioInsteadOfPlan(s, ctx) {
     pref: defaultActivityPref(),
     accum: 0,
     since: null,
-    card: { name: s.name, effort: s.effort, cue: s.cue, structure: s.structure, minutes: s.minutes, level: s.level || "" },
+    card: { name: s.name, effort: s.effort, cue: s.cue, structure: s.structure, minutes: s.minutes, kind: s.categoryKey || "" },
     instead: planned,
   };
   csnSave();
