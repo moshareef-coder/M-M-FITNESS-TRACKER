@@ -138,6 +138,23 @@ const variantLevel = (liftName, sex, liftLb, bw) => {
   return L[i];
 };
 
+/* Every dumbbell entry, not a chosen few. A factor applied upside down is
+   invisible by inspection and the table grew again the moment somebody asked
+   why their legs carried no level, so the mechanical half is a loop over the
+   table itself: add a row and it is held from the next run onwards. */
+console.log("\nEvery dumbbell variant reads as its own base lift");
+for (const name of Object.keys(LS).filter((k) => /dumbbell|goblet/.test(k))) {
+  const [base, factor] = LS[name];
+  for (const sex of ["Male", "Female"]) {
+    const bw = REF[sex];
+    for (const mult of S[base][sex]) {
+      const load = thresholdLb(mult, sex, bw) * factor * 1.02;
+      check(`${name} ${sex} at ${Math.round(load)} lb`,
+        variantLevel(name, sex, load, bw), levelFor(base, sex, load / factor, bw));
+    }
+  }
+}
+
 for (const [name, load, bw, why] of [
   ["dumbbell bench press", 70, 180, "a pair of 70s at 180 lb"],
   ["dumbbell bench press", 100, 180, "a pair of 100s at 180 lb"],
@@ -156,6 +173,16 @@ for (const [name, load, bw, why] of [
 check("a pair of 70s at 180 lb is not Elite", variantLevel("dumbbell bench press", "Male", 70, 180), "Intermediate");
 check("a pair of 30s at 180 lb is a beginner", variantLevel("dumbbell bench press", "Male", 30, 180), "Beginner");
 check("400 lb leg press at 180 lb is not Advanced", variantLevel("leg press", "Male", 400, 180), "Novice");
+/* The lower-body dumbbells, anchored the same way. The goblet squat is the one
+   to watch: it is a single implement held in two hands, so a factor that had
+   been halved like the presses would read every one of these a level high. */
+check("a 70 lb goblet squat at 180 lb", variantLevel("goblet squat", "Male", 70, 180), "Novice");
+check("a 100 lb goblet squat at 180 lb", variantLevel("goblet squat", "Male", 100, 180), "Intermediate");
+check("a pair of 70s on RDLs at 180 lb", variantLevel("dumbbell romanian deadlift", "Male", 70, 180), "Novice");
+check("a pair of 100s on RDLs at 180 lb", variantLevel("dumbbell romanian deadlift", "Male", 100, 180), "Intermediate");
+check("a pair of 50s on lunges at 180 lb", variantLevel("dumbbell lunge", "Male", 50, 180), "Novice");
+check("a pair of 80s on lunges at 180 lb", variantLevel("dumbbell lunge", "Male", 80, 180), "Advanced");
+check("a pair of 80s on decline at 180 lb", variantLevel("decline dumbbell press", "Male", 80, 180), "Intermediate");
 check("an isolation move has no entry", LS["dumbbell curl"] ? "scored" : "unscored", "unscored");
 check("a lateral raise has no entry", LS["lateral raise"] ? "scored" : "unscored", "unscored");
 

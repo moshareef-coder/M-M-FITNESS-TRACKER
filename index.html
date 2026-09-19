@@ -4913,7 +4913,17 @@
   .rc-bar-name { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
   .rc-bar-line { display: flex; align-items: center; gap: 8px; }
   .rc-bar-track { flex: 1; height: 7px; border-radius: 100px; background: var(--panel-2); overflow: hidden; }
-  .rc-bar-fill { height: 100%; border-radius: 100px; background: var(--accent); box-shadow: var(--glow-accent); }
+  /* Same --heat the Body tab's own bars and rings paint with, so a muscle that
+     came back deep red on the figure is deep red here too. The accent glow
+     that used to sit under this is gone with the accent: a green halo under a
+     red fill is the two scales arguing in one element. */
+  /* display:block is load bearing, not tidying. This is a span inside a span,
+     and width and height do not apply to an inline box, so the fill has been
+     0 by 0 since the recap shipped: every bar on this card was an empty grey
+     track. That is what Mo was actually looking at when he asked for the bar
+     to be coloured. Measured before the fix, on the paired fixture: fill
+     97 x 7 track, fill box 0 x 0. */
+  .rc-bar-fill { display: block; height: 100%; border-radius: 100px; background: var(--heat, var(--accent)); }
   .rc-bar-band { font-size: 11px; color: var(--muted); flex-shrink: 0; min-width: 46px; text-align: right; }
   .rc-ex-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
   .rc-ex-head h4 { margin: 0; font-size: 15.5px; font-weight: 700; font-family: var(--font-display); letter-spacing: -.02em; }
@@ -14768,12 +14778,14 @@ const INFO_TOPICS = {
   trainNext: () => ({
     eyebrow: "What to train next",
     paras: [
+      "The answer at the top is the same reading the generator uses. It is asked the same question the Generate button asks, with the same history, so what it names here is what it would build for you if you pressed generate right now. When a plan is already sitting on today, that plan is the answer instead, because it came from the same place.",
+      "The rows underneath are its working: which muscles it found rested, which are still inside their window and for how long, which groups you marked on the body picker, and where that puts you in your week.",
       `A muscle takes about ${BODY_RECOVERY_HOURS} hours to repair after the session that worked it. That is the usual window, not a rule about how you feel.`,
       `Green, ready now: it has had the full ${BODY_RECOVERY_HOURS} hours since the last session that worked it, or you have never trained it.`,
       `Amber, fine to train: worked between ${BODY_FRESH_HOURS} and ${BODY_RECOVERY_HOURS} hours ago. Not fully repaired, but training it again is a normal thing to do and the app is not going to argue. Expect less than your best.`,
       `Red, give it a day: worked in the last ${BODY_FRESH_HOURS} hours. This is the one worth leaving alone if you have a choice.`,
       "The number on an amber or red chip is the hours until that area is fully recovered, so a red one turns amber well before it runs out.",
-      "The suggestion above picks whatever this week has missed first, then whatever has had the least work. It only tells you to rest when every area is red.",
+      "An area takes the state of whichever muscle in it was worked most recently, so Back reads red the day after rows even though your traps are untouched.",
     ],
   }),
   planMatch: () => ({
@@ -15622,10 +15634,26 @@ function recapFor(email, name, date) {
   };
 }
 
-/* Muscle load for a single day, ranked against the hardest-hit muscle that
-   day. High/Medium/Low is relative on purpose: an absolute scale would call an
-   honest 20-minute session "Low" across the board, which tells nobody
-   anything. */
+/* Muscle load for a single day, on the same scale the Body tab paints the
+   figure with: a group's credited sets against a full day's dose
+   (BODY_IMPACT_TARGET.today), coloured through bodyHeatColor, yellow at light
+   work and red at heavy.
+
+   This used to be scored against the hardest-hit muscle of the day instead,
+   which made the top bar full and red on every session ever logged, including
+   a twenty minute one. That is the part Mo was looking at: "muscles hit should
+   showcase the progress bar with it being colored, from yellow to red" only
+   means something if a light day is actually yellow.
+
+   The old comment defended the relative scale on the grounds that an absolute
+   one calls an honest short session "Low" across the board. It does, and the
+   Body tab already says exactly that about the same day, in the same words,
+   two taps away. Two screens disagreeing about one session is the more
+   expensive of the two problems, so the ranking now lives in the order of the
+   rows and the colour says how much work it really was. Measured on the
+   fixture: 2026-09-18 reads lats 88%, biceps 81%, forearms 44%, traps 19%,
+   where the relative scale read 100 / 93 / 50 / 21 and called forearms the
+   same colour as a five set day. */
 function dayMuscleLoad(email, date) {
   const load = {};
   ALL_EXERCISE_LOGS
@@ -15638,17 +15666,24 @@ function dayMuscleLoad(email, date) {
       (rule.secondary || []).forEach((g) => { load[g] = (load[g] || 0) + sets * 0.5; });
     });
 
-  const max = Math.max(...Object.values(load), 0);
-  if (!max) return [];
+  if (!Object.keys(load).length) return [];
+  const dose = BODY_IMPACT_TARGET.today;
   const pretty = { lowerback: "Lower back", abs: "Core", obliques: "Obliques", lats: "Lats" };
   return Object.entries(load)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
-    .map(([g, v]) => ({
-      name: pretty[g] || g.charAt(0).toUpperCase() + g.slice(1),
-      pct: Math.round((v / max) * 100),
-      band: v / max >= 0.66 ? "High" : v / max >= 0.33 ? "Medium" : "Low",
-    }));
+    .map(([g, v]) => {
+      /* One number does all three jobs, so the bar can never be longer than
+         its colour is hot, or hotter than the word beside it. Capped at the
+         dose for the same reason the rings are: 140% reads as a mistake. */
+      const share = Math.min(1, v / dose);
+      return {
+        name: pretty[g] || g.charAt(0).toUpperCase() + g.slice(1),
+        pct: Math.round(share * 100),
+        band: bodyImpactLevel(share),
+        heat: bodyHeatColor(share),
+      };
+    });
 }
 
 /* A MET estimate, which is the standard way to do this without a heart rate
@@ -15662,8 +15697,13 @@ function estCalories(name, seconds, minutes) {
   return Math.round(5.0 * (lb / 2.205) * hours);
 }
 
-function recapStat(value, label, cls = "") {
-  return `<div class="rc-stat ${cls}"><b>${escapeHtml(String(value))}</b><span>${escapeHtml(label)}</span></div>`;
+/* `unit` is a separate argument rather than markup in `value` because this
+   function escapes what it is handed, so the volume tile has been printing a
+   literal "11,320<small>lb</small>" on screen since the recap shipped. The
+   escaping stays; the one caller that wanted a small unit gets a slot for it. */
+function recapStat(value, label, cls = "", unit = "") {
+  return `<div class="rc-stat ${cls}"><b>${escapeHtml(String(value))}${
+    unit ? `<small>${escapeHtml(unit)}</small>` : ""}</b><span>${escapeHtml(label)}</span></div>`;
 }
 
 /* A plan for a day that has not happened yet: no logs, no time, no PRs, just
@@ -15747,7 +15787,7 @@ function openRecap(email, name, date) {
   /* Volume and calories only appear when they are real: a bodyweight session
      has no tonnage, and calories need a logged bodyweight to mean anything. */
   const secondRow = [
-    sharing && r.volume > 0 ? recapStat(`${Math.round(r.volume).toLocaleString()}<small>lb</small>`, "TOTAL VOLUME") : null,
+    sharing && r.volume > 0 ? recapStat(Math.round(r.volume).toLocaleString(), "TOTAL VOLUME", "", "lb") : null,
     kcal ? recapStat(String(kcal), "EST. CALORIES") : null,
   ].filter(Boolean);
 
@@ -15796,7 +15836,7 @@ function openRecap(email, name, date) {
       <div class="rc-bar-card">
         <h4>Muscles Hit</h4>
         <div class="rc-bars">
-          ${bars.map((m) => `<div>
+          ${bars.map((m) => `<div style="--heat:${m.heat}">
             <div class="rc-bar-name">${escapeHtml(m.name)}</div>
             <div class="rc-bar-line">
               <span class="rc-bar-track"><span class="rc-bar-fill" style="width:${m.pct}%"></span></span>
@@ -22171,9 +22211,9 @@ function renderStrengthStats() {
   if (summary) {
     const lv = strengthLevelFor(name, picked.name);
     if (!lv) {
-      /* No honest level for the currently picked lift (a dumbbell, a
-         machine), so the row falls back to the fact it does have rather
-         than going blank above a chevron. */
+      /* No honest level for the currently picked lift (an isolation move, a
+         lift nothing publishes a standard for), so the row falls back to the
+         fact it does have rather than going blank above a chevron. */
       summary.innerHTML = `<span>${escapeHtml(picked.name)}, best ${picked.best} lb</span>`;
     } else {
       const dots = STRENGTH_LEVELS.map((_, i) => {
@@ -22186,8 +22226,8 @@ function renderStrengthStats() {
   }
 }
 
-/* The level, or nothing at all. A lift we cannot level honestly (a dumbbell,
-   a machine, somebody with no weigh-in) hides the whole block rather than
+/* The level, or nothing at all. A lift we cannot level honestly (a curl, a
+   lateral raise, somebody with no weigh-in) hides the whole block rather than
    showing a bar with nothing in it, which would read as "you are a beginner"
    when what it means is "we do not know". Element ids are parameters, not
    hardcoded, so the lift detail sheet can draw the same bar as the card
@@ -32421,21 +32461,28 @@ const BODY_GROUP_LABELS = {
 // hypertrophy range); anything past that is capped at 100% rather than shown
 // as 140%, which would read as a mistake.
 const BODY_IMPACT_TARGET = { today: 8, week: 14, lastweek: 14 };
-const BODY_RECOVERY_HOURS = 48;
+/* These three are recovery.mjs FRESH_HOURS, RECOVERY_HOURS and MIN_CREDIT_SETS,
+   and they are `let` rather than `const` because ensureRecoveryEngine
+   overwrites them with the engine's own numbers the first time this tab reads
+   it. The values below are what the engine said on the day this was written,
+   so a Body tab that opened before the import landed says the same thing it
+   always did; the point of the overwrite is that the two can no longer drift.
+   Until now they were copies kept in step by hand, which is exactly the kind
+   of promise that holds until the day somebody moves one of them. */
+let BODY_RECOVERY_HOURS = 48;
 /* The first day after a session is the one worth actually leaving alone. From
    there to the 48 hour mark a group is not fully repaired but is perfectly
    trainable, and the app should say so rather than colouring it the same as
    "you trained this an hour ago". Wanting to hit a body part again is a normal
    thing to want; this exists so the answer is "yes, and here is the cost"
    instead of a wall of red. */
-const BODY_FRESH_HOURS = 24;
+let BODY_FRESH_HOURS = 24;
 
 /* Same floor recovery.mjs uses before it will credit a muscle as actually
-   worked, kept in sync by hand since this file and the engine cannot share
-   an import. Without it, a single secondary-only touch (a shoulder press's
+   worked. Without it, a single secondary-only touch (a shoulder press's
    0.5 credit to Shoulders, say) could mark the whole group "hold" on a day
    it was barely involved. */
-const BODY_MIN_CREDIT_SETS = 2;
+let BODY_MIN_CREDIT_SETS = 2;
 
 // Untrained groups fill the ring row so it is always five wide. Big movers
 // first: an empty chest ring is a more useful nudge than an empty forearms one.
@@ -33454,10 +33501,144 @@ function bodyGroupsPhrase(groups) {
    Suggestion, each with a number on the right: "37h", "New", "Rest or cardio
    tomorrow". Nobody opens the Body tab wanting a dashboard. They want an
    answer to one question, so the card answers that question first and shows
-   its working underneath. */
+   its working underneath.
+
+   And the answer now comes from the generator rather than from this file.
+   Mo, 2026-09-18: "what to train next in Body must be aligned with our
+   algorithms. Not just whatever hasn't been trained." It was the second
+   thing: the card picked whichever area this week had touched least and had
+   no idea what the Generate button would build, so it could and did
+   recommend legs on a day the engine was queueing a push. Two screens, one
+   body, two answers.
+
+   So the card asks the same question the generate button asks, of the same
+   function, with the same payload: adapter.mjs generateFromPayload on
+   workoutEnginePayload(). What comes back IS what pressing Generate would
+   build. The working underneath is the engine's too: recovery.mjs
+   muscleRecoveryStates for what is repaired and what is not, and meta.focus
+   for the groups the person marked on the body picker.
+
+   The one thing that outranks the engine is a plan that already exists for
+   today, because that plan came out of this same engine and is sitting on the
+   workout tab with a Begin button on it. Naming a different day while a real
+   plan waits would be the same disagreement in a new place. */
+
+/* recovery.mjs, lazily, the same shape as ensurePlanEngine and
+   ensureFocusBudget above: nothing is fetched until somebody opens this tab.
+   It also hands back the three thresholds this file used to keep its own
+   copies of. */
+let recoveryEnginePromise = null;
+function ensureRecoveryEngine() {
+  if (!recoveryEnginePromise) {
+    recoveryEnginePromise = import("/mo-knowledge/engine/recovery.mjs")
+      .then((m) => {
+        if (Number.isFinite(m.RECOVERY_HOURS)) BODY_RECOVERY_HOURS = m.RECOVERY_HOURS;
+        if (Number.isFinite(m.FRESH_HOURS)) BODY_FRESH_HOURS = m.FRESH_HOURS;
+        if (Number.isFinite(m.MIN_CREDIT_SETS)) BODY_MIN_CREDIT_SETS = m.MIN_CREDIT_SETS;
+        return m;
+      })
+      .catch((e) => { console.warn("recovery engine: using the built-in reading", e); return null; });
+  }
+  return recoveryEnginePromise;
+}
+
+/* The six areas this card speaks in, answered out of the engine's fourteen
+   muscle groups rather than out of a second walk over the logs.
+
+   An area takes the state of whichever muscle in it was worked most recently,
+   so "Back: ready now" cannot appear on a day the lats were hit an hour ago.
+   A group the engine has no record of never took a real hit inside the window
+   and reads as rested, which is what muscleRecoveryStates leaving it out
+   means. */
+function bodyAreasFromEngine(states) {
+  const [weekStart, weekEnd] = [weekStartStr(), bodyPeriodRange("today")[1]];
+  const weekVol = computeMuscleVolumeBetween(ME, weekStart, weekEnd);
+  return COVERAGE_TARGETS.map((t) => {
+    const members = t.members || [t.key];
+    const weekSets = members.reduce((n, k) => n + (weekVol[k] || 0), 0);
+    let recent = null;
+    for (const k of members) {
+      const s = states.get(k);
+      if (s && (!recent || s.hoursSince < recent.hoursSince)) recent = s;
+    }
+    const state = recent ? recent.state : "ready";
+    return {
+      ...t, members, weekSets,
+      lastDate: recent?.lastDate || "",
+      hoursSince: recent ? recent.hoursSince : Infinity,
+      hoursLeft: recent ? BODY_RECOVERY_HOURS - recent.hoursSince : -1,
+      state, ready: state === "ready",
+    };
+  });
+}
+
+/* Everything the card needs, or null when the generator could not be asked.
+   Null is a real outcome and not a swallowed error: the lazy import fails
+   offline, and the app has to keep working there, so the caller falls back to
+   this file's own reading and the card says out loud that it did. */
+async function bodyNextReading() {
+  const [engine, rec] = await Promise.all([ensurePlanEngine(), ensureRecoveryEngine(), FIT_MATH_READY]);
+  /* No library, no muscle index, and an empty index reads every muscle as
+     rested, which is a confident wrong answer rather than a missing one. */
+  if (!engine || !rec || !EXERCISE_TRAININGS.length) return null;
+
+  const payload = workoutEnginePayload();
+  let built;
+  try {
+    built = engine.generateFromPayload(payload, { includePlan: true });
+  } catch (err) {
+    /* Same treatment the alternatives sheet gives a failed build: say it in
+       the console, hand back nothing, let the caller degrade. */
+    console.warn("what to train next: the generator could not answer", err);
+    return null;
+  }
+
+  /* payload.logs, not ALL_EXERCISE_LOGS. The engine's rotation was decided on
+     exactly these rows, so the recovery reading printed underneath has to be
+     the one it saw, down to the ninety day window and the trimmed columns. */
+  const states = rec.muscleRecoveryStates({
+    logs: payload.logs,
+    muscleIndex: rec.buildMuscleIndex(EXERCISE_TRAININGS),
+    today: new Date(),
+  });
+
+  const week = built.plan?.week || [];
+  const dayName = built.meta?.dayName || built.workout?.focus || "";
+  const dayIndex = week.findIndex((d) => d?.name === dayName);
+  const day = dayIndex >= 0 ? week[dayIndex] : null;
+
+  /* A plan already on today wins, but only while there is something left of
+     it. Once every exercise on it is logged, the next thing to train really
+     is the next day of the rotation. */
+  const planned = TODAY_WORKOUT?.exercises || [];
+  const loggedToday = planned.length ? todaysLoggedExerciseNames() : null;
+  const leftOnPlan = planned.filter((ex) => !loggedToday.has((ex.name || "").toLowerCase()));
+
+  return {
+    areas: bodyAreasFromEngine(states),
+    states,
+    dayName,
+    dayIndex,
+    dayCount: week.length,
+    dayGroups: day?.mainGroups || [],
+    /* The body picker's marks, as the engine applied them rather than as they
+       were tapped: meta.focus.why explains any gap between the two. */
+    marked: built.meta?.focus?.applied || [],
+    markedWhy: built.meta?.focus?.why || [],
+    planFocus: leftOnPlan.length ? displayFocus(TODAY_WORKOUT.focus, planned.map((e) => e.name)) : null,
+    planLeft: leftOnPlan.length,
+    planPartway: planned.length > 0 && leftOnPlan.length > 0 && leftOnPlan.length < planned.length,
+  };
+}
 
 /* Per training area: what it got this week, when it was last worked, and
-   whether it has had its recovery window. */
+   whether it has had its recovery window.
+
+   The fallback reading, used only when the engine cannot be reached. It walks
+   the logs itself through classifyMuscles, which guesses a muscle from the
+   exercise NAME where recovery.mjs reads the library's own tags, so the two
+   can differ on an unusual name. That is why the card says which of the two it
+   is showing rather than quietly printing this one. */
 function bodyAreaStates() {
   const [weekStart, weekEnd] = [weekStartStr(), bodyPeriodRange("today")[1]];
   const weekVol = computeMuscleVolumeBetween(ME, weekStart, weekEnd);
@@ -33499,8 +33680,68 @@ function bodyAreaStates() {
   });
 }
 
-function renderBodyNext(animate) {
-  const areas = bodyAreaStates();
+/* The list of names people read out loud: "Chest, back and arms". */
+const bodyPhraseAnd = (names) => names.length <= 1 ? (names[0] || "")
+  : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+
+/* The answer, in the generator's own words.
+
+   Everything printed here is something the engine said: the day name is the
+   one generateFromPayload just handed back, the muscles are that day's
+   mainGroups, and the hours come from muscleRecoveryStates. Nothing in this
+   function decides anything; it puts the engine's decision into a sentence. */
+function bodyNextEngineAnswer(r) {
+  const label = (g) => (BODY_GROUP_LABELS[g] || g).toLowerCase();
+  const pos = r.dayCount > 1 && r.dayIndex >= 0 ? `, day ${r.dayIndex + 1} of ${r.dayCount}` : "";
+
+  if (r.planFocus) {
+    const n = r.planLeft;
+    const same = r.dayName && r.planFocus.trim().toLowerCase() === r.dayName.trim().toLowerCase();
+    return {
+      headline: r.planFocus,
+      why: `The generator built this one for today and ${n} exercise${n === 1 ? "" : "s"} ${n === 1 ? "is" : "are"} still to do.`
+        + (same || !r.dayName ? "" : ` After it, the rotation moves to ${r.dayName.toLowerCase()}.`),
+    };
+  }
+
+  const headline = r.dayName || "Anything at all";
+  if (!r.states.size) {
+    return {
+      headline,
+      why: `Nothing is logged yet, so every muscle reads rested and the engine starts the week at ${headline.toLowerCase()}${pos}.`,
+    };
+  }
+
+  const leads = r.dayGroups.length ? ` It leads on ${bodyPhraseAnd(r.dayGroups.map(label))}.` : "";
+  /* The muscles this day is FOR that are not repaired yet. Worth saying
+     because it is the one place the engine's answer can look wrong from the
+     figure above, and the reason it is not wrong is a rule worth learning. */
+  const busy = r.dayGroups
+    .map((g) => ({ g, s: r.states.get(g) }))
+    .filter((x) => x.s && x.s.state !== "ready")
+    .sort((a, b) => a.s.hoursSince - b.s.hoursSince);
+  const fresh = busy.filter((x) => x.s.state === "hold");
+
+  let caveat = "";
+  if (fresh.length) {
+    const names = bodyPhraseAnd(fresh.map((x) => label(x.g)));
+    caveat = ` Your ${names} ${fresh.length > 1 ? "were" : "was"} worked in the last ${BODY_FRESH_HOURS} hours;`
+      + ` the engine took this day anyway because no day of your week is clear of fresh muscle right now.`;
+  } else if (busy.length) {
+    const x = busy[0];
+    caveat = ` Your ${label(x.g)} last worked ${Math.round(x.s.hoursSince)} hours ago, which is past the first day,`
+      + ` and the engine counts that as trainable.`;
+  }
+
+  return {
+    headline,
+    why: `Ask for a workout now and this is what the engine builds${pos}.${leads}${caveat}`,
+  };
+}
+
+async function renderBodyNext(animate) {
+  const reading = await bodyNextReading();
+  const areas = reading ? reading.areas : bodyAreaStates();
   const trained = areas.filter((a) => a.lastDate);
   const ready = areas.filter((a) => a.state === "ready");
   const okToTrain = areas.filter((a) => a.state === "ok").sort((a, b) => a.hoursLeft - b.hoursLeft);
@@ -33511,11 +33752,12 @@ function renderBodyNext(animate) {
     : names.slice(0, -1).join(", ") + " or " + names[names.length - 1];
   // "or" offers a choice, which is right for a suggestion and wrong for a
   // statement about what you already did.
-  const phraseAnd = (names) => names.length <= 1 ? (names[0] || "")
-    : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+  const phraseAnd = bodyPhraseAnd;
 
   let headline, why;
-  if (!trained.length) {
+  if (reading) {
+    ({ headline, why } = bodyNextEngineAnswer(reading));
+  } else if (!trained.length) {
     headline = "Anything at all";
     why = "Nothing logged yet, so there is nothing to balance against. The first session sets the baseline.";
   } else {
@@ -33547,6 +33789,10 @@ function renderBodyNext(animate) {
       why = `Everything you train was worked in the last ${BODY_FRESH_HOURS} hours. A walk or an easy ride does not set that back.`;
     }
   }
+  /* Said out loud rather than swallowed. This reading and the generator's can
+     differ, and somebody comparing this card with the workout tab deserves to
+     know which one they are looking at. */
+  if (!reading) why += " The generator could not be reached just now, so this is the app's own reading of your logs rather than its.";
 
   // This week against the same point last week, so a Tuesday is never
   // compared with a full seven days.
@@ -33574,6 +33820,19 @@ function renderBodyNext(animate) {
         kind === "go" ? "" : ` <i>${Math.ceil(a.hoursLeft)}h</i>`}</span>`).join("")
     : `<span class="nx-none">None</span>`;
 
+  /* The two rows that only exist when the engine answered, because neither is
+     something this file can work out for itself: which day of the split comes
+     next, and which groups the body picker marked. */
+  const markedRow = !reading ? "" : `
+      <div class="nx-row"><span class="nx-k">You marked</span><span class="nx-v">${
+        reading.marked.length
+          ? reading.marked.map((g) => `<span class="nx-chip">${escapeHtml(BODY_GROUP_LABELS[g] || g)}</span>`).join("")
+          : `<span class="nx-none">Nothing, so the plan spreads volume evenly</span>`}</span></div>`;
+  const splitRow = !reading || !reading.dayName ? "" : `
+      <div class="nx-row"><span class="nx-k">Rotation</span><span class="nx-v nx-text">${
+        escapeHtml(reading.dayName + (reading.dayCount > 1 && reading.dayIndex >= 0
+          ? `, day ${reading.dayIndex + 1} of ${reading.dayCount}` : ""))}</span></div>`;
+
   $("biNext").innerHTML = `
     <div class="nx-answer${animate ? " bi-anim" : ""}" style="--d:120ms">
       <div class="nx-head">${escapeHtml(headline)}</div>
@@ -33583,6 +33842,8 @@ function renderBodyNext(animate) {
       <div class="nx-row"><span class="nx-k">Ready now</span><span class="nx-v">${chips(ready, "go")}</span></div>
       <div class="nx-row"><span class="nx-k">Fine to train</span><span class="nx-v">${chips(okToTrain, "easy")}</span></div>
       <div class="nx-row"><span class="nx-k">Give it a day</span><span class="nx-v">${chips(holding, "rest")}</span></div>
+      ${markedRow}
+      ${splitRow}
       <div class="nx-row"><span class="nx-k">This week</span><span class="nx-v nx-text">${escapeHtml(weekLine)}</span></div>
     </div>`;
   $("biNextInfoSlot").innerHTML = infoDot("trainNext", "How this is worked out");
@@ -34498,12 +34759,48 @@ const LIFT_STANDARDS = {
      about 0.80 of a barbell bench in total, and half of that total is what
      gets logged, so one dumbbell at 0.40 of the barbell threshold is the same
      achievement. Anybody logging the pair instead will read about a level and
-     a half high, which is the one thing this convention has to hold. */
+     a half high, which is the one thing this convention has to hold.
+
+     Strength Level publishes its dumbbell tables the same way, which is worth
+     knowing because it is the biggest public sample of the convention:
+     "dumbbell weights are for one dumbbell". So the numbers on that site and
+     the numbers in this app mean the same thing, and a ratio taken from there
+     can be used here without halving it first. */
   "dumbbell bench press":   ["bench", 0.40],
   "incline dumbbell press": ["bench", 0.34],
+  /* The barbell decline sits at 1.05 of the bench, so its dumbbell reads
+     1.05 x 0.80 / 2. Added because the library offers this movement and its
+     incline sibling was already scored: one of the two carrying a level and
+     the other not is the kind of hole nobody reports, they just stop
+     believing the feature. */
+  "decline dumbbell press": ["bench", 0.42],
   "dumbbell shoulder press":["press", 0.40],
   "seated dumbbell press":  ["press", 0.40],
   "dumbbell row":           ["row", 0.48],
+
+  /* ---- Dumbbells below the waist ----
+     Mo asked why a person whose legs are trained with dumbbells reads no
+     level. These three close that, and the first of them breaks the per-hand
+     rule above, which is the trap worth writing down.
+
+     A GOBLET SQUAT is one implement held in two hands. There is no pair and
+     nothing to halve, so its factor is the plain ratio between the movement
+     and the barbell squat: Strength Level's goblet squat and squat tables
+     average 95 lb against 303 lb across all levels, which is 0.31. It also
+     means this lift runs out of dumbbell before it runs out of legs, so Elite
+     on a goblet squat is not really reachable and is not meant to be.
+
+     The other two are a pair, logged per hand like the presses. The dumbbell
+     Romanian deadlift lands on 0.34 from both directions, which is why it is
+     the one to trust: Strength Level's table at 180 lb (67 / 98 / 136 / 177
+     per dumbbell) is 0.32 to 0.37 of our own deadlift thresholds, and the
+     table's own derivation, barbell RDL at 0.85 x the 0.80 pair ratio / 2,
+     gives 0.34 exactly. The dumbbell lunge is Strength Level's ratio alone,
+     63 lb per hand against a 289 lb squat, and it is a single-leg movement,
+     which is why the number looks small next to the squat it is scored on. */
+  "goblet squat":               ["squat", 0.31],
+  "dumbbell romanian deadlift": ["deadlift", 0.34],
+  "dumbbell lunge":             ["squat", 0.22],
 
   /* ---- Machines ----
      Mo: "machines you can just do that too." In they go, and they are the
