@@ -24813,10 +24813,16 @@ async function applySwap(chosen, source) {
 
   /* Nothing announces the record itself, the row redrawing above is the
      feedback. Mirrored into ALL_SWAPS as well as written, so the next
-     generate carries it without waiting for the next loadAll. */
+     generate carries it without waiting for the next loadAll.
+
+     Only once it has actually landed. A rejected write used to be mirrored
+     anyway, so memory and the table disagreed until the next reload and the
+     generator was fed swaps the database had refused. A write that was queued
+     offline is not mirrored either: flushQueue reloads everything once it
+     lands, and a generate needs the network the queue is waiting for. */
   const row = { email: MY_EMAIL, entry_date: date, planned_exercise: planned, chosen_exercise: chosen, source };
-  await safeWrite("exercise_swaps", "insert", row);
-  ALL_SWAPS.push({ ...row, created_at: new Date().toISOString() });
+  const landed = await safeWrite("exercise_swaps", "insert", row);
+  if (landed) ALL_SWAPS.push({ ...row, created_at: new Date().toISOString() });
 
   /* The saved plan has to move with the screen: loadTodayWorkout re-reads
      ai_workouts on the next loadAll, and a stale row would put the movement
@@ -25007,10 +25013,15 @@ async function switchRemainderToBodyweight() {
   }
   saveSessionToStorage();
 
-  // Mirrored into ALL_SWAPS the same way applySwap does, so the next generate
-  // sees these without waiting on the next loadAll.
-  await safeWrite("exercise_swaps", "insert", swapRows);
-  ALL_SWAPS.push(...swapRows.map((r) => ({ ...r, created_at: new Date().toISOString() })));
+  /* Mirrored into ALL_SWAPS the same way applySwap does, so the next generate
+     sees these without waiting on the next loadAll, and for the same reason
+     only once the insert has landed. This is one batch, and until
+     20260919_exercise_swaps_source.sql runs the table's check rejects every
+     row of it: 'no-equipment' was not a source the day the table was made.
+     The plan upsert below still goes ahead, because the swapped lifts are on
+     the screen whether or not the preference record made it. */
+  const landed = await safeWrite("exercise_swaps", "insert", swapRows);
+  if (landed) ALL_SWAPS.push(...swapRows.map((r) => ({ ...r, created_at: new Date().toISOString() })));
   /* Same upsert key and same shape applySwap writes with: the saved plan has
      to move with the screen, or a reload puts the equipment lifts straight
      back in front of them. */
