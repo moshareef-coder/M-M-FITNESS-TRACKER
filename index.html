@@ -4189,6 +4189,11 @@
   .goal-tile-grid.plain .goal-row { padding: 15px 14px; }
   .goal-tile-grid.plain .goal-row-title { font-size: 16.5px; font-weight: 700; }
   .goal-row-sub { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
+  /* What an extra goal adds, under its row, indented to the title (14px pad,
+     34px icon, 12px gap). `flat` is the engine saying it adds nothing, which
+     is the one line here that is a warning. */
+  .goal-row-effect { display: block; padding: 0 14px 12px 60px; font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+  .goal-row-effect.flat { color: var(--warn); }
   .goal-row-chev { flex: none; color: var(--muted); display: grid; place-items: center; }
   .goal-row-badge { flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
                     padding: 3px 8px; border-radius: 100px; background: var(--accent); color: var(--bg); }
@@ -10978,9 +10983,11 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
             ? icon(isOpen ? "chevronDown" : "chevronRight", 17)
             : `<span class="goal-row-tick${main || alsoCount ? " on" : ""}">${main || alsoCount ? icon("check", 14) : ""}</span>`}</span>
         </button>
+        ${alsoCount ? `<span class="goal-row-effect" data-effect="${t.id}"></span>` : ""}
         ${kids}
       </div>`;
     }).join("");
+    paintEffects();
 
     grid.querySelectorAll("[data-tile]").forEach((b) => {
       b.onclick = () => {
@@ -11025,6 +11032,43 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
   function paintConfirm() {
     confirmEl.disabled = !primary;
     confirmEl.textContent = primary ? confirmLabel : "Pick a goal first";
+  }
+
+  /* What each extra goal will add to the plan, under its row, the moment it
+     is tapped. Measured across every pickable pair on 2026-09-19: 20 of 36
+     change nothing at all, and the 16 that do change only the weekly cardio
+     and the cool-down, never a lift. goalOutcomeFor could say so, but only
+     after a plan had been built and the picker reopened, which is never
+     during onboarding. resolveGoal is the exact function buildPlan asks, and
+     it is pure, so its answer is the plan's answer and can be given now.
+     Nothing here stops the pick: it is the person's to keep. */
+  let effectGen = 0;
+  async function paintEffects() {
+    const gen = ++effectGen;
+    if (!primary || !extras.length) return;
+    const mod = await ensureGoalEngine();
+    if (gen !== effectGen || !mod) return;
+    let r;
+    try { r = mod.resolveGoal({ bubble: primary.bubble, child: primary.child, secondary: extras }); }
+    catch (e) { console.warn("goal effect", e); return; }
+    const main = goalTileFor(primary.bubble)?.title || "your main goal";
+    const same = (a, b) => a && b && a.bubble === b.bubble && (a.child || null) === (b.child || null);
+    const lines = {};
+    for (const e of extras) {
+      const hit = (r.secondary || []).find((s) => same(s, e));
+      const dropped = (r.ignoredSecondary || []).find((s) => same(s, e));
+      const effect = hit ? hit.effect.filter((s) => typeof s === "string" && s.trim()) : [];
+      const text = dropped ? `Not used: ${dropped.why}.`
+        : effect.length ? `Adds ${effect.join(", and ")}.`
+        : `Changes nothing alongside ${main}.`;
+      (lines[e.bubble] ??= []).push({ text, flat: !effect.length });
+    }
+    for (const [bubble, list] of Object.entries(lines)) {
+      const el = grid.querySelector(`[data-effect="${bubble}"]`);
+      if (!el) continue;
+      el.textContent = list.map((l) => l.text).join(" ");
+      el.classList.toggle("flat", list.every((l) => l.flat));
+    }
   }
 
   confirmEl.onclick = () => {
@@ -12566,7 +12610,7 @@ const OB_STEPS = ["name", "intro", "goal", "about", "tune", "styles", "days", "p
    `kind` is what the page looks like:
      focus   the existing Focus areas picker, figure and all, reused rather
              than rebuilt so onboarding and Setup cannot drift apart
-     sore    the same picker asking the opposite question, where it bothers you
+     hurts   the limits sheet's eight joints as chips, into profiles.limits
      choice  a short list of chips
    `field` is where the answer lands on the draft. */
 const GOAL_TUNE = {
@@ -12592,9 +12636,22 @@ const GOAL_TUNE = {
       { id: "distance", label: "Going further", sub: "Longer runs or rides" },
       { id: "speed", label: "Going faster", sub: "Intervals and tempo work" },
     ] },
-  "move-better": { kind: "sore", field: "tune_move",
-    title: "Where does it bother you most?",
-    sub: "Tap anywhere stiff or sore and the mobility work builds around it. This is not medical advice, and if something actually hurts, see someone about it." },
+  /* Was a body map asking "where does it bother you most?", writing through
+     bodyRegionFocusEntries into focus_groups, the same column the "what do
+     you want to grow" map writes. Measured on 2026-09-19: tapping Back on
+     the sore map took lats from 8 to 11 weekly sets and lower back from 0 to
+     5. A screen inviting people to report pain answered by loading it.
+
+     The engine has exactly one input that responds to a sore joint, and it is
+     limits.hurts: every lift, warm-up move and stretch joint-load.mjs says
+     loads that joint comes out, and the plan says what that cost. It has no
+     way to bias the mobility block toward a region (mobilityFor covers the
+     groups the day worked), so the old copy promised something nothing could
+     deliver. This asks the limits sheet's own question, in its own eight
+     joints, into its own column, so Setup > Limits opens on the same answer. */
+  "move-better": { kind: "hurts", field: "hurts",
+    title: "Does anything hurt?",
+    sub: "Tap it and nothing in the plan loads it, lifts, warm-up and stretches included. Each chip says what that costs. This is not medical advice, and if something actually hurts, see someone about it." },
 };
 
 /* Every tuning answer on the draft, as one object keyed by goal. One column
@@ -12604,6 +12661,10 @@ const GOAL_TUNE = {
 function goalTuningPatch(data) {
   const out = {};
   for (const [goalId, spec] of Object.entries(GOAL_TUNE)) {
+    /* The hurts answer has a column of its own, profiles.limits, and the
+       engine reads it from there. A copy in goal_tuning would be a second
+       record of the same answer that Setup > Limits could never update. */
+    if (spec.kind === "hurts") continue;
     const v = data[spec.field];
     if (v === undefined || v === null) continue;
     if (Array.isArray(v) && !v.length && !data[spec.field + "_all"]) continue;
@@ -12744,9 +12805,23 @@ function wireTrainStylePicker(root, picked, onChange) {
    the way quips.mjs does it, so the line is worth reading when it appears. */
 function trainStyleNote(picked) {
   if (!picked.length) return "Pick at least one.";
-  const has = (k) => picked.some((id) => TRAIN_STYLES.find((t) => t.id === id)?.mod === k);
-  return has("weight-training") ? ""
-    : "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle.";
+  const of = (k) => picked.map((id) => TRAIN_STYLES.find((t) => t.id === id)).filter((t) => t?.mod === k);
+  if (!of("weight-training").length) {
+    return "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle.";
+  }
+  /* What a second style next to lifting actually buys, said here because the
+     cards cannot: a single generated session is the lifting day whatever
+     else is ticked (measured byte-identical on 2026-09-19), and the run or
+     the class arrives only through the week builder, which gives cardio one
+     day and a class one day (weekGenKinds). Two cardio styles still share
+     the one day, so they are listed with "or". */
+  const names = (list) => list.map((t) => t.label.toLowerCase()).join(" or ");
+  const parts = [];
+  if (of("cardio").length) parts.push(`one day of ${names(of("cardio"))}`);
+  if (of("flow").length) parts.push(`one day of ${names(of("flow"))}`);
+  return parts.length
+    ? `Lifting is the backbone. Generate the week and it gets ${parts.join(" and ")}. A single session on its own is still a lifting day.`
+    : "";
 }
 
 /* How many training days each step is worth on the bar. Not evenly spaced,
@@ -13036,15 +13111,25 @@ function renderOnboardStep(step, data = {}) {
       <div class="ob-step">
         ${obChrome("about", data)}
         <h1>About you</h1>
+        ${/* Measured with the about step's other two: the first plan is byte
+              identical for Male and Female. What sex does is draw the figure
+              and decide what gets put forward (Pilates), so that is what it
+              says. */ ""}
+        <p class="sub">This draws your figure and shapes the suggestions. The first plan is the same either way.</p>
         <div class="ob-sexes" id="sexGrid">
           ${SEX_TILES.map((s) => `<button type="button" class="ob-sex${sexPick === s.id ? " on" : ""}" data-sex="${s.id}">${escapeHtml(s.label)}</button>`).join("")}
         </div>
-        <label class="ob-lab">Height</label>
+        <label class="ob-lab">Height <span class="ob-opt">for the healthy-weight line and the calorie estimate, not the training</span></label>
         <div class="ob-row">
           <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
           <input id="obIn" type="number" inputmode="numeric" min="0" max="11" placeholder="inches" value="${inv}" />
         </div>
-        <label class="ob-lab">Weight <span class="ob-opt">it sets your starting loads</span></label>
+        ${/* Said "it sets your starting loads". Measured on 2026-09-19: on day
+              one 130 lb and 260 lb build byte-identical plans, and once there
+              are logs the number only caps what gets extrapolated from them.
+              Loads come from what somebody lifts. What the number does on day
+              one is start the chart. */ ""}
+        <label class="ob-lab">Weight <span class="ob-opt">your first weigh-in. Loads come from what you log; this only caps them</span></label>
         <div class="ob-row">
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
@@ -13127,9 +13212,57 @@ function renderOnboardStep(step, data = {}) {
       return;
     }
 
-    /* focus and sore are the SAME picker asking opposite questions, and since
-       2026-09-17 that picker is the region body, not Setup's fourteen muscle
-       map. Mo cut the detail here and nowhere else: "big regions, not muscles,
+    /* The limits sheet's question, asked on the way in for the one goal whose
+       tile says "less pain". Same chips, same hints, same engine list
+       (ensureLimitsLists), and the answer lands in profiles.limits through
+       saveLimits at the end of the run, so Setup > Limits opens on it.
+
+       Nothing tapped and Continue is an answer too: an empty hurts list is
+       written, so limits stops being null and the plan screen's after-plan
+       offer, which fires on null, does not ask the same person twice. Back
+       leaves the draft exactly as it was. */
+    if (spec.kind === "hurts") {
+      const chosen = new Set(Array.isArray(data[spec.field]) ? data[spec.field] : []);
+      ob.innerHTML = `
+        <div class="ob-step">
+          ${obChrome("tune", data)}
+          ${eyebrow}
+          <h1>${escapeHtml(spec.title)}</h1>
+          <p class="sub">${escapeHtml(spec.sub)}</p>
+          <div class="limit-chips" id="tuneHurtChips"><p class="muted-note">Loading the options...</p></div>
+          <button type="button" class="btn-primary" id="tuneNext">Nothing hurts</button>
+          <button type="button" class="btn-ghost" id="tuneBack">Back</button>
+        </div>`;
+      const label = () => { $("tuneNext").textContent = chosen.size ? "Work around those" : "Nothing hurts"; };
+      let areas = [];
+      ensureLimitsLists().then(({ BODY_AREAS }) => {
+        if (!$("tuneHurtChips")) return;   // navigated on before the module arrived
+        areas = BODY_AREAS;
+        $("tuneHurtChips").innerHTML = BODY_AREAS.map((a) => `<button type="button" class="limit-chip${chosen.has(a.key) ? " on" : ""}"
+            data-hurt="${escapeHtml(a.key)}" aria-pressed="${chosen.has(a.key)}"><b>${escapeHtml(a.label)}</b><i>${escapeHtml(a.hint)}</i></button>`).join("");
+        ob.querySelectorAll("[data-hurt]").forEach((b) => b.onclick = () => {
+          const k = b.dataset.hurt;
+          chosen.has(k) ? chosen.delete(k) : chosen.add(k);
+          b.classList.toggle("on", chosen.has(k));
+          b.setAttribute("aria-pressed", String(chosen.has(k)));
+          label();
+        });
+      }).catch((e) => {
+        console.error("limits: the engine's lists failed to load", e);
+        if ($("tuneHurtChips")) $("tuneHurtChips").innerHTML = `<p class="muted-note">Could not load the options. You can answer this later in Setup.</p>`;
+      });
+      label();
+      /* The engine's own order, not tap order, the way saveLimitsPage does it,
+         so two people who said the same thing store the same thing. */
+      $("tuneNext").onclick = () => onNext({ [spec.field]: areas.filter((a) => chosen.has(a.key)).map((a) => a.key) });
+      $("tuneBack").onclick = back;
+      return;
+    }
+
+    /* The focus question, on the region body rather than Setup's fourteen
+       muscle map since 2026-09-17. (The sore question used to share this
+       picker; it is the hurts page above now, because what it wrote here was
+       focus volume.) Mo cut the detail here and nowhere else: "big regions, not muscles,
        this is too much in the beginning". Setup still gets the muscles and the
        tiers, and bodyRegionFocusEntries() writes the same column in the same
        shape, so the two screens still cannot disagree about what was asked
@@ -13298,54 +13431,92 @@ function renderOnboardStep(step, data = {}) {
        "the last one makes me feel stressed, I do not want to do it." A colour
        that talks somebody out of the hardest option is not a warning, it is a
        leak. */
-    const TIERS = [
-      { id: "easy", days: [1, 2], mins: 30, head: "Easy", heat: 0,
-        detail: "1 to 2 days a week, about 30 minutes." },
-      { id: "steady", days: [3, 4], mins: 45, head: "Steady", heat: 2,
-        detail: "3 to 4 days a week, about 45 minutes. Sometimes a short second session on the same day." },
-      { id: "allin", days: [5, 6], mins: 60, head: "All in", heat: 3,
-        detail: "5 to 6 days a week, about 60 minutes. Room to double up on a day when you feel like it." },
+    /* The tiers used to be fixed at 1 to 2, 3 to 4 and 5 to 6 days for every
+       goal, and wrote the top of each range. Measured on 2026-09-19 across
+       all seven goals: 8 of 21 tile-by-goal combinations built a week outside
+       the range on the tile, because plan.mjs clamps the ask to the goal's own
+       minDays..maxDays. All in never built six for any goal, Easy built three
+       for five of the seven, and the commit screen then had people promising
+       "5 to 6 days a week" for a week that was going to be four.
+
+       So the rungs come off the goal's own range now, read from the engine,
+       and each one is a single number rather than a span: it is the number
+       the engine builds, and the commit screen repeats it. A goal whose range
+       is only two wide gets two rungs, because a third would have to repeat
+       a number under a bigger word. */
+    const LADDER = [
+      { id: "easy", head: "Easy", heat: 0, mins: 30 },
+      { id: "steady", head: "Steady", heat: 2, mins: 45 },
+      { id: "allin", head: "All in", heat: 3, mins: 60 },
     ];
-    const chosen = data.intensity || null;
+    const tiersFor = ([lo, hi]) => {
+      const counts = [lo, Math.round((lo + hi) / 2), hi];
+      const seen = new Set();
+      return LADDER.map((r, i) => ({ ...r, days: counts[i] })).filter((t) => {
+        if (seen.has(t.days)) return false;
+        seen.add(t.days);
+        return true;
+      }).map((t) => ({
+        ...t,
+        detail: `${t.days} days a week, about ${t.mins} minutes.`
+          + (t.days === hi && lo !== hi ? " The most this goal builds: past it, the recovery between sessions is what gives." : ""),
+      }));
+    };
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("days", data)}
         <h1>How hard do you want to go?</h1>
         <p class="sub">Pick the one you would still do in a bad week. All of it moves later.</p>
-        <div class="ob-tiers" id="tierGrid">
-          ${TIERS.map((t) => `<button type="button" class="ob-tier heat-${t.heat}${chosen === t.id ? " on" : ""}" data-tier="${t.id}">
+        <div class="ob-tiers" id="tierGrid"><p class="muted-note">Working out what this goal needs...</p></div>
+        <button class="btn-primary" id="daysNext" disabled>Show me the plan</button>
+        <button class="btn-ghost" id="daysBack">Back</button>
+      </div>`;
+    $("daysNext").onclick = () => renderOnboardStep("plan", data);
+    $("daysBack").onclick = () => renderOnboardStep("styles", data);
+    goalDayRange({ bubble: data.goal_bubble, child: data.goal_child, secondary: data.goal_secondary }).then((range) => {
+      if (!$("tierGrid")) return;   // navigated on before the engine arrived
+      /* No engine, no promise: the plan step falls back to the goal's legacy
+         day count, which the engine will still clamp, and the tile that would
+         have said a number nobody checked is not drawn. */
+      if (!range) {
+        $("tierGrid").innerHTML = `<p class="muted-note">Could not load this goal's range. We will start it at a sensible week and you can change it in Setup.</p>`;
+        data.intensity = null; data.days_per_week = null; data.days_range = null;
+        $("daysNext").disabled = false;
+        return;
+      }
+      const TIERS = tiersFor(range);
+      /* A draft's pick survives only if the rung still exists for this goal,
+         and its number is re-read off the rung rather than trusted from the
+         draft, because the draft may have been saved by the fixed tiers. */
+      const kept = TIERS.find((t) => t.id === data.intensity) || null;
+      const apply = (t) => {
+        data.intensity = t.id;
+        data.days_per_week = t.days;
+        data.days_range = [t.days, t.days];
+        if (!data.session_minutes_manual) data.session_minutes = t.mins;
+      };
+      if (kept) apply(kept); else { data.intensity = null; data.days_per_week = null; data.days_range = null; }
+      const chosen = data.intensity;
+      $("tierGrid").innerHTML = TIERS.map((t) => `<button type="button" class="ob-tier heat-${t.heat}${chosen === t.id ? " on" : ""}" data-tier="${t.id}">
             <span class="obt-top"><span class="obt-head">${t.head}</span>
               <span class="obt-flame" aria-hidden="true">${Array.from({ length: t.heat / 2 + 1 }).map(() => `<i></i>`).join("")}</span></span>
             <span class="obt-detail"${chosen === t.id ? "" : " hidden"}>${escapeHtml(t.detail)}</span>
-          </button>`).join("")}
-        </div>
-        <button class="btn-primary" id="daysNext"${chosen ? "" : " disabled"}>Show me the plan</button>
-        <button class="btn-ghost" id="daysBack">Back</button>
-      </div>`;
-    ob.querySelectorAll("[data-tier]").forEach((b) => b.onclick = () => {
-      const t = TIERS.find((x) => x.id === b.dataset.tier);
-      data.intensity = t.id;
-      /* The top of the range, because the plan is what we aim at and the bottom
-         of the range is what a bad week looks like rather than what to build.
-         The pair is kept as well, because the plan screen says the range out
-         loud rather than the single number: rest gets suggested, so promising
-         six is promising something we will talk them out of. */
-      data.days_per_week = t.days[1];
-      data.days_range = t.days;
-      if (!data.session_minutes_manual) data.session_minutes = t.mins;
-      ob.querySelectorAll("[data-tier]").forEach((x) => {
-        x.classList.toggle("on", x === b);
-        /* One open at a time. Two tiers with their numbers showing is the wall
-           of text this screen just came out of. */
-        const d = x.querySelector(".obt-detail");
-        if (d) d.hidden = x !== b;
+          </button>`).join("");
+      $("daysNext").disabled = !chosen;
+      ob.querySelectorAll("[data-tier]").forEach((b) => b.onclick = () => {
+        apply(TIERS.find((x) => x.id === b.dataset.tier));
+        ob.querySelectorAll("[data-tier]").forEach((x) => {
+          x.classList.toggle("on", x === b);
+          /* One open at a time. Two tiers with their numbers showing is the wall
+             of text this screen just came out of. */
+          const d = x.querySelector(".obt-detail");
+          if (d) d.hidden = x !== b;
+        });
+        $("daysNext").disabled = false;
+        const say = document.getElementById("obBotSay");
+        if (say) { say.dataset.say = OB_ROBOT.days(data); typeOut(say, say.dataset.say); }
       });
-      $("daysNext").disabled = false;
-      const say = document.getElementById("obBotSay");
-      if (say) { say.dataset.say = OB_ROBOT.days(data); typeOut(say, say.dataset.say); }
     });
-    $("daysNext").onclick = () => renderOnboardStep("plan", data);
-    $("daysBack").onclick = () => renderOnboardStep("styles", data);
     return;
   }
 
@@ -13589,6 +13760,10 @@ function finishOnboardingFromDraft(data) {
     train_styles: Array.isArray(data.train_styles) ? data.train_styles : null,
     committed_at: data.committed_at || null,
     goal_tuning: goalTuningPatch(data),
+    /* A list only when the hurts page was passed, empty list included.
+       Undefined means the page was never shown, and limits stays null so the
+       plan screen still gets to ask once. */
+    hurts: Array.isArray(data.hurts) ? data.hurts : undefined,
   }).then((ok) => { if (!ok) finishOnboardingFromDraft.busy = false; })
     .catch((err) => { console.error(err); finishOnboardingFromDraft.busy = false; toast("Setup failed, try again"); });
 }
@@ -13658,6 +13833,13 @@ async function finishOnboarding(data) {
   const tune = data.goal_tuning?.[data.goal_bubble];
   if (tune && (tune.all || (tune.areas || []).length)) {
     await saveFocusGroups(tune.all ? ["all"] : tune.areas);
+  }
+  /* The hurts page's answer, through the one writer profiles.limits has, in
+     the exact shape the limits sheet writes, so that sheet opens on it. Only
+     when the page was shown: writing an empty answer for everybody else would
+     tell the plan screen the question had been asked when it had not. */
+  if (Array.isArray(data.hurts)) {
+    await saveLimits({ ...emptyLimits(), hurts: data.hurts });
   }
   clearObDraft();
   /* The weight they just typed, logged as what it is: a weigh-in. It is the
@@ -25141,6 +25323,37 @@ function ensurePlanEngine() {
   return planEnginePromise;
 }
 
+/* The goal table on its own, for the two screens that need an answer about a
+   goal before any plan exists: the days step, which has to promise the week
+   buildPlan will actually build, and the goal picker, which says what a
+   second goal adds the moment it is tapped. goal-engine.mjs is a table of
+   numbers plus resolveGoal, which is pure, so this is cheap to import and
+   cheaper than mirroring the table here and watching the two drift. */
+let goalEnginePromise = null;
+function ensureGoalEngine() {
+  if (!goalEnginePromise) {
+    goalEnginePromise = import("/mo-knowledge/engine/goal-engine.mjs")
+      .catch((e) => { console.warn("goal engine", e); return null; });
+  }
+  return goalEnginePromise;
+}
+
+/* [min, max] days a week the engine builds for a goal set, off resolveGoal's
+   own dayRange, so what a screen promises is what plan.mjs clamps to. A
+   retired bubble is routed the way the picker routes it. Null when the engine
+   cannot answer, so a caller can say so rather than guess. */
+async function goalDayRange({ bubble, child = null, secondary = null } = {}) {
+  if (!bubble) return null;
+  const mod = await ensureGoalEngine();
+  if (!mod) return null;
+  try {
+    const pick = migrateGoalPick(bubble, child || null);
+    const r = mod.resolveGoal({ bubble: pick.bubble, child: pick.child, secondary: normaliseGoalSecondary(secondary) });
+    const range = r?.dayRange;
+    return Array.isArray(range) && range.length === 2 && range.every(Number.isFinite) ? range : null;
+  } catch (e) { console.warn("goal day range", e); return null; }
+}
+
 /* The cardio library loader lives further up this file. Two features landed in
    the same week both needing it and both wrote their own; this is the one that
    went, because the other uses a relative specifier and this one used an
@@ -32498,8 +32711,20 @@ function weekGenDays() {
    chose on the plan screen; what is already done this week comes off it, so
    pressing this on Thursday of a four day week after two sessions builds two
    days and not four. Next week owes the whole number. */
-function weekGenTarget(days) {
-  const perWeek = Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week) || weeklyGoalFor(MY_EMAIL) || 4;
+/* The number they chose, held inside the days the engine builds for their
+   goal. This used to read the raw profile number, so a profile saying 6 laid
+   down six sessions while the engine built a three day rotation and the
+   week was the same three days twice. Same clamp plan.mjs applies, read off
+   the same table, so the two cannot disagree. */
+async function weekGenPerWeek() {
+  const chosen = Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week) || weeklyGoalFor(MY_EMAIL) || 4;
+  const range = await goalDayRange({
+    bubble: MY_PROFILE?.goal_bubble, child: MY_PROFILE?.goal_child, secondary: MY_PROFILE?.goal_secondary,
+  });
+  return range ? Math.min(range[1], Math.max(range[0], chosen)) : chosen;
+}
+
+function weekGenTarget(days, perWeek) {
   if (weekGenNext()) return Math.min(perWeek, days.length);
   const week = planWeekDays(0);
   const already = week.filter((d) => d.done || d.trained).length;
@@ -32641,8 +32866,9 @@ async function generateTheWeek() {
 
   const open = weekGenDays();
   if (!open.length) { toast("Nothing left in this week to fill"); return; }
-  let want = weekGenTarget(open);
-  if (!want) { toast(`Your ${Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week) || weeklyGoalFor(MY_EMAIL)} days are already in this week`); return; }
+  const perWeek = await weekGenPerWeek();
+  let want = weekGenTarget(open, perWeek);
+  if (!want) { toast(`Your ${perWeek} days are already in this week`); return; }
 
   /* A day somebody planned by hand is theirs, so it is not written over
      without being asked about. Leaving them alone means they still count: the
