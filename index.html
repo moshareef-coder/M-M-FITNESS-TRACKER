@@ -31087,7 +31087,21 @@ function renderChooseScreen() {
      It used to open a summary sheet whose only offer was a swap, which is not
      what "see the plan" means. */
   if ($("chooseSeeTomorrow")) $("chooseSeeTomorrow").onclick = () => openPlanReview(nextDate);
-  if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = startWorkout;
+  /* Mo, 2026-09-19: "when I press start today's plan or generate workout or
+     whatever, always take me to the workout preview before I start workout.
+     ALWAYS!" This was the one door that did not. Home's button, the FAB, the
+     bot card, the reveal's Let's go and today's session list all land on the
+     plan screen and let its own Begin start the session; this one called
+     startWorkout directly, so the single tap somebody is most likely to make
+     on the workout tab was the single tap that skipped the screen where the
+     plan can still be read, reordered, swapped or shortened.
+
+     Not startWorkout with a preview bolted on: goWorkoutScreen(null) is how
+     every other door gets there, and one way in means the preview cannot drift
+     out of agreement with itself. On a cardio day this lands on that day's
+     card, which IS its preview, and Start the clock is one tap further: one
+     preview, not two. */
+  if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = () => goWorkoutScreen(null);
   /* Planning your own for a day that is not today is the day planner's job,
      not the manual builder's: the builder writes to today. */
   if ($("choosePlanBtn")) $("choosePlanBtn").onclick = () => (allDone ? openDayPlanner(nextDate) : toManual());
