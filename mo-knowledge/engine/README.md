@@ -2025,7 +2025,7 @@ slot a week.
 | `GAIN_RATE_PER_MONTH` | four rungs | two ends and a slide on `effectiveSessions`, holding at the fresh end while loading still works. The four-rung version was stated in YEARS and fed by 90 days, in the one place in the engine that becomes a date on a screen |
 | `mobilityFor` | one rank above theirs | nothing tagged advanced. Byte for byte what every production user already got, since beginner + 1 and novice + 1 both come to "beginner and intermediate stretches" |
 | `scoreAlternatives` | level distance from the USER | distance from the ORIGINAL, asymmetric so harder costs and easier is free, plus +1.5 for a movement they have done. Eligibility is deliberately NOT applied here: this is the menu, and choosing from it is what earns a movement |
-| `cardioSessionFor` | the person's level | `intermediate`, a property of the request rather than of the person. The library's only swim, only HIIT, only jump rope and only stairs session are all tagged intermediate, so a beginner gate answered four of the onboarding sheet's own ticks with nothing at all. Advanced stays out: they named a mode, not a difficulty |
+| `cardioSessionFor` | the person's level | `intermediate`, a property of the request rather than of the person. Running has one beginner row and five intermediate, so a beginner gate handed a runner Easy Run seven days running; before the styles were cut to seven it also answered swimming, HIIT, jump rope and stairs with nothing at all. Advanced stays out: they named a mode, not a difficulty |
 
 ### Sweep deltas
 

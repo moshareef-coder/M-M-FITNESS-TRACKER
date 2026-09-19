@@ -59,10 +59,18 @@ import { PILATES } from "../../knowledge/exercise-library/pilates.mjs";
 import { buildActivitySession, levelFromSessions, MIN_SESSION_MINUTES } from "./activity-session.mjs";
 
 /* The vocabulary onboarding writes. Anything outside it is dropped rather than
-   guessed at: a typo in a text[] column should narrow nothing. */
+   guessed at: a typo in a text[] column should narrow nothing.
+
+   Seven, and it was twelve until 2026-09-19. Swimming, rowing, classes, hiking
+   and sports were on the sheet, and every one of them was a place this engine
+   had to say "cannot build": sports named no session in any library, and the
+   other four had one row or none at the level a person could be given. Mo's
+   call was fewer promises, all kept. A profile saved while those ticks existed
+   may still hold one of the old words; it is dropped here exactly as a typo is,
+   so somebody whose only tick was swimming reads as never asked and keeps a
+   full plan rather than an empty one. */
 export const STYLE_KEYS = Object.freeze([
   "lifting", "home", "running", "cycling", "walking", "pilates", "yoga",
-  "swimming", "rowing", "classes", "hiking", "sports",
 ]);
 
 /* Which of them are resistance training, which are cardio and what cardio mode
@@ -74,11 +82,6 @@ const STYLE_KIND = {
   running: { kind: "cardio", mode: "running" },
   cycling: { kind: "cardio", mode: "cycling" },
   walking: { kind: "cardio", mode: "walking" },
-  swimming: { kind: "cardio", mode: "swimming" },
-  rowing: { kind: "cardio", mode: "rowing" },
-  classes: { kind: "cardio", mode: "hiit" },
-  hiking: { kind: "cardio", mode: "hiking" },
-  sports: { kind: "cardio", mode: null },
   pilates: { kind: "flow", training: "pilates" },
   yoga: { kind: "flow", training: "yoga" },
 };
@@ -185,10 +188,13 @@ function styleNote(cardio, flow) {
    until 2026-09-19, and that was the truth while yoga and Pilates were refused
    wholesale. It is not the truth any more and a sentence that outlives its
    reason is how an app starts lying politely. What is left is narrow and the
-   sentence now says the narrow thing: Sports, which names no session in any
-   library we have; a cardio mode whose only sessions are the hardest tier; a flow
-   library that came back with no move they can do. In all three the honest
-   claim is about the library and not about the app's ambitions. */
+   sentence now says the narrow thing: a cardio library that came back with
+   nothing in the mode they named, or a flow library with no move they can do.
+   In both the honest claim is about the library and not about the app's
+   ambitions. Since the styles were cut to seven on 2026-09-19 no tick a person
+   can make reaches this sentence with the library as it ships; it stays because
+   the library can change under it, and a refusal that is never needed costs
+   nothing, where a missing one costs somebody a week. */
 export function refusalNote(cardio, flow) {
   const what = cardio && flow ? "cardio and mobility" : cardio ? "cardio" : flow ? "mobility work" : "what you picked";
   return `This is a lifting session, not the ${what} week you picked: nothing in the ${what} library fits what you asked for, `
@@ -210,10 +216,11 @@ function daySeed(today) {
 /* The cardio half of a week with no lifting in it, out of the library the app
    already reads, or null when there is nothing honest to build.
 
-   Null rather than an empty day, and it matters: somebody who ticked only
-   Sports has no mode the library knows (see STYLE_KIND), and `cardioFor`
-   answers a modeless ask with EVERY session it has, so building from that
-   would hand a five a side player an Easy Run and call it their choice.
+   Null rather than an empty day, and it matters: `cardioFor` answers a mode
+   it cannot serve with EVERY session it has, so building from an unfiltered
+   answer would hand somebody a session in a mode they never ticked and call
+   it their choice. That is what happened while Sports was a tick with no mode
+   behind it, and it is why the modes are filtered again on the way out.
 
    Until 2026-09-19 this also refused a yoga-only week, on the grounds that a
    flow session is a move list with nowhere to sit in the shape this engine
@@ -232,25 +239,25 @@ export function cardioSessionFor(styles, { today = new Date(), minutes = null } 
      request: they ticked this mode by name, so everything in it short of the
      hardest tier is open to them.
    *
-     The reason it is not simply "beginner" is a measured one. The library's only
-     swim is tagged intermediate ("Easy Swim"), and so is the only HIIT session,
-     the only jump rope session and the only stairs session. A beginner gate
-     therefore answered four of the modes on the onboarding sheet with nothing at
-     all, and somebody who ticked Swimming got told we could not build their
-     week. Refusing to build the thing a person asked for, because of a
-     difficulty tag on the only row that could have served it, is the same
-     paternalism this whole change removes.
+     The reason it is not simply "beginner" is a measured one. Of the three
+     modes left on the sheet, running has exactly one row tagged beginner (Easy
+     Run) and five tagged intermediate, so a beginner gate handed a runner the
+     same Easy Run on every day of the week. It used to be worse than that: the
+     only swim, HIIT, jump rope and stairs rows were all intermediate, so the
+     gate answered four ticks with nothing at all. Those ticks are gone, and the
+     seven day Easy Run is reason enough on its own. Refusing variety a person
+     asked for, over a difficulty tag, is the paternalism this change removed.
    *
      Advanced stays out, and that line is drawn where the request stops. They
-     named a mode, not a difficulty. Sprint Intervals and a Threshold Row are the
-     two rows behind it, and nothing anybody ticked says they want either.
+     named a mode, not a difficulty. Sprint Intervals is the one row behind it
+     in the three modes left, and nothing anybody ticked says they want it.
 
      Filtered again on the way out, and this is not belt and braces. `cardioFor`
      answers a mode it cannot serve with everything else it has, which is the
      right call for a week planner choosing among several modes and the wrong one
-     here: it is how somebody who ticked Swimming was handed an Easy Spin on a
-     stationary bike under a note saying the week was cardio only "because that
-     is what you picked". */
+     here: it is how somebody who ticked Swimming, while that was a tick, was
+     handed an Easy Spin on a stationary bike under a note saying the week was
+     cardio only "because that is what you picked". */
   const all = cardioFor({ modes, level: "intermediate" }).filter((s) => modes.includes(s.mode));
   if (!all.length) return null;
   /* The clock they gave us, applied the same way plan.mjs applies it to a
@@ -454,7 +461,8 @@ export function flowSessionFor(styles, { training = null, today = new Date(), as
    for somebody who also ticked Yoga the honest answer
    to that refusal is the yoga day they also asked for, not the lifting day
    they did not. Null, and with it the refusal note, only when NOTHING in the
-   ring can be built: a Sports-only week, or a library that comes back empty. */
+   ring can be built, which with the seven styles that are left means a
+   library that came back empty. */
 export function styleDayFor(styles, { today = new Date(), minutes = null, askedMinutes = null, logs = [] } = {}) {
   const ring = [];
   if ((styles?.cardioModes || []).length) ring.push("cardio");

@@ -36,7 +36,7 @@ somebody on day zero who has answered nothing, and it does.
 | `gym_days_this_week` | number | engine | fallback day count when `challenge_target` is absent |
 | `challenge_target` | number | engine | days per week they chose themselves, 2 to 6. Beats everything else |
 | `session_minutes` | number | engine | **new.** How long one session should take, in minutes. Absent, `null`, `0` and nonsense all mean "never answered" and the goal's own session length runs. A real answer replaces it: the week is built to fit the number, in both directions. Clamped to 15 and 120, and the clamp is said in `notes`. **2026-09-12**: a longer answer than the plan needs buys two things that cost no recovery: the rest the clock took back, if a lighter week left room for it, and a ten minute stretching block instead of five. It never buys hard sets past the weekly ceiling, and when there is nothing left to buy it still says so. Ramp sets are NOT among them: they are warm-up, they are on every day that has something to ramp, and no session length decides them |
-| `train_styles` | text[] | engine | **new.** What the person agreed to do, from onboarding: `lifting`, `home`, `running`, `cycling`, `walking`, `pilates`, `yoga`, plus `swimming`, `rowing`, `classes`, `hiking`, `sports`. Strict opt in by product decision: a style not in the list is never planned and there is no floor putting resistance training back. `null`, an empty list and a list of nothing recognisable all mean "never asked" and build exactly the plan built before this column existed. Two resistance styles: `lifting` means a gym and narrows nothing, `home` without `lifting` means bodyweight and dumbbells only and folds into the equipment limit rather than opening a second path through the builder. A limit set by hand on the limits sheet survives the merge. A person who ticked no resistance style gets the day they asked for: a cardio session built from `knowledge/exercise-library/cardio.mjs` (see `workout.cardio`), or a yoga or Pilates class built from those libraries (see `workout.flow`), alternating by date when they ticked both kinds. Where nothing in what they ticked can be built, which today means Sports or a cardio mode with nothing at their level, the lifting day stands and `meta.styles.honoured` is false with a sentence saying so |
+| `train_styles` | text[] | engine | **new.** What the person agreed to do, from onboarding: `lifting`, `home`, `running`, `cycling`, `walking`, `pilates`, `yoga`, and nothing else. **2026-09-19**: `swimming`, `rowing`, `classes`, `hiking` and `sports` were removed by product decision, each having been a place the engine had to refuse; a stored one is dropped like a typo, so a profile holding only removed values reads as "never asked". Strict opt in by product decision: a style not in the list is never planned and there is no floor putting resistance training back. `null`, an empty list and a list of nothing recognisable all mean "never asked" and build exactly the plan built before this column existed. Two resistance styles: `lifting` means a gym and narrows nothing, `home` without `lifting` means bodyweight and dumbbells only and folds into the equipment limit rather than opening a second path through the builder. A limit set by hand on the limits sheet survives the merge. A person who ticked no resistance style gets the day they asked for: a cardio session built from `knowledge/exercise-library/cardio.mjs` (see `workout.cardio`), or a yoga or Pilates class built from those libraries (see `workout.flow`), alternating by date when they ticked both kinds. Where nothing in what they ticked can be built, which no tick on the seven style sheet reaches with the library as it ships, the lifting day stands and `meta.styles.honoured` is false with a sentence saying so |
 | `for_date` | text | engine | **new 2026-09-19.** The day this plan is being written onto, `YYYY-MM-DD`. Read by ONE thing: the seed for the session a no-lifting week gets (`workout.cardio`, `workout.flow`). Without it that seed is the moment of the call, so planning Thursday and Friday in one sitting came back as the same run twice and never turned the cardio/flow ring. Anything that is not an ISO day, this field included when absent, means "today", which is what every client that predates it sends. It changes nothing about a lifting week |
 | `focus` | text | engine | a day name ("Push day"), which day of the week they want. Beats the rotation |
 | `focus_groups` | text[] | engine | the body map pick, now with a priority tier on each entry. `"chest:3"` is red, `"chest:2"` yellow, `"chest:1"` green, and a bare `"chest"` with no tier is yellow, which is what every pick saved before 2026-09-12 means. Muscle group keys or the finer piece keys the zoomed view uses; both are flattened to the app's fourteen groups. The single entry `"all"` is "select my whole body" and expands to every group at green. A jsonb object, `{"chest":3}`, is accepted too, so the column can become jsonb later without the engine changing |
@@ -140,10 +140,11 @@ Before this the engine returned the lifting day regardless, set
 `meta.styles.honoured` to false, attached a note saying "this week is cardio
 only", and left it to the caller to throw the day away and build its own. Two
 claims in one response, one of them false, and whether anybody ever saw a run
-depended on a caller remembering to. Where no session can be built (a mode with
-nothing at their level, or a tick no library can name, which today is Sports)
-the lifting day still stands, `honoured` is false, and `meta.styles.note` says
-so in a sentence beginning "This is a lifting session".
+depended on a caller remembering to. Where no session can be built (a library
+that comes back empty for the mode they named, which none of the seven styles
+reaches today; Sports used to) the lifting day still stands, `honoured` is
+false, and `meta.styles.note` says so in a sentence beginning "This is a
+lifting session".
 
 ### `workout.flow`, the other one
 
@@ -192,9 +193,9 @@ hours would be one short sequence run eight times. What was asked for is said in
 **A week with cardio AND a flow style in it alternates.** Both were ticked and
 both are meant. The ticked kinds go in a ring turned by the date, so consecutive
 days are different kinds and the same day asked twice is the same day. When one
-kind cannot be built the next in the ring is tried, which is why a beginner who
-ticked Swimming and Yoga gets the yoga class rather than the refusal the swim
-alone would have earned.
+kind cannot be built the next in the ring is tried, so a cardio mode the library
+comes back empty for hands the day to the yoga class they also ticked rather
+than to a refusal.
 
 ### `workout.rampSets`, and the one rule the app must not break
 

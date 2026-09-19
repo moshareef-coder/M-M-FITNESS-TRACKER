@@ -374,18 +374,22 @@ function makePayload(seed) {
      that comes back as a run), and a flow-only pick (the week we have to refuse
      out loud). The junk side is about normalizeStyles: a text[] column arrives
      as a CSV through some clients, and a list of nothing recognisable has to
-     read as "never asked" rather than emptying somebody's plan. */
+     read as "never asked" rather than emptying somebody's plan. The five ticks
+     removed on 2026-09-19 (swimming, rowing, classes, hiking, sports) sit on
+     the junk side now and on purpose: a profile saved before the cut can still
+     hold one, and it has to read as noise beside whatever else was ticked. */
   if (r.chance(0.3)) {
     p.train_styles = real
       ? r.pick([
         [r.pick(["lifting", "home"])],
         ["lifting", r.pick(STYLE_KEYS)],
-        [r.pick(["running", "cycling", "walking", "swimming", "rowing", "hiking", "classes", "sports"])],
+        [r.pick(["running", "cycling", "walking"])],
         [r.pick(["yoga", "pilates"])],
         ["walking", "yoga"],
         STYLE_KEYS.slice(),
       ])
-      : r.pick([[], ["Running", " YOGA "], "running,walking", "", ["nonsense"], [null, 3, {}], {}, 7, junk(r), STYLE_KEYS.concat(STYLE_KEYS)]);
+      : r.pick([[], ["Running", " YOGA "], "running,walking", "", ["nonsense"], [null, 3, {}], {}, 7, junk(r), STYLE_KEYS.concat(STYLE_KEYS),
+        ["swimming"], ["sports", "running"], [r.pick(["rowing", "classes", "hiking"]), "yoga"]]);
   }
   if (r.chance(0.2)) p.avoid = real ? [r.pick(LIB_NAMES)] : r.pick([[r.pick(LIB_NAMES)], LIB_NAMES.slice(0, 200), junk(r), [null, 3, {}]]);
 

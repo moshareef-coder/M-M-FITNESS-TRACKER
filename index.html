@@ -20956,13 +20956,21 @@ const CARDIO_ACTS = [
   { key: "walk",       label: "Walk",                                  ico: "walk",     dist: true,  cardio: "walking",    venue: "outdoor" },
   { key: "cycle",      label: "Cycle",         title: "Cycle outside", ico: "bike",     dist: true,  cardio: "cycling",    venue: "outdoor" },
   { key: "treadmill",  label: "Treadmill",   short: "Treadmill",       ico: "run",      dist: true,  cardio: "running",    venue: "gym" },
-  { key: "stairs",     label: "Stair master", short: "Stairs",         ico: "trending", dist: false, cardio: "stairs",     venue: "gym" },
+  /* The stair master, the rower, the elliptical and HIIT carry no `cardio`
+     mode since 2026-09-19, so they are a clock like Other: the library's
+     stairs, rowing, elliptical and HIIT rows are never built into a session
+     any more, on Mo's call that the app offers running, cycling and walking
+     and nothing it has one row for. The machines stay on the shelf because a
+     rowing session is still a thing a person does and logs, and Progress
+     reads the label back out of history. A `cardio` key put back on one of
+     these would offer that mode again from three places at once. */
+  { key: "stairs",     label: "Stair master", short: "Stairs",         ico: "trending", dist: false, venue: "gym" },
   { key: "bikemachine",label: "Bike machine", short: "Bike",           ico: "bike",     dist: true,  cardio: "cycling",    venue: "gym" },
-  { key: "row",        label: "Rowing machine", short: "Rower",        ico: "dumbbell", dist: true,  cardio: "rowing",     venue: "gym", alias: ["row"] },
-  { key: "elliptical", label: "Elliptical",  short: "Elliptical",      ico: "refresh",  dist: false, cardio: "elliptical", venue: "gym" },
+  { key: "row",        label: "Rowing machine", short: "Rower",        ico: "dumbbell", dist: true,  venue: "gym", alias: ["row"] },
+  { key: "elliptical", label: "Elliptical",  short: "Elliptical",      ico: "refresh",  dist: false, venue: "gym" },
   { key: "yoga",       label: "Yoga",                                  ico: "heart",    dist: false, training: "yoga" },
   { key: "pilates",    label: "Pilates",                               ico: "star",     dist: false, training: "pilates" },
-  { key: "hiit",       label: "HIIT",                                  ico: "bolt",     dist: false, cardio: "hiit" },
+  { key: "hiit",       label: "HIIT",                                  ico: "bolt",     dist: false },
   { key: "other",      label: "Other",                                 ico: "clock",    dist: false },
 ];
 
@@ -25182,16 +25190,13 @@ function tunedCardioCategory() {
 }
 
 /* The activity timer speaks in CARDIO_ACTS and the library speaks in modes.
-   Anything with no timer of its own lands on Other, which is a clock and a
-   minutes field, and that is honest: this app cannot coach a swim. */
+   Three modes, because three is what a person can tick (TRAIN_STYLES) and the
+   swap sheet only ever asks the library in the modes somebody opted into. It
+   used to map rowing, HIIT, elliptical, stairs and a swim too, and those went
+   with the styles on 2026-09-19: a mode nobody can tick is never asked for,
+   so an entry for it here is a promise with no way to be called on. */
 const CARDIO_ACT_FOR_MODE = {
-  running: "run", walking: "walk", hiking: "walk", cycling: "cycle",
-  /* Elliptical and stairs used to land on Other, because there was no activity
-     for either and a clock was the honest answer. The machines gave them one,
-     so a swap to Stair Intervals now opens the stair master rather than a
-     stopwatch with no idea what it is timing. Swimming still lands on Other,
-     because this app still cannot coach a swim. */
-  rowing: "row", hiit: "hiit", swimming: "other", elliptical: "elliptical", stairs: "stairs",
+  running: "run", walking: "walk", cycling: "cycle",
 };
 
 /* Up to four, and deliberately no more. This is a choice between genuinely
@@ -40384,13 +40389,16 @@ function trainStyleSetupNote(picked, stored) {
   return trainStyleNote(picked) || "The next plan you generate is built on this.";
 }
 
-/* What actually goes in the column. Anything the grid cannot draw is carried
-   through untouched: styles.mjs knows keys this app does not offer yet
-   (swimming, rowing), and a screen must not delete what it cannot show. */
+/* What actually goes in the column: exactly what is ticked on the grid.
+
+   Until 2026-09-19 anything the grid could not draw was carried through
+   untouched, because styles.mjs knew keys this screen did not offer yet
+   (swimming, rowing) and a screen must not delete what it cannot show. The
+   grid IS the whole vocabulary now, the engine drops those old words as noise,
+   and a value this page cannot show is a value nobody can untick. Saving what
+   is on screen is the only honest write. */
 function trainStylesToSave() {
-  const stored = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : [];
-  const unseen = stored.filter((id) => !TRAIN_STYLES.some((t) => t.id === id));
-  return [...(SETUP_STYLES || []), ...unseen];
+  return [...(SETUP_STYLES || [])];
 }
 
 function renderSetupTab() {
