@@ -11303,7 +11303,7 @@ function closeBodyFocusPage() {
 
    The picker the onboarding tune step asks its one body question with, after
    Mo's 2026-09-17 meeting cut the muscle-level detail out of setup: "big
-   regions, not muscles. I don't want to see too much detail." Five regions on
+   regions, not muscles. I don't want to see too much detail." Four regions on
    the app's own body, front and back at once, and no ranking anywhere on it.
 
    It is a SECOND picker on purpose and Setup's Focus areas is not going
@@ -11315,8 +11315,16 @@ function closeBodyFocusPage() {
    nothing downstream can tell which screen an answer came from.
 
    The difference between them is only how much is on screen. Focus areas asks
-   for fourteen muscles and a ranking; this asks for five regions, and the same
+   for fourteen muscles and a ranking; this asks for four regions, and the same
    figure answers both.
+
+   Those four are FOCUS_AREAS's four, one for one, since 2026-09-18. This
+   shipped with five, legs and core apart, and the app then asked the same
+   question twice and got two different answers into one column: five regions
+   here, four ranked areas there, and nothing downstream able to tell which
+   screen had answered. Core lost, because nobody trains core as a day. It
+   rides with legs here for the same reason it does in FOCUS_AREAS, whose
+   comment makes the argument at more length.
 
    The two exported names are a contract with the onboarding sequence:
      bodyRegionPickerHTML({ sex, selected, sore })   -> markup string
@@ -11334,20 +11342,24 @@ const BODY_REGIONS = Object.freeze([
     groups: ["chest"] },
   { id: "back",  label: "Back", say: "your back",
     groups: ["lats", "traps", "lowerback"] },
-  /* Glutes ride with legs rather than with core. They are trained on leg day,
-     and "legs" is the word somebody points at their own hip and says. */
-  { id: "legs",  label: "Legs", say: "your legs",
-    groups: ["quads", "hamstrings", "glutes", "calves"] },
-  { id: "core",  label: "Core", say: "your core",
-    groups: ["abs", "obliques"] },
+  /* Same six groups in the same order as FOCUS_AREAS's legscore, deliberately,
+     because the spend below pays from the front of this list and Setup's
+     AREA_SPEND pays from the front of that one. Two orders would mean the two
+     screens buying different muscles out of the same answer. Quads, hamstrings
+     and glutes lead because they are the three the budget can actually reach;
+     abs and obliques sit behind them, which is what "core rides with legs"
+     costs and is worth saying out loud. Calves are last for the reason they
+     are last everywhere. */
+  { id: "legscore", label: "Legs and core", say: "your legs and core",
+    groups: ["quads", "hamstrings", "glutes", "abs", "obliques", "calves"] },
 ]);
 const BODY_REGION_IDS = BODY_REGIONS.map((r) => r.id);
 const bodyRegionFor = (id) => BODY_REGIONS.find((r) => r.id === id) || null;
 
 /* How much of each picked region actually gets written, keyed by how many
    regions were picked. Every row costs nine units or fewer against the engine's
-   FOCUS_BUDGET, which is the whole reason this table exists: five regions is
-   fourteen muscle groups, and fourteen groups asked for at once is a request
+   FOCUS_BUDGET, which is the whole reason this table exists: all four regions
+   is fourteen muscle groups, and fourteen groups asked for at once is a request
    focus.mjs answers by silently dropping the tail.
 
    Setup's picker solves the same arithmetic with AREA_SPEND, which pays out by
@@ -11362,14 +11374,22 @@ const BODY_REGION_SPEND = Object.freeze({
   1: [3, 3, 2],   // one region, so go three groups deep into it: 3 + 3 + 2 = 8
   2: [3, 1],      // the lead group of each, hard, and the next one as a nudge: 8
   3: [3],         // the lead group of each, hard: 9, the budget exactly
-  4: [2],         // four leads, one tier down, because four mains do not fit: 8
+  /* There is no row 4. Four regions is every region there is, which
+     bodyRegionFocusEntries answers as the whole body before it ever reaches
+     this table. A row here for a count that cannot arrive is a rule nobody
+     could ever see run, and it used to say "four leads, one tier down" when
+     what four picks now means is that nothing stands out. */
 });
 
-/* All five regions is every muscle group there is, which is the thing the
+/* All four regions is every muscle group there is, which is the thing the
    column already has a word for. "all" is one stored token and not fourteen
    rows, and it is what makes Setup's picker come back reading "Whole body"
-   rather than a list, so five taps here and "Everything level" there land on
-   the same answer. See focusParseStored(). */
+   rather than a list, so four taps here and "Everything level" there land on
+   the same answer. See focusParseStored().
+
+   Four used to be a spend row of its own and five was the whole body. Now that
+   the regions are Setup's four, the last tap is the whole body, which is also
+   the honest reading: somebody who has named every region has named nothing. */
 function bodyRegionsAreWholeBody(ids) {
   return BODY_REGION_IDS.every((id) => ids.includes(id));
 }
@@ -11381,7 +11401,13 @@ function bodyRegionsAreWholeBody(ids) {
 function bodyRegionFocusEntries(ids) {
   const picked = BODY_REGIONS.filter((r) => ids.includes(r.id));
   if (!picked.length || bodyRegionsAreWholeBody(ids)) return [];
-  const tiers = BODY_REGION_SPEND[picked.length] || BODY_REGION_SPEND[4];
+  /* The fallback is unreachable while there are four regions and all four is
+     the whole body, so picked.length is only ever 1, 2 or 3 by the time it is
+     read. It pays one light group per region rather than the deepest row,
+     because the only way to arrive here is a region added without a spend row
+     for it, and the safe answer to a count this table did not plan for is the
+     one that cannot overrun the budget whatever the count turns out to be. */
+  const tiers = BODY_REGION_SPEND[picked.length] || [1];
   const out = [];
   for (const region of picked) {
     tiers.forEach((tier, i) => {
@@ -11395,7 +11421,17 @@ function bodyRegionFocusEntries(ids) {
 /* The way back in, so somebody who taps Back and then Continue sees what they
    already answered rather than an empty body. Exact for the set of regions,
    which is all this screen shows: which groups inside a region the budget paid
-   for is not something it ever put on screen. */
+   for is not something it ever put on screen.
+
+   It is also the whole migration off the five-region picker, and it needs no
+   code of its own: it reads GROUPS, and every group the old five wrote still
+   belongs to exactly one of the four. An old Core pick comes back as Legs and
+   core rather than as nothing, which is the shape that would have been a real
+   loss. An old Legs and an old Core in the same answer come back as one
+   region, because that is what the merge says they always were. The one answer
+   that changes meaning is four of the old five with either Legs or Core among
+   them: that is now every region, so it reads as the whole body and gets no
+   extra. It is the same sentence the person picked, said in the new words. */
 function bodyRegionsFromEntries(entries, all) {
   if (all) return [...BODY_REGION_IDS];
   const { picked } = focusParseStored(Array.isArray(entries) ? entries : []);
@@ -11504,9 +11540,12 @@ async function initBodyRegionFigures(wrap, o) {
        this call. */
     onLoad: () => BODY_PICK_REPAINT?.(),
     /* A tap anywhere on a muscle picks the REGION it belongs to, so a tap on
-       one bicep lights both arms and both shoulders. The regions are the
-       question; the body is the other way of reaching them. Rive's own hit
-       testing hands back the muscle, so there is nothing here to hit test. */
+       one bicep lights both arms and both shoulders, and a tap on the abs
+       lights the legs with them, because Legs and core is one region and half
+       of it lighting up would be the figure disagreeing with the chip. The
+       regions are the question; the body is the other way of reaching them.
+       Rive's own hit testing hands back the muscle, so there is nothing here
+       to hit test. */
     onMuscleClick: (muscle, group) => o.onGroupTap(group),
   });
   BODY_PICK_FRONT_CTRL = make(front, "Front");
@@ -11559,7 +11598,7 @@ function bodyRegionPickerHTML(opts = {}) {
      two pickers on one page could never collide over one; ids here are Body
      Impact's habit and not a requirement.
 
-     aria-hidden on the pair: the chips underneath are the same five choices
+     aria-hidden on the pair: the chips underneath are the same four choices
      with real button semantics, and a screen reader reading a body twice, once
      as an unlabelled canvas and once as names, is worse than one that reads the
      names. */
@@ -12862,12 +12901,16 @@ function renderOnboardStep(step, data = {}) {
     }
 
     /* focus and sore are the SAME picker asking opposite questions, and since
-       2026-09-17 that picker is the five region body, not Setup's fourteen
-       muscle map. Mo cut the detail here and nowhere else: "big regions, not
-       muscles, this is too much in the beginning". Setup still gets the muscles
-       and the tiers, and bodyRegionFocusEntries() writes the same column in the
-       same shape, so the two screens still cannot disagree about what was
-       asked for, only about how much of it they show. */
+       2026-09-17 that picker is the region body, not Setup's fourteen muscle
+       map. Mo cut the detail here and nowhere else: "big regions, not muscles,
+       this is too much in the beginning". Setup still gets the muscles and the
+       tiers, and bodyRegionFocusEntries() writes the same column in the same
+       shape, so the two screens still cannot disagree about what was asked
+       for, only about how much of it they show.
+
+       Since 2026-09-18 the regions are the same four Setup ranks, legs and
+       core together. They were five here and four there, so the app asked one
+       question twice and stored two different answers in one column. */
     const picked = bodyRegionsFromEntries(data[spec.field], data[spec.field + "_all"]);
     ob.innerHTML = `
       <div class="ob-step ob-step-wide">
@@ -12880,8 +12923,8 @@ function renderOnboardStep(step, data = {}) {
         <button type="button" class="btn-ghost" id="tuneBack">Back</button>
       </div>`;
     /* Read off the picker's own callback rather than out of the DOM on the way
-       past, because the figure is the only thing that knows that all five
-       regions is the whole body and not four picks and a leftover. */
+       past, because the picker is the only thing that knows that all four
+       regions is the whole body and not four picks that each get a share. */
     let regions = picked;
     wireBodyRegionPicker($("bodyPickRoot"), { sex: data.sex, onChange: (ids) => { regions = ids; } });
     $("tuneNext").onclick = () => {
