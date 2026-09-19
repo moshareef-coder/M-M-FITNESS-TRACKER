@@ -282,3 +282,42 @@ stationary bike, under a note reading "this week is cardio only, because that is
 what you picked". `cardioSessionFor` in `engine/styles.mjs` now filters the
 result back down to the modes that were asked for and refuses when nothing is
 left, which is honest and is still one fewer person getting the week they chose.
+
+---
+
+## 10. Beginner yoga and Pilates run out of moves before a class is over (2026-09-19)
+
+From 2026-09-19 the engine builds the day itself for somebody who ticked Yoga or
+Pilates and no resistance style, out of `yoga.mjs` and `pilates.mjs` through
+`engine/activity-session.mjs`. That made the size of the beginner pools visible
+on the plan screen, where it had only been visible to a timer before.
+
+Measured off the libraries as they ship, at beginner:
+
+- **Yoga**: about 14 minutes of unique moves, so a 30 minute class is 3 rounds
+  of the same 18 poses and a 45 minute one is 4.
+- **Pilates**: about 8 minutes, so a 30 minute class is 4 rounds and a 45 minute
+  one is 6. Six rounds of the same ten moves is a real thing a person will read
+  on their plan.
+
+Repeating is not wrong, a mat class does repeat and the session says out loud
+how many rounds it is and how small the pool was. Six is past where that reads
+as a class rather than as a library running dry.
+
+**Asked for:** more beginner rows, Pilates first. Pilates has four categories
+and the beginner half of them is thin; ten more beginner mat moves would take a
+30 minute class from four rounds to two. Yoga is less urgent and would benefit
+most in Balance and Core, which are its two smallest categories.
+
+**Also worth having, and cheaper:** a `seconds` on the rows that are not 45
+second moves. Every row in both libraries currently falls back to the default,
+so a two minute Savasana and a 45 second Chair Pose are costed the same, and a
+`perSide: true` on the single sided poses (Warrior I and II, Low Lunge, Tree,
+Half Moon, Side Plank, Single Leg Stretch) would make the clock honest about
+what a round actually takes.
+
+**Why we did not work around it:** padding a class out with moves above the
+person's level, or holding the same pose for longer to fill the minutes, would
+both be the engine inventing content it does not have. The rounds are stated in
+`workout.flow.rounds` and in a note, which is honest and is still a thinner
+class than the person deserves.
