@@ -29,6 +29,14 @@
 --   [ "Goblet Squat, Step-Up and Leg Press are still in this week. ...",
 --     "This is general training guidance. If you are training around pain ..." ]
 --
+-- Since later on 2026-09-19 each entry is an object rather than a bare
+-- sentence, { kind, text }, so the plan screen can order them (injury first)
+-- and fold the rest: kinds are injury, days, secondary, frequency, equipment,
+-- bodymap, missing, deload and progression, see planWarnings() in index.html.
+-- A bare string in the array is still read, as an injury line, because that
+-- was the only kind ever stored as one. The column is jsonb either way and
+-- nothing here changes.
+--
 -- Not a fourth shape in `cardio`. That column already carries three
 -- ({ sessions, minutes, zone }, { session } and { flow }) and
 -- 20260919_ai_workouts_flow_session.sql already says its name is the weakest

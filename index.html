@@ -6820,6 +6820,12 @@
   .gen-scrim .plan-time b { color: #fff; }
   /* What a budget change did, under the control that did it. */
   .plan-time-change { margin: -2px 0 10px; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
+  /* The over-budget line reads as the clock's, not the card's: same muted
+     ink, one weight up, so it is a fact beside the number rather than a nag. */
+  .plan-time-over { font-weight: 600; }
+  /* A fold, not a button: the same link ink as "Back to 45 min" above it, and
+     the padding buys the 44px target without moving the notes around it. */
+  .plan-notes-more { display: block; min-height: 44px; margin: -12px 0 2px; padding: 12px 0; }
   .gen-scrim .plan-time-change { margin: 0 0 12px; text-align: center; color: rgba(255,255,255,.72); }
   .exercise-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .exercise-row:last-child { border-bottom: none; padding-bottom: 0; }
@@ -24571,7 +24577,11 @@ let JUST_GENERATED = null;   // { date }
 
    Keyed by the day and never cleared: a sitting holds at most a week of them,
    and the next generate for a day replaces that day's. */
-const PLAN_WARNINGS = new Map();   // entry_date -> [sentence]
+const PLAN_WARNINGS = new Map();   // entry_date -> [{ kind, text }]
+/* Which day's notes are unfolded past PLAN_NOTES_SHOWN. One day at a time and
+   never persisted: opening the rest of Thursday's lines is a thing you did
+   on Thursday's screen. */
+let PLAN_NOTES_OPEN = null;
 
 /* Matched on the engine's own phrases, so a rewording there costs a line and
    never a plan.
@@ -24584,9 +24594,92 @@ const PLAN_WARNINGS = new Map();   // entry_date -> [sentence]
    what the split cannot fit, where rest was cut, what the ramp-up sets are, and
    "Nothing that loads a bad knee is in here", which is the reassurance rather
    than the warning. Nothing safety shaped is on the wrong side of it. */
-function planWarnings(notes) {
-  return (Array.isArray(notes) ? notes : [])
-    .filter((n) => typeof n === "string" && /stop if it hurts|clinician/i.test(n));
+/* Widened 2026-09-19 to the things a person would ACT on, each typed so the
+   screen can order them and cut them off. The engine says a great deal about
+   a week and most of it is explanation; these are the sentences where the
+   answer is a tap somewhere else in the app: another training day, the goal
+   picker, the limits sheet, the body map, a body weight on the profile.
+
+   Distilled to a line, not carried whole. The engine's frequency note is three
+   sentences and its body map note is four, and a plan screen is not a log.
+   The injury sentence is the one exception and is kept exactly as the engine
+   said it: safety copy is not the place to save a line.
+
+   Measured again over the same 14,580 weeks with these kinds: the median plan
+   carries 2 lines, 5,018 carry three or more, 1,396 carry more than three,
+   and the most any plan carried was 6. Three show and the rest fold behind
+   "more".
+
+   Everything under `meta` is feature detected. `deload`, `progression` and
+   `volume.frequencyCapped` are being added to the response in parallel and
+   render if present and say nothing if absent. `progression` prints only when
+   the rule is not the linear default, since "add weight when every rep lands"
+   is the plan's normal state and a line on every plan is not a line. */
+const PLAN_NOTE_KINDS = ["injury", "days", "secondary", "frequency", "equipment", "bodymap", "missing", "deload", "progression"];
+const PLAN_NOTES_SHOWN = 3;
+
+/* The first sentence of an engine note, which is where each of them puts the
+   fact before the paragraph of why. */
+function noteLead(text, sentences = 1) {
+  return String(text || "").split(/(?<=\.)\s+(?=[A-Z])/).slice(0, sentences).join(" ");
+}
+
+function planWarnings(notes, meta = null) {
+  const out = [];
+  for (const n of Array.isArray(notes) ? notes : []) {
+    if (typeof n !== "string") continue;
+    if (/stop if it hurts|clinician/i.test(n)) out.push({ kind: "injury", text: n });
+    /* "You asked for 6 days. This goal tops out at 5: more sessions than that
+       and ..." keeps the two facts and drops what follows the colon. */
+    else if (/^You asked for \d+ days\. This goal/.test(n)) out.push({ kind: "days", text: noteLead(n.replace(/:.*$/s, "."), 2) });
+    else if (/changed nothing in this plan/.test(n)) out.push({ kind: "secondary", text: noteLead(n, 2).replace(/, because two goals cannot set them at once/, "") });
+    else if (/of the goals you picked were not used at all/.test(n)) out.push({ kind: "secondary", text: n });
+    else if (/^This split trains .* once or twice a week/.test(n)) out.push({ kind: "frequency", text: noteLead(n) });
+    else if (/^You said you have no /.test(n)) out.push({ kind: "equipment", text: n });
+    else if (/^You marked .* on the body map/.test(n)) out.push({ kind: "bodymap", text: noteLead(n) });
+    else if (/^You picked (your whole body|\d+ of the fourteen)/.test(n) || /marked red, which is the top tier/.test(n)) out.push({ kind: "bodymap", text: noteLead(n) });
+  }
+  if (!meta || typeof meta !== "object") return out;
+
+  /* The engine's own per-group sentence, when the response carries it, in
+     place of the split-wide one: it names the number the week asked for and
+     the number the split can hold, which is what makes it actionable. */
+  const capped = meta.volume?.frequencyCapped;
+  if (Array.isArray(capped) && capped.length === 1 && typeof capped[0]?.why === "string") {
+    const i = out.findIndex((w) => w.kind === "frequency");
+    const line = { kind: "frequency", text: noteLead(capped[0].why, 2) };
+    if (i >= 0) out[i] = line; else out.push(line);
+  }
+  for (const w of Array.isArray(meta.focus?.why) ? meta.focus.why : []) {
+    if (typeof w === "string" && /in line and did not fit/.test(w)) out.push({ kind: "bodymap", text: noteLead(w) });
+  }
+  /* Day one only, by the engine's own definition of day one, and only for the
+     two answers a profile can hold. "Any completed plans" is not something a
+     person can go and give us. */
+  const missing = Array.isArray(meta.missing) ? meta.missing.filter((m) => typeof m === "string") : [];
+  if (missing.some((m) => /day one plan/.test(m))) {
+    const wants = [];
+    if (missing.some((m) => /^sex\b/.test(m))) wants.push("sex");
+    if (missing.some((m) => /^bodyweight\b/.test(m))) wants.push("body weight");
+    if (wants.length) out.push({ kind: "missing", text: `Tell us your ${wants.join(" and ")} and the starting weights get sharper.` });
+  }
+  const said = (v) => typeof v === "string" ? v : (v && typeof v === "object" ? [v.text, v.say, v.detail, v.why, v.note].find((t) => typeof t === "string") : null);
+  if (said(meta.deload)) out.push({ kind: "deload", text: said(meta.deload) });
+  if (said(meta.progression) && !(meta.progression?.rule === "linear")) out.push({ kind: "progression", text: said(meta.progression) });
+  return out;
+}
+
+/* Rows written before the kinds existed hold plain sentences, and every one of
+   those was an injury line, since that was the only kind stored. Ordered here
+   so every screen that prints them agrees on what comes first: injury, then
+   what the week could not hold, then what would sharpen it. */
+function planNotesOrdered(raw) {
+  const rank = (k) => { const i = PLAN_NOTE_KINDS.indexOf(k); return i < 0 ? PLAN_NOTE_KINDS.length : i; };
+  return (Array.isArray(raw) ? raw : [])
+    .map((w) => typeof w === "string" ? { kind: "injury", text: w }
+      : (w && typeof w.text === "string" ? { kind: typeof w.kind === "string" ? w.kind : "other", text: w.text } : null))
+    .filter(Boolean)
+    .sort((a, b) => rank(a.kind) - rank(b.kind));
 }
 
 /* The warnings to print on a day. The row first and the sitting second, so a
@@ -24609,7 +24702,7 @@ function planWarnings(notes) {
    a session it replaced. Same for a day somebody has emptied by hand. */
 function warningsForPlan(plan) {
   if (!(plan?.exercises || []).length) return [];
-  return Array.isArray(plan?.warnings) ? plan.warnings : PLAN_WARNINGS.get(plan?.entry_date) || [];
+  return planNotesOrdered(Array.isArray(plan?.warnings) ? plan.warnings : PLAN_WARNINGS.get(plan?.entry_date) || []);
 }
 
 /* ---------- Swapping an exercise ----------
@@ -25996,7 +26089,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
          week are explanations Mo had taken off the reveal in September. Storing
          them would put a few kilobytes on every one of the sixty rows the app
          reads at boot to keep text nothing renders. */
-      warnings: planWarnings(data.notes),
+      warnings: planWarnings(data.notes, data.meta),
     };
     let { error: saveErr } = await sb.from("ai_workouts").upsert(planRow, { onConflict: "email,entry_date" });
     /* `warnings` is new and the owner runs the migrations, so there is a window
@@ -34619,13 +34712,24 @@ function renderPlanPreview(opts) {
   const estMin = sessionEstimateMinutes(exercises, planMobility(plan));
   const oneOff = (!review && ONE_OFF_SESSION?.date === (plan.entry_date || todayStr())
     && ONE_OFF_SESSION.made === planSignature(exercises)) ? ONE_OFF_SESSION : null;
+  /* The number against the number they gave. The estimate costs the real
+     seconds and the engine allows itself some slack over the budget and calls
+     that a fit, so "About 52 min" could sit over a 45 minute ask with nothing
+     said. Now it says so, in the same breath, whenever the gap is more than a
+     couple of minutes, and the fix is the control it is printed under. A
+     one-off budget for today outranks the profile's, since that is the number
+     they most recently asked for. */
+  const askedMin = oneOff?.minutes ?? (Number(MY_PROFILE?.session_minutes) || null);
+  const overMin = estMin && askedMin ? estMin - askedMin : 0;
+  const overLine = overMin > 2 ? `${overMin} min over the ${askedMin} you asked for. Tap the time to fit it.` : "";
   const timeRow = (review || started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
     <div class="plan-time-row">
-      <button type="button" class="plan-time" id="planTimeBtn" aria-label="About ${estMin} minutes. Change how long you have today.">
+      <button type="button" class="plan-time" id="planTimeBtn" aria-label="About ${estMin} minutes.${overLine ? " " + overLine : ""} Change how long you have today.">
         ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
       </button>
       ${oneOff?.from?.minutes ? `<button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button>` : ""}
     </div>
+    ${overLine ? `<p class="plan-time-change plan-time-over" id="planTimeOver">${escapeHtml(overLine)}</p>` : ""}
     ${oneOff?.changed ? `<p class="plan-time-change" id="planTimeChange">${escapeHtml(oneOff.changed)}</p>` : ""}`;
 
   const planRamps = planMobility(plan)?.ramp || [];
@@ -34766,7 +34870,14 @@ function renderPlanPreview(opts) {
       eyebrow: review ? `Planned for ${planDayWord(date)}` : "Today’s session",
     }) : ""}
     ${activityDay && !actSession ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
-    ${planSays.map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}
+    ${/* Three lines and a fold. The lines are already in order, so what shows
+          is the most important three and "more" is only ever the rest. */ ""}
+    ${(PLAN_NOTES_OPEN === planDate ? planSays : planSays.slice(0, PLAN_NOTES_SHOWN))
+      .map((n) => `<p class="ef-note" data-note-kind="${escapeHtml(n.kind)}">${escapeHtml(n.text)}</p>`).join("")}
+    ${planSays.length > PLAN_NOTES_SHOWN
+      ? `<button type="button" class="link-btn plan-notes-more" id="planNotesMoreBtn">${
+          PLAN_NOTES_OPEN === planDate ? "Fewer" : `${planSays.length - PLAN_NOTES_SHOWN} more`}</button>`
+      : ""}
     ${stretchBlockHTML("warmup", finished, plan)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished, plan)}
@@ -34891,6 +35002,9 @@ function renderPlanPreview(opts) {
     });
   }
   if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
+  if ($("planNotesMoreBtn")) {
+    $("planNotesMoreBtn").onclick = () => { PLAN_NOTES_OPEN = PLAN_NOTES_OPEN === planDate ? null : planDate; rerenderPlanScreen(); };
+  }
 
   // These three are mutually exclusive depending on how far the workout got.
   if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
