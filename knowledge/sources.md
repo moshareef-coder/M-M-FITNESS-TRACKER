@@ -253,3 +253,32 @@ workout plans: `principles/sex-and-anthropometry.md`,
 - SportsMonkie, "Couch to 5K Plan: A 9-Week Walk/Run Schedule for Total
   Beginners" — https://sportsmonkie.com/couch-to-5k-plan/
 - Inspired by Sports, "Running Plan: Go from Sofa to 5K in 8 Weeks" — https://www.inspiredbysports.com/en/learning-to-run-your-8-week-plan-from-the-sofa-to-your-first-5k/
+
+## Build endurance: speed/interval training research
+- PMC, "Faster intervals, faster recoveries — intensified short VO2max
+  running intervals are inferior to traditional long intervals" — https://pmc.ncbi.nlm.nih.gov/articles/PMC11743937/
+- Runners Blueprint, "How Interval Training Improves VO2 Max for
+  Runners" (source of the 4x4min / 90-95% max HR / 7.2% VO2max
+  improvement figure) — https://www.runnersblueprint.com/how-interval-training-improves-vo%E2%82%82-max/
+- PeakVO2Trainer, "Interval Training for Running: Workouts, Programs, and
+  Plans" (cites Milanovic et al. 2015 meta-analysis; tempo/cruise
+  interval format) — https://peakvo2trainer.com/blog/interval-training-for-running/
+- Shuichi Running, "VO2max Interval Training — The Most Effective
+  Workouts, Backed by Research" — https://shuichi-running.com/en/vo2max-interval-training/
+- Laura Norris Running, "VO2Max Interval Workouts" (beginner vs.
+  intermediate volume guidance) — https://lauranorrisrunning.com/vo2max-fartlek-workout/
+- RunningXpert, "Guide: VO2-max intervals for runners" — https://www.runningxpert.com/en/inspiration/guide-how-to-improve-vo2-max-with-intervals
+
+## Build endurance: general/everyday-stamina guidelines
+- Cleveland Clinic, "How Much Should You Exercise Per Week?" — https://health.clevelandclinic.org/how-often-you-should-work-out
+- ACSM, "Physical Activity Guidelines" — https://acsm.org/education-resources/trending-topics-resources/physical-activity-guidelines/
+- ETSU Exercise is Medicine, "ACSM's General Exercise Guidelines" (source
+  of the "talk test" moderate/vigorous framing) — https://www.etsu.edu/exercise-is-medicine/guidelines.php
+- American Heart Association, "AHA Recommendations for Physical Activity
+  in Adults and Kids" (source of the gradual-ramp guidance) — https://www.heart.org/en/healthy-living/exercise-and-physical-activity/fitness-basics/aha-recs-for-physical-activity-in-adults
+- CDC, "Adult Activity: An Overview" — https://www.cdc.gov/physical-activity-basics/guidelines/adults.html
+- American College of Cardiology, "Physical Activity Guidelines for
+  Americans" — https://www.acc.org/latest-in-cardiology/ten-points-to-remember/2018/11/14/14/37/the-physical-activity-guidelines-for-americans
+- PubMed, ACSM position stand, "Quantity and quality of exercise for
+  developing and maintaining cardiorespiratory, musculoskeletal, and
+  neuromotor fitness in apparently healthy adults" — https://pubmed.ncbi.nlm.nih.gov/21694556/
