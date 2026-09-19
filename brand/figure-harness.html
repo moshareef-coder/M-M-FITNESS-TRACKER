@@ -26,16 +26,33 @@
   // Where in the loop to freeze. The extremes of a shake-out are the readable
   // poses; the middle is a blur of transition.
   const at = Number(params.get("t") || 0);
+  /* live=1 lets the clock run instead of pinning a frame.
+
+     The face blinks on its own every 4.3 seconds, but seek() clamps to a single
+     move cycle, and a move is a second or two long, so a pinned render can
+     never reach the blink. Nothing in the rig needed changing for this: it just
+     needed to be allowed to run. The film renderer drives it under Chrome's
+     virtual time, so "letting it run" is still frame exact. */
+  const live = params.get("live") === "1";
 
   const anim = mountMove(document.getElementById("stage"), name, {
-    theme, accent: "action", skin: "mannequin", mood, paused: true,
+    theme, accent: "action", skin: "mannequin", mood, paused: !live,
   });
 
   // Signals the screenshot step that there is something on the canvas.
   window.__ready = false;
   if (anim) {
-    if (typeof anim.seek === "function") anim.seek(at);
-    else if (typeof anim.setTime === "function") anim.setTime(at);
+    if (!live) {
+      if (typeof anim.seek === "function") anim.seek(at);
+      else if (typeof anim.setTime === "function") anim.setTime(at);
+    }
+    /* The film renderer sweeps time itself rather than reloading the page per
+       frame, so it needs the handle. seek() is a fraction of the move's own
+       duration, which is why a long hold like Mountain Pose is the one to
+       shoot: at 6.4 seconds the sweep reaches the 4.3 second blink, and a two
+       second move never can. */
+    window.__anim = anim;
+    window.__dur = (anim.move && anim.move.dur) || 0;
     requestAnimationFrame(() => requestAnimationFrame(() => { window.__ready = true; }));
   } else {
     window.__error = `mountMove returned null for ${name}`;

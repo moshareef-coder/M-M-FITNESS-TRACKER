@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Figure film harness</title>
+<!--
+  Draws the app's own figure on demand, one frame per call, for brand films.
+
+  figure-harness.html mounts the runtime and lets it animate, which is right for
+  a still but wrong for a film: the runtime drives itself off requestAnimationFrame,
+  and headless Chrome suspends that whenever it decides the page is not being
+  looked at. The frame then never arrives and the renderer waits forever.
+
+  This calls the rig's own render() directly instead. Nothing schedules, nothing
+  waits: __draw returns once the pixels are on the canvas. It also separates the
+  two clocks the runtime ties together, the body's position in its loop and the
+  face's wall clock, so a film can hold a pose while the eyes blink on a beat
+  somebody chose rather than on the rig's own 4.3 second cycle.
+-->
+<style>
+  html, body { margin: 0; background: transparent; }
+  #stage { display: block; }
+</style>
+
+<canvas id="stage" width="1080" height="1080"></canvas>
+
+<script type="module">
+  import { moveFor, palette, render } from "/knowledge/motion/index.mjs";
+
+  const canvas = document.getElementById("stage");
+
+  window.__size = (w, h) => { canvas.width = w; canvas.height = h; return [w, h]; };
+
+  /* cycle is 0..1 through the move. face is in seconds and is what the blink
+     runs off, so it is deliberately not derived from cycle. */
+  window.__draw = (name, cycle, face, opts = {}) => {
+    const move = moveFor(name);
+    if (!move) throw new Error(`no move called ${name}`);
+    const C = palette(opts.theme || "light", opts.accent || "action", "mannequin", "male");
+    render(canvas, move, C, cycle, face, { mood: opts.mood || undefined, view: opts.view || undefined });
+    return true;
+  };
+
+  window.__png = () => canvas.toDataURL("image/png").slice(22);
+  window.__dur = (name) => (moveFor(name) || {}).dur || 0;
+  window.__ready = true;
+</script>
