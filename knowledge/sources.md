@@ -198,3 +198,19 @@ workout plans: `principles/sex-and-anthropometry.md`,
   (adherence/retention findings, strength benchmarks via StrengthLevel's
   48.7M-lift dataset). Internal to the repo, not a public URL — see the
   file directly for full citations and confidence ratings on each claim.
+
+## Get stronger: rest periods and progression convention
+- Grgic et al. (2017), "Effect of Rest Interval Duration in Resistance
+  Training on Measures of Muscular Strength: A Systematic Review,"
+  Sports Medicine — PubMed, PMID 28755103 — https://pubmed.ncbi.nlm.nih.gov/19691365/
+- Fitbod, "How Long Should You Rest Between Sets? Science-Backed Rest
+  Times By Goal" — https://fitbod.me/blog/how-long-should-you-rest-between-sets/
+- Gold's Gym, "How Long to Rest Between Sets?" — https://www.goldsgym.com/blog/how-long-to-rest-between-sets/
+- Stronger (mobile app blog), "How Long to Rest Between Sets for Muscle
+  & Strength" — https://www.strongermobileapp.com/blog/rest-between-sets
+- SWOL Mindset, "How Long to Rest Between Sets for Strength and Muscle" — https://www.swolmindset.com/blogs/training/rest-between-sets
+- SetGraph, "How Long Should You Rest Between Sets? The Ultimate Guide"
+  (cites Grgic et al. 2017 directly) — https://setgraph.app/articles/how-long-should-you-rest-between-strength-training-sets
+- Keedia, "Rest Between Sets: What the Science Says You Actually Need" — https://keedia.com/fitness/rest-between-sets-science-strength-hypertrophy-endurance/
+- FitBesidesHealth, "Rest Periods Between Sets: Strength and Muscle
+  Guide" — https://fitbesideshealth.com/rest-periods-between-sets/
