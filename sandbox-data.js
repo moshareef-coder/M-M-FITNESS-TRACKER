@@ -86,6 +86,13 @@
            pull day, so today's push plan still has all five exercises left. */
         { id: "x0a", email: ME, user_name: "Mo", entry_date: day(0), exercise_name: "Lat Pulldown", sets: 4, reps: 10, weight: 130, created_at: day(0) + "T07:05:00Z" },
         { id: "x0b", email: ME, user_name: "Mo", entry_date: day(0), exercise_name: "Seated Cable Row", sets: 3, reps: 12, weight: 120, created_at: day(0) + "T07:20:00Z" },
+        /* A dumbbell session six days back, so the level ladder has dumbbell
+           lifts to grade. Mo asked why dumbbells were not scored; the fixture
+           had none logged, so the sandbox could not have shown him either way.
+           Loads are per hand, the way the app stores them. */
+        { id: "x6a", email: ME, user_name: "Mo", entry_date: day(-6), exercise_name: "Dumbbell Bench Press", sets: 4, reps: 8, weight: 70, created_at: day(-6) + "T07:05:00Z" },
+        { id: "x6b", email: ME, user_name: "Mo", entry_date: day(-6), exercise_name: "Dumbbell Row", sets: 4, reps: 10, weight: 80, created_at: day(-6) + "T07:18:00Z" },
+        { id: "x6c", email: ME, user_name: "Mo", entry_date: day(-6), exercise_name: "Goblet Squat", sets: 3, reps: 10, weight: 60, created_at: day(-6) + "T07:32:00Z" },
         { id: "x0c", email: ME, user_name: "Mo", entry_date: day(0), exercise_name: "Barbell Curl", sets: 3, reps: 10, weight: 60, created_at: day(0) + "T07:32:00Z" },
         { id: "x1", email: ME, user_name: "Mo", entry_date: day(-1), exercise_name: "Barbell Back Squat", sets: 4, reps: 6, weight: 245, created_at: day(-1) + "T08:00:00Z" },
         { id: "x2", email: ME, user_name: "Mo", entry_date: day(-3), exercise_name: "Deadlift", sets: 3, reps: 5, weight: 315, created_at: day(-3) + "T08:00:00Z" },
