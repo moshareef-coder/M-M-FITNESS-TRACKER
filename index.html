@@ -24533,24 +24533,66 @@ function closeGenOverlay() {
    The generating animation above it is untouched: what went is the summary at
    the end, not the build. */
 
-/* The plan that was just made, and the two things about it that ai_workouts
-   has no column for. Cleared by nothing: it is replaced by the next generate
-   and it dies with the sitting, which is exactly how long both of these are
-   worth saying.
+/* The plan that was just made. One thing rides on it now, the unprompted offer
+   to record limits, and for that one a sitting is the right life: it is about
+   the moment a plan first appeared, not about the plan.
 
-   `warnings` is the engine's plan level notes, filtered to the ones that are a
-   warning rather than an explanation. Mo had the explanations taken off the
-   reveal in September and they are not coming back; these two are different,
-   because they are the app admitting out loud that it has prescribed a movement
-   somebody said hurts, or that a goal needs a clinician. With the reveal gone
-   this is the only thing keeping that admission true. */
-let JUST_GENERATED = null;   // { date, warnings: [] }
+   The warnings used to ride here too, and that was the bug. They are the app
+   admitting out loud that it has prescribed a movement somebody said hurts, or
+   that a goal wants a clinician, and an admission that dies when the tab closes
+   is an admission nobody gets: close the app on a plan built around a bad knee
+   and it came back holding three knee-loading lifts with nothing said. They are
+   written on the row now, and held in PLAN_WARNINGS meanwhile. */
+let JUST_GENERATED = null;   // { date }
+
+/* The same sentences for a day, held for this sitting, and it has two jobs.
+   "Generate rest of week" writes six rows without opening one, so the quiet
+   path had no JUST_GENERATED to set and a whole week built in one tap warned
+   nobody, not even once. And ai_workouts.warnings is a column the owner has
+   still to add, so until 20260919_ai_workouts_warnings.sql is run this is the
+   whole of the fix rather than a cache in front of it.
+
+   Keyed by the day and never cleared: a sitting holds at most a week of them,
+   and the next generate for a day replaces that day's. */
+const PLAN_WARNINGS = new Map();   // entry_date -> [sentence]
 
 /* Matched on the engine's own phrases, so a rewording there costs a line and
-   never a plan. */
+   never a plan.
+
+   Measured 2026-09-19 rather than argued about: 14,580 weeks across every goal
+   in the tree, 2 to 6 days, nine limit cases and six histories produced 99 note
+   families. The 23 this keeps are all one of two things, the softened note
+   ("... are still in this week ... go light, stop if it hurts") and the goal's
+   clinician line. The 76 it drops are explanations Mo had taken off the reveal:
+   what the split cannot fit, where rest was cut, what the ramp-up sets are, and
+   "Nothing that loads a bad knee is in here", which is the reassurance rather
+   than the warning. Nothing safety shaped is on the wrong side of it. */
 function planWarnings(notes) {
   return (Array.isArray(notes) ? notes : [])
     .filter((n) => typeof n === "string" && /stop if it hurts|clinician/i.test(n));
+}
+
+/* The warnings to print on a day. The row first and the sitting second, so a
+   day the database can speak for needs nothing in memory: that is the whole of
+   what surviving a reload means.
+
+   Measured 2026-09-19 and worth writing down, because it was a surprise: the
+   engine's sentence is about the WEEK ("Goblet Squat, Step-Up and Barbell Back
+   Squat are still in this week") and the app stores one day of that week per
+   row. On a four day build-muscle week with a bad knee, the day that got
+   generated was a Push day and held none of the three. So this cannot be
+   filtered down to "movements on this card": that would print the warning on
+   the one day it does not matter and hide it on the rest, and on a week where
+   only one day has been built it would print nowhere at all. It is the week's
+   sentence and every day of that week is the right place for it.
+
+   The one day it is not: a day with no lifts on it. planActivityOnDay writes a
+   yoga class straight over a generated row and leaves this column alone, and a
+   note about barbell squats printed under a yoga class is the app talking about
+   a session it replaced. Same for a day somebody has emptied by hand. */
+function warningsForPlan(plan) {
+  if (!(plan?.exercises || []).length) return [];
+  return Array.isArray(plan?.warnings) ? plan.warnings : PLAN_WARNINGS.get(plan?.entry_date) || [];
 }
 
 /* ---------- Swapping an exercise ----------
@@ -25852,7 +25894,10 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        migrations are owned elsewhere. Nothing reads it since the reveal screen
        that printed it went; the engine still sends it, so it is still taken
        off the response rather than quietly dropped. */
-    const { error: saveErr } = await sb.from("ai_workouts").upsert({
+    /* Named rather than written into the call, because one field on it may not
+       exist in the database yet and the retry below has to be able to take it
+       back off. */
+    const planRow = {
       user_name: ME,
       email: MY_EMAIL,
       entry_date: target,
@@ -25911,20 +25956,51 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
         : null,
       completed_at: null,
       duration_sec: null,
-    }, { onConflict: "email,entry_date" });
+      /* The one thing on this row that is about the plan rather than in it: the
+         engine saying out loud that it has prescribed a movement somebody told
+         us hurts, or that this goal wants a clinician looked at first. It rode
+         on a variable that died with the tab until 2026-09-19, so a plan built
+         around a bad knee came back after a reload with the knee work still on
+         it and nothing said, and a week built in one tap never said it at all.
+
+         Filtered here rather than on the way out: what the screen prints is
+         what the row holds, and the 76 other things the engine says about a
+         week are explanations Mo had taken off the reveal in September. Storing
+         them would put a few kilobytes on every one of the sixty rows the app
+         reads at boot to keep text nothing renders. */
+      warnings: planWarnings(data.notes),
+    };
+    let { error: saveErr } = await sb.from("ai_workouts").upsert(planRow, { onConflict: "email,entry_date" });
+    /* `warnings` is new and the owner runs the migrations, so there is a window
+       where this app is live against a database without that column. PostgREST
+       answers an unknown column with PGRST204 and rejects the whole payload, so
+       without this the price of a warning would be the plan itself. One retry
+       without the field: the plan lands, the sentence falls back to
+       PLAN_WARNINGS for the sitting, and the day the migration runs this starts
+       working with no app change. */
+    if (saveErr?.code === "PGRST204") {
+      const { warnings, ...olderSchema } = planRow;
+      ({ error: saveErr } = await sb.from("ai_workouts").upsert(olderSchema, { onConflict: "email,entry_date" }));
+    }
     // Supabase upsert does not throw on its own -- it was failing silently here, which
     // would show "Workout ready" even though nothing was actually saved. Checking .error
     // explicitly is what turns that into a real, visible failure instead.
     if (saveErr) throw new Error(`Save failed: ${saveErr.message}`);
+
+    /* Held for the sitting as well as written, and before the quiet path
+       returns two lines below: that is the path "Generate rest of week" takes
+       for every day it builds, and it is why a week built in one tap used to
+       carry blocked movements with no warning on any day of it. */
+    PLAN_WARNINGS.set(target, planRow.warnings);
 
     /* The week builder does its own reload once every day is written, so a
        quiet call stops at the row it saved. LAST_GEN_WORKOUT is how it reads
        back what landed without going to the database for it. */
     LAST_GEN_WORKOUT = data.workout;
     if (quiet) { rememberPlannedDay(target, data.workout.focus, data.workout.exercises); return true; }
-    /* The two things the plan screen cannot read off the row, kept for exactly
-       as long as this sitting: see JUST_GENERATED. */
-    JUST_GENERATED = { date: target, warnings: planWarnings(data.notes) };
+    /* The one thing left that is about the moment rather than about the plan:
+       see JUST_GENERATED. The warnings went to the row a few lines above. */
+    JUST_GENERATED = { date: target };
     /* Through the one door every plan change goes through. It drops the
        generator's cached next day, which this write has just made wrong, and
        repaints Home as well as this tab: generating for Thursday used to
@@ -34472,6 +34548,10 @@ function renderPlanPreview(opts) {
      is not printed over Saturday's. */
   const planDate = plan.entry_date || todayStr();
   const justMade = JUST_GENERATED?.date === planDate ? JUST_GENERATED : null;
+  /* And the warnings, which are no longer a thing about this moment at all:
+     they come off the row, so this screen says the same thing tomorrow morning
+     as it said when the plan was built. */
+  const planSays = warningsForPlan(plan);
   /* The one unprompted offer in the app, and it is here rather than in
      onboarding because a limit is a constraint on how a goal gets trained for,
      not a goal: asking up front turns "what do you want" into "what is wrong
@@ -34658,7 +34738,7 @@ function renderPlanPreview(opts) {
       eyebrow: review ? `Planned for ${planDayWord(date)}` : "Today’s session",
     }) : ""}
     ${activityDay && !actSession ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
-    ${(justMade?.warnings || []).map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}
+    ${planSays.map((n) => `<p class="ef-note">${escapeHtml(n)}</p>`).join("")}
     ${stretchBlockHTML("warmup", finished, plan)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished, plan)}
