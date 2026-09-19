@@ -24,7 +24,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const JOBS = [
   ["unio-mark-flat", 1024], ["unio-mark-flat", 512], ["unio-mark-flat", 180],
   ["unio-mark-gloss", 1024], ["unio-mark-gloss", 512], ["unio-mark-gloss", 180],
-  ["unio-mark-glow", 1024], ["unio-mark-ghigh", 1024],
+  ["unio-mark-pa", 1024], ["unio-mark-pb", 1024], ["unio-mark-pc", 1024],
   ["unio-left", 853], ["unio-right", 853], ["unio-bar", 853],
 ];
 

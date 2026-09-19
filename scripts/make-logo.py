@@ -80,7 +80,7 @@ def rrect(cx, cy, w, h, r, fill, extra=""):
 # and that is what read as "shadows all over".
 # Mo picked the middle of three shine levels by looking at them side by side,
 # which is the only sensible way to settle a word like "glossy".
-def gloss_defs(sheen=0.50, glow=0.75):
+def gloss_defs(sheen=0.50, glow=0.75, plate="#2b3036"):
     """The glossy palette. One light, up and slightly left, and everything obeys
     it: gradients are in user space, not per shape, or each arc lights itself and
     the two halves disagree about where the sun is.
@@ -102,10 +102,7 @@ def gloss_defs(sheen=0.50, glow=0.75):
   <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
 </linearGradient>
 <linearGradient id="pl" gradientUnits="userSpaceOnUse" x1="340" y1="300" x2="690" y2="740">
-  <stop offset="0" stop-color="#3a4046"/><stop offset="0.45" stop-color="#191d21"/><stop offset="1" stop-color="#07090b"/>
-</linearGradient>
-<linearGradient id="plTop" x1="0" y1="0" x2="0" y2="1">
-  <stop offset="0" stop-color="#ffffff" stop-opacity="0.34"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+  <stop offset="0" stop-color="{plate}"/><stop offset="1" stop-color="{plate}"/>
 </linearGradient>
 <linearGradient id="pd" x1="0" y1="0" x2="0.28" y2="1">
   <stop offset="0" stop-color="#ddff8a"/><stop offset="0.2" stop-color="#bcff3d"/>
@@ -201,10 +198,6 @@ def build(style, only=None):
         px = C + sgn * PLATE_X
         parts.append(rrect(px, C, PLATE_W, PLATE_H, PLATE_R, plate))
         if gloss:
-            # A lit top face on the plate, inset so it does not touch the edge.
-            parts.append(rrect(px, C - PLATE_H * 0.29, PLATE_W * 0.80, PLATE_H * 0.36,
-                               PLATE_R * 0.7, "url(#plTop)"))
-        if gloss:
             # The pad glows before it is drawn, so the lime reads as lit rather
             # than painted on. This is the one place the mark is allowed to shout.
             parts.append(rrect(px, C, PAD_W, PAD_H, PAD_W / 2, PAD,
@@ -224,11 +217,11 @@ def main():
     # Three amounts of shine, so the call can be made by looking rather than by
     # arguing about the word "glossy".
     global GLOSS_TUNE
-    for tag, tune in (("low", {"sheen": 0.34, "glow": 0.55}),
-                      ("mid", {"sheen": 0.50, "glow": 0.75}),
-                      ("high", {"sheen": 0.66, "glow": 0.95})):
+    for tag, tune in (("a", {"plate": "#23272b"}),
+                      ("b", {"plate": "#2b3036"}),
+                      ("c", {"plate": "#353b42"})):
         GLOSS_TUNE = tune
-        (OUT / f"unio-mark-g{tag}.svg").write_text(build("gloss"))
+        (OUT / f"unio-mark-p{tag}.svg").write_text(build("gloss"))
     GLOSS_TUNE = {}
     # The boot layers take the glossy build: they are shown at 150px on a phone,
     # which is nowhere near the size where gloss turns to mud.
