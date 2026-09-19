@@ -11223,47 +11223,21 @@ function focusSpendDown(groups, units, maxTier = FOCUS_TIERS.main) {
   return { pairs, left };
 }
 
-/* The same units spread ACROSS a list instead of down it: a unit to each group
-   in turn, so two units on a two group half buy both at the lightest tier
-   rather than one at the middle.
-
-   That is not a style choice, it is what the engine measures. The plan's core
-   slot names ONE group and which one depends on the split: the full body and
-   legs templates fill it from abs, the upper/lower template fills it from
-   obliques (SLOTS in mo-knowledge/engine/plan.mjs). So a core focus spent deep
-   on abs lands on a group a four day week never trains, and the week comes back
-   with LESS core work than picking nothing at all: measured on a four day
-   build-muscle week, abs:2 gives 2 weekly core sets against a baseline of 5,
-   while abs:1 plus obliques:1 gives 10. Spread across both, it lands whatever
-   the split. The real fix is one line per template in plan.mjs, widening that
-   slot to ["abs", "obliques"] the way the traps slot was already widened, and
-   this picker should stop compensating the day that lands. */
-function focusSpendAcross(groups, units) {
-  const tier = new Map(groups.map((g) => [g, 0]));
-  let left = Math.max(0, units);
-  while (left > 0) {
-    const lowest = Math.min(...groups.map((g) => tier.get(g)));
-    const g = groups.find((x) => tier.get(x) === lowest && tier.get(x) < FOCUS_TIERS.main);
-    if (!g) break;
-    tier.set(g, tier.get(g) + 1);
-    left -= 1;
-  }
-  return { pairs: [...tier].filter(([, t]) => t > 0), left };
-}
-
 /* What one region buys for a given number of budget units, keeping the promise
    its label makes. A region named after two things spends about a quarter of
-   what it was given on the second half, never less than one unit per group in
-   that half so a named half is never bought as a coin flip, and never so much
-   that the half the name leads with stops leading.
+   what it was given on the second half, never less than a unit for each group
+   in that half so a named half is never bought as a token, and never so much
+   that the half the name leads with stops leading. What that share buys is
+   spent down the same ladder as everything else: as deep as it reaches on the
+   first group, then on to the next.
 
-   The floor is why "Legs and core" with three units buys quads, abs and
-   obliques at a unit each rather than quads at two and abs at one. Measured, the
-   second of those is worse than not picking at all: the legs take the volume,
-   the single core unit lands on a group half the splits never train, and core
-   comes back at 2 weekly sets against a baseline of 5. A name that promises two
-   things and delivers less of the second one than silence would is the bug this
-   whole commit is about, one level down.
+   The floor is what keeps the core half worth buying once a second region is
+   picked. A quarter of three or four units rounds to one, and one unit of core
+   is barely more than silence. Measured through the engine on a build-muscle
+   week, weekly core sets against a baseline of 10 for no pick at all: "Legs and
+   core" alongside one other region lands 13, 12 and 12 on three, four and five
+   day weeks with the floor, and 12, 11 and 11 without it. A name that promises
+   two things has to buy enough of the second one to be worth reading.
 
    Two units is the one case where the floor cannot be paid, because the lead
    half must keep a unit. That is a second-ranked area on Setup and nowhere
@@ -11278,7 +11252,7 @@ function focusRegionSpend(region, units) {
   const first = focusSpendDown(region.lead, units - share);
   /* The lead half's own leftover goes here rather than being binned: a one
      group lead (Chest) hands its whole allowance on. */
-  const second = focusSpendAcross(region.also, share + first.left);
+  const second = focusSpendDown(region.also, share + first.left);
   return { pairs: [...first.pairs, ...second.pairs], left: second.left };
 }
 
