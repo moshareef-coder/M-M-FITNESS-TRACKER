@@ -442,10 +442,15 @@
      the thumb is. */
   .wkt-next-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2px; }
   .wkt-next-top .info-dot { margin: -2px -2px 0 0; }
+  /* Words left, figure right, buttons across the bottom. Mo, on the ring
+     sitting centred on its own row: "I don't like how the percentage match is
+     directly in the middle, put that to the right, make it big." Beside the
+     title rather than under it, which is also where the plan overview puts it,
+     so the two screens that carry this number now carry it the same way. */
   .wkt-next-grid {
-    display: grid; column-gap: 8px; row-gap: 12px; align-items: start;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "words" "arc" "acts" "line";
+    display: grid; column-gap: 10px; row-gap: 12px; align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "words arc" "acts acts";
   }
   .wkt-next-words { grid-area: words; min-width: 0; }
   /* Not hired: the ring and the muscle list are the reading he does for you,
@@ -455,6 +460,7 @@
      where you do them. */
   .wkt-next-hire { grid-area: pitch; }
   .wkt-next.not-hired .wkt-next-grid {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "words" "pitch" "acts";
   }
   .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
@@ -462,7 +468,7 @@
      Sized and pressed like the other cards on this tab rather than like a
      control: it is the number that is tappable, not a widget around it. */
   .wkt-arc {
-    grid-area: arc; position: relative; width: 120px; height: 92px; justify-self: center;
+    grid-area: arc; position: relative; width: 136px; height: 104px; justify-self: end;
     margin: 2px 0; padding: 0; border: 0; background: none; cursor: pointer;
     transition: transform .12s ease;
   }
@@ -471,11 +477,8 @@
   /* The gauge's centre sits below the middle of its box, since the gap is at
      the bottom, so the number is pinned to it rather than to the box. */
   .wkt-arc-num { position: absolute; left: 0; right: 0; top: 60%; transform: translateY(-50%); text-align: center; line-height: 1; }
-  .wkt-arc-num b { display: block; font-size: 28px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
+  .wkt-arc-num b { display: block; font-size: 32px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
   .wkt-arc-num i { display: block; margin-top: 4px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
-  /* The caption under the buttons, where the ticked column used to be a third
-     thing competing with the ring. */
-  .wkt-next-line { grid-area: line; margin: 0; font-size: 12.5px; font-weight: 500; color: var(--muted); line-height: 1.4; }
   /* The overview at the top of a day being reviewed. Mo, looking at the card
      and then at this screen: "plan overview, I like the percentage match on
      the right side and very big." Same figure, same sheet behind it, a size
@@ -1490,19 +1493,6 @@
   .ex-body.ex-tap:disabled { cursor: default; opacity: 1; }
   .ex-body.ex-tap:not(:disabled):active { opacity: .6; }
   .ex-body.ex-tap .ex-target svg { opacity: .5; vertical-align: -1px; margin-left: 2px; }
-
-  .cardio-note {
-    display: flex; gap: 11px; align-items: flex-start; margin: 10px 0 2px;
-    padding: 11px 13px; border-radius: 14px;
-    background: var(--panel-2); border: 1px dashed var(--border);
-  }
-  .cardio-note-ico {
-    width: 28px; height: 28px; border-radius: 9px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink);
-  }
-  .cardio-note b { display: block; font-size: 13.5px; font-weight: 650; letter-spacing: -.01em; }
-  .cardio-note i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
 
   .workout-progress-row.stretch-row { color: var(--stretch-ink); font-weight: 700; }
   .workout-progress-row.stretch-row .link-btn { color: var(--stretch-ink); }
@@ -6563,7 +6553,6 @@
   }
   .cardio-act.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
   .cardio-field { margin-bottom: 14px; }
-  .cardio-note { display: block; }
   .wt-logrow {
     display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; margin: 0;
     background: none; border: 0; color: inherit; font-family: inherit; text-align: left; cursor: pointer;
@@ -8433,7 +8422,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.19.1";
+const APP_VERSION = "2026.09.19.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -25220,8 +25209,9 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
          One column rather than two because a new one needs a migration that has
          not been run, and supabase rejects the whole upsert on an unknown
          column: the save would fail and somebody would lose the plan, to store
-         a field nothing reads yet. cardioNoteHTML gates on `sessions`, so a
-         run-only row still correctly prints no weekly advice. */
+         a field nothing reads yet. The weekly half is written and no longer
+         read: the note that printed it came off the plan screen on Mo's note
+         of 2026-09-19, and `session` is the half the screen still uses. */
       cardio: (data.meta?.cardio || data.workout.cardio)
         ? { ...(data.meta?.cardio || {}), ...(data.workout.cardio ? { session: data.workout.cardio } : {}) }
         : null,
@@ -30411,7 +30401,7 @@ function renderChooseScreen() {
         </div>
         ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : `
         <button type="button" class="wkt-arc" data-info="planMatchWhy" aria-label="Why this is a ${p.match}% match">
-          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 120)}
+          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 136)}
           <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
         </button>`}
         <div class="wkt-next-acts">
@@ -30427,16 +30417,19 @@ function renderChooseScreen() {
               ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
               : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
           ${tomorrowPlan ? "" : `<button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>`}
+          ${/* "or start an activity" is gone from this card on Mo's note: "remove
+                or start an activity, we do not need that there." A session already
+                on the clock is not that offer though, it is the way back into
+                something running, and losing that would strand somebody
+                mid-run, so it stays exactly while one is going. */ ""}
           ${csnRunning()
             ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
-            : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
+            : ""}
         </div>
-        ${/* Where the ticked column went. One line, under the buttons, saying
-              what the figure above was read from. It is a caption, not a
-              choice, so it is the last thing on the card and the quietest. */ ""}
-        ${hiredHere && (p.muscles || []).length
-          ? `<p class="wkt-next-line">Trains ${escapeHtml(p.muscles.map((m) => m.name.toLowerCase()).join(", "))}</p>`
-          : ""}
+        ${/* The muscle caption is gone too: "remove trains triceps, chest,
+              traps, shoulders, we can see it when we generate the workout."
+              The muscles are on the plan itself and in the sheet behind the
+              ring, which is where somebody asking the question already looks. */ ""}
       </div>
     </section>`;
 
@@ -33059,33 +33052,6 @@ function rampLoadsLine(ramp) {
     .join(" · ");
 }
 
-/* The cardio the goal asks for, said in words rather than as a row you could
-   mistake for a lift. It is a weekly number, so it is phrased weekly and sits
-   under the session as advice, not as a sixth exercise: the engine has always
-   prescribed this (plan.cardio) and until today never told anybody. A goal
-   that asks for none renders nothing at all. */
-const CARDIO_ZONE_WORDS = {
-  easy: "easy pace, you can still hold a conversation",
-  moderate: "moderate, breathing hard but steady",
-  hard: "hard intervals",
-  /* The endurance goal emits "mixed" and this table had no words for it, so
-     the card printed "mixed." as a sentence. */
-  mixed: "mix it up, one easy session, one with hard intervals, one longer and steady",
-};
-function cardioNoteHTML(finished, plan = TODAY_WORKOUT) {
-  const c = plan?.cardio;
-  if (finished || !c || !c.sessions) return "";
-  const zone = CARDIO_ZONE_WORDS[c.zone] || c.zone || "";
-  return `
-    <div class="cardio-note">
-      <span class="cardio-note-ico">${icon("run", 15)}</span>
-      <div>
-        <b>${c.sessions}x ${c.minutes} min of cardio this week</b>
-        <i>Run, bike or incline walk. ${escapeHtml(zone)}. Separate from this session, on a day that suits you.</i>
-      </div>
-    </div>`;
-}
-
 /* Which fold is open, remembered while the tab is alive so opening the
    warm-up to read a cue and coming back from the session does not shut it
    again. Not persisted: the default every morning is closed, because the
@@ -33629,7 +33595,6 @@ function renderPlanPreview(opts) {
     ${stretchBlockHTML("warmup", finished, plan)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished, plan)}
-    ${cardioNoteHTML(finished, plan)}
     ${finished || activityDay ? "" : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
     ${askLimits ? `
     <p class="ef-note">Anything that hurts, or gear you don&rsquo;t have? Tell me once and every plan after this one will respect it.</p>
