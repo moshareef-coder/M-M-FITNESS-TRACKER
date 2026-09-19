@@ -3020,6 +3020,10 @@
     color: #8f959d; opacity: .28; pointer-events: none;
   }
   .sess-stage:has(.fig-live) .sess-stage-none { display: none; }
+  /* Same rule, the other stand-in: the running robot is what a cardio stage
+     shows while its mode has no authored gait, so a mounted figure takes the
+     stage off him. */
+  .sess-stage:has(.fig-live) .csn-figure { display: none; }
   .sess-fig.sess-fig-stage canvas {
     width: auto; height: min(360px, 88vw, 100%); max-width: 88vw; aspect-ratio: 1 / 1;
   }
@@ -21753,9 +21757,22 @@ function renderActivityLive(a, stage) {
   const stageFigure = plan
     ? `<div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(move?.name || (done ? "Rest: Towel" : ""))}" data-theme="light" ${paused || done ? "data-fig-static" : ""}></div>
        <div class="sess-stage-none" aria-hidden="true">${icon(a.ico || "heart", 72)}</div>`
-    /* No run cycle exists, so this is him, and it is the only place a cardio
-       figure is drawn. Freezing with the clock is what pausing looks like. */
-    : `<div class="csn-figure${paused ? " paused" : ""}">${robotRunningSVG(a.short || a.label || "")}</div>`;
+    /* A cardio session is drawn the same way a pose is, now that there is
+       something to draw: knowledge/motion/moves/cardio.mjs carries a run, a
+       walk, a ride and the stepmill, keyed by the library's own session names,
+       so `data-fig="Easy Run"` mounts the gait exactly as `data-fig="Tree
+       Pose"` mounts the pose.
+
+       Twenty of the twenty seven sessions have one. The other seven (rowing,
+       swimming, the elliptical, HIIT, the rope) still have nothing honest to
+       draw, so he keeps running for those, and which of the two shows is
+       decided by the mount rather than by a list kept here: mountMotionFigures
+       marks a name it cannot draw with `fig-none` and leaves `fig-live` on one
+       it can, so the CSS beside .sess-stage-none hides whichever is wrong.
+       Nothing in this file has to know which modes are covered, which is what
+       stops this going stale the day a rower is authored. */
+    : `<div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(card?.name || "")}" data-theme="light" ${paused ? "data-fig-static" : ""}></div>
+       <div class="csn-figure${paused ? " paused" : ""}">${robotRunningSVG(a.short || a.label || "")}</div>`;
 
   stage.innerHTML = `
     <div class="session-bar">
