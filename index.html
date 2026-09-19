@@ -434,14 +434,18 @@
   .wkt-btn-solid:active, .wkt-btn-soft:active { transform: translateY(1px); filter: brightness(.96); }
   .wkt-btn-solid.sm, .wkt-btn-soft.sm { font-size: 13px; height: 36px; padding: 0 12px; border-radius: 10px; }
 
-  /* Next workout: words and buttons on the left, the ring beside them, the
-     muscles it was read from down the right. */
+  /* Next workout, read top to bottom: what the day is, a sentence about it,
+     the ring, the two buttons, and a line naming the muscles the ring was read
+     from. The ring used to sit in a three column row with a ticked list beside
+     it, which made the one number the card exists for the smallest thing in
+     it. On its own row it can be 120 wide and still leave the buttons where
+     the thumb is. */
   .wkt-next-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2px; }
   .wkt-next-top .info-dot { margin: -2px -2px 0 0; }
   .wkt-next-grid {
     display: grid; column-gap: 8px; row-gap: 12px; align-items: start;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas: "words arc list" "acts acts acts";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "words" "arc" "acts" "line";
   }
   .wkt-next-words { grid-area: words; min-width: 0; }
   /* Not hired: the ring and the muscle list are the reading he does for you,
@@ -451,22 +455,27 @@
      where you do them. */
   .wkt-next-hire { grid-area: pitch; }
   .wkt-next.not-hired .wkt-next-grid {
-    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "words" "pitch" "acts";
   }
   .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
-  .wkt-arc { grid-area: arc; position: relative; width: 92px; height: 70px; align-self: center; }
+  /* A button, because the figure is a claim and tapping it shows the working.
+     Sized and pressed like the other cards on this tab rather than like a
+     control: it is the number that is tappable, not a widget around it. */
+  .wkt-arc {
+    grid-area: arc; position: relative; width: 120px; height: 92px; justify-self: center;
+    margin: 2px 0; padding: 0; border: 0; background: none; cursor: pointer;
+    transition: transform .12s ease;
+  }
+  .wkt-arc:active { transform: scale(.96); }
   .wkt-arc svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   /* The gauge's centre sits below the middle of its box, since the gap is at
      the bottom, so the number is pinned to it rather than to the box. */
   .wkt-arc-num { position: absolute; left: 0; right: 0; top: 60%; transform: translateY(-50%); text-align: center; line-height: 1; }
-  .wkt-arc-num b { display: block; font-size: 22px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
-  .wkt-arc-num i { display: block; margin-top: 3px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
-  .wkt-muscles { grid-area: list; align-self: center; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-  .wkt-muscles li { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; white-space: nowrap; color: var(--text); }
-  .wkt-tick { width: 14px; height: 14px; display: grid; place-items: center; color: var(--accent-ink); }
-  /* An open ring, not a tick: the one the day is aimed at is the one not done. */
-  .wkt-ring { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--accent-ink); flex: none; }
+  .wkt-arc-num b { display: block; font-size: 28px; font-weight: 800; letter-spacing: -.03em; color: var(--accent-ink); }
+  .wkt-arc-num i { display: block; margin-top: 4px; font-size: 9px; font-style: normal; font-weight: 700; letter-spacing: .1em; color: var(--muted); }
+  /* The caption under the buttons, where the ticked column used to be a third
+     thing competing with the ring. */
+  .wkt-next-line { grid-area: line; margin: 0; font-size: 12.5px; font-weight: 500; color: var(--muted); line-height: 1.4; }
   .wkt-next-acts { grid-area: acts; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .wkt-next-acts .wkt-more { flex-basis: 100%; }
   .wkt-more {
@@ -5013,6 +5022,18 @@
     font-family: var(--font-display);
   }
   .rc-ex-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+  /* The same circle a lift's position number sits in, holding the activity's
+     own icon instead: a run is not exercise three of anything, so it gets the
+     picture rather than a number. */
+  .rc-act-ico {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex;
+    align-items: center; justify-content: center;
+    border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    color: var(--accent-ink);
+  }
+  /* Activities follow the exercises, so the second heading needs the air the
+     first one gets from the block above it. */
+  .rc-list + .rc-ex-head { margin-top: 16px; }
   .rc-ex-num { font-size: 12.5px; font-weight: 700; font-family: var(--font-display); text-align: right; white-space: nowrap; }
   .rc-pr {
     font-size: 11px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 9px;
@@ -14928,6 +14949,11 @@ const INFO_TOPICS = {
       "Opening one shows the body it works and the exercises in it. From there you can do it today, edit a copy without touching the original, or delete it.",
     ],
   }),
+  /* The ring on the workout tab, tapped. Same arrangement as progressNote:
+     the working is put together when the card is drawn and this only reads it,
+     so the sheet explains the figure that is actually on screen. With nothing
+     built yet it falls back to what the little i beside it says. */
+  planMatchWhy: () => MATCH_NOTE || INFO_TOPICS.planMatch(),
   /* The Progress headline's own aside, whatever it happens to be saying about
      the person on screen right now. Built at tap time off the last render, so
      it can never disagree with the number above it. */
@@ -15730,17 +15756,33 @@ function recapFor(email, name, date) {
   const plans = (ALL_PLANS || []).filter((w) => w.email === email && w.entry_date === date);
   const entry = ALL_ENTRIES.find((e) => e.user_name === name && e.entry_date === date);
 
-  const sets = logs.reduce((s, l) => s + (l.sets || 1), 0);
-  const volume = logs.reduce((s, l) => s + (l.sets || 1) * (l.reps || 0) * (l.weight || 0), 0);
+  /* An activity is a row with minutes on it and no sets, which is exactly what
+     todaySessions tests for, through the same countsAsCardio, so this sheet and
+     the workout tab cannot disagree about what a session was. Splitting them
+     here is what lets the yoga class have its own block under the lifts
+     instead of being printed as one set of something, and it is what keeps
+     TOTAL SETS honest on a day that was only a run. */
+  const activities = logs.filter((l) => l.duration_min && countsAsCardio(l.exercise_name));
+  const actIds = new Set(activities.map((l) => l.id));
+  const lifts = logs.filter((l) => !actIds.has(l.id));
+
+  const sets = lifts.reduce((s, l) => s + (l.sets || 1), 0);
+  const volume = lifts.reduce((s, l) => s + (l.sets || 1) * (l.reps || 0) * (l.weight || 0), 0);
   const minutes = logs.reduce((s, l) => s + (l.duration_min || 0), 0);
   const seconds = plans.reduce((s, w) => s + (w.duration_sec || 0), 0);
 
   const { prLogIds } = personalRecords(name);
   return {
     date,
-    title: displayFocus(plans.find((w) => w.focus)?.focus, logs.map((l) => l.exercise_name)),
-    logs, sets, volume, minutes, seconds,
-    exercises: logs.length,
+    /* A day with nothing lifted on it is named after what was actually done.
+       This took its title off whatever plan sat on the date, so a morning yoga
+       class on a day whose push day never happened opened a recap headed
+       "Push Day" over a single thirty five minute row. */
+    title: lifts.length || !activities.length
+      ? displayFocus(plans.find((w) => w.focus)?.focus, logs.map((l) => l.exercise_name))
+      : activities.length === 1 ? activities[0].exercise_name : "Activity day",
+    logs, lifts, activities, sets, volume, minutes, seconds,
+    exercises: lifts.length,
     note: entry?.note || null,
     /* The same record personalRecords means, so the tag here and the banner
        mid-workout can never disagree. This used to look the name up in a
@@ -15897,7 +15939,16 @@ function openRecap(email, name, date) {
   const when = [relDayLabel(r.date), at ? at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null]
     .filter(Boolean).join(" · ");
 
-  const timeText = r.seconds ? fmtElapsed(r.seconds * 1000) : (r.minutes ? `${r.minutes}:00` : "-");
+  /* Both halves of the day, added. The lift's clock came off the plan row and
+     an activity's minutes came off its log, and TIME only ever read the first
+     one: a day of a push day and a thirty five minute yoga class printed the
+     push day's clock and quietly dropped the yoga. */
+  const totalSeconds = (r.seconds || 0) + (r.minutes || 0) * 60;
+  const timeText = totalSeconds ? fmtElapsed(totalSeconds * 1000) : "-";
+  /* A day nobody lifted on. The sheet still opens on it, because a yoga class
+     is training and this is where the day is read back, but it cannot call
+     itself a completed workout or print sets it does not have. */
+  const onlyActivities = !r.lifts.length && r.activities.length > 0;
 
   /* Volume and calories only appear when they are real: a bodyweight session
      has no tonnage, and calories need a logged bodyweight to mean anything. */
@@ -15918,6 +15969,19 @@ function openRecap(email, name, date) {
     </div>`;
   };
 
+  /* An activity carries its own icon rather than a position number, because it
+     is not the third thing in a list of sets: it is the class or the run that
+     also happened. Distance only when there is one, the same way the session
+     list writes it, and from the same two columns. */
+  const actRow = (l) => {
+    const act = actForExerciseName((l.exercise_name || "").trim());
+    return `<div class="rc-ex">
+      <span class="rc-act-ico">${icon(act?.ico || "run", 15)}</span>
+      <span class="rc-ex-name">${escapeHtml((l.exercise_name || "").trim())}</span>
+      <span class="rc-ex-num2">${escapeHtml(`${l.duration_min} min`)}${l.distance_mi ? `<i>${escapeHtml(`${l.distance_mi} mi`)}</i>` : ""}</span>
+    </div>`;
+  };
+
   $("recapSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="scr-head">
@@ -15930,18 +15994,24 @@ function openRecap(email, name, date) {
     <div class="rc-head">
       <div class="rc-tick">${icon("check", 22)}</div>
       <div>
-        <div class="rc-kicker">WORKOUT COMPLETED</div>
+        <div class="rc-kicker">${sharing && onlyActivities ? "ACTIVITY COMPLETED" : "WORKOUT COMPLETED"}</div>
         <div class="rc-title">${escapeHtml(sharing ? r.title : "Workout")}</div>
         <div class="rc-when">${escapeHtml(when)}</div>
       </div>
     </div>
 
-    <div class="rc-stats"${sharing ? "" : ` style="grid-template-columns:1fr;"`}>
-      ${sharing
-        ? `${recapStat(r.sets || "-", "TOTAL SETS")}
-           ${recapStat(r.exercises || "-", "EXERCISES")}
+    ${/* A day that was only a run has no sets and no exercises, and printing
+          two dashes over it is the sheet shrugging. It gets the two numbers it
+          does have instead. */ ""}
+    <div class="rc-stats"${!sharing ? ` style="grid-template-columns:1fr;"` : onlyActivities ? ` style="grid-template-columns:repeat(2,1fr);"` : ""}>
+      ${!sharing
+        ? recapStat(String(effortXPBetween(name, date, date)), "EFFORT XP")
+        : onlyActivities
+        ? `${recapStat(r.activities.length, r.activities.length === 1 ? "ACTIVITY" : "ACTIVITIES")}
            ${recapStat(timeText, "TIME")}`
-        : recapStat(String(effortXPBetween(name, date, date)), "EFFORT XP")}
+        : `${recapStat(r.sets || "-", "TOTAL SETS")}
+           ${recapStat(r.exercises || "-", "EXERCISES")}
+           ${recapStat(timeText, "TIME")}`}
     </div>
     ${secondRow.length
       ? `<div class="rc-stats" style="grid-template-columns:repeat(${secondRow.length},1fr);">${secondRow.join("")}</div>`
@@ -15963,10 +16033,20 @@ function openRecap(email, name, date) {
 
     ${!sharing
       ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>`
-      : r.logs.length ? `
+      : r.lifts.length ? `
       <div class="rc-ex-head"><h4>Exercises</h4></div>
-      <div class="rc-list">${r.logs.map(exRow).join("")}</div>`
+      <div class="rc-list">${r.lifts.map(exRow).join("")}</div>`
+      : r.activities.length ? ""
       : `<div class="ps-empty">No exercises were logged for this one.</div>`}
+
+    ${/* Mo: "View today's training only shows the workout, but I also did an
+          activity, should be able to show that as well." Its own block under
+          the lifts, because a yoga class is not exercise three of the push
+          day; on a day that was only a run this is the whole recap, and the
+          sheet opens on it rather than on "no exercises were logged". */ ""}
+    ${sharing && r.activities.length ? `
+      <div class="rc-ex-head"><h4>Activities</h4></div>
+      <div class="rc-list">${r.activities.map(actRow).join("")}</div>` : ""}
 
     ${r.note ? `<p class="quote">${escapeHtml(r.note)}</p>` : ""}
 
@@ -24371,6 +24451,43 @@ let planEnginePromise = null;
    closes. The engine import is lazy, so the card paints with its own guess
    first and repaints once, if the answer differs. */
 let ENGINE_NEXT_DAY = null;
+
+/* EVERY WAY A DAY'S PLAN CHANGES ENDS HERE.
+
+   Mo: "when I swap a workout then go back to the workout page, it should be
+   updated for the smart workout overview." Four doors lead to a swap, the
+   whole-session sheet from the plan screen, the same sheet from the reveal,
+   the day planner's Swap the whole workout, and swapping a lift for an
+   activity, and each one used to decide for itself what to reload and what to
+   redraw. A swap onto a day that is not today reloaded the tables and then
+   redrew the home tab, so the week strip and the next-workout card sitting
+   behind the sheet kept the day that had just been replaced.
+
+   ENGINE_NEXT_DAY is dropped here too. It is the generator's answer to "which
+   day next", cached, and it was asked before this write: on a day with no plan
+   the card reads it synchronously, so without this the card paints the
+   suggestion the old plan produced, and only corrects itself once the engine
+   module answers again.
+
+   `date` is the day that was written, and is what decides whether TODAY_WORKOUT
+   needs re-reading as well as the tables. `then` runs in the gap between the
+   reload and the repaint, for the one caller with a flag to set off the row it
+   has just read back (FRESH_PLAN_ID), which the repaint then has to see. */
+async function planChangedOn(date, { then = null } = {}) {
+  ENGINE_NEXT_DAY = null;
+  await loadAll();
+  if (date === sessionDate()) await loadTodayWorkout();
+  if (then) then();
+  renderHero();
+  /* Only while the workout tab is the one on screen: these sheets open over it
+     and over Home, and rebuilding a panel nobody is looking at is how a screen
+     ends up redrawn underneath an animation. Asked of the panel rather than of
+     the tab bar, because the workout tab has no tab button: it is reached from
+     the middle of the bar, and switchTab leaves every .tab-btn inactive for
+     it. respectMode, so a screen asked for by name stays where it is. */
+  if (!$("tab-workout")?.classList.contains("hidden")) renderWorkoutTab({ respectMode: true });
+}
+
 async function refreshEngineNextDay() {
   const engine = await ensurePlanEngine();
   if (!engine?.generateFromPayload) return;
@@ -24658,14 +24775,12 @@ async function applySessionSwap(workout, ctx) {
      to 45 min" offer pointing at a session they swapped away from is a trap. */
   if (ONE_OFF_SESSION?.date === date) ONE_OFF_SESSION = null;
 
-  await loadAll();
-  if (date === todayStr()) {
-    await loadTodayWorkout();
-    FRESH_PLAN_ID = TODAY_WORKOUT?.id || null;
-    renderWorkoutTab();
-  } else {
-    renderHero();
-  }
+  /* One reload and one repaint for every day, not just for today. A swap onto
+     Friday redrew Home and left the workout tab underneath showing Friday's
+     old session on the week strip. */
+  await planChangedOn(date, {
+    then: () => { if (date === sessionDate()) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+  });
   toast(`Swapped to ${workout.focus}`);
   /* Opened from the reveal, so the reveal is what redraws: the same overlay,
      the new session landing a row at a time exactly as the first one did, with
@@ -24731,7 +24846,11 @@ async function archiveSwappedPlan(instead) {
   const { error } = await sb.from("ai_workouts").update({ archived: true }).eq("id", instead.planId);
   if (error) { console.error("could not stand the swapped plan down", error); return; }
   if (TODAY_WORKOUT?.id === instead.planId) TODAY_WORKOUT = null;
-  renderWorkoutTab();
+  /* Through the same door as every other plan change. It used to null out
+     TODAY_WORKOUT and redraw, leaving ALL_PLANS still holding the row it had
+     just archived, so the week strip kept a dot on a day whose lift had been
+     stood down. */
+  await planChangedOn(sessionDate());
 }
 
 /* The screen that says what went wrong. It has to be the most robust thing
@@ -29428,6 +29547,11 @@ function planFromToday() {
     focus: displayFocus(TODAY_WORKOUT.focus, list),
     match: md.match,
     muscles: md.muscles,
+    /* Every muscle scored, and the week's hardest, for the sheet behind the
+       ring. The card only has room for four of them. */
+    all: md.all,
+    peak: md.peak,
+    peakName: md.peakName,
     duration: `${Math.max(10, mins - 5)}-${mins + 5} min`,
     equipment: kit.length ? kit.join(", ") : null,
     targets,
@@ -29456,14 +29580,54 @@ function matchDetail(counts) {
   const vols = computeMuscleVolume(ME, 0);
   const trained = Object.keys(counts || {});
   const peak = Math.max(...Object.values(vols), 0);
-  if (!trained.length) return { match: 99, muscles: [] };
+  if (!trained.length) return { match: 99, muscles: [], all: [], peak: 0 };
   const pretty = { lowerback: "Lower back", abs: "Core", obliques: "Obliques" };
+  const last = muscleLastTrained();
   const muscles = trained.map((m) => ({
+    key: m,
     name: pretty[m] || m.charAt(0).toUpperCase() + m.slice(1),
     fresh: peak > 0 ? Math.max(0, Math.min(100, Math.round((1 - (vols[m] || 0) / peak) * 100))) : 100,
+    /* The two numbers the freshness above is made of, carried out with it so
+       the sheet that explains the figure can show its working rather than
+       re-deriving it and risking a different answer. */
+    sets: Math.round((vols[m] || 0) * 10) / 10,
+    lastDate: last[m] || null,
+    focusTier: focusTierOfGroup(m),
   })).sort((a, b) => b.fresh - a.fresh);
   const match = Math.round(muscles.reduce((s, x) => s + x.fresh, 0) / muscles.length);
-  return { match: Math.max(35, Math.min(99, match)), muscles: muscles.slice(0, 4) };
+  /* `muscles` is the four the card has room for, freshest first. `all` is what
+     the average was actually taken over: the muscle dragging the figure down
+     is by definition the least fresh, which is the one the top four cut off,
+     and a sheet that explains a low number cannot leave it out. */
+  /* The muscle every other one is scored against, named, because "0% is
+     whichever one you have worked hardest" is not a fact anybody can check
+     without knowing which one that is. */
+  const peakKey = peak > 0 ? Object.keys(vols).find((m) => vols[m] === peak) : null;
+  return {
+    match: Math.max(35, Math.min(99, match)),
+    muscles: muscles.slice(0, 4),
+    all: muscles,
+    peak: Math.round(peak * 10) / 10,
+    peakName: peakKey ? (pretty[peakKey] || peakKey.charAt(0).toUpperCase() + peakKey.slice(1)) : null,
+  };
+}
+
+/* The last day each muscle got any credit, on the same weighting
+   computeMuscleVolumeBetween uses, so "trained yesterday" in the match sheet
+   means the same day the freshness figure was scored from. Whole history, not
+   this week: a muscle last worked nine days ago is still the answer to when. */
+function muscleLastTrained() {
+  const out = {};
+  const hidden = bodyHiddenToday(ME);
+  for (const l of ALL_EXERCISE_LOGS) {
+    if (l.user_name !== ME || isBodyHidden(l, hidden)) continue;
+    const rule = classifyMuscles(l.exercise_name);
+    if (!rule) continue;
+    for (const g of [...(rule.primary || []), ...(rule.secondary || [])]) {
+      if (!out[g] || l.entry_date > out[g]) out[g] = l.entry_date;
+    }
+  }
+  return out;
 }
 
 function matchReading(pct) {
@@ -29472,6 +29636,56 @@ function matchReading(pct) {
   if (pct >= 50) return "Reasonable fit. Some of this has had work already.";
   return "Most of this is already worked. Go lighter, or swap the focus.";
 }
+/* Mo: "when I click on the percentage match, then it should show me why it's a
+   low match." So the ring is a button, and this is what it says.
+
+   Built when the card is drawn rather than when the sheet opens, so the number
+   being explained is the number on screen and the two cannot drift. Every line
+   is a figure matchDetail already worked out: the muscle's own freshness, the
+   weighted sets behind it, the week's hardest worked muscle it was scored
+   against, and the day it was last trained. Nothing here is a new opinion
+   about the workout. */
+let MATCH_NOTE = null;
+function matchNoteFor(p) {
+  const all = p.all || [];
+  if (!all.length) return null;
+  /* "yesterday" reads as a word, a weekday and a date read as places, so the
+     preposition goes in front of those two and not in front of the first. */
+  const when = (d) => {
+    const lab = relDayLabel(d);
+    return lab === "Today" || lab === "Yesterday" ? lab.toLowerCase() : `on ${lab}`;
+  };
+  const working = (m) => {
+    const bits = [];
+    const s = m.sets === 1 ? "set" : "sets";
+    /* The muscle everything is measured against is named once, in the
+       paragraph below, rather than repeated on all four rows. */
+    if (!(m.sets > 0)) bits.push("nothing logged on it this week");
+    else if (p.peak > 0 && m.sets >= p.peak) bits.push(`${m.sets} ${s} this week, more than anything else you have trained`);
+    else bits.push(`${m.sets} ${s} this week`);
+    if (m.lastDate) bits.push(`last trained ${when(m.lastDate)}`);
+    if (m.focusTier) bits.push("marked as a focus");
+    return `${m.name}: ${bits.join(", ")}.`;
+  };
+  // Sorted freshest first, so the one dragging the figure down is the last one.
+  const worst = all[all.length - 1];
+  return {
+    eyebrow: `Why ${p.match}%`,
+    rows: all.map((m) => [`${m.fresh}%`, working(m)]),
+    paras: [
+      `${p.match}% is the average of the ${all.length} figure${all.length === 1 ? "" : "s"} above, one for every muscle this day trains. Each one is how much room that muscle has left this week: 100% is a muscle you have not worked at all, 0% is whichever one you have worked hardest.${p.peakName
+        ? ` That is your ${p.peakName.toLowerCase()} this week, at ${p.peak} sets, and every figure above is measured against it.`
+        : ` You have logged nothing this week, so every muscle reads full.`}`,
+      worst.fresh >= 80
+        ? `There is nothing here to fix. Every muscle this day trains is above 80%, so it already lands on what your week has had least of.`
+        : `${worst.name} at ${worst.fresh}% is what holds this one back. Training a day that leaves it out, or giving it another day before you come back to it, is what moves the number.`,
+      ...(all.some((m) => m.focusTier)
+        ? ["A muscle you marked as a focus does not change this figure. The match is only about how much room your week has left, not about what you want to work on."]
+        : []),
+    ],
+  };
+}
+
 function freshTone(pct) {
   if (pct >= 65) return "var(--accent)";
   if (pct >= 45) return "var(--warn)";
@@ -29545,6 +29759,9 @@ function planPreview() {
     ask: focus,
     match,
     muscles: md.muscles,
+    all: md.all,
+    peak: md.peak,
+    peakName: md.peakName,
     duration: avg ? `${Math.max(15, avg - 5)}-${avg + 5} min` : null,
     equipment: kit.length ? kit.join(", ") : null,
     targets,
@@ -29859,6 +30076,10 @@ function renderChooseScreen() {
   const coached = isCoachedClient();
   const coachName = MY_COACH ? MY_COACH.split("@")[0] : "your coach";
   const p = planPreview();
+  /* The ring's explanation, built from the same p the ring is drawn from. Set
+     here rather than when the sheet opens so it can only ever describe the
+     number currently on screen. */
+  MATCH_NOTE = matchNoteFor(p);
 
   // The card's own heading and focus line would just repeat the screen title
   // and the preview, so this screen owns the top of the card outright.
@@ -30004,16 +30225,22 @@ function renderChooseScreen() {
       </div>
     </section>`;
 
-  /* Next workout. The ring and the muscle list are two readings of one number:
-     the percentage is the average freshness, the list is which muscles it came
-     from, and an open circle marks the one the day is aimed at. Printing both
-     is what stops the figure being a score nobody can check.
+  /* Next workout. The ring is the centrepiece and the muscles are a quiet line
+     at the bottom, which is Mo's note: "remove the triceps chest shoulders in
+     that tab or put it below, make the percentage match bigger." They were a
+     column of ticks beside the ring, three things competing for the same
+     glance on a card whose job is to name tomorrow and start it.
+
+     The figure is a score somebody is entitled to check, so it is now the
+     thing you tap: matchNoteFor puts its whole working in a sheet, muscle by
+     muscle. The line underneath still says which muscles it was read from,
+     because a percentage with nothing attached to it is a number nobody can
+     argue with.
 
      Two buttons, not three cards. The third door, an activity on the clock,
      is a line under them: it has to stay reachable from here because on an
      empty day this screen is where it lives, but it is not what most people
      open this tab to do. */
-  const aimed = (p.focus || "").toLowerCase();
   /* Which day this card is about. Today until today is done, then tomorrow.
      A plan already sitting on tomorrow is shown rather than offered again:
      the button becomes the way to look at it. */
@@ -30041,18 +30268,10 @@ function renderChooseScreen() {
           ${hiredHere ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
         </div>
         ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : `
-        <div class="wkt-arc">
-          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 96)}
+        <button type="button" class="wkt-arc" data-info="planMatchWhy" aria-label="Why this is a ${p.match}% match">
+          ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 120)}
           <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
-        </div>
-        <ul class="wkt-muscles">
-          ${(p.muscles || []).map((m) => {
-            const on = aimed.includes(m.name.toLowerCase());
-            return `<li>${on
-              ? `<span class="wkt-ring" aria-hidden="true"></span>`
-              : `<span class="wkt-tick" aria-hidden="true">${icon("check", 14)}</span>`}${escapeHtml(m.name)}</li>`;
-          }).join("")}
-        </ul>`}
+        </button>`}
         <div class="wkt-next-acts">
           ${p.real
             ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume workout" : "Begin workout"}</button>`
@@ -30064,6 +30283,12 @@ function renderChooseScreen() {
             ? `<button type="button" class="wkt-more" id="chooseActivityBtn">Resume ${escapeHtml(csnAct().label.toLowerCase())}, ${csnClock(csnElapsedMs())} ${icon("chevronRight", 13)}</button>`
             : `<button type="button" class="wkt-more" id="chooseActivityBtn">or start an activity ${icon("chevronRight", 13)}</button>`}
         </div>
+        ${/* Where the ticked column went. One line, under the buttons, saying
+              what the figure above was read from. It is a caption, not a
+              choice, so it is the last thing on the card and the quietest. */ ""}
+        ${hiredHere && (p.muscles || []).length
+          ? `<p class="wkt-next-line">Trains ${escapeHtml(p.muscles.map((m) => m.name.toLowerCase()).join(", "))}</p>`
+          : ""}
       </div>
     </section>`;
 
@@ -32174,10 +32399,7 @@ async function planActivityOnDay(date, name, { quiet = false } = {}) {
   /* The week builder writes several of these in a row and reloads once at the
      end, so a quiet call stops at the row it saved. */
   if (quiet) { rememberPlannedDay(date, name, []); return true; }
-  await loadAll();
-  if (date === todayStr()) await loadTodayWorkout();
-  renderHero();
-  renderWorkoutTab();
+  await planChangedOn(date);
   toast(`${name} is on ${datedLabel(date)}`);
   return true;
 }
