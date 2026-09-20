@@ -19,7 +19,6 @@ export const CALISTHENICS = {
         { name: "Push-Up", primary: ["chest"], secondary: ["triceps", "shoulders"], equipment: "bodyweight", level: "beginner" },
         { name: "Diamond Push-Up", primary: ["triceps"], secondary: ["chest"], equipment: "bodyweight", level: "intermediate" },
         { name: "Dip", primary: ["chest", "triceps"], secondary: ["shoulders"], equipment: "bodyweight", level: "intermediate" },
-        { name: "Archer Push-Up", primary: ["chest"], secondary: ["triceps", "shoulders"], equipment: "bodyweight", level: "advanced" },
         { name: "Pseudo Planche Push-Up", primary: ["chest", "shoulders"], secondary: ["triceps", "abs"], equipment: "bodyweight", level: "advanced" },
         { name: "One-Arm Push-Up", primary: ["chest"], secondary: ["triceps", "shoulders", "obliques"], equipment: "bodyweight", level: "advanced" },
       ],
@@ -29,6 +28,13 @@ export const CALISTHENICS = {
       label: "Pull progressions",
       exercises: [
         { name: "Dead Hang", primary: ["forearms"], secondary: ["lats"], equipment: "bodyweight", level: "beginner", isHold: true },
+        // Band-assisted work was missing entirely -- the standard entry point for someone who
+        // can't yet control a full negative, per a 2019 JSCR study finding weekly band
+        // reduction added 4-5 strict reps over 10 weeks vs. 1-2 for pulldown-only work. Tagged
+        // "band" equipment since it needs one, distinct from "bodyweight" -- see
+        // skill-ladder-training.md for how assistance level is tracked (relative terms, not a
+        // specific band color/tension the app can't verify anyone owns).
+        { name: "Band-Assisted Pull-Up", primary: ["lats"], secondary: ["biceps", "forearms"], equipment: "band", level: "beginner" },
         { name: "Inverted Row", primary: ["lats"], secondary: ["biceps", "traps"], equipment: "bodyweight", level: "beginner" },
         { name: "Negative Pull-Up", primary: ["lats"], secondary: ["biceps", "forearms"], equipment: "bodyweight", level: "beginner" },
         { name: "Pull-Up", primary: ["lats"], secondary: ["biceps", "forearms"], equipment: "bodyweight", level: "intermediate" },
