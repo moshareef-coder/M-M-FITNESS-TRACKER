@@ -15,6 +15,23 @@
 // reproducing that exact known dropout wall, not as an arbitrary round number.
 export const MAX_WEEKLY_RUNTIME_GROWTH = 0.5;
 
+// Cycling gets a genuinely less conservative cap, not a bigger version of the same caution:
+// runners average ~11 injuries per 1,000 hours versus cyclists' ~6 (roughly half), and a study
+// matching training duration found runners accumulated up to 404% more muscle damage, 256%
+// higher inflammation, and 87% more soreness than cyclists over the same time. That's a real,
+// sourced difference, not an assumption -- cycling is non-weight-bearing, so it lacks running's
+// primary injury driver (repeated ground-impact loading on connective tissue).
+//
+// Still a real cap, not "no limit": overuse injury remains common in cycling too, and multiple
+// sources name the SAME trap specifically -- people under-rest because cycling *feels* easier,
+// not because it demands less recovery. See build-endurance-training.md for the full caution
+// (saddle/bike-fit issues, and cycling's real crash-risk category that running doesn't have).
+export const CYCLING_MAX_WEEKLY_GROWTH = 0.65;
+
+function growthRateForMode(mode) {
+  return mode === "cycling" ? CYCLING_MAX_WEEKLY_GROWTH : MAX_WEEKLY_RUNTIME_GROWTH;
+}
+
 // 3 sessions/week is standard across every real program checked, and matches the cardio floor
 // training-mix.mjs already establishes for this modality generally -- not a coincidence, this is
 // close to the minimum frequency needed to build aerobic fitness while giving connective tissue
@@ -41,41 +58,50 @@ export function estimateWeeksToTarget(currentContinuousRunSeconds, targetContinu
 /**
  * Builds one week's run/walk interval structure.
  * weekIndex: 0-based, from the start of the plan.
+/**
  * currentContinuousRunSeconds: their ability BEFORE this week's progression is applied --
- *   caller is expected to feed each week's own output back in as the next week's input.
+ *   caller is expected to feed each week's own output back in as the next week's input. Despite
+ *   the name (kept for backward compatibility), this is "continuous cardio seconds" generally --
+ *   see `mode` below.
  * targetContinuousRunSeconds: the eventual goal (e.g. 1800 = 30 min, roughly a 5K at most
- *   beginner paces).
+ *   beginner paces, or a comparable cycling duration).
  * totalSessionMinutes: how long one session should run, used to compute how many
- *   run/walk rounds fit in it.
+ *   work/recovery rounds fit in it.
+ * mode: "running" (default) | "cycling" -- changes the growth cap and the recovery-interval
+ *   floor, not the overall structure. See CYCLING_MAX_WEEKLY_GROWTH above for why cycling gets
+ *   a genuinely less conservative cap, not just a bigger version of running's.
  */
 export function buildCardioWeek({
-  weekIndex, currentContinuousRunSeconds, targetContinuousRunSeconds, totalSessionMinutes = 25,
+  weekIndex, currentContinuousRunSeconds, targetContinuousRunSeconds, totalSessionMinutes = 25, mode = "running",
 }) {
   const isRecoveryWeek = weekIndex > 0 && weekIndex % RECOVERY_WEEK_EVERY_N_WEEKS === 0;
   const isFirstWeek = weekIndex === 0;
+  const isCycling = mode === "cycling";
 
   // A recovery week repeats the PREVIOUS week's numbers rather than progressing further -- the
-  // whole point is giving connective tissue a week to catch up, not a harder one dressed up as
-  // a break. Week 1 also doesn't apply growth -- it establishes the floor a person actually
-  // starts from; every real program checked opens at a genuinely easy interval (60s run / 90s+
-  // walk for a true beginner), not one step already ahead of it.
-  const growthFactor = (isRecoveryWeek || isFirstWeek) ? 1 : (1 + MAX_WEEKLY_RUNTIME_GROWTH);
+  // whole point is giving the body a week to catch up, not a harder one dressed up as a break.
+  // Week 1 also doesn't apply growth -- it establishes the floor a person actually starts from.
+  const growthFactor = (isRecoveryWeek || isFirstWeek) ? 1 : (1 + growthRateForMode(mode));
   const runSeconds = Math.round(Math.min(
     targetContinuousRunSeconds,
     Math.max(currentContinuousRunSeconds, 60) * growthFactor
   ));
 
-  // The walk interval shrinks as the run interval grows, but keeps a real recovery floor until
-  // continuous running is actually reached -- matching every real program checked, none of which
-  // eliminate the walk break early just because the run interval got longer.
+  // The recovery interval (walk, for running; easy spin, for cycling) shrinks as the work
+  // interval grows, but keeps a real floor until the target is actually reached. Cycling's
+  // floor and ratio are both a little lower than running's -- easy spinning is more readily
+  // sustainable and recovers faster between harder segments than walking does between running
+  // segments, since it's non-impact, not because cycling needs LESS structure overall.
   const isGraduated = runSeconds >= targetContinuousRunSeconds;
-  const walkSeconds = isGraduated ? 0 : Math.max(60, Math.round(runSeconds * 0.75));
+  const recoveryFloor = isCycling ? 45 : 60;
+  const recoveryRatio = isCycling ? 0.6 : 0.75;
+  const walkSeconds = isGraduated ? 0 : Math.max(recoveryFloor, Math.round(runSeconds * recoveryRatio));
 
   const roundSeconds = runSeconds + walkSeconds;
   const rounds = walkSeconds > 0 ? Math.max(1, Math.round((totalSessionMinutes * 60) / roundSeconds)) : 1;
 
   return {
-    runSeconds, walkSeconds, rounds, isRecoveryWeek, isGraduated,
+    runSeconds, walkSeconds, rounds, isRecoveryWeek, isGraduated, mode,
     sessionsThisWeek: SESSIONS_PER_WEEK,
   };
 }
@@ -83,12 +109,12 @@ export function buildCardioWeek({
 /** Builds a full plan, week by week, feeding each week's resulting ability into the next --
  *  this is what a caller actually wants: the whole progression, not one week at a time managed
  *  externally. */
-export function buildCardioPlan({ currentContinuousRunSeconds = 0, targetContinuousRunSeconds = 1800, totalSessionMinutes = 25 }) {
+export function buildCardioPlan({ currentContinuousRunSeconds = 0, targetContinuousRunSeconds = 1800, totalSessionMinutes = 25, mode = "running" }) {
   const weeks = [];
   let cur = currentContinuousRunSeconds;
   let weekIndex = 0;
   while (weeks.length < 52) {
-    const week = buildCardioWeek({ weekIndex, currentContinuousRunSeconds: cur, targetContinuousRunSeconds, totalSessionMinutes });
+    const week = buildCardioWeek({ weekIndex, currentContinuousRunSeconds: cur, targetContinuousRunSeconds, totalSessionMinutes, mode });
     weeks.push(week);
     cur = week.runSeconds;
     weekIndex++;
@@ -120,28 +146,36 @@ export const SPEED_GROWTH_PER_WEEK = 0.15; // more conservative than the distanc
  * effort-based instruction.
  * level: "beginner" | "intermediate" | "advanced" -- from experience-tiers.md, NOT specific to
  *   running experience, but a reasonable proxy in the absence of a running-specific history.
+ * mode: "running" (default) | "cycling" -- changes the effort language only, NOT the growth
+ *   rate. Unlike the distance case, the injury-rate research supporting a less conservative
+ *   cycling cap was about aggregate training injury (impact-driven), not specifically about
+ *   high-intensity interval sessions -- the classic VO2max interval research (4x4min at
+ *   90-95% max HR) is commonly done on a cycling ergometer in lab studies to begin with, so
+ *   there's no real basis to treat interval-specific injury risk as mode-dependent here. Kept
+ *   the same on purpose rather than guessing at a cycling-specific number.
  */
-export function buildSpeedWeek({ weekIndex, level = "beginner" }) {
+export function buildSpeedWeek({ weekIndex, level = "beginner", mode = "running" }) {
   const isRecoveryWeek = weekIndex > 0 && weekIndex % RECOVERY_WEEK_EVERY_N_WEEKS === 0;
   const growthFactor = isRecoveryWeek ? 0 : Math.min(weekIndex, 8) * SPEED_GROWTH_PER_WEEK; // caps growth after week 8 -- linear growth forever isn't realistic for interval volume either
+  const verb = mode === "cycling" ? "pedaling" : "running";
 
   if (level === "beginner") {
     // 6x30s hard, generous recovery -- the standard beginner entry point. Rounds grow slowly;
     // interval duration itself does not, since going both longer AND more frequent at once is
     // exactly the kind of double-progression that causes overuse injury.
     const rounds = Math.min(10, Math.round(6 * (1 + growthFactor)));
-    return { intervalSeconds: 30, recoverySeconds: 90, rounds, effort: "hard, not all-out", isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
+    return { intervalSeconds: 30, recoverySeconds: 90, rounds, mode, effort: `hard ${verb}, not all-out`, isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
   }
   if (level === "intermediate") {
     // Tempo/"cruise interval" format -- less neurologically taxing than short VO2max intervals,
     // so sustainable more often. 3x10min at "comfortably hard" with 2min jog recovery.
     const rounds = Math.min(5, Math.round(3 * (1 + growthFactor)));
-    return { intervalSeconds: 600, recoverySeconds: 120, rounds, effort: "comfortably hard, sustainable pace", isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
+    return { intervalSeconds: 600, recoverySeconds: 120, rounds, mode, effort: `comfortably hard ${verb}, sustainable pace`, isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
   }
   // Advanced: classic 4x4min hard effort, 3min easy recovery -- the specific structure behind
   // the cited 7.2% VO2max improvement.
   const rounds = Math.min(6, Math.round(4 * (1 + growthFactor)));
-  return { intervalSeconds: 240, recoverySeconds: 180, rounds, effort: "hard, 90-95% effort", isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
+  return { intervalSeconds: 240, recoverySeconds: 180, rounds, mode, effort: `hard ${verb}, 90-95% effort`, isRecoveryWeek, sessionsThisWeek: SPEED_SESSIONS_PER_WEEK };
 }
 
 // ---------------------------------------------------------------------------
