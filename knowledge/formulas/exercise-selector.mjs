@@ -57,14 +57,56 @@ export function weeklyVolumeTarget(categoryKey, level) {
  * computeMuscleVolume() returns -- pass {} (or omit) with no data and every group ranks equal,
  * falling back to declaration order (roughly biggest-muscle-first).
  */
-export function pickFocusCategories({ level, weeklyVolumeByCategory = {}, count = 2 }) {
+/**
+ * Emphasis weighting for the "What do you want to grow most / Stronger where / Where do you
+ * want it to show first" tune questions -- live and real on three tiles (build-muscle,
+ * get-stronger, tone-lean-abs), confirmed in index.html's GOAL_TUNE with its own ranked-priority
+ * system, and confirmed by search that NO formula was actually reading it before this fix.
+ * Mirrors the UI's own weighting exactly (index.html's AREA_RANK_TIER): 1st choice = 3x,
+ * 2nd = 2x, 3rd = 1x, unranked/4th = 1x baseline -- matches the UI's own promise ("last gets
+ * none of the extra," not a penalty on anything unranked).
+ *
+ * emphasisRanks is keyed by category (chest/lats/quads/etc, NOT the UI's 4 broad regions --
+ * translating "arms" -> {biceps:1, triceps:1, forearms:1, shoulders:1} is the caller's job,
+ * same region->group expansion index.html's own FOCUS_REGIONS already does).
+ */
+const EMPHASIS_TIER_MULTIPLIER = { 1: 3, 2: 2, 3: 1 };
+
+export function emphasisMultiplier(categoryKey, emphasisRanks = {}) {
+  return EMPHASIS_TIER_MULTIPLIER[emphasisRanks[categoryKey]] ?? 1;
+}
+
+/**
+ * The tune questions don't actually offer per-muscle picks -- index.html's own FOCUS_REGIONS
+ * groups the 14 categories into 4 broad regions (arms & shoulders, chest, back, legs & core),
+ * ranked as a set. This mirrors that exact grouping so a caller can pass the UI's own region
+ * ranks straight through rather than needing to know our internal category vocabulary at all.
+ */
+export const FOCUS_REGION_GROUPS = {
+  arms: ["biceps", "triceps", "forearms", "shoulders"],
+  chest: ["chest"],
+  back: ["lats", "traps", "lowerback"],
+  legscore: ["quads", "hamstrings", "glutes", "calves", "abs", "obliques"],
+};
+
+export function emphasisRanksFromRegions(regionRanks = {}) {
+  const out = {};
+  for (const [region, rank] of Object.entries(regionRanks)) {
+    for (const category of FOCUS_REGION_GROUPS[region] || []) out[category] = rank;
+  }
+  return out;
+}
+
+function weightedGap(key, level, weeklyVolumeByCategory, emphasisRanks) {
+  const target = weeklyVolumeTarget(key, level) || 1;
+  const done = weeklyVolumeByCategory[key] || 0;
+  return ((target - done) / target) * emphasisMultiplier(key, emphasisRanks);
+}
+
+export function pickFocusCategories({ level, weeklyVolumeByCategory = {}, count = 2, emphasisRanks = {} }) {
   const keys = Object.keys(VOLUME_LANDMARKS);
   return keys
-    .map((key) => {
-      const target = weeklyVolumeTarget(key, level) || 1;
-      const done = weeklyVolumeByCategory[key] || 0;
-      return { key, gap: (target - done) / target };
-    })
+    .map((key) => ({ key, gap: weightedGap(key, level, weeklyVolumeByCategory, emphasisRanks) }))
     .sort((a, b) => b.gap - a.gap)
     .slice(0, count)
     .map((c) => c.key);
@@ -92,15 +134,11 @@ const MOVEMENT_PATTERNS = {
 };
 const PATTERN_ORDER = ["squat", "hinge", "push", "pull", "core"];
 
-export function pickCircuitCategories({ level, weeklyVolumeByCategory = {} }) {
+export function pickCircuitCategories({ level, weeklyVolumeByCategory = {}, emphasisRanks = {} }) {
   return PATTERN_ORDER.map((pattern) => {
     const candidates = MOVEMENT_PATTERNS[pattern];
     const [best] = candidates
-      .map((key) => {
-        const target = weeklyVolumeTarget(key, level) || 1;
-        const done = weeklyVolumeByCategory[key] || 0;
-        return { key, gap: (target - done) / target };
-      })
+      .map((key) => ({ key, gap: weightedGap(key, level, weeklyVolumeByCategory, emphasisRanks) }))
       .sort((a, b) => b.gap - a.gap);
     return best.key;
   });
@@ -427,14 +465,10 @@ const HYPERTROPHY_SPLIT = {
   core: ["abs", "obliques", "lowerback"],
 };
 
-export function pickSplitCategories({ level, weeklyVolumeByCategory = {}, dayIndex = 0 }) {
+export function pickSplitCategories({ level, weeklyVolumeByCategory = {}, dayIndex = 0, emphasisRanks = {} }) {
   const half = dayIndex % 2 === 0 ? "upper" : "lower";
   const [bestCore] = HYPERTROPHY_SPLIT.core
-    .map((key) => {
-      const target = weeklyVolumeTarget(key, level) || 1;
-      const done = weeklyVolumeByCategory[key] || 0;
-      return { key, gap: (target - done) / target };
-    })
+    .map((key) => ({ key, gap: weightedGap(key, level, weeklyVolumeByCategory, emphasisRanks) }))
     .sort((a, b) => b.gap - a.gap);
   return [...HYPERTROPHY_SPLIT[half], bestCore.key];
 }
@@ -486,6 +520,7 @@ export function buildWeightTrainingPlan({
   level, goal, weeklyVolumeByCategory = {}, recentExerciseNames = [],
   equipmentAvailable = null, historyByExercise = {}, bodyWeightLb = null,
   focusCategoryCount = 2, exercisesPerCategory = 2, dayIndex = 0, isDeloadWeek = false,
+  emphasisRanks = {},
 }) {
   const isCircuit = sessionStyleForGoal(goal) === "circuit";
   const isHypertrophy = isHypertrophyStyle(goal);
@@ -499,10 +534,10 @@ export function buildWeightTrainingPlan({
   // Session style/reps/rest stay strength-appropriate; only category SELECTION is shared with
   // circuit's logic, not circuit's actual pacing.
   const categories = (isCircuit || isStrength)
-    ? pickCircuitCategories({ level, weeklyVolumeByCategory })
+    ? pickCircuitCategories({ level, weeklyVolumeByCategory, emphasisRanks })
     : isHypertrophy
-      ? pickSplitCategories({ level, weeklyVolumeByCategory, dayIndex })
-      : pickFocusCategories({ level, weeklyVolumeByCategory, count: focusCategoryCount });
+      ? pickSplitCategories({ level, weeklyVolumeByCategory, dayIndex, emphasisRanks })
+      : pickFocusCategories({ level, weeklyVolumeByCategory, count: focusCategoryCount, emphasisRanks });
   // Circuit and strength sessions cover 5 movement patterns in one exercise each (full-body
   // every time); hypertrophy sessions alternate upper/lower for full coverage at ~2x/week
   // frequency; anything else falls back to the older, narrower split logic.
@@ -527,6 +562,14 @@ export function buildWeightTrainingPlan({
     return picked.map((ex) => {
       const lastLog = historyByExercise[ex.name] || null;
       const isBodyweight = ex.equipment === "bodyweight";
+      // Top-ranked emphasis (tier 3, the person's #1 pick) gets an actual extra set, not just
+      // a better chance of being selected -- "first gets the most work" per the UI's own
+      // copy should mean more volume specifically, not just more frequent selection. 2nd/3rd
+      // rank rely on selection frequency alone (already handled by the weighted gap above);
+      // only #1 gets a direct set bump, so the distinction between ranks is felt, not just
+      // theoretical.
+      const isTopEmphasis = (ex.primary || []).some((m) => emphasisRanks[m] === 1);
+      const exerciseSets = isTopEmphasis ? sets + 1 : sets;
       // null (not 0) means "no formula-backed number yet" -- 0 would read as a real
       // prescription. Bodyweight moves have no load at all, which is a different, known 0.
       const weight = isBodyweight
@@ -537,7 +580,7 @@ export function buildWeightTrainingPlan({
           ?? null;
       if (ex.isHold) {
         return {
-          name: ex.name, sets, reps: null, holdSeconds: progressiveHold({ lastLog, level }),
+          name: ex.name, sets: exerciseSets, reps: null, holdSeconds: progressiveHold({ lastLog, level }),
           targetWeight: isBodyweight ? 0 : weight, isEstimate: false,
           primary: ex.primary, equipment: ex.equipment, level: ex.level, isHold: true,
         };
@@ -550,7 +593,7 @@ export function buildWeightTrainingPlan({
           const harder = findHarderBodyweightVariation({ trainingId: "weight-training", categoryKey, currentExerciseName: ex.name });
           if (harder) {
             return {
-              name: harder.name, sets, reps: repsForGoal(goal), targetWeight: 0, isEstimate: false,
+              name: harder.name, sets: exerciseSets, reps: repsForGoal(goal), targetWeight: 0, isEstimate: false,
               primary: harder.primary, equipment: harder.equipment, level: harder.level,
               progressedFrom: ex.name, // so the UI can say "you leveled up from X" rather than silently swap
             };
@@ -559,13 +602,13 @@ export function buildWeightTrainingPlan({
           // ceiling on the current exercise rather than pretending there's somewhere to go.
         }
         return {
-          name: ex.name, sets, reps: bwReps, targetWeight: 0, isEstimate: false,
+          name: ex.name, sets: exerciseSets, reps: bwReps, targetWeight: 0, isEstimate: false,
           primary: ex.primary, equipment: ex.equipment, level: ex.level,
           atRepCeiling: atCeiling, // true only when atCeiling AND no harder variation was found
         };
       }
       return {
-        name: ex.name, sets, reps, targetWeight: weight,
+        name: ex.name, sets: exerciseSets, reps, targetWeight: weight,
         isEstimate: !isBodyweight && weight != null && !lastLog,
         primary: ex.primary, equipment: ex.equipment, level: ex.level,
       };
@@ -597,7 +640,7 @@ export function sessionCapacity(minutesAvailable) {
 // next day is generated, so day 4 already "knows" what days 1-3 did -- the same mechanic that
 // makes today's plan depend on yesterday's real logged history once this is wired into the app.
 // ---------------------------------------------------------------------------
-export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable = null, bodyWeightLb = null, focusCategoryCount = 2, exercisesPerCategory = 2, weeksSinceLastDeload = 0, missedRepStreak = 0, risingRpeStreak = 0, historyByExercise = {} }) {
+export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable = null, bodyWeightLb = null, focusCategoryCount = 2, exercisesPerCategory = 2, weeksSinceLastDeload = 0, missedRepStreak = 0, risingRpeStreak = 0, historyByExercise = {}, emphasisRanks = {} }) {
   const days = [];
   let weeklyVolumeByCategory = {};
   let recentExerciseNames = [];
@@ -606,7 +649,7 @@ export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable
   for (let day = 0; day < daysPerWeek; day++) {
     const plan = buildWeightTrainingPlan({
       level, goal, weeklyVolumeByCategory, recentExerciseNames, equipmentAvailable, bodyWeightLb,
-      focusCategoryCount, exercisesPerCategory, dayIndex: day, isDeloadWeek, historyByExercise,
+      focusCategoryCount, exercisesPerCategory, dayIndex: day, isDeloadWeek, historyByExercise, emphasisRanks,
     });
     days.push(plan);
 
