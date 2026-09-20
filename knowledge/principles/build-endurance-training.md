@@ -159,11 +159,53 @@ building and then maintaining a standing weekly activity habit.
   is grounded in the well-documented dropout pattern, not a settled
   injury-rate claim; worth not overselling the evidence as more unanimous
   than it is.
-- **"Distance" and "speed" are still running-specific** — cycling isn't
-  covered by either, even though it's one of the tune question's own
-  stated examples ("Longer runs or rides"). "General" is modality-agnostic
-  by design; the other two aren't yet.
 - **Where this meets the broader "Train for an event" research in
   `real-goals.md`** (a half marathon, Hyrox) still isn't reconciled —
   this covers the foundational continuous-running and general-fitness
   cases a date-driven event goal would presumably build on top of.
+
+## Cycling: added as a mode, not a separate system
+
+Both `buildCardioWeek()`/`buildCardioPlan()` (distance) and
+`buildSpeedWeek()` (speed) now accept `mode: "running" | "cycling"`.
+Cycling genuinely gets a different growth cap for the distance case,
+grounded in real injury data, not treated as a lower-priority afterthought:
+
+- **Runners average roughly 11 injuries per 1,000 hours; cyclists average
+  roughly 6** — about half. A study matching training duration found
+  runners accumulated up to 404% more muscle damage, 256% higher
+  inflammation, and 87% more soreness than cyclists over the same time.
+  This is a real, sourced difference: cycling is non-weight-bearing, so it
+  lacks running's primary injury driver (repeated ground-impact loading).
+  `CYCLING_MAX_WEEKLY_GROWTH` is set to 65%/week versus running's 50% —
+  genuinely less conservative, not a bigger version of the same caution.
+- **Still a real cap, not "no limit."** Overuse injury remains common in
+  cycling — multiple sources name the exact same trap: people under-rest
+  specifically *because* cycling feels easier, not because it needs less
+  recovery. One source's direct framing: "you might think cycling is
+  easier on the body, so you don't need to build in rest days." The
+  recovery-week cadence and structure stay identical to running.
+- **The recovery interval (easy spin, not "walk") gets a slightly lower
+  floor and ratio** (45s/0.6 vs. running's 60s/0.75) — easy spinning is
+  more readily sustainable and recovers faster between harder segments
+  than walking does between running segments, since it's non-impact, not
+  because cycling needs less structure overall.
+- **The speed/interval case deliberately does NOT get a different growth
+  rate for cycling.** The injury-rate research supporting a less
+  conservative distance cap is about aggregate training injury (impact-
+  driven) — it doesn't specifically speak to high-intensity interval-
+  session risk, and the classic VO2max interval research (4x4min at
+  90-95% max HR) is commonly conducted on a cycling ergometer in lab
+  studies to begin with. Kept the same on purpose rather than guessing at
+  a cycling-specific number with no real basis.
+
+**What this doesn't cover, on purpose:** bike-fit and saddle-related
+issues (a real, named injury category specific to cycling — knee, neck,
+and wrist pain from poor fit) are outside what a training-progression
+formula can address; the app has no way to assess someone's actual bike
+setup. Worth a mention in whatever copy surfaces this, not something the
+algorithm itself can fix. Cycling also carries a real crash-risk category
+running doesn't have (cyclists account for roughly 2% of traffic
+accidents) — outside this formula's scope entirely, but worth naming
+rather than implying cycling is risk-free simply because it's lower-
+injury on the overuse-injury axis specifically.
