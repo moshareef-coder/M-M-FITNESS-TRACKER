@@ -232,3 +232,120 @@ workout plans: `principles/sex-and-anthropometry.md`,
   Lahav et al. 2026) — https://evolvlife.com/blogs/the-evolv-journal/body-recomposition
 - Built With Science, "Body Recomposition Calculator: Build Muscle and
   Lose Fat" — https://builtwithscience.com/fitness-tips/body-recomposition-calculator/
+
+## Build endurance: run/walk progression research
+- Marathon Handbook, "Couch to 5K Plan: The Beginner Plan That Actually
+  Sticks" — https://marathonhandbook.com/couch-to-5k-training-plan/
+- PMC/NCBI, "Experiences of beginner runners on a modified Couch-to-5k
+  programme: a qualitative exploration" — https://www.ncbi.nlm.nih.gov/pmc/articles/PMC13504285/
+- SmartSMSSolutions, "Couch to 5K Training Plan: 9-Week Beginner
+  Run/Walk" — https://smartsmssolutions.com/resources/blog/business/couch-to-5k-training-plan
+- Pheidi, "The C25K Wall: Why Week 4 to 5 Makes Beginners Quit" (source
+  of the 72.7% single-week jump finding; cites Damsted et al. 2012 and
+  Buist et al. 2007 on injury-risk research) — https://pheidi.training/articles/beginner-running-progression/
+- Runners Blueprint, "Couch to 5K Plan: 8-Week Beginner Run-Walk
+  Schedule" — https://www.runnersblueprint.com/couch-to-5k/
+- Heather Grace, "Couch to 5K Training Plan, with FREE Printable
+  Worksheet!" — https://www.heather-grace.com/blog/couch-to-5k-training-plan-with-free-printable-worksheet
+- The Running Genie, "Couch to 5K vs Structured Beginner Plans: Which
+  Works Better?" (cites the 2017 BMJ Open Sport & Exercise Medicine
+  walk-run vs. continuous-running VO2 max study) — https://therunninggenie.com/blog/couch-to-5k-vs-structured-plan
+- SportsMonkie, "Couch to 5K Plan: A 9-Week Walk/Run Schedule for Total
+  Beginners" — https://sportsmonkie.com/couch-to-5k-plan/
+- Inspired by Sports, "Running Plan: Go from Sofa to 5K in 8 Weeks" — https://www.inspiredbysports.com/en/learning-to-run-your-8-week-plan-from-the-sofa-to-your-first-5k/
+
+## Build endurance: speed/interval training research
+- PMC, "Faster intervals, faster recoveries — intensified short VO2max
+  running intervals are inferior to traditional long intervals" — https://pmc.ncbi.nlm.nih.gov/articles/PMC11743937/
+- Runners Blueprint, "How Interval Training Improves VO2 Max for
+  Runners" (source of the 4x4min / 90-95% max HR / 7.2% VO2max
+  improvement figure) — https://www.runnersblueprint.com/how-interval-training-improves-vo%E2%82%82-max/
+- PeakVO2Trainer, "Interval Training for Running: Workouts, Programs, and
+  Plans" (cites Milanovic et al. 2015 meta-analysis; tempo/cruise
+  interval format) — https://peakvo2trainer.com/blog/interval-training-for-running/
+- Shuichi Running, "VO2max Interval Training — The Most Effective
+  Workouts, Backed by Research" — https://shuichi-running.com/en/vo2max-interval-training/
+- Laura Norris Running, "VO2Max Interval Workouts" (beginner vs.
+  intermediate volume guidance) — https://lauranorrisrunning.com/vo2max-fartlek-workout/
+- RunningXpert, "Guide: VO2-max intervals for runners" — https://www.runningxpert.com/en/inspiration/guide-how-to-improve-vo2-max-with-intervals
+
+## Build endurance: general/everyday-stamina guidelines
+- Cleveland Clinic, "How Much Should You Exercise Per Week?" — https://health.clevelandclinic.org/how-often-you-should-work-out
+- ACSM, "Physical Activity Guidelines" — https://acsm.org/education-resources/trending-topics-resources/physical-activity-guidelines/
+- ETSU Exercise is Medicine, "ACSM's General Exercise Guidelines" (source
+  of the "talk test" moderate/vigorous framing) — https://www.etsu.edu/exercise-is-medicine/guidelines.php
+- American Heart Association, "AHA Recommendations for Physical Activity
+  in Adults and Kids" (source of the gradual-ramp guidance) — https://www.heart.org/en/healthy-living/exercise-and-physical-activity/fitness-basics/aha-recs-for-physical-activity-in-adults
+- CDC, "Adult Activity: An Overview" — https://www.cdc.gov/physical-activity-basics/guidelines/adults.html
+- American College of Cardiology, "Physical Activity Guidelines for
+  Americans" — https://www.acc.org/latest-in-cardiology/ten-points-to-remember/2018/11/14/14/37/the-physical-activity-guidelines-for-americans
+- PubMed, ACSM position stand, "Quantity and quality of exercise for
+  developing and maintaining cardiorespiratory, musculoskeletal, and
+  neuromotor fitness in apparently healthy adults" — https://pubmed.ncbi.nlm.nih.gov/21694556/
+
+## Build endurance: cycling vs. running injury-rate research
+- We Love Cycling, "Cycling vs Running: Which is Better?" (source of the
+  11 vs. 6 injuries/1,000 hours figure and the 404%/256%/87% muscle
+  damage/inflammation/soreness study) — https://www.welovecycling.com/wide/2021/05/04/cycling-vs-running-which-is-better/
+- Nike.com, "Running vs Cycling: What's a Better Workout for Me?" (source
+  of the "you might think cycling is easier on the body" under-resting
+  caution) — https://www.nike.com/a/running-vs-cycling-benefits
+- Marathon Handbook, "Cycling Vs Running: Which Is Better For Fitness,
+  Fat Loss + Joints?" — https://marathonhandbook.com/cycling-vs-running/
+- Magicshine Bike Lights, "Cycling vs Running: Which Is Better for Your
+  Health?" (bike-fit/saddle injury notes) — https://magicshine.com/blogs/cycling-tips/cycling-vs-running-which-is-better-for-your-health
+- Help Shoe, "Running Vs Cycling [Comparison Charts]" (source of the
+  cyclist traffic-accident figure) — https://helpshoe.com/running-vs-cycling-comparion-charts/
+- ScienceDirect, "Self-reported injury in ultra-endurance participants
+  with a focus on knee injuries: running, cycling, and triathlon" — https://www.sciencedirect.com/science/article/pii/S1466853X24001305
+- PMC, "A retrospective international study on factors associated with
+  injury, discomfort and pain perception among cyclists" — https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6347182/
+
+## Skill ladder: first pull-up progression research
+- SET FOR SET, "The Ultimate Pull Up Progression Plan for Beginners" — https://www.setforset.com/blogs/news/pull-up-progression
+- Built With Science, "The Most Effective Way To Master The Pull-Up
+  (4-Step Progression)" — https://builtwithscience.com/fitness-tips/4-step-pull-up-progression/
+- Nourish Move Love, "Assisted Pull-Ups (Beginners' Guide and Tutorial)" — https://www.nourishmovelove.com/assisted-pull-ups/
+- GymnaseTips, "Assisted Pull-Ups: 8-Week Beginner Progression to First
+  Rep" (source of the 2019 JSCR banded-work study, 4-5 vs. 1-2 rep
+  finding, and the eccentric 1.5x load figure) — https://www.gymnasetips.com/assisted-pull-ups/
+- Odin Fitness, "First Pull-Up: Zero to Your First Rep in 8 Weeks"
+  (source of the 30-second dead-hang checkpoint and 5-exercise order) — https://www.odin.fitness/blog/complete-guide-calisthenics-first-pull-up
+- BULLBAR, "Stop Calling It a Beginner Move: The Band-Assisted Negative
+  Pull-Up Is..." — https://bullbarfit.com/blogs/updates/stop-calling-it-a-beginner-move-the-band-assisted-negative-pull-up-is-a-master-class-in-strength
+- SensAI, "How to Do Your First Pull-Up: A Research-Backed Progression
+  From Dead Hang to Strict Rep" (source of the "4x5 @ 8-second descent"
+  advancement criterion, cites Hortobagyi et al. on eccentric training) — https://www.sensai.fit/blog/how-to-do-a-pull-up-beginner-progression
+- Nordic Performance Training, "How to Do Your First Pull-Up: Skip the
+  Bands and Negatives" (the dissenting view on negatives' effectiveness) — https://www.nordicperformancetraining.com/blog/pull-ups-guide
+- PhD, "Pull Up Progression Plan" — https://www.phd.com/perform-smart/pull-up-progression/
+
+## Move better: flexibility dosing research
+- PubMed, "Optimising the Dose of Static Stretching to Improve
+  Flexibility: A Systematic Review, Meta-analysis and Multivariate
+  Meta-regression" (source of the 4min/session, 10min/week ceiling,
+  unmoderated by age/sex/training status) — https://pubmed.ncbi.nlm.nih.gov/39614059/
+- Athletics Coach by Australian Athletics, "New Research Shows How Long,
+  Hard and Often You Need to Stretch to Improve Your Flexibility" — https://coachathletics.com.au/coaching-education/new-research-shows-how-long-hard-and-often-you-need-to-stretch-to-improve-your-flexibility
+- PMC, "Current Concepts in Muscle Stretching for Exercise and
+  Rehabilitation" (source of the Feland et al. older-adult 60-second
+  hold finding) — https://pmc.ncbi.nlm.nih.gov/articles/PMC3273886/
+- Frontiers in Physiology, "Effects of post-exercise stretching versus no
+  stretching on lower limb muscle recovery and performance: a
+  meta-analysis" — https://www.frontiersin.org/journals/physiology/articles/10.3389/fphys.2025.1674871/full
+- PMC, "Effects of Low-Volume Static Stretching and Full Range-of-Motion
+  Resistance Training on Flexibility in Physically Active Young Adults" — https://pmc.ncbi.nlm.nih.gov/articles/PMC13467512/
+
+## Move better: back-postpartum research (informs the flagged gap, not auto-generated content)
+- Every Mother, "Postpartum Cardio Exercises & Diastasis Recti" (source
+  of the 60%+ prevalence figure and high-impact/crunch cautions) — https://every-mother.com/empower/postpartum-cardio-exercises-diastasis-recti
+- ResearchGate/BJSM 2025, "Impact of postpartum exercise on pelvic floor
+  disorders and diastasis recti abdominis: a systematic review and
+  meta-analysis" (65 studies, n=21,334; source of the 37%/56% odds
+  reduction figures) — https://www.researchgate.net/publication/387210633_Impact_of_postpartum_exercise_on_pelvic_floor_disorders_and_diastasis_recti_abdominis_a_systematic_review_and_meta-analysis
+- PMC, "Diastasis Recti Abdominis Rehabilitation in the Postpartum
+  Period: A Scoping Review of Current Clinical Practice" — https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11023973/
+- ClinicalTrials.gov, "Impact of Exercise on Diastasis Rectus Abdominus" — https://clinicaltrials.gov/study/NCT04049487
+- Wiley Online Library, "Comparative effectiveness of rehabilitation
+  therapies for diastasis recti abdominis: A systematic review and
+  Bayesian network meta-analysis" — https://obgyn.onlinelibrary.wiley.com/doi/10.1002/ijgo.70413
