@@ -17,6 +17,15 @@ export const GOAL_MIX_WEIGHTS = {
   lose:        { weightTraining: 2, cardio: 3, sports: 1, flow: 0 },
   gain:        { weightTraining: 5, cardio: 1, sports: 0, flow: 0 },
   hypertrophy: { weightTraining: 5, cardio: 1, sports: 0, flow: 0 },
+  // Recomp trains identically to hypertrophy/build-muscle -- see
+  // ../principles/recomp-training.md and exercise-selector.mjs's isHypertrophyStyle(), which
+  // already treats them the same for exercise selection. This key was missing entirely, which
+  // would have silently dropped a recomp user to the diluted "general" mix (3 weightTraining)
+  // instead of the 5 their training structure actually calls for -- same class of bug as the
+  // "Recomp accidentally matching hypertrophy via a substring" issue already fixed elsewhere,
+  // just the inverse: here the accident would have gone the OTHER way (missing entirely rather
+  // than matching by accident), so fixed explicitly rather than left to fall through.
+  recomp:      { weightTraining: 5, cardio: 1, sports: 0, flow: 0 },
   strength:    { weightTraining: 5, cardio: 1, sports: 0, flow: 0 },
   general:     { weightTraining: 3, cardio: 2, sports: 1, flow: 1 },
 };
