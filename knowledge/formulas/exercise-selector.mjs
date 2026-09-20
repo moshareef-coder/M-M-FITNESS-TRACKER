@@ -226,6 +226,74 @@ export function selectExercisesForCategory({ trainingId, categoryKey, level, equ
     .slice(0, count);
 }
 
+/**
+ * Bodyweight progression (see ../principles/equipment-substitution.md): reps are the first,
+ * weakest lever -- progressed up to a ceiling, same "hit target -> push further, miss it ->
+ * hold" shape progressiveOverload() already uses for loaded lifts. Past that ceiling, more
+ * reps drifts into muscular-endurance/conditioning territory rather than the intended
+ * strength/hypertrophy stimulus, so the right response is a harder variation, not an
+ * ever-climbing rep count. This is the fix for a gap flagged since the very first PR:
+ * incrementForEquipment("bodyweight") has always returned 0, meaning bodyweight exercises
+ * never progressed in the generated plan at all.
+ */
+const BODYWEIGHT_REP_CEILING = 30; // past here, reps stop testing strength/hypertrophy at all
+
+export function progressiveBodyweightReps({ lastLog, goal }) {
+  const [lo, hi] = REP_RANGES[normalizeGoal(goal)];
+  const ceiling = Math.min(hi, BODYWEIGHT_REP_CEILING);
+  if (!lastLog) return { reps: lo, atCeiling: false };
+  if (lastLog.repsAchieved >= ceiling) return { reps: ceiling, atCeiling: true };
+  const hitTarget = lastLog.repsAchieved >= lastLog.targetReps;
+  const nextReps = hitTarget ? Math.min(ceiling, lastLog.targetReps + 1) : lastLog.targetReps;
+  return { reps: nextReps, atCeiling: false };
+}
+
+/**
+ * Finds the next harder same-category bodyweight variation -- deliberately bypassing the
+ * trainee's overall level cap that selectExercisesForCategory applies, since this is a
+ * movement-specific signal (capped reps on THIS exercise), not a general trainee-level
+ * upgrade, and the two shouldn't be coupled. A true beginner by session count can still be
+ * ready for Diamond Push-Up if they've maxed reps on regular Push-Up; making them wait for
+ * their overall level to advance would ignore the actual signal in front of it.
+ */
+export function findHarderBodyweightVariation({ trainingId, categoryKey, currentExerciseName }) {
+  const training = byId[trainingId];
+  const category = training?.categories.find((c) => c.key === categoryKey);
+  if (!category) return null;
+
+  const current = category.exercises.find((ex) => ex.name === currentExerciseName);
+  if (!current) return null;
+  const currentRank = LEVEL_RANK[current.level] ?? 1;
+
+  const harderOptions = category.exercises
+    .filter((ex) => ex.equipment === "bodyweight" && (LEVEL_RANK[ex.level] ?? 1) > currentRank)
+    .sort((a, b) => (LEVEL_RANK[a.level] ?? 1) - (LEVEL_RANK[b.level] ?? 1)); // nearest harder tier first, not the biggest jump cataloged
+
+  return harderOptions[0] ?? null; // null at the hardest cataloged variation -- a real, honest limit, not every movement has a next tier
+}
+
+/**
+ * Once someone has progressed to a harder bodyweight variation, the NEXT session's category
+ * selection needs to know that happened -- otherwise selectExercisesForCategory just re-picks
+ * the original (now-capped) exercise from the pool every time, re-triggering the same swap
+ * repeatedly instead of continuing progression on the new variation. This finds whichever
+ * bodyweight exercise in a category has the most recent log, so that one can be used directly
+ * instead of falling back to the pool default. Requires callers to stamp a loggedAt timestamp
+ * on each history entry -- without one, "most recent" can't be determined, so entries without
+ * it are treated as not-yet-logged rather than guessed at.
+ */
+export function continuedBodyweightExercise({ trainingId, categoryKey, historyByExercise = {} }) {
+  const training = byId[trainingId];
+  const category = training?.categories.find((c) => c.key === categoryKey);
+  if (!category) return null;
+
+  const logged = category.exercises
+    .filter((ex) => ex.equipment === "bodyweight" && historyByExercise[ex.name]?.loggedAt)
+    .sort((a, b) => historyByExercise[b.name].loggedAt - historyByExercise[a.name].loggedAt);
+
+  return logged[0] ?? null;
+}
+
 /** Finds the exercise + its category/training by name, since a plan only carries the name. */
 function locateExercise(exerciseName, trainingId = null) {
   const searchSpace = trainingId ? [byId[trainingId]].filter(Boolean) : TRAININGS;
@@ -442,11 +510,21 @@ export function buildWeightTrainingPlan({
   const reps = repsForGoal(goal);
   const sets = applyDeload(setsPerExercise(level, goal), isDeloadWeek);
 
-  const exercises = categories.flatMap((categoryKey) =>
-    selectExercisesForCategory({
+  const exercises = categories.flatMap((categoryKey) => {
+    // Continuation check first: if someone already progressed to a harder bodyweight
+    // variation in this category, keep going on that one instead of letting the pool
+    // default re-select the original, now-capped exercise every session. Only applies when
+    // exactly one exercise is picked per category (circuit/hypertrophy/strength full-body
+    // selection) -- multi-exercise categories don't have this "one variation per slot" shape.
+    const continued = perCategoryCount === 1
+      ? continuedBodyweightExercise({ trainingId: "weight-training", categoryKey, historyByExercise })
+      : null;
+    const picked = continued ? [continued] : selectExercisesForCategory({
       trainingId: "weight-training", categoryKey, level, equipmentAvailable,
       recentExerciseNames, count: perCategoryCount,
-    }).map((ex) => {
+    });
+
+    return picked.map((ex) => {
       const lastLog = historyByExercise[ex.name] || null;
       const isBodyweight = ex.equipment === "bodyweight";
       // null (not 0) means "no formula-backed number yet" -- 0 would read as a real
@@ -464,13 +542,35 @@ export function buildWeightTrainingPlan({
           primary: ex.primary, equipment: ex.equipment, level: ex.level, isHold: true,
         };
       }
+      // Bodyweight progression: reps climb toward a ceiling, then hand off to a harder
+      // variation instead of climbing forever -- see progressiveBodyweightReps() above.
+      if (isBodyweight) {
+        const { reps: bwReps, atCeiling } = progressiveBodyweightReps({ lastLog, goal });
+        if (atCeiling) {
+          const harder = findHarderBodyweightVariation({ trainingId: "weight-training", categoryKey, currentExerciseName: ex.name });
+          if (harder) {
+            return {
+              name: harder.name, sets, reps: repsForGoal(goal), targetWeight: 0, isEstimate: false,
+              primary: harder.primary, equipment: harder.equipment, level: harder.level,
+              progressedFrom: ex.name, // so the UI can say "you leveled up from X" rather than silently swap
+            };
+          }
+          // No harder cataloged variation exists -- an honest limit, not a bug. Hold at the
+          // ceiling on the current exercise rather than pretending there's somewhere to go.
+        }
+        return {
+          name: ex.name, sets, reps: bwReps, targetWeight: 0, isEstimate: false,
+          primary: ex.primary, equipment: ex.equipment, level: ex.level,
+          atRepCeiling: atCeiling, // true only when atCeiling AND no harder variation was found
+        };
+      }
       return {
         name: ex.name, sets, reps, targetWeight: weight,
         isEstimate: !isBodyweight && weight != null && !lastLog,
         primary: ex.primary, equipment: ex.equipment, level: ex.level,
       };
-    })
-  );
+    });
+  });
 
   const sessionStyle = sessionStyleForGoal(goal);
   return {
@@ -497,7 +597,7 @@ export function sessionCapacity(minutesAvailable) {
 // next day is generated, so day 4 already "knows" what days 1-3 did -- the same mechanic that
 // makes today's plan depend on yesterday's real logged history once this is wired into the app.
 // ---------------------------------------------------------------------------
-export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable = null, bodyWeightLb = null, focusCategoryCount = 2, exercisesPerCategory = 2, weeksSinceLastDeload = 0, missedRepStreak = 0, risingRpeStreak = 0 }) {
+export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable = null, bodyWeightLb = null, focusCategoryCount = 2, exercisesPerCategory = 2, weeksSinceLastDeload = 0, missedRepStreak = 0, risingRpeStreak = 0, historyByExercise = {} }) {
   const days = [];
   let weeklyVolumeByCategory = {};
   let recentExerciseNames = [];
@@ -506,7 +606,7 @@ export function buildWeekPlan({ level, goal, daysPerWeek = 4, equipmentAvailable
   for (let day = 0; day < daysPerWeek; day++) {
     const plan = buildWeightTrainingPlan({
       level, goal, weeklyVolumeByCategory, recentExerciseNames, equipmentAvailable, bodyWeightLb,
-      focusCategoryCount, exercisesPerCategory, dayIndex: day, isDeloadWeek,
+      focusCategoryCount, exercisesPerCategory, dayIndex: day, isDeloadWeek, historyByExercise,
     });
     days.push(plan);
 
