@@ -86,3 +86,58 @@ strict; incline → knee → full) — it's the general case of the same idea.
 - Bodyweight and machine variants are legitimate primary programming for
   someone whose only equipment is that tier — never present them as a
   fallback or a lesser version of "the real plan."
+
+## Implemented: bodyweight progression via leverage, not endless reps
+
+This gap was flagged since the very first PR (`incrementForEquipment
+("bodyweight")` always returned 0) and stayed open across every category
+built since. Now implemented in `exercise-selector.mjs`:
+
+- **Reps climb first, as the weaker lever** (`progressiveBodyweightReps()`),
+  same "hit target → push further, miss it → hold" shape
+  `progressiveOverload()` already uses for loaded lifts — up to a ceiling
+  (the goal's own rep-range top, capped at 30 regardless of goal, since
+  past that point reps stop testing strength/hypertrophy at all and drift
+  into conditioning work).
+- **At the ceiling, hand off to a harder cataloged variation**
+  (`findHarderBodyweightVariation()`) rather than climbing reps forever.
+  The library already has real, usable leverage ladders for common
+  patterns — Wall Push-Up → Incline Push-Up → Push-Up → Diamond Push-Up →
+  One-Arm Push-Up; Bodyweight Squat → Split Squat → Bulgarian Split Squat
+  → Pistol Squat — so no new exercise content was needed for this part.
+- **Deliberately bypasses the trainee's overall level cap** for this one
+  decision. `selectExercisesForCategory()` normally won't offer an
+  intermediate-tagged exercise to a beginner-tier trainee — correct for
+  general selection, wrong here: capping reps on a specific movement is a
+  movement-specific signal, not a general trainee-level upgrade. A true
+  beginner by session count who's already maxed Push-Up reps shouldn't
+  have to wait for their overall level to catch up before getting Diamond
+  Push-Up.
+- **When no harder variation is cataloged**, holds at the rep ceiling
+  honestly (`atRepCeiling: true`) rather than pretending there's somewhere
+  further to go — not every movement pattern has a next tier in the
+  library yet.
+
+**A bigger bug found while testing this**, not scoped to bodyweight at
+all: `buildWeekPlan()` never actually threaded `historyByExercise` through
+to `buildWeightTrainingPlan()`. This meant every progression mechanism
+built so far — loaded-weight progression, hold-duration progression, and
+now bodyweight reps — was silently inert whenever called through the
+actual entry point the app would use to generate someone's next week from
+logged history. Fixed as part of this change; affects every category
+already built, not just this one.
+
+**A second real bug found by testing multi-session behavior**: once
+someone progresses to a harder variation, the next session's category
+selection didn't know that happened — it kept re-selecting the original
+(now-capped) exercise from the pool, re-triggering the same level-up over
+and over instead of continuing progression on the new variation. Fixed
+with `continuedBodyweightExercise()`, which checks logged history for
+whichever bodyweight exercise in a category was most recently logged and
+continues on that one directly.
+
+**A minor data question, not fixed here:** `Weighted Dip` is tagged
+`equipment: "bodyweight"` in the library despite the name implying an
+added weight belt or vest. Could be intentional (an advanced bodyweight-
+dip tier that's optionally loaded) or a mislabel — flagging for Mo rather
+than guessing at the answer.
