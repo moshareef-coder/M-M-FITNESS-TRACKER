@@ -408,10 +408,22 @@
     margin-top: 2px;
   }
   .wkt-bot-face { flex: none; width: 56px; height: auto; }
-  .wkt-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 12px; }
+  /* One to a row. Two to a row left 53px for the name on a 390 screen and
+     "Push Day" needs 63, so the only card that says what you did was saying
+     "Push ...", and every real focus ("Upper body", "Rowing machine") is
+     longer than that one. Measured, not guessed. These are buttons into the
+     recap now, which is the other reason they get a whole row: a row you can
+     read is a row you know what you are pressing. */
+  .wkt-chips { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 14px 0 12px; }
+  /* A button since the session mark became something you press, so it carries
+     the reset every other button in this file carries: inherit the type, keep
+     the text ranged left, and move under the finger. */
   .wkt-chip {
     background: var(--panel); border-radius: 14px; padding: 12px; display: flex; align-items: center; gap: 10px; min-width: 0;
+    font: inherit; color: inherit; text-align: left; width: 100%; border: none; cursor: pointer;
+    transition: transform .12s ease, filter .12s ease;
   }
+  .wkt-chip:active { transform: translateY(1px); filter: brightness(.97); }
   .wkt-chip-ico {
     flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
     background: var(--panel-2); color: var(--accent-ink);
@@ -419,7 +431,15 @@
   .wkt-chip-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
   .wkt-chip-body b { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .wkt-chip-body i { font-size: 12.5px; font-style: normal; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .wkt-chip-ring { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.75px solid var(--accent-ink); }
+  /* Done is a tick in a filled disc, the same mark the card's own heading
+     badge wears. An empty ring is what "not yet" looks like, and it was
+     wearing that on finished work. */
+  .wkt-chip-ring {
+    flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.75px solid var(--accent-ink);
+    display: grid; place-items: center;
+  }
+  .wkt-chip-ring.done { background: var(--accent-ink); color: var(--bg); }
+  .wkt-chip-ring svg { width: 11px; height: 11px; }
   .wkt-chip-ring.open { border-color: var(--border); }
   .wkt-done-acts { display: grid; grid-template-columns: 1fr; gap: 10px; }
   .wkt-btn-solid, .wkt-btn-soft {
@@ -7167,7 +7187,14 @@
   .session-complete { text-align: center; padding: 12px 0 0; }
   .session-complete h3 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin: 12px 0 4px; }
   .session-complete p { color: var(--muted); margin: 0 0 4px; font-size: 14px; }
-  .sc-ring { position: relative; width: 148px; height: 148px; margin: 0 auto; }
+  /* A button since the dial became the way into the detail of what was just
+     logged, so it carries a button's reset and presses like one. */
+  .sc-ring {
+    position: relative; width: 148px; height: 148px; margin: 0 auto;
+    display: block; padding: 0; border: 0; background: none; font: inherit; cursor: pointer;
+    transition: transform .12s ease;
+  }
+  .sc-ring:active { transform: scale(.98); }
   /* Direct child only: the tick sitting in the middle is an svg too, and a
      bare .sc-ring svg rule blew it up to the full dial and rotated it. */
   .sc-ring > svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
@@ -30098,7 +30125,14 @@ async function renderSessionComplete() {
 
   $("sessionBody").innerHTML = `
     <div class="session-complete">
-      <div class="sc-ring">
+      ${/* The dial is the mark for the session that just ended, so it is the
+            door into the detail of it, for the same reason the finished card's
+            session mark is: Mo went looking for "the details of that workout"
+            by pressing the circle. Same recap sheet, which reads the whole day
+            rather than this session alone, so a morning class is in there too.
+            It paints over the session overlay rather than behind it: measured,
+            the recap scrim is z-index 65 against this screen's 60. */ ""}
+      <button type="button" class="sc-ring" id="scRingBtn" aria-label="See everything you logged today">
         <svg viewBox="0 0 128 128" aria-hidden="true">
           <circle class="sc-track" cx="64" cy="64" r="${scR}"/>
           <circle class="sc-fill" id="scFill" cx="64" cy="64" r="${scR}"
@@ -30116,7 +30150,7 @@ async function renderSessionComplete() {
               fine outcome, not a failure. (Not the clock, whose circle fills
               solid at this size against the ring's own colour.) */ ""}
         <div class="sc-ring-mid">${icon(recorded ? "check" : "minus", 38)}</div>
-      </div>
+      </button>
       <h3>${full ? "Workout Complete" : recorded ? "Workout Ended" : "Nothing Logged"}</h3>
       <p>${escapeHtml(displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises))} · ${doneCount} of ${total} exercises</p>
       ${/* Said out loud rather than left to be inferred from a number. With no
@@ -30191,6 +30225,10 @@ async function renderSessionComplete() {
     $("sessionProofBtn").onclick = () => $("proofInput").click();
   }
   if (PARTNER_EMAIL) $("sessionNoteBtn").onclick = () => openNoteComposer("workout");
+  /* The mark opens what was logged. sessionDate() rather than todayStr() for
+     the reason every other reader of this screen uses it: a session that ran
+     past midnight still belongs to the day it started on. */
+  $("scRingBtn").onclick = () => openRecap(MY_EMAIL, ME, sessionDate());
   $("sessionDoneBtn").onclick = sessionDone;
 }
 
@@ -32343,21 +32381,44 @@ function renderChooseScreen() {
         ${/* `label`, `ico` and `detail` are todaySessions' own fields. Read from
               there rather than re-derived, so this strip and the one on the
               plan preview cannot start disagreeing about what a session is. */ ""}
-        ${sessions.map((x) => `<div class="wkt-chip">
+        ${/* Mo, on the mark at the end of a session: "it's a circle, not even a
+              checkbox. Have us be able to click on that to view the details of
+              that workout." Both halves of that are here. The mark is a tick
+              in a filled disc, which is what finished looks like everywhere
+              else in this app, and the whole chip is the button rather than
+              the 18px disc on its own: the thing somebody aims at is the
+              session, and a tap target has to be 44px before it is a control.
+
+              Where it goes is what already exists. A lift opens the recap, the
+              same sheet the calendar opens for a day you trained, which holds
+              every exercise, every set, the loads and the time. An activity
+              opens its own detail out of that same sheet, because a run has
+              minutes and a distance rather than sets. */ ""}
+        ${sessions.map((x) => `<button type="button" class="wkt-chip" data-done-open="${escapeHtml(x.key || "")}"
+          aria-label="${escapeHtml(x.label || "Session")}, ${x.state === "done" ? "done" : "not finished"}. See what you did">
           <span class="wkt-chip-ico">${icon(x.ico || "dumbbell", 20)}</span>
           <span class="wkt-chip-body"><b>${escapeHtml(x.label || "Session")}</b>
             <i>${escapeHtml(x.detail || "")}</i></span>
-          <span class="wkt-chip-ring${x.state === "done" ? "" : " open"}" aria-hidden="true"></span>
-        </div>`).join("")}
+          <span class="wkt-chip-ring${x.state === "done" ? " done" : " open"}" aria-hidden="true">${x.state === "done" ? icon("check", 12) : ""}</span>
+        </button>`).join("")}
       </div>
       <div class="wkt-done-acts">
-        ${/* One CTA on this page, and it is not this one. Looking back at a
-              session you have finished is a review, not the next thing to do,
-              so it is the quiet button; the green one lives on the card below,
-              which is now about tomorrow. "Preview tomorrow" went with it:
-              that card IS tomorrow now, so the button pointed at something
-              already on screen. */ ""}
-        <button type="button" class="wkt-btn-soft" id="wktViewToday">View today&rsquo;s training</button>
+        ${/* Mo: "where it says View Today's Training, have it say Do Another
+              Exercise or something like that. When you click on that, it'll
+              recommend what you can do next."
+
+              It said "View today's training" and it opened the recap, so the
+              words were a door to the past on a card whose only remaining
+              question is what happens next. The recap is not lost: it moved
+              onto the session mark above, which is where he went looking for
+              it anyway.
+
+              Still the quiet button, and still the only one on this card. A
+              day that is genuinely over should not be argued with: the card
+              says rest, the mark says done, and this sits underneath as an
+              offer for the person who came back for a second session, not as
+              a prompt at the person who did not. */ ""}
+        <button type="button" class="wkt-btn-soft" id="wktNextUp">Do another session</button>
       </div>
     </section>`;
 
