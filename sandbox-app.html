@@ -8884,7 +8884,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.15";
+const APP_VERSION = "2026.09.21.16";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -11190,6 +11190,14 @@ function renderGoalTilesStep(data = {}) {
       <button type="button" class="btn-ghost" id="goalSkipBtn">Skip for now</button>
       <button type="button" class="btn-ghost" id="goalBackBtn">Back</button>
     </div>`;
+  /* Read by Skip below. Tiles are tapped locally inside initGoalTiles and only
+     ever reached `data` through onPick, which fires on the confirm button and
+     nowhere else. Mo, asked directly whether Skip should keep taps made before
+     it was pressed: "keep whatever they tapped... Skip only matters if
+     nothing was tapped at all." So Skip needs its own copy of the live
+     selection, not the `data` this function was called with, which is frozen
+     from before any tile was touched. */
+  let livePick = null;
   initGoalTiles($("goalTileGrid"), {
     /* `plain` is onboarding's version of the same list: the labels, big and
        tappable, and nothing else. Mo wants the first real question in the app
@@ -11200,6 +11208,7 @@ function renderGoalTilesStep(data = {}) {
     plain: true,
     confirmLabel: "That's the goal",
     selected: { bubble: data.goal_bubble || null, child: data.goal_child || null, secondary: data.goal_secondary },
+    onSelect: (primary, extras) => { livePick = primary ? { primary, extras } : null; },
     onPick: ({ bubble, child, label, secondary }) => {
       const tile = goalTileFor(bubble);
       const next = { ...data, goalKey: tile.legacy, goal_bubble: bubble, goal_child: child, goalLabel: label, goal_secondary: secondary };
@@ -11212,12 +11221,27 @@ function renderGoalTilesStep(data = {}) {
   });
   /* Required like every tile grid the app has: Pick a goal first sits on the
      confirm button until something is tapped. Skip is the way past that for
-     somebody who wants to look around before committing to a goal, and it
-     writes nothing, the same way a fresh account that never opened this
-     screen would carry no goal fields either. finishOnboardingFromDraft
-     already falls back to the last GOALS entry when goalKey is missing, so a
-     skipped goal is not a broken one, it is a deferred one. */
-  $("goalSkipBtn").onclick = () => renderOnboardStep("about", { ...data, tuneIdx: 0 });
+     somebody who wants to look around before committing to a goal.
+
+     It carries forward whatever is tapped, the same fields onPick would have
+     written, rather than discarding a real answer just because the person
+     left through Skip instead of the confirm button. Only truly nothing
+     tapped writes nothing, the same as a fresh account that never opened this
+     screen. finishOnboardingFromDraft already falls back to the last GOALS
+     entry when goalKey is missing, so a genuinely skipped goal is not a
+     broken one, it is a deferred one. */
+  $("goalSkipBtn").onclick = () => {
+    if (!livePick) { renderOnboardStep("about", { ...data, tuneIdx: 0 }); return; }
+    const { primary, extras } = livePick;
+    const tile = goalTileFor(primary.bubble);
+    const kid = tile.kids.find((k) => k.id === primary.child);
+    const label = kid ? kid.label : tile.title;
+    const next = {
+      ...data, goalKey: tile.legacy, goal_bubble: primary.bubble, goal_child: primary.child, goalLabel: label,
+      goal_secondary: extras.map((e) => ({ bubble: e.bubble, child: e.child })),
+    };
+    renderOnboardStep("about", { ...next, detail: primary.child ? label : null, tuneIdx: 0 });
+  };
   $("goalBackBtn").onclick = () => renderOnboardStep("intro", { ...data, introIdx: ONBOARD_INTRO.length - 1 });
 }
 
@@ -11378,8 +11402,10 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
     });
     /* Told after every paint, not only on save, so a caller showing a field
        that depends on which bubble is picked (the weight target row) can
-       react the moment somebody taps a tile rather than after they commit. */
-    onSelect?.(primary);
+       react the moment somebody taps a tile rather than after they commit.
+       `extras` rides along too, for a caller that needs the full live
+       selection rather than just the main goal (onboarding's Skip button). */
+    onSelect?.(primary, extras);
   }
 
   /* Deliberately empty. This used to print every pick back with a paragraph
