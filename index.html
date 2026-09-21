@@ -6753,12 +6753,22 @@
   }
   .tsl-rows { display: flex; flex-direction: column; gap: 8px; }
   .tsl-row {
-    display: flex; align-items: center; gap: 11px; width: 100%; min-height: 58px;
+    display: flex; align-items: center; gap: 9px; width: 100%; min-height: 58px;
     padding: 11px 13px; border-radius: 14px; text-align: left; font: inherit;
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
   }
-  button.tsl-row { cursor: pointer; }
-  button.tsl-row:active { transform: scale(.99); }
+  /* The row is the card and the face is the tap, because the remove button now
+     sits in the same card and a button cannot hold another button: the parser
+     hoists the inner one out and the row comes apart around it. The press
+     scale stays on the whole card, so pressing the face still moves the box
+     the way it did when the box was the button. */
+  .tsl-face {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 11px;
+    padding: 0; background: none; border: 0; text-align: left;
+    font: inherit; color: inherit;
+  }
+  button.tsl-face { cursor: pointer; }
+  .tsl-row:has(button.tsl-face:active) { transform: scale(.99); }
   .tsl-ico {
     width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
@@ -26282,6 +26292,55 @@ async function upsertPlanRow(row, slot = 0) {
   return { data: null, error: { code: "no-slot", message: "Could not save that plan." } };
 }
 
+/* ONE session off a day, which has always been a single delete: a day is up to
+   three rows and this takes one of them. What made it read as "the whole day
+   went" was the word on the button, not the query under it.
+
+   Deliberately not the same thing as deleteTodaysTraining. That one is about a
+   day that did not happen and empties exercise_logs and fit_entries with it;
+   this one only takes a session off the plan and never touches a set somebody
+   really lifted. The copy is where that line has to be drawn, so it names the
+   session going and names the ones staying. */
+async function removePlannedSession(plan, date) {
+  const others = plansOnDate(date).filter((w) => w.id !== plan.id);
+  const name = displayFocus(plan.focus, plan.exercises);
+  const kept = others.map((w) => displayFocus(w.focus, w.exercises));
+  /* "off today" and "off tomorrow", but "off ON Thursday": the two days with
+     names of their own are already adverbs and the rest are not. */
+  const word = planDayWord(date);
+  const when = word === "today" || word === "tomorrow" ? word : `on ${word}`;
+  const rest = kept.length
+    ? `Your other ${kept.length === 1 ? "session" : `${kept.length} sessions`}, ${kept.join(" and ")}, ${kept.length === 1 ? "stays" : "stay"}.`
+    : `That leaves nothing planned ${when}.`;
+  const ok = await askConfirm({
+    heading: `Remove ${name}`,
+    body: `${name} comes off ${when}. ${rest} Anything you have already logged is kept.`,
+    ok: `Remove ${name}`,
+  });
+  if (!ok) return false;
+  /* supabase-js resolves with an error rather than throwing, so a delete
+     nobody checked is a session that looks removed and is back tomorrow. */
+  const { error } = await sb.from("ai_workouts").delete().eq("id", plan.id);
+  if (error) { toast("Couldn't remove it"); console.error(error); return false; }
+  /* The plan screen is pointed at a slot, and the slot it is pointed at may be
+     the one that just went. Move the pointer onto a survivor BEFORE the
+     repaint: planForDate falls back to the day's first row on its own, so the
+     screen would look right while the pointer went on naming a row that is not
+     there, and the next write onto this day would decide against a stale
+     number. With nothing left, the repaint finds no plan and stands the screen
+     down to the workout tab, which is what renderPlanPreview already does. */
+  if (PLAN_VIEW_SLOT === planSlot(plan)) PLAN_VIEW_SLOT = others.length ? planSlot(others[0]) : 0;
+  /* Mo, 2026-09-18, on the version of this that cleared a day: "I don't have
+     to go on another tab, go back, and then finally be able to see generate
+     workout and for it to be updated." The one door every plan change goes
+     through answers that: it drops ENGINE_NEXT_DAY, which is the generator's
+     answer to "which day next" cached from before this delete, reloads,
+     repaints Home and repaints this tab. */
+  await planChangedOn(date);
+  toast(`${name} removed`);
+  return true;
+}
+
 function todaySessions() {
   const date = sessionDate();
   const out = [];
@@ -26417,12 +26476,24 @@ function todaySessionsHTML() {
         <span class="tsl-n">${list.length}</span>
       </div>
       <div class="tsl-rows">
-        ${list.map((sn) => `
-          <${sn.tap ? `button type="button"` : "div"} class="tsl-row tsl-${sn.state}"${sn.tap ? ` data-session-open="${sn.tap}" data-session-slot="${sn.slot ?? 0}"` : ""}>
-            <span class="tsl-ico">${icon(sn.ico, 17)}</span>
-            <span class="tsl-txt"><b>${escapeHtml(sn.label)}</b><i>${escapeHtml(sn.detail)}</i></span>
-            <span class="tsl-state">${sn.state === "done" ? icon("check", 14) : escapeHtml(stateWord[sn.state])}</span>
-          </${sn.tap ? "button" : "div"}>`).join("")}
+        ${list.map((sn) => {
+          /* Mo: "Remove Elliptical. Remove HIIT." One session off the day, on
+             the row that names it, which is the shortest way to say which one
+             goes. Only a planned session that has not started: a finished one
+             has logged sets behind it and one on the clock is counting them,
+             and undoing either of those is Delete today's workout's job rather
+             than this one. */
+          const canGo = sn.tap === "plan" && sn.state === "open";
+          return `
+          <div class="tsl-row tsl-${sn.state}">
+            <${sn.tap ? `button type="button"` : "div"} class="tsl-face"${sn.tap ? ` data-session-open="${sn.tap}" data-session-slot="${sn.slot ?? 0}"` : ""}>
+              <span class="tsl-ico">${icon(sn.ico, 17)}</span>
+              <span class="tsl-txt"><b>${escapeHtml(sn.label)}</b><i>${escapeHtml(sn.detail)}</i></span>
+              <span class="tsl-state">${sn.state === "done" ? icon("check", 14) : escapeHtml(stateWord[sn.state])}</span>
+            </${sn.tap ? "button" : "div"}>
+            ${canGo ? `<button type="button" class="row-btn" data-session-remove="${sn.slot ?? 0}" aria-label="Remove ${escapeHtml(sn.label)}" title="Remove ${escapeHtml(sn.label)}">${icon("close", 13)}</button>` : ""}
+          </div>`;
+        }).join("")}
       </div>
       ${/* Two sessions is not two days, and somebody looking at two rows under
             one heading is entitled to wonder. gymDaysInWeek counts distinct
@@ -26471,6 +26542,16 @@ function wireTodaySessions(root) {
          `before`, which is where goWorkoutScreen hands control back. */
       const slot = Number(b.dataset.sessionSlot) || 0;
       goWorkoutScreen(null, { before: () => { PLAN_VIEW_SLOT = slot; } });
+    };
+  });
+  root.querySelectorAll("[data-session-remove]").forEach((b) => {
+    b.onclick = () => {
+      /* Back to TODAY_PLANS by slot rather than by the row's place in the
+         list: the list above also carries what is already logged and what is
+         on the clock, and neither of those is a plan row. */
+      const slot = Number(b.dataset.sessionRemove) || 0;
+      const w = TODAY_PLANS.find((p) => planSlot(p) === slot);
+      if (w) removePlannedSession(w, sessionDate());
     };
   });
   const add = root.querySelector("#tslAddBtn");
@@ -27498,7 +27579,7 @@ let ENGINE_NEXT_DAY = null;
    Mo: "when I swap a workout then go back to the workout page, it should be
    updated for the smart workout overview." Many doors lead to a day being
    rewritten or emptied: generating one, the whole-session sheet, the review
-   screen's Clear this day, Home's Clear this workout, saving a plan by hand,
+   screen's Remove this session, Home's Clear this workout, saving a plan by hand,
    putting a session budget back, swapping a lift for an activity, and
    finishing or standing down today's own plan. Each one used to decide for
    itself what to reload and what to redraw. A swap onto a day that is not
@@ -38322,12 +38403,18 @@ function plannedDayListHTML(date, showing) {
           const act = cardioSessionOf(w);
           const n = (w.exercises || []).length;
           const on = w.id === showing?.id;
+          const name = displayFocus(w.focus, w.exercises);
           return `
-          <button type="button" class="tsl-row tsl-${on ? "running" : "open"}" data-plan-slot="${planSlot(w)}">
-            <span class="tsl-ico">${icon(act ? (cardioActFor(act)?.ico || "run") : "dumbbell", 17)}</span>
-            <span class="tsl-txt"><b>${escapeHtml(displayFocus(w.focus, w.exercises))}</b><i>${escapeHtml(act ? cardioSaid(act) : `${n} exercise${n === 1 ? "" : "s"}`)}</i></span>
-            <span class="tsl-state">${on ? "Showing" : "Open"}</span>
-          </button>`;
+          <div class="tsl-row tsl-${on ? "running" : "open"}">
+            <button type="button" class="tsl-face" data-plan-slot="${planSlot(w)}">
+              <span class="tsl-ico">${icon(act ? (cardioActFor(act)?.ico || "run") : "dumbbell", 17)}</span>
+              <span class="tsl-txt"><b>${escapeHtml(name)}</b><i>${escapeHtml(act ? cardioSaid(act) : `${n} exercise${n === 1 ? "" : "s"}`)}</i></span>
+              <span class="tsl-state">${on ? "Showing" : "Open"}</span>
+            </button>
+            ${/* Nothing on a day that has not arrived is running or logged, so
+                  every row here can go. */ ""}
+            <button type="button" class="row-btn" data-plan-remove="${planSlot(w)}" aria-label="Remove ${escapeHtml(name)}" title="Remove ${escapeHtml(name)}">${icon("close", 13)}</button>
+          </div>`;
         }).join("")}
       </div>
       <p class="tsl-note">${escapeHtml(plannedDaySentence(date, rows))}</p>` : ""}
@@ -38347,9 +38434,9 @@ function renderPlanPreview(opts) {
   if (opts?.slot != null) PLAN_VIEW_SLOT = Number(opts.slot) || 0;
   const plan = review ? planForDate(date, PLAN_VIEW_SLOT)
     : TODAY_PLANS.find((w) => planSlot(w) === PLAN_VIEW_SLOT) || TODAY_WORKOUT;
-  /* The day can be emptied out from under this screen: Clear this day, a swap
-     that turned it into an activity, a reload that lost it. Nothing to review
-     is not an error, it is the workout tab. */
+  /* The day can be emptied out from under this screen: the last session
+     removed off it, a swap that turned it into an activity, a reload that lost
+     it. Nothing to review is not an error, it is the workout tab. */
   if (!plan) { PLAN_VIEW_DATE = null; goWorkoutScreen("choose", { back: true }); return; }
 
   // Reachable straight from choose/manual/week now, each of which stamps its
@@ -38512,12 +38599,29 @@ function renderPlanPreview(opts) {
   /* "Maybe by accident I didn't do it." The way out, at the bottom of the
      screen that is about today, under everything that offers to do today: it
      is the last thing you reach for, not the first. Never on a review of
-     another day, which has Clear this day for the plan and the day sheet for
-     what was logged; and never when the day holds nothing yet, where a button
-     to delete nothing is furniture. */
+     another day, which has a Remove for each session on it and the day sheet
+     for what was logged; and never when the day holds nothing yet, where a
+     button to delete nothing is furniture. */
   const delToday = !review && todaysTrainingFacts().anything
     ? `<button type="button" class="btn-ghost danger" id="planDeleteTodayBtn">Delete today&rsquo;s workout</button>`
     : "";
+
+  /* This very session on the clock, the lifting half of the reading actLive
+     already makes about an activity. */
+  const planLive = actLive || (!!SESSION && !SESSION.finished && SESSION.workoutId === plan.id);
+  /* Mo: "if I'm clicking on a session, I have an option to delete this specific
+     workout or a specific session ... Remove Elliptical. Remove HIIT." Named
+     after the session so it cannot be read as the day, and standing beside
+     Delete today's workout rather than instead of it. The line between the two
+     is what they are ABOUT: this takes a session off a plan, that one says the
+     day did not happen and takes the sets with it.
+
+     Which is why it is never offered over a session that is finished or one
+     that is running. Removing the row under either of those leaves the logged
+     work behind with nothing naming it, and undoing work that really happened
+     is the other button's job. */
+  const removeThis = finished || planLive ? "" : `
+    <button type="button" class="btn-ghost" id="planRemoveSessionBtn">Remove ${escapeHtml(displayFocus(plan.focus, exercises))}</button>`;
 
   /* The doors, in the order somebody reaches for them: the same day leaning
      somewhere, the same day around a limit, or not a workout at all. Each one
@@ -38558,10 +38662,16 @@ function renderPlanPreview(opts) {
       </button>
     </div>
     ${/* The day planner's last door, kept because this screen replaced it and
-          taking a workout off a day would otherwise have nowhere left to
+          taking a session off a day would otherwise have nowhere left to
           happen. Quiet, under the three that change the day rather than
-          empty it. */ ""}
-    <button type="button" class="btn-ghost" id="planReviewClear">Clear this day</button>
+          empty it.
+
+          It read "Clear this day" until 2026-09-21 and always deleted exactly
+          one row. On a screen that shows one session at a time that is the app
+          naming something it does not do, and Mo read it the only way it can
+          be read: "I can't delete a singular session. If I do, it would just
+          delete the whole entire workout." It never did. The label did. */ ""}
+    ${removeThis}
     <button type="button" class="btn-ghost" id="planReviewBack">Back to the workout tab</button>`;
 
   /* The match figure for the day being reviewed, the same reading and the same
@@ -38670,6 +38780,10 @@ function renderPlanPreview(opts) {
          ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>
            <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`}
     ${addSessionFootHTML(date || todayStr(), review)}
+    ${/* On a reviewed day this already sits up in "Change it"; today has no
+          such block, so it comes in here, between the door that adds a session
+          and the one that deletes the day. */ ""}
+    ${review ? "" : removeThis}
     ${delToday}`;
   wireTodaySessions($("workoutContent"));
   /* The other session on a day that has not arrived. Straight back through this
@@ -38687,6 +38801,16 @@ function renderPlanPreview(opts) {
      wires its own tslAddBtn to the live clock instead, through
      wireTodaySessions above. */
   if ($("tslPlanAddBtn")) $("tslPlanAddBtn").onclick = (e) => openAddActivitySheet(e.currentTarget.dataset.addDate);
+  /* The X on a reviewed day's rows. By slot off plansOnDate rather than through
+     planForDate, which answers a slot that is not there with the day's first
+     row: a helpful fallback everywhere else and the wrong session to delete. */
+  $("workoutContent").querySelectorAll("[data-plan-remove]").forEach((b) => {
+    b.onclick = () => {
+      const slot = Number(b.dataset.planRemove) || 0;
+      const w = plansOnDate(date).find((r) => planSlot(r) === slot);
+      if (w) removePlannedSession(w, date);
+    };
+  });
   mountMotionFigures($("workoutContent"));
 
   makeReorderable($("planRows"), async (order) => {
@@ -38818,6 +38942,12 @@ function renderPlanPreview(opts) {
       if (await deleteTodaysTraining()) goWorkoutScreen("choose", { back: true });
     };
   }
+  /* No navigation of its own: planChangedOn repaints this tab, and the repaint
+     lands on whichever session is still on the day, or on the workout tab when
+     that was the last one. */
+  if ($("planRemoveSessionBtn")) {
+    $("planRemoveSessionBtn").onclick = () => removePlannedSession(plan, plan.entry_date || todayStr());
+  }
 
   /* The limits offer, which the reveal screen used to make and dismiss for
      you: tapping Let's go there quietly wrote the empty answer, which is how
@@ -38857,36 +38987,6 @@ function renderPlanPreview(opts) {
     $("planReviewLimits").onclick = () => openPlanLimitsSheet(date, planDayWord(date));
   }
   if ($("planReviewAct")) $("planReviewAct").onclick = () => openActivityInstead(date, planDayWord(date));
-  if ($("planReviewClear")) {
-    $("planReviewClear").onclick = async () => {
-      const ok = await askConfirm({
-        heading: "Clear this day",
-        body: `${displayFocus(plan.focus, exercises)} is removed from ${planDayLabel(date).toLowerCase()}. Anything you have already logged is kept.`,
-        ok: "Clear it",
-      });
-      if (!ok) return;
-      /* supabase-js resolves with an error rather than throwing, so a delete
-         nobody checked is a day that looks cleared and comes back tomorrow. */
-      const { error } = await sb.from("ai_workouts").delete().eq("id", plan.id);
-      if (error) { toast("Couldn't clear it"); console.error(error); return; }
-      /* Mo, 2026-09-18: "when I press clear the day I want to go back to that
-         page, and I don't have to go on another tab, go back, and then finally
-         be able to see generate workout and for it to be updated."
-
-         Through the one door every plan change goes through, rather than round
-         it. This used to reload the tables and then walk to the choose screen
-         itself, which left ENGINE_NEXT_DAY holding the generator's answer from
-         before the day was emptied and never told Home anything had happened:
-         the card could still be naming the day that had just been deleted, and
-         only a tab switch, which reloads, put it right. planChangedOn drops
-         that cache, reloads, repaints Home and repaints this tab. The repaint
-         lands back on this very screen, finds nothing on the day, and stands
-         itself down to the choose screen (see the top of renderPlanPreview),
-         so one reload and one paint end with the day already showing empty. */
-      await planChangedOn(date);
-      toast("Day cleared");
-    };
-  }
   if ($("planReviewBack")) $("planReviewBack").onclick = () => goWorkoutScreen("choose", { back: true });
 }
 
