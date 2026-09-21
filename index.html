@@ -32051,7 +32051,7 @@ function planFromToday(date = todayStr()) {
      session lands on what the week has trained least. A plan that hits your
      most neglected regions scores high; one more chest day in a chest-heavy
      week scores low. It is a claim about balance, not about quality. */
-  const md = matchDetail(counts);
+  const md = matchDetail(counts, date);
 
   return {
     real: true,
@@ -32091,8 +32091,8 @@ function planFromToday(date = todayStr()) {
    Scored per muscle against the single most-worked muscle of the week, the
    same session reads 68%, which is the honest number and agrees with the Body
    tab instead of contradicting it. */
-function matchDetail(counts) {
-  const vols = computeMuscleVolume(ME, 0);
+function matchDetail(counts, date = todayStr()) {
+  const vols = computeMuscleVolume(ME, 0, date);
   const trained = Object.keys(counts || {});
   const peak = Math.max(...Object.values(vols), 0);
   if (!trained.length) return { match: 99, muscles: [], all: [], peak: 0 };
@@ -37492,8 +37492,17 @@ function classifyMuscles(exerciseName) {
   return null;
 }
 
-function computeMuscleVolume(name, weekOffset) {
-  const start = new Date(weekStartStr() + "T00:00:00");
+/* refDate anchors "this week" to the day being scored, not to whenever the
+   browser happens to think "now" is. Measured with a repro of the exact
+   complaint: without it, tapping into next week's Monday from the week
+   planner while it is still today's Sunday scored that Monday against
+   TODAY's window, so a Sunday chest session (logged, correctly, against last
+   week by weekStartStr) still dragged the score for an untouched week down
+   to 35. With refDate it reads 99, because that Monday's own week has
+   nothing on it yet. weekStartOf(refDate) is the same Monday-start
+   arithmetic weekStartStr() already does for today, just parameterized. */
+function computeMuscleVolume(name, weekOffset, refDate = todayStr()) {
+  const start = new Date(weekStartOf(refDate) + "T00:00:00");
   start.setDate(start.getDate() - weekOffset * 7);
   const end = new Date(start);
   end.setDate(end.getDate() + 7);
