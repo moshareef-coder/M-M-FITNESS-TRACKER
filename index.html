@@ -5695,6 +5695,48 @@
   }
   .goal-chip.on { color: var(--text); border-bottom-color: var(--accent); }
   .goal-chip:active { color: var(--text); }
+
+  /* Whose progress you are reading. Mo asked for "one singular tick... maybe
+     on the right side of the title, maybe like 'Me and Me'", and the two of
+     you already have initials and a colour each at the top of every screen, so
+     the tick IS that pair, shrunk. It rides inside the title row rather than
+     above it: the pair of pills that used to sit over the goal strip was cut
+     for turning one screen into two rows of tabs, and this has to cost no row.
+
+     A ring rather than a fill, because that is the language the header pair
+     already speaks for these same two people, and because a filled orange
+     circle with white on it does not clear contrast in either theme. */
+  .prog-who { margin-left: auto; align-self: center; display: flex; gap: 6px; }
+  .prog-who ~ .track-kebab { margin-left: 2px; }
+  .prog-who button {
+    position: relative; width: 28px; height: 28px; border-radius: 50%; padding: 0;
+    display: grid; place-items: center; cursor: pointer;
+    background: none; border: 2px solid transparent; color: var(--muted);
+    font: inherit; font-size: 10.5px; font-weight: 800; letter-spacing: -.02em;
+    transition: border-color .15s, color .15s, transform .12s ease;
+  }
+  /* 30px is the right size beside a tab title and the wrong size for a thumb,
+     so the tappable box is grown past the paint instead of the paint being
+     grown to meet the thumb: 30 plus 7 either side is 44 and the row keeps the
+     height the title gave it. */
+  .prog-who button::after { content: ""; position: absolute; inset: -7px; }
+  .prog-who button:active { transform: scale(.93); }
+  .prog-who button[aria-pressed="true"].me { border-color: var(--me); color: var(--me-ink); }
+  .prog-who button[aria-pressed="true"].them { border-color: var(--partner); color: var(--partner-ink); }
+  .prog-who button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  /* Their view has no goal tabs, because their goals are theirs. Their name
+     stands where the title was and reads like the tab it replaces, minus the
+     tap, so the row never collapses to a switch floating on a rule. */
+  .prog-title-static {
+    padding: 0 0 9px; border-bottom: 2px solid var(--partner);
+    font-size: 14px; font-weight: 700; letter-spacing: -.01em; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* What this screen is not showing. Quiet on purpose: it is a footnote about
+     somebody else's privacy, not a second headline. */
+  .prog-withheld h2 { margin-bottom: 2px; }
+  .prog-withheld p { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 8px 0 0; }
+  .prog-withheld .btn-ghost { margin-top: 12px; }
   .photo-strip { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px 12px; padding: 4px 16px 6px; }
   .photo-item { flex-shrink: 0; width: 116px; }
   .photo-item img {
@@ -7520,12 +7562,12 @@
 
   <!-- PROGRESS TAB -->
   <div id="tab-progress" class="tab-panel hidden">
-    <!-- No You/Partner toggle here for now. Mo cut it: this tab answers one
-         question about one person, and a pair of pills above the goal strip
-         made two rows of tabs stacked on each other before a single number.
-         Their progress is still on the Home timeline and the day sheet, and
-         every isPartner branch below still works, so putting it back is one
-         element and one listener. -->
+    <!-- The You/Partner switch is back, and it is NOT the pair of pills that
+         was cut: those were a second row of tabs above the goal strip, and
+         this is two 30px rings on the right hand end of the title row itself,
+         built by paintProgWho() into #progGoalChips. Mo: "make it subtle...
+         like one singular tick... maybe on the right side of the title, maybe
+         like 'Me and Me'". Nothing at all when there is no partner. -->
     <!-- A lens, not a setter. Tapping a chip shows you what this tab looks
          like judged on that goal; it does NOT rewrite your profile, because a
          row of tabs that silently changes what you are training for is a trap.
@@ -7546,6 +7588,11 @@
          there is one node with one set of handlers rather than one built and
          thrown away on every repaint. -->
     <div class="card hidden" id="progHirePitch"></div>
+
+    <!-- What their view is not showing, and the door to your own half of it.
+         Filled by renderProgressWithheld() and moved to the end of the tab on
+         every render, because everything above it gets re-ordered by goal. -->
+    <div class="card quiet prog-withheld hidden" id="progWithheld"></div>
 
     <!-- The Tone Up screen (renderToneHero), for the recomp goal only. Not a
          card: the goal order walks past it, and it is pinned straight under
@@ -8088,6 +8135,19 @@
         <input type="checkbox" id="shareDetailsToggle" />
       </label>
       <p class="muted-note">Off hides the exercise name, muscle figure, sets and up-next from their live view and timeline. They still see that you're training, for how long, and your effort score, so who worked hardest never depends on showing what you did.</p>
+    </div>
+    <!-- The scale is a separate question from the gym, so it is a separate
+         switch. Hidden until the column exists (weighInSharingLive): a privacy
+         switch that silently fails to save is worse than no switch, and
+         share_weigh_ins is written in 20260920_share_weigh_ins.sql and not
+         applied. Off until then, which is what the Progress tab shows. -->
+    <div class="card hidden" id="shareWeighInsCard">
+      <h2>Your weigh-ins</h2>
+      <label class="gym-toggle" id="shareWeighInsToggleWrap">
+        <span>Share weigh-ins and measurements with <span id="shareWeighPartnerName">your partner</span></span>
+        <input type="checkbox" id="shareWeighInsToggle" />
+      </label>
+      <p class="muted-note">Off, and nothing on their Progress tab shows your weight, your goal weight or your tape: the switch on the right of their title simply has no weight trend behind it. On, and they read the same line you do. Body photos are never shared either way, and this changes nothing about what they see of your workouts.</p>
     </div>
     <div class="card danger-card hidden" id="leavePartnerCard">
       <h2>Leave this partnership</h2>
@@ -21134,7 +21194,8 @@ function renderLiftHero(on, profile, isPartner) {
   const vs = expected > 0 ? Math.round(((thisWeek - expected) / expected) * 100) : null;
   $("liftVolume").innerHTML = `<span class="prog-tile-ico">${icon("bolt", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Weekly Volume</span><span class="prog-tile-val">${fmtVolume(thisWeek)} lb</span><span class="prog-tile-sub">${
-      vs == null ? "first week to compare" : `${vs >= 0 ? "+" : ""}${vs}% on your 8 week average, so far`}</span></span>`;
+      vs == null ? "first week to compare"
+        : `${vs >= 0 ? "+" : ""}${vs}% on ${isPartner ? "their" : "your"} 8 week average, so far`}</span></span>`;
 
   const prs = recentPRCount(name, 30);
   $("liftPRs").innerHTML = `<span class="prog-tile-ico">${icon("trophy", 18)}</span>
@@ -39047,11 +39108,53 @@ async function uploadBodyPhoto(file) {
 
 /* ---------- Progress tab ---------- */
 
-/* Whose data the Progress tab is currently showing. */
-/* Nothing sets this to "partner" any more: the toggle that did came off the
-   tab. The branches that read it are left alone rather than deleted, because
-   "for now" was the word and they are what a restored toggle would need. */
+/* Whose data the Progress tab is currently showing. Set by the two rings on
+   the right of the title row (paintProgWho), and only ever "partner" while
+   there is a partner: renderProgressTab puts it back if that stops being
+   true, so an unpairing cannot leave the tab reading a person who is gone. */
 let PROGRESS_VIEW = "me";
+
+/* Does their workout detail come with them. This is deliberately the same
+   expression the timeline, the day sheet, the recap and the live sheet all
+   read (PARTNER_PROFILE?.share_workout_details !== false), named rather than
+   copied a tenth time, so there is one answer to "is she sharing" and this
+   tab cannot drift away from the rest of the app.
+
+   Off hides the lifts, the loads, the tonnage and the muscle map. It does not
+   hide that she trained: her sessions and her effort score are the floor the
+   whole partnership is built on, and every other surface already shows them. */
+function partnerSharesDetails() {
+  /* The one place this deliberately differs from the nine copies of the same
+     expression elsewhere: with no profile in memory, `?.` makes undefined,
+     undefined !== false is true, and the whole thing fails OPEN. On a timeline
+     row that is a cosmetic risk. Here it is a whole tab of somebody's
+     training, so no profile means no permission, not permission by default. */
+  return !!PARTNER_PROFILE && PARTNER_PROFILE.share_workout_details !== false;
+}
+
+/* Her body weight and her tape, which are a different question and until now
+   had no answer at all. RLS on fit_entries is ROW level, and the waist and
+   measurement migrations say so in as many words: a partner who can read your
+   day row can read every column on it, weight included, and a policy cannot
+   hide one column of a visible row. So the server has always sent it. What
+   never happened is any screen DRAWING it, which means nobody has ever agreed
+   to it, and a number nobody agreed to is not shared just because it arrived.
+
+   So this reads share_weigh_ins as a strict opt in, `=== true` and not
+   `!== false`: a profile written before 20260920_share_weigh_ins.sql runs has
+   no such key, that reads as not shared, and not shared is the truth. */
+function partnerSharesBody() {
+  return !!PARTNER_PROFILE && PARTNER_PROFILE.share_weigh_ins === true;
+}
+
+/* The one place that knows whether the switch in Settings can be offered at
+   all. select("*") brings the column back as null or a boolean once it exists
+   and leaves the key off the object entirely until then, so this is a real
+   feature detect and not a guess about what has been deployed. A privacy
+   switch that cannot save is worse than no privacy switch. */
+function weighInSharingLive() {
+  return !!MY_PROFILE && "share_weigh_ins" in MY_PROFILE;
+}
 function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME; }
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
 
@@ -39717,7 +39820,10 @@ function weightTrendHTML(name, profile, opts = {}) {
 function renderWeightTrend(id, name, profile, isPartner, always) {
   const el = $(id);
   if (!el) return;
-  const wanted = hired() && (isPartner || isTracked("weight"))
+  /* Was `isPartner ||`, which read as "always, on their view". Their weight is
+     theirs to give now (partnerSharesBody), and the callers above cannot be
+     the only thing standing between it and the screen. */
+  const wanted = hired() && (isPartner ? partnerSharesBody() : isTracked("weight"))
     && (always || entriesFor(name).some((e) => e.weight != null));
   el.classList.toggle("hidden", !wanted);
   el.innerHTML = wanted ? weightTrendHTML(name, profile, { card: id !== "wtHeroTrend" }) : "";
@@ -40762,11 +40868,54 @@ function legacyGoalBubble(goalText) {
            recomp: "tone-lean-abs", consistent: "consistent" }[key] || null;
 }
 
+/* The switch itself: two rings, the initials and colours this app already
+   gives the two of you, and the lit one is the one you are reading. Appended
+   into the title row so it costs no row of its own, and to the LEFT of the
+   three dots, which govern your own goal and stay hard right where they were.
+
+   Never drawn at all without a partner. A two state control whose other state
+   does not exist is furniture, and somebody training alone must not be shown a
+   door to a person they do not have. */
+function paintProgWho(host) {
+  if (!PARTNER_EMAIL || !PARTNER_PROFILE) return;
+  const mine = PROGRESS_VIEW !== "partner";
+  const them = partnerName();
+  const wrap = document.createElement("div");
+  wrap.className = "prog-who";
+  wrap.id = "progWho";
+  wrap.innerHTML = `
+    <button type="button" class="me" data-who="me" aria-pressed="${mine}"
+      aria-label="Your progress">${escapeHtml(initials(ME))}</button>
+    <button type="button" class="them" data-who="partner" aria-pressed="${!mine}"
+      aria-label="${escapeHtml(them)}'s progress">${escapeHtml(initials(them))}</button>`;
+  const keb = host.querySelector("#trackOpen");
+  keb ? host.insertBefore(wrap, keb) : host.appendChild(wrap);
+  wrap.querySelectorAll("[data-who]").forEach((b) => {
+    b.onclick = () => {
+      if (b.dataset.who === PROGRESS_VIEW) return;
+      PROGRESS_VIEW = b.dataset.who;
+      /* A goal lens is something you did to YOUR tab. Carried across it would
+         read her data through a goal neither of you picked, which is the one
+         thing the lens comment above already says nobody asked for. */
+      PROGRESS_GOAL_LENS = null;
+      renderProgressTab();
+    };
+  });
+}
+
 function renderGoalChips(profile) {
   const host = $("progGoalChips");
   if (!host) return;
-  if (PROGRESS_VIEW === "partner") { host.classList.add("hidden"); return; }
   host.classList.remove("hidden");
+  /* Their goals are theirs, so the strip has nothing to offer on their view.
+     The row stays, because the switch lives in it and because a screen about
+     somebody else should say whose it is: their name takes the title's place,
+     underlined in their colour. */
+  if (PROGRESS_VIEW === "partner") {
+    host.innerHTML = `<span class="prog-title-static">${escapeHtml(partnerName())}</span>`;
+    paintProgWho(host);
+    return;
+  }
 
   /* migrateGoalPick is not given an empty bubble: a retired id needs
      translating, but "no goal at all" is not a retired id and asking it to
@@ -40822,6 +40971,7 @@ function renderGoalChips(profile) {
       renderProgressTab();
     };
   });
+  paintProgWho(host);
   /* No More chip. Mo: you have one, two or three goals and the strip shows
      them; a fourth thing shaped exactly like a goal that is really a link to
      Setup was the tab teaching people to tap a goal to go somewhere else.
@@ -40988,7 +41138,12 @@ function paintProgIndex(host) {
 function renderProgTiles(kind, isPartner, opts = {}) {
   const host = $("progTiles");
   if (!host) return;
-  const on = kind === "scale";
+  /* A tape reading is the same class of thing as the weigh-in beside it, on
+     the same row of the same table, so it answers to the same switch. kind can
+     no longer be "scale" on a partner who has not shared it, and this says so
+     out loud anyway: this is a privacy gate, and a gate that only works
+     because of what some other function decided is not a gate. */
+  const on = kind === "scale" && (!isPartner || opts.bodyShared !== false);
   host.classList.toggle("hidden", !on);
   /* Straight under Weight, wherever the reorder above just put Weight. This
      block is not a card, so the goal order and a saved drag order both walk
@@ -41479,6 +41634,10 @@ async function saveMeasurements() {
 }
 
 function renderProgressTab() {
+  /* Unpairing, a block, or a reload that finds the partnership gone all leave
+     the switch pointing at nobody. Put the tab back on its owner rather than
+     rendering a screen about a person the app no longer has. */
+  if (PROGRESS_VIEW === "partner" && (!PARTNER_EMAIL || !PARTNER_PROFILE)) PROGRESS_VIEW = "me";
   /* Before anything else this tab does. On a first open with nothing answered
      the run IS this tab, and every card below it would be drawn against choices
      that have not been made yet. Never over a partner's view, where the goals
@@ -41503,7 +41662,12 @@ function renderProgressTab() {
      day sheet and the live sheet all already ask before showing it. This tab
      did not: the Strength card listed every lift and load they had ever done
      while the rest of the app was carefully hiding exactly that. */
-  const sharing = !isPartner || PARTNER_PROFILE?.share_workout_details !== false;
+  const sharing = !isPartner || partnerSharesDetails();
+  /* Their weigh-ins and their tape are a separate question from their
+     workouts, and one nothing in this app had ever put on a screen before
+     today. See partnerSharesBody(): the row has always come down the wire,
+     which is not the same as anybody having agreed to it being drawn. */
+  const bodyShared = !isPartner || partnerSharesBody();
   /* The lens, if one is up. headlineKindFor reads a profile, so it is handed a
      COPY carrying the looked-at bubble rather than the real one: every
      downstream rule (which card leads, which gets the ring, what the sentence
@@ -41520,6 +41684,21 @@ function renderProgressTab() {
      still the other half of this goal. */
   if (!sharing && kind === "bulk") kind = "scale";
   if (!sharing && (kind === "lift" || kind === "volume" || kind === "reps")) kind = "habit";
+  /* endurance belongs on that list and was missed when it was written. The
+     screen it leads to prints their runs one row each, with the distance and
+     the clock on them, which is exactly what the timeline is careful to
+     withhold two taps away. */
+  if (!sharing && kind === "endurance") kind = "habit";
+  /* Every reading left below leads with their body weight, and without it they
+     are not readings, they are a heading over a hole. bulk falls to volume
+     rather than to habit because tonnage is what Build muscle is measured on
+     when there is no goal weight, which is headlineKindFor's own answer to the
+     same question; with the detail withheld too there is nothing left but
+     showing up. */
+  if (!bodyShared) {
+    if (kind === "bulk") kind = sharing ? "volume" : "habit";
+    if (kind === "scale" || kind === "recomp") kind = "habit";
+  }
   /* Somebody who untracked the scale must not be met by a headline that leads
      with it. Taking the chart away and leaving "You are at 189.3 lbs" over the
      top of it is worse than not honouring the choice at all, because it looks
@@ -41553,6 +41732,9 @@ function renderProgressTab() {
   /* This card names the lifts somebody is doing and what they load them with,
      which is exactly what share_workout_details exists to withhold. */
   if (!sharing) { barred.add("cardStrength"); barred.add("cardVolume"); barred.add("cardMuscles"); }
+  /* One card, but the chart, the one line answer, the range pills, the goal
+     weight row and the full list of weigh-ins are all inside it. */
+  if (!bodyShared) barred.add("cardWeight");
 
   const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
   /* The cards somebody asked for by name. The picker is the only thing that
@@ -41569,7 +41751,12 @@ function renderProgressTab() {
   const chosenCards = (isPartner ? [] : trackedMetrics())
     .map((k) => TRACK_ALL.find((m) => m.key === k)?.card)
     .filter((c, i, all) => c && PICKED_CARDS.has(c) && !barred.has(c) && all.indexOf(c) === i);
-  const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c) && !WEEK_CARD_IDS.has(c));
+  /* Photos are never a partner's business, and renderBodyPhotos hides that
+     card on their view whatever this list says. Leaving it in meant the rule
+     above it counted one card, drew itself, and then labelled nothing: a
+     heading with an empty section under it, which is the shape of a bug. */
+  const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c)
+    && !WEEK_CARD_IDS.has(c) && !(isPartner && c === "cardPhotos"));
   /* On a brand new account every card is an empty card, so none of them are
      drawn. The one exception is Weight on a weight goal, because logging into
      it IS the single action the empty state is pointing at, and it opens
@@ -41603,7 +41790,7 @@ function renderProgressTab() {
      the scale not moving, so somebody who asked to stop being shown it must
      actually stop being shown it, including on the screen their goal would
      otherwise lead with. The tape and photo tiles below stand in as the door. */
-  const wantsWeight = isPartner || isTracked("weight");
+  const wantsWeight = isPartner ? bodyShared : isTracked("weight");
   const shownRaw = (blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
     : weightScreen ? ["cardWeight"]
@@ -41663,6 +41850,10 @@ function renderProgressTab() {
   // The rule is a label for what follows it, so with nothing following it, and
   // on a brand new account where nothing is on screen at all, it says nothing.
   rule.classList.toggle("hidden", blank || !rest.length || weightScreen || own);
+  /* "you have logged" over her cards is the tab talking to the wrong person. */
+  const ruleWord = rule.querySelector("b");
+  if (ruleWord) ruleWord.textContent = isPartner
+    ? `Everything else ${partnerName()} has logged` : "Everything else you have logged";
   /* After the reorder, so each block can pin itself under the headline card. */
   renderToneHero(toneScreen, lensProfile, isPartner);
   renderEnduranceHero(endScreen, lensProfile, isPartner);
@@ -41672,7 +41863,7 @@ function renderProgressTab() {
   /* photosAvailable is passed rather than read off cardPhotos's hidden class,
      because on the weight screen that card is hidden ON PURPOSE and the tile
      is meant to be its door, not to vanish with it. */
-  renderProgTiles(kind, isPartner, { photosAvailable: !isPartner && !blank });
+  renderProgTiles(kind, isPartner, { photosAvailable: !isPartner && !blank, bodyShared });
   /* After every screen has drawn itself, because this takes readings away
      rather than deciding which ones there were: the goal, the head and the
      shape of the tab are the same whether or not he has been hired, and one
@@ -41685,6 +41876,61 @@ function renderProgressTab() {
   if (live.has("cardVolume")) { renderVolumeChart(); renderVolumeStats(); }
   if (live.has("cardPhotos")) renderBodyPhotos();
   for (const spec of WEEK_CARDS) if (live.has(spec.card)) renderWeekCard(spec);
+  renderProgressWithheld(isPartner, sharing, bodyShared);
+}
+
+/* What their screen is NOT showing, said plainly.
+
+   A card that is simply absent reads as "she has not done any of that", which
+   is worse than a zero: a zero is a wrong number and an absence is an
+   accusation. So everything this tab decided to withhold gets named, without
+   a verdict attached to it, in the same voice dayNotes and meta.missing use
+   for what the engine could not do.
+
+   The wording splits on WHY, because the two reasons are not the same thing
+   and saying they are would be a small lie in both directions. Workout detail
+   is a switch she has flipped, so it is attributed to her. Weigh-ins are not:
+   nobody has ever been asked, so that line says the sharing is off and does
+   not put the choice in her mouth.
+
+   It also carries the one link Mo asked for. The controls for your own half
+   live in Settings and there is exactly one copy of them, because two copies
+   of a privacy switch is how one of them ends up wrong. */
+function renderProgressWithheld(isPartner, sharing, bodyShared) {
+  const box = $("progWithheld");
+  if (!box) return;
+  box.classList.toggle("hidden", !isPartner);
+  if (!isPartner) { box.innerHTML = ""; return; }
+  const them = partnerName();
+  const lines = [];
+  if (!bodyShared) {
+    /* Two different facts wearing one sentence otherwise. With the column
+       live she has made a choice and it is hers to be named; without it
+       nobody has been asked yet, and saying she keeps her weight private
+       would be putting a decision in her mouth she never made. */
+    lines.push(weighInSharingLive()
+      ? `${escapeHtml(them)} has weigh-in sharing off, so their weight, their goal weight and their tape are not here.`
+      : "Weigh-ins and tape measurements are not shared yet, in either direction.");
+  }
+  if (!sharing) {
+    /* they/their, not she/hers: every other third person line in this tab
+       reads that way (progressHeadline's `third` branches) and the profile's
+       sex is not something a privacy note should be guessing from. */
+    lines.push(`${escapeHtml(them)} has workout detail switched off, so the lifts, the loads, the tonnage and the muscle map stay theirs. The sessions and the effort above are real, and are the part they do share.`);
+  }
+  // Said whatever else is or is not on, because it is the question everybody
+  // asks second and the answer has never been anywhere near this screen.
+  lines.push("Body photos are never shared, in either direction.");
+  box.innerHTML = `<h2>Not shown here</h2>${
+    lines.map((l) => `<p>${l}</p>`).join("")}
+    <button type="button" class="btn-ghost" id="progShareSettings">What ${escapeHtml(them)} can see of you</button>`;
+  /* Straight to the card, not to the top of Settings: "let's have that option
+     there" is not answered by a link to a page somebody then has to search. */
+  $("progShareSettings").onclick = () => { switchTab("setup"); openSettingsPage("partner"); };
+  // Last thing on the tab, after the goal has finished re-ordering everything
+  // above it.
+  const host = $("tab-progress");
+  if (host && box.parentNode === host && host.lastElementChild !== box) host.appendChild(box);
 }
 
 /* Progress, for somebody who has not hired him yet.
@@ -42721,6 +42967,50 @@ function trainStylesToSave() {
   return [...(SETUP_STYLES || [])];
 }
 
+/* The second half of the privacy card, and the half that has to say the
+   uncomfortable thing. Their Progress tab can now read your weigh-ins, which
+   no screen in this app has ever done before, so there has to be a switch and
+   it has to default to off.
+
+   Drawn only where it can actually work. The column lands with
+   20260920_share_weigh_ins.sql, migrations here are written and not applied,
+   and a switch that flips, says nothing, and comes back on the next render is
+   the exact shape of a privacy control people stop trusting. Until it exists
+   the sharing is off and their tab says so in words. */
+function renderShareWeighIns() {
+  const card = $("shareWeighInsCard");
+  if (!card) return;
+  const offer = !!PARTNER_EMAIL && weighInSharingLive();
+  card.classList.toggle("hidden", !offer);
+  if (!offer) return;
+  $("shareWeighPartnerName").textContent = partnerName();
+  const paint = (on) => {
+    $("shareWeighInsToggle").checked = on;
+    $("shareWeighInsToggleWrap").classList.toggle("checked", on);
+  };
+  paint(MY_PROFILE?.share_weigh_ins === true);
+  /* Same shape as the switch above it, and for the same reason: no Save
+     button, so it writes on the flip, and a label wrapping its own checkbox
+     sees the click twice, so one flip has to be one write. */
+  $("shareWeighInsToggleWrap").onclick = () => {
+    setTimeout(async () => {
+      const on = $("shareWeighInsToggle").checked;
+      $("shareWeighInsToggleWrap").classList.toggle("checked", on);
+      if (on === (MY_PROFILE?.share_weigh_ins === true)) return;
+      const { error } = await sb.from("profiles")
+        .update({ share_weigh_ins: on }).eq("email", MY_EMAIL);
+      if (error) {
+        console.error(error);
+        toast("Could not save");
+        paint(MY_PROFILE?.share_weigh_ins === true);
+        return;
+      }
+      if (MY_PROFILE) MY_PROFILE.share_weigh_ins = on;
+      toast(on ? `${partnerName()} can see your weigh-ins` : `Weigh-ins hidden from ${partnerName()}`);
+    }, 0);
+  };
+}
+
 function renderSetupTab() {
   $("setupDisplayName").value = ME || "";
   if ($("setupBio")) {
@@ -42792,6 +43082,7 @@ function renderSetupTab() {
       }, 0);
     };
   }
+  renderShareWeighIns();
   renderRestChoices();
   renderPushToggle();
   renderSetupPhoto();
