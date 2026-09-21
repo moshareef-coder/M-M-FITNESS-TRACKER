@@ -4714,6 +4714,55 @@
   .dot.rest { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
   .dot.wt { color: var(--muted); font-size: 11px; font-weight: 700; }
 
+  /* The month sheet's cell. Sits on the same .cal-grid / .cal-dows layout the
+     workout tab's calendar already proved fits 44px targets at 390px (see the
+     bleed-math comment on .cal-grid), but its own class for content: a photo
+     or tick/rest/weight in the middle, the day number and (paired) both
+     people's pip overlaid rather than given their own rows, because a cell
+     this size has no rows to spare. */
+  .mon-day {
+    position: relative; aspect-ratio: 1 / 1; min-height: 44px; padding: 0; overflow: hidden;
+    border-radius: 11px; border: 1.5px dashed var(--border); background: var(--panel-2);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    font-family: inherit; color: #fff; transition: transform .12s ease;
+  }
+  .mon-day:active { transform: scale(.94); }
+  .mon-day.out { opacity: .35; }
+  .mon-day.on { border: none; background: color-mix(in srgb, var(--accent) 22%, var(--panel-2)); color: var(--accent-ink); }
+  /* fillWeekProofs drops the <img> in asynchronously, after the cell's class
+     list is already fixed, so nothing here can key off a "photo landed"
+     class without that class going stale the moment the photo does arrive.
+     The number and pips instead carry their own always-on scrim (a slice of
+     --panel behind the text) that reads fine over a flat tint OR a photo,
+     rather than swapping color schemes for a state the DOM cannot see. */
+  .mon-day img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mon-day.rest, .mon-day.wt { border-style: solid; background: var(--panel-2); color: var(--muted); }
+  .mon-day.rest { font-size: 10px; font-weight: 800; letter-spacing: .03em; }
+  .mon-day.wt { font-size: 10px; font-weight: 700; }
+  /* Last, and a full border shorthand rather than just border-color: .on sets
+     border:none for its photo/tick cells, and today can land on any state, so
+     the ring only stays visible on a trained "today" if this comes after
+     (and overrides) every state rule above rather than losing the cascade to
+     whichever of them happens to match too. */
+  .mon-day.today { border: 1.5px solid var(--me); }
+  .mon-num {
+    position: absolute; top: 2px; left: 2px; font-size: 10px; font-weight: 800; line-height: 1;
+    font-variant-numeric: tabular-nums; color: var(--text); z-index: 1;
+    background: color-mix(in srgb, var(--panel) 65%, transparent); border-radius: 5px; padding: 2px 4px;
+  }
+  /* Both people's outcome, shrunk to a pip since the cell already spent its
+     one photo on whichever of you logged something. Lit means trained; dim
+     means not, the same distinction the week's rest/weight/empty states
+     collapse to at this size, with the exact split one tap away. Same scrim
+     trick as the day number, for the same reason. */
+  .mon-pips {
+    position: absolute; right: 2px; bottom: 2px; display: flex; gap: 3px; z-index: 1;
+    background: color-mix(in srgb, var(--panel) 65%, transparent); border-radius: 6px; padding: 2px 3px;
+  }
+  .mon-pip { width: 6px; height: 6px; border-radius: 50%; background: color-mix(in srgb, var(--muted) 35%, transparent); }
+  .mon-pip.me.on { background: var(--me); }
+  .mon-pip.them.on { background: var(--partner); }
+
   /* Together timeline: one card per session, the latest word on it below. */
   .card-link.ink { color: var(--text); display: inline-flex; align-items: center; gap: 2px; font-weight: 600; }
   .tl-item { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-top: 10px; background: var(--panel); }
@@ -8571,6 +8620,13 @@
   </div>
   <div class="sheet-scrim hidden" id="timelineScrim">
     <div class="partner-sheet" id="timelineSheet"></div>
+  </div>
+  <!-- "See all" on the week card opens this: the whole month, same tiles as
+       the week grid at a calendar's density. Its own scrim, built on the same
+       .partner-sheet shell as the timeline it replaced the button's target
+       on, so the swipe-to-dismiss and scroll-lock layer both apply for free. -->
+  <div class="sheet-scrim hidden" id="monthScrim">
+    <div class="partner-sheet" id="monthSheet"></div>
   </div>
   <div class="sheet-scrim hidden" id="cropScrim">
     <div class="partner-sheet" id="cropSheet"></div>
@@ -14183,7 +14239,7 @@ function showApp() {
   });
   $("deleteConfirmBtn").addEventListener("click", deleteMyAccount);
 
-  $("timelineAllBtn").addEventListener("click", openTimelineSheet);
+  $("timelineAllBtn").addEventListener("click", openMonthSheet);
   /* With nobody on the other side, the encouragement card IS the invite. It
      is the one piece of furniture on Home that exists purely to say "keep
      going together", so with no together it should offer to make one. */
@@ -14356,7 +14412,7 @@ async function reconcileNativeSurfaces() {
 /* One place that guarantees the nav is reachable. */
 function closeAllOverlays() {
   document.body.classList.remove("session-open");
-  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "actDetailScrim", "allWorkoutsScrim", "timelineScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "swapDayScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
+  ["popScrim", "daySheetScrim", "partnerSheetScrim", "recapScrim", "actDetailScrim", "allWorkoutsScrim", "timelineScrim", "monthScrim", "liveScrim", "clipRecScrim", "clipViewScrim", "cbPickScrim", "nextWorkoutScrim", "swapScrim", "swapDayScrim", "liftsScrim", "reportScrim", "measureScrim", "cardioScrim", "csnScrim"]
     .forEach((id) => $(id)?.classList.add("hidden"));
   stopGenTicker();
   $("genScrim")?.classList.add("hidden");
@@ -17670,12 +17726,13 @@ function cachedProofUrl(path) {
   return hit && typeof hit === "object" && hit.at + PROOF_URL_TTL > Date.now() ? hit.url : null;
 }
 
-/* One person's dot for one day. A filled dot with a tick means they trained;
-   rest days and weigh-ins still open, because they are days you can correct. */
-function dotHTML(name, email, date, cls) {
+/* What one person's day carries: a photo when there is one, else the tick,
+   rest or weigh-in it stands in for. Split out of dotHTML so the month grid
+   below can draw the same states inside a bigger cell (a day number, both
+   people's outcome) without re-deriving what "trained" or "rest" means a
+   second time. */
+function dayMarkHTML(name, email, date) {
   const e = entryOn(name, date);
-  const who = `data-day="${date}" data-who="${escapeHtml(email || "")}"`;
-  const label = `aria-label="${escapeHtml(name)}, ${relDayLabel(date)}"`;
   if (e?.gym) {
     /* Signing a proof link is a network round trip, and a paired week has up
        to fourteen of them. Awaiting them held the entire grid behind the
@@ -17688,10 +17745,22 @@ function dotHTML(name, email, date, cls) {
     const url = cachedProofUrl(e.proof_path);
     const pending = e.proof_path && !url ? ` data-proof="${escapeHtml(e.proof_path)}"` : "";
     const inner = url ? `<img src="${url}" alt="" loading="lazy" />` : icon("check", 16);
-    return `<button type="button" class="dot on ${cls}" ${who} ${label}${pending}>${inner}</button>`;
+    return { cls: "on", pending, inner };
   }
-  if (e?.rest_day) return `<button type="button" class="dot rest" ${who} ${label}>rest</button>`;
-  if (e?.weight != null) return `<button type="button" class="dot wt" ${who} ${label}>${escapeHtml(String(e.weight))}</button>`;
+  if (e?.rest_day) return { cls: "rest", pending: "", inner: "rest" };
+  if (e?.weight != null) return { cls: "wt", pending: "", inner: escapeHtml(String(e.weight)) };
+  return { cls: "", pending: "", inner: "" };
+}
+
+/* One person's dot for one day. A filled dot with a tick means they trained;
+   rest days and weigh-ins still open, because they are days you can correct. */
+function dotHTML(name, email, date, cls) {
+  const who = `data-day="${date}" data-who="${escapeHtml(email || "")}"`;
+  const label = `aria-label="${escapeHtml(name)}, ${relDayLabel(date)}"`;
+  const m = dayMarkHTML(name, email, date);
+  if (m.cls === "on") return `<button type="button" class="dot on ${cls}" ${who} ${label}${m.pending}>${m.inner}</button>`;
+  if (m.cls === "rest") return `<button type="button" class="dot rest" ${who} ${label}>${m.inner}</button>`;
+  if (m.cls === "wt") return `<button type="button" class="dot wt" ${who} ${label}>${m.inner}</button>`;
   /* An empty day used to be the one tile you could not tap, which is exactly
      the day you want to open: to call it a rest day, or to add a weigh-in you
      forgot. Your own past days open; a day that has not happened cannot be
@@ -17904,6 +17973,137 @@ function fillWeekProofs(grid) {
     }).catch((e) => console.warn("could not sign a week proof photo", e));
   }
 }
+
+/* ---- Home: the month, in pictures ----
+   Mo: "when I press see all let me see the whole month, with the pics as
+   proof and I can click it to see the workout. same concept as the week but
+   now its a calendar view."
+
+   Same concept, not the same tile. A week tile is ~46px and holds ONE photo
+   because it is alone in its own row; a month is up to 42 of those cells at
+   once and two full photos do not fit side by side at that size, they turn
+   into a smear nobody can read. So a cell leads with ONE person's mark, mine
+   if I logged anything that day, else theirs, and carries the other person's
+   outcome as a small pip in the corner instead of a second photo. The split
+   nobody could see (who rested, who weighed in) is one tap away in the same
+   day sheet the week grid already opens.
+
+   This is also why it does not reach for the workout tab's calendarInnerHTML:
+   that grid answers "trained, planned or rest" from dayState() for the
+   planner. This one answers "what did we each actually do" from the same
+   entryOn()/dayMarkHTML() the week reads, and the two are deliberately kept
+   apart so a change to one day's meaning cannot quietly drift the other. */
+let HOME_MONTH_OFFSET = 0;   // 0 is this month; the sheet always opens on it
+
+/* The 42 (or 35) cells of one month, Monday first. Pure date math, not a day's
+   state, so this stays a few lines rather than pulling in the planner's
+   dayState()/plansOnDate() for numbers it would then throw away. */
+function homeMonthDates(offset) {
+  const today = new Date(todayStr() + "T00:00:00");
+  const first = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+  const start = new Date(first);
+  start.setDate(start.getDate() - ((first.getDay() + 6) % 7));
+  const out = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    out.push({ date: isoDate(d), dayNum: d.getDate(), thisMonth: d.getMonth() === first.getMonth() });
+  }
+  // A trailing week made entirely of next month is padding nobody needs.
+  return out.slice(0, out.slice(35).every((x) => !x.thisMonth) ? 35 : 42);
+}
+
+/* One cell: the day number, the leading person's mark, and (paired) a pip per
+   person so a day you skipped but your partner trained still shows THEIR
+   proof rather than an empty square next to a full one. Every cell opens the
+   same day sheet a week tile does, regardless of whose mark is showing or
+   whether anything happened yet: this is a calendar, not a per-person dot, so
+   unlike dotHTML nothing here is left untappable. */
+function monthDayCellHTML(date, dayNum, thisMonth) {
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const loggedSomething = (e) => !!(e?.gym || e?.rest_day || e?.weight != null);
+  const mineE = entryOn(ME, date);
+  const theirE = partner ? entryOn(partner, date) : null;
+  const leadMine = !partner || loggedSomething(mineE) || !loggedSomething(theirE);
+  const mark = leadMine ? dayMarkHTML(ME, MY_EMAIL, date) : dayMarkHTML(partner, PARTNER_EMAIL, date);
+  const isToday = date === todayStr();
+  const cls = ["mon-day", mark.cls, isToday ? "today" : "", thisMonth ? "" : "out"]
+    .filter(Boolean).join(" ");
+  const pips = partner ? `<span class="mon-pips">
+      <i class="mon-pip me${mineE?.gym ? " on" : ""}"></i>
+      <i class="mon-pip them${theirE?.gym ? " on" : ""}"></i>
+    </span>` : "";
+  return `<button type="button" class="${cls}" data-day="${date}"${mark.pending}
+    aria-label="${escapeHtml(relDayLabel(date))}">
+    <span class="mon-num">${dayNum}</span>
+    ${mark.inner}
+    ${pips}
+  </button>`;
+}
+
+function homeMonthLegendHTML() {
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  return `<span><i class="me"></i>${escapeHtml(ME)}</span>`
+    + (partner ? `<span><i class="them"></i>${escapeHtml(partner)}</span>` : "");
+}
+
+/* Prev/Next only ever runs from this month back to wherever real data starts:
+   the workout tab's month needs to reach a future week a plan was generated
+   into, this one is a photo gallery of what already happened, so there is
+   nothing forward of this month to show. That also means "today" is always
+   at most one Prev/Next step from wherever the sheet is, satisfied by the
+   Back button below rather than a second navigation scheme. */
+function renderMonthSheet() {
+  const oldest = Math.min(0, historyOldestOffset());
+  const atStart = HOME_MONTH_OFFSET <= oldest;
+  const atEnd = HOME_MONTH_OFFSET >= 0;
+  const lost = HOME_MONTH_OFFSET !== 0;
+  const days = homeMonthDates(HOME_MONTH_OFFSET);
+  const sheet = $("monthSheet");
+  sheet.innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="ps-head">
+      <div class="ps-label" style="margin:0">YOUR MONTH</div>
+      <button type="button" class="ds-x" id="monthClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="cal-head">
+      <button type="button" class="wk-nav-btn" id="monthPrev" ${atStart ? "disabled" : ""} aria-label="Previous month">${icon("chevronLeft", 16)}</button>
+      <span class="cal-title cal-title-static">${escapeHtml(historyMonthLabel(HOME_MONTH_OFFSET))}</span>
+      <button type="button" class="wk-nav-btn" id="monthNext" ${atEnd ? "disabled" : ""} aria-label="Next month">${icon("chevronRight", 16)}</button>
+    </div>
+    ${lost ? `<button type="button" class="cal-today" id="monthToday">Back to this month</button>` : ""}
+    <div class="wk-legend" id="monthLegend">${homeMonthLegendHTML()}</div>
+    <div class="cal-dows">${DAY_LETTERS.map((d) => `<span>${d}</span>`).join("")}</div>
+    <div class="cal-grid" id="monthGrid">${days.map((d) => monthDayCellHTML(d.date, d.dayNum, d.thisMonth)).join("")}</div>`;
+  $("monthClose").onclick = closeMonthSheet;
+  $("monthPrev").onclick = () => { HOME_MONTH_OFFSET = Math.max(oldest, HOME_MONTH_OFFSET - 1); renderMonthSheet(); };
+  $("monthNext").onclick = () => { HOME_MONTH_OFFSET = Math.min(0, HOME_MONTH_OFFSET + 1); renderMonthSheet(); };
+  if ($("monthToday")) $("monthToday").onclick = () => { HOME_MONTH_OFFSET = 0; renderMonthSheet(); };
+  const grid = $("monthGrid");
+  /* Tapping a day opens exactly what tapping a week tile opens: the same
+     handler, not a second one that would have to be kept in step with it.
+     This sheet closes first rather than leaving the day sheet to open
+     underneath it: both are .sheet-scrim, so with neither closed the later
+     one in the document (this one) paints over the other, and a day report
+     that opens invisible behind the calendar it was tapped from reads as the
+     tap doing nothing. */
+  grid.querySelectorAll("[data-day]").forEach((b) => {
+    b.onclick = () => {
+      closeMonthSheet();
+      if (PARTNER_EMAIL) openBothDaySheet(b.dataset.day); else openDaySheet(MY_EMAIL, b.dataset.day);
+    };
+  });
+  fillWeekProofs(grid);
+}
+
+function openMonthSheet() {
+  HOME_MONTH_OFFSET = 0;   // always opens on today's month, never wherever it was left
+  renderMonthSheet();
+  $("monthScrim").classList.remove("hidden");
+  $("monthScrim").onclick = (ev) => { if (ev.target === $("monthScrim")) closeMonthSheet(); };
+}
+
+function closeMonthSheet() { $("monthScrim").classList.add("hidden"); }
 
 
 /* ---------- Live clips ----------
@@ -20208,6 +20408,10 @@ function renderHome(animate = false) {
   renderMoments();
   renderClipPill();
   renderWeekStrips(animate);
+  // Same reason the timeline sheet re-renders itself on a reload: a proof
+  // photo or a new entry landing while the month is open should not need the
+  // sheet closed and reopened to show up.
+  if (!$("monthScrim").classList.contains("hidden")) renderMonthSheet();
   renderRestDayPrompt();
   renderEncouragementBanner();
   // Last, so every card has settled whether it is showing before they stagger.
@@ -43949,6 +44153,7 @@ const A11Y_SHEETS = {
   partnerSheetScrim: "Partner",
   daySheetScrim: "Day",
   timelineScrim: "Timeline",
+  monthScrim: "Month",
   cropScrim: "Move and scale",
   swapScrim: "Swap exercise",
   measureScrim: "Log measurements",
