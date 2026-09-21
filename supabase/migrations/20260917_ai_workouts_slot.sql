@@ -51,7 +51,7 @@ begin
   join pg_class t on t.oid = c.conrelid
   where t.relname = 'ai_workouts'
     and c.contype = 'u'
-    and (select array_agg(a.attname order by a.attname)
+    and (select array_agg(a.attname::text order by a.attname)
          from unnest(c.conkey) k
          join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k)
         = array['email', 'entry_date']::text[];
