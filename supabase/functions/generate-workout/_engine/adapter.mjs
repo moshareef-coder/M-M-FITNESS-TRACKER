@@ -1088,6 +1088,13 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
          rather than identical, which is what a deterministic engine otherwise
          has to return. */
       avoid: Array.isArray(payload.avoid) ? payload.avoid : [],
+      /* What they said they HAVE, which is the half of the styles column that
+         did nothing until 2026-09-21. `mergeStyleLimits` above carries the
+         subtracting half and always did; ticking Lifting subtracts nothing, so
+         until now the tick was a question the app asked and then ignored, and
+         a gym member's week opened on push-ups. Null when nobody was asked,
+         and null is the pre-styles week. See plan.mjs, `preferLoadable`. */
+      declaredEquipment: styles.asked ? styles.equipmentDeclared : null,
     });
 
     step = "ageWarmup";
@@ -1334,6 +1341,11 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
           resistance: styles.resistance,
           honoured: stylesHonoured,
           equipmentMissing: styles.equipmentMissing,
+          /* And what the tick added, rather than only what it took away. A
+             screen that shows one without the other can say "you are working
+             without a barbell" and never say "your plan is built around the
+             rack you told us about". */
+          equipmentDeclared: styles.equipmentDeclared,
           cardioModes: styles.cardioModes,
           flowTrainings: styles.flowTrainings,
           /* One sentence, and it is the one that is true of this response.
