@@ -11384,13 +11384,19 @@ function renderGoalPage() {
   if (confirmBtn) confirmBtn.parentElement.insertBefore(targetRow, confirmBtn);
 }
 
-/* Two columns here are behind migrations that are written and not applied, so
-   right now every account is on a database without them and a write that
-   mentions one comes back PGRST204. Dropping the named field and writing the
-   rest is the only version of this that does not lose somebody's main goal over
-   a column that does not exist yet. It reports what it dropped rather than
-   swallowing it, because "saved" when half of it was not saved is the kind of
-   quiet lie this app does not tell. */
+/* A safety net for a column a database has not got yet, not a statement that
+   it has not got one. Checked against production on 2026-09-21: every column
+   in this list now exists there, so the first write lands and none of the
+   retry below runs. It stays because the retry costs nothing when it never
+   fires, and because an account on an older database would otherwise lose its
+   main goal over a column that does not exist yet.
+
+   Read it as stale once and it reads as "these never save", which cost an
+   agent a wrong diagnosis on 2026-09-21. The server's own answer decides,
+   never this list: a name only counts when PostgREST names it back.
+
+   It reports what it dropped rather than swallowing it, because "saved" when
+   half of it was not saved is the kind of quiet lie this app does not tell. */
 const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal"];
 
 async function upsertGoalFields(patch) {
@@ -20868,9 +20874,10 @@ function renderToneHero(on, profile, isPartner) {
   renderWeightTrend("toneTrend", name, profile, isPartner, true);
 
   /* Photos are never shared, so a partner's screen has no photos card rather
-     than an empty one. */
+     than an empty one, and they leave your own screen when you stop tracking
+     them: see the note on bulkPhotos. */
   const photos = $("tonePhotos");
-  const showPhotos = !isPartner && typeof renderComparePhotos === "function";
+  const showPhotos = !isPartner && isTracked("photos") && typeof renderComparePhotos === "function";
   photos.classList.toggle("hidden", !showPhotos);
   if (showPhotos) renderComparePhotos(photos, isPartner);
   else photos.innerHTML = "";
@@ -21453,9 +21460,13 @@ function renderBulkHero(on, profile, isPartner) {
      Weight chip above already draws "No readings yet" with nothing on file. */
   renderWeightTrend("bulkTrend", name, profile, isPartner, false);
 
-  /* The same pair Tone Up shows, same rules: yours only, no See all. */
+  /* The same pair Tone Up shows, same rules: yours only, no See all, and only
+     while Body photos is something they are still tracking. Mo, 2026-09-21:
+     "when I deselect something I want it deselected." The chip strip above is
+     the case he reported; this pair is the same rule one card down and was
+     ignoring it just as completely. */
   const photos = $("bulkPhotos");
-  const showPhotos = !isPartner && typeof renderComparePhotos === "function";
+  const showPhotos = !isPartner && isTracked("photos") && typeof renderComparePhotos === "function";
   photos.classList.toggle("hidden", !showPhotos);
   if (showPhotos) renderComparePhotos(photos, isPartner);
   else photos.innerHTML = "";
