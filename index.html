@@ -517,8 +517,10 @@
      than one of four. */
   .plan-ov { display: flex; align-items: center; gap: 14px; margin: 2px 0 16px; }
   .plan-ov-words { flex: 1; min-width: 0; }
-  .plan-ov-sub { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
-  .plan-ov-line { margin: 7px 0 0; font-size: 12.5px; font-weight: 500; color: var(--muted); line-height: 1.4; }
+  /* Was margin-top: 7px, spacing it off plan-ov-sub, the match subtext Mo
+     had removed on 2026-09-21. This line can be the first thing in the
+     column now, so it carries no top margin to answer to. */
+  .plan-ov-line { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--muted); line-height: 1.4; }
   /* The card places its arc on a grid; here it is a flex item on the right. */
   .plan-ov .wkt-arc { grid-area: auto; justify-self: auto; flex: none; width: 136px; height: 104px; }
   .plan-ov .wkt-arc-num b { font-size: 32px; }
@@ -4645,29 +4647,6 @@
   .moments:active { opacity: .7; }
 
   .pact-foot { margin-top: 12px; }
-  /* The three things you actually want to say, revealed in place. Wrapping
-     chips rather than a sheet: this is a reply, not a destination, and pushing
-     a whole surface over the screen to send three words is the friction the
-     reveal exists to remove. */
-  .pact-quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
-  /* The UA rule for [hidden] is display:none at attribute specificity, which a
-     class selector setting display outranks. Without this the reveal is open
-     from the moment the card renders and the button toggles nothing. */
-  .pact-quick[hidden] { display: none; }
-  .pq {
-    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
-    padding: 10px 13px; border-radius: 11px; min-height: 42px;
-    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    font: inherit; font-size: 13.5px; font-weight: 700; letter-spacing: -.01em;
-    animation: quipIn .26s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--d, 0ms);
-  }
-  .pq svg { color: var(--partner-ink); flex-shrink: 0; }
-  .pq.pq-own { color: var(--muted); font-weight: 600; }
-  .pq:active { filter: brightness(.92); }
-  .pq:disabled { opacity: .75; }
-  .pq.sent { background: color-mix(in srgb, var(--accent) 16%, var(--panel-2)); border-color: var(--accent); color: var(--accent-ink); }
-  .pq.sent svg { color: var(--accent-ink); }
-  @media (prefers-reduced-motion: reduce) { .pq { animation: none; } }
   .pact-act {
     width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
     padding: 13px 14px; border-radius: 13px; cursor: pointer;
@@ -17715,58 +17694,34 @@ function sharedDaysThisWeek() {
    between you", with "1 day you both showed up" under the grid. Momentum in the
    hero now says all three of those numbers, and the rule this app keeps is that
    a number gets printed once. What is left here is the one thing seven columns
-   of dots cannot do, which is reach the other person. */
-/* Mo: "Instead of opening a generic message box immediately, tapping it could
-   reveal 3 quick actions." Most days the whole message is one of three things,
-   and a blank textarea is a worse way to say any of them: it asks you to write
-   something good enough to be worth sending, and so you send nothing. The
-   composer is still one tap further in for the days you do have words. */
-function quickSends(partner) {
-  return [
-    { ico: "flame", label: `Hype ${partner} up`, msg: "Let's go. You have got this." },
-    { ico: "clock", label: "Training today?", msg: "You training today?" },
-    { ico: "heart", label: "Proud of you", msg: "Proud of you." },
-  ];
-}
+   of dots cannot do, which is reach the other person.
 
-async function sendQuick(btn, msg) {
-  btn.disabled = true;
-  const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: msg });
-  if (error) { toast("Couldn't send"); console.error(error); btn.disabled = false; return; }
-  /* It says Sent in the button that was pressed, not in a toast at the other
-     end of the screen away from where you were looking. */
-  btn.classList.add("sent");
-  btn.innerHTML = `${icon("check", 15)} Sent`;
-  setTimeout(renderPact, 1100);
-}
-
+   Mo, 2026-09-21: "when i click on my partner in the home page, instead of
+   send encouragement it should say Check Progress and it will take me to
+   their progress tab." The quick-send panel this used to expand into (three
+   canned messages plus Write your own, itself built off an earlier note of
+   his: "tapping it could reveal 3 quick actions") is gone with it: sending
+   something to her is still one tap away, from the streak row's own door onto
+   openPartnerSheet, so this is a second door repointed rather than the
+   feature's only one closing. Same navigation the header avatar's theirs-tap
+   uses, so there is one answer to "how do I see her progress", not two. */
 function renderPact() {
   const foot = $("pactFoot");
   if (!foot) return;
   if (!PARTNER_EMAIL) { foot.innerHTML = ""; return; }
 
   const partner = partnerName();
-  const sends = quickSends(partner);
   foot.innerHTML = `
-    <button type="button" class="pact-act" id="pactActBtn" aria-expanded="false" aria-controls="pactQuick">
+    <button type="button" class="pact-act" id="pactActBtn">
       <span class="pact-av">${escapeHtml(initials(partner))}</span>
-      Send ${escapeHtml(partner)} something
-    </button>
-    <div class="pact-quick" id="pactQuick" hidden>
-      ${sends.map((q, i) => `<button type="button" class="pq" style="--d:${i * 45}ms" data-send="${escapeHtml(q.msg)}">${icon(q.ico, 15)} ${escapeHtml(q.label)}</button>`).join("")}
-      <button type="button" class="pq pq-own" id="pactOwn" style="--d:135ms">Write your own</button>
-    </div>`;
+      Check ${escapeHtml(partner)}&rsquo;s progress
+    </button>`;
 
-  const quick = $("pactQuick");
   $("pactActBtn").onclick = () => {
-    const open = quick.hidden;
-    quick.hidden = !open;
-    $("pactActBtn").setAttribute("aria-expanded", String(open));
+    PROGRESS_VIEW = "partner";
+    PROGRESS_GOAL_LENS = null;
+    switchTab("progress");
   };
-  quick.querySelectorAll("[data-send]").forEach((b) => {
-    b.onclick = () => sendQuick(b, b.dataset.send);
-  });
-  $("pactOwn").onclick = () => openNoteComposer("congratulate");
 }
 
 /* Mo: "Add one tiny shared social moment below the week. Not a huge feed...
@@ -25363,6 +25318,12 @@ function todaySessionsHTML() {
   const list = todaySessions();
   if (!list.length) return "";
   const stateWord = { done: "Done", running: "Live", open: "Ready" };
+  /* The list only, now: what to add to the day moved to the very bottom of
+     the screen (addSessionFootHTML), off Mo's own read of it, 2026-09-21:
+     "put all the way at the bottom... remove back to the workout tab, we
+     already have a back button, there's no need to put that there." A card
+     announcing itself above the plan he opened the screen to look at was the
+     app talking about itself before it got to the point. */
   return `
     <section class="tsl">
       ${list.length > 1 ? `
@@ -25377,13 +25338,27 @@ function todaySessionsHTML() {
             <span class="tsl-txt"><b>${escapeHtml(sn.label)}</b><i>${escapeHtml(sn.detail)}</i></span>
             <span class="tsl-state">${sn.state === "done" ? icon("check", 14) : escapeHtml(stateWord[sn.state])}</span>
           </${sn.tap ? "button" : "div"}>`).join("")}
-      </div>` : ""}
-      <button type="button" class="tsl-add" id="tslAddBtn">${icon("plus", 15)} Add another session</button>
+      </div>
       ${/* Two sessions is not two days, and somebody looking at two rows under
             one heading is entitled to wonder. gymDaysInWeek counts distinct
             dates, so the ring cannot move twice for one Tuesday, and this is
             the app saying that rather than the reader having to trust it. */ ""}
-      ${list.length > 1 ? `<p class="tsl-note">${list.length} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
+      <p class="tsl-note">${list.length} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
+    </section>`;
+}
+
+/* The add-another door, moved to the foot of the screen rather than the head
+   of it: one function for both the day you are standing in and one you are
+   reviewing, since it is the same offer either way and the two used to be
+   two near-identical blocks that could drift. */
+function addSessionFootHTML(date, review) {
+  const count = review ? plansOnDate(date).length : todaySessions().length;
+  return `
+    <section class="tsl-foot">
+      ${review
+        ? `<button type="button" class="tsl-add" id="tslPlanAddBtn" data-add-date="${escapeHtml(date)}">${icon("plus", 15)} Add another activity</button>`
+        : `<button type="button" class="tsl-add" id="tslAddBtn">${icon("plus", 15)} Add another session</button>`}
+      ${count > 1 ? `<p class="tsl-note">${count} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
     </section>`;
 }
 
@@ -33014,9 +32989,15 @@ function renderChooseScreen() {
       <div class="wkt-next-grid${restAdvised ? " hid" : ""}">
         <div class="wkt-next-words">
           <h2>${escapeHtml(p.focus)}</h2>
-          ${hiredHere && p.match != null ? `<p class="wkt-next-sub">${escapeHtml(matchReading(p.match))}</p>` : ""}
+          ${/* Mo, 2026-09-21: "subtext is way way way too long... don't put
+                any subtext and if they click on the match they'll be able to
+                see it." The ring right below this IS that tap: it already
+                carries data-info="planMatchWhy" and opens the full reading,
+                so the sentence here was saying the short version of something
+                one tap away says in full. */ ""}
           ${/* What the reading would have said, for the one day it cannot be
-                read: how long and how hard, which is the whole of a run. */ ""}
+                read: how long and how hard, which is the whole of a run, and
+                a run has no ring to tap for it. */ ""}
           ${p.cardio ? `<p class="wkt-next-sub">${escapeHtml(cardioSaid(p.cardio))}</p>` : ""}
         </div>
         ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : p.match == null ? "" : `
@@ -33036,7 +33017,12 @@ function renderChooseScreen() {
             : tomorrowPlan
               ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
               : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
-          ${tomorrowPlan ? "" : `<button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>`}
+          ${/* Mo, 2026-09-21: "stack generate tomorrow's and plan my own...
+                to be like generate this week or plan the week yourself. It
+                should match." One solid primary action, one quiet line under
+                it, the same shape wkt-week-gen already uses below: not two
+                buttons of near-equal weight side by side. */ ""}
+          ${tomorrowPlan ? "" : `<button type="button" class="wkt-more" id="choosePlanBtn">or plan it yourself ${icon("chevronRight", 13)}</button>`}
           ${/* Ahead of the generate, not after it: the plan screen's own time
                 control (planTimeBtn) only exists once a plan does, and this is
                 the moment "how long have you got" actually matters, before
@@ -36706,38 +36692,55 @@ function openPreGenLengthSheet({ date, chosen, suggested, onPick }) {
    row), and a snapshot that lives as long as the app is open is the right
    length for the change of mind it exists for. */
 async function applySessionBudget(minutes) {
-  if (!TODAY_WORKOUT?.exercises?.length) return;
+  /* Whichever session is actually on screen, not always the day's first.
+     Hard-wired to TODAY_WORKOUT (slot 0) until 2026-09-21: a day could hold a
+     second session by then, and the estimate on it had nowhere honest to send
+     an adjustment, so the control was hidden there rather than shown and
+     wired to the wrong plan. Same lookup renderPlanPreview uses to decide
+     which plan it is even looking at. */
+  const targetSlot = PLAN_VIEW_SLOT || 0;
+  const target = TODAY_PLANS.find((w) => planSlot(w) === targetSlot) || TODAY_WORKOUT;
+  if (!target?.exercises?.length) return;
   /* Belt and braces against a caller that got its hands on this while a session
      is open. Mid-session is the third case and it is not this control. */
   if (sessionOpen()) return;
-  const date = TODAY_WORKOUT.entry_date || todayStr();
+  const date = target.entry_date || todayStr();
   /* The snapshot is the ORIGINAL session, not the previous one. Shorten twice
      and "back to" still means the plan the day started with, which is the thing
      somebody is actually trying to get back to; keeping the last step instead
-     would strand them one version away from it with nothing named on screen. */
+     would strand them one version away from it with nothing named on screen.
+     Keyed by slot as well as date now, so a one-off on the day's second
+     session cannot answer for its first. */
   const snapshot = {
     date,
+    slot: targetSlot,
     minutes,
-    from: (ONE_OFF_SESSION?.date === date && ONE_OFF_SESSION.from) || {
-      minutes: sessionEstimateMinutes(TODAY_WORKOUT.exercises, planMobility()),
-      focus: TODAY_WORKOUT.focus,
-      exercises: JSON.parse(JSON.stringify(TODAY_WORKOUT.exercises)),
-      mobility: TODAY_WORKOUT.mobility ? JSON.parse(JSON.stringify(TODAY_WORKOUT.mobility)) : null,
-      cardio: TODAY_WORKOUT.cardio ?? null,
+    from: (ONE_OFF_SESSION?.date === date && ONE_OFF_SESSION?.slot === targetSlot && ONE_OFF_SESSION.from) || {
+      minutes: sessionEstimateMinutes(target.exercises, planMobility(target)),
+      focus: target.focus,
+      exercises: JSON.parse(JSON.stringify(target.exercises)),
+      mobility: target.mobility ? JSON.parse(JSON.stringify(target.mobility)) : null,
+      cardio: target.cardio ?? null,
     },
   };
-  const keepFocus = TODAY_WORKOUT.focus;
+  const keepFocus = target.focus;
   ONE_OFF_SESSION = snapshot;
   /* A failed generate leaves the old plan exactly where it was, so there is
-     nothing to offer to put back. */
-  const ok = await generateWorkout(null, { sessionMinutes: minutes, keepFocus });
+     nothing to offer to put back. slot: targetSlot is what makes this a
+     replace rather than a third session: generateWorkout's own next-free-slot
+     search is for a NEW session, and this is the opposite of new. */
+  const ok = await generateWorkout(null, { sessionMinutes: minutes, keepFocus, slot: targetSlot });
   if (!ok) { if (ONE_OFF_SESSION === snapshot) ONE_OFF_SESSION = null; return; }
-  snapshot.made = planSignature(TODAY_WORKOUT?.exercises);
+  /* Re-read rather than trust `target`: generateWorkout wrote a new row, and
+     TODAY_WORKOUT is slot 0 by definition, which is the wrong object to read
+     back for slot 1's own after-picture. */
+  const after = TODAY_PLANS.find((w) => planSlot(w) === targetSlot) || TODAY_WORKOUT;
+  snapshot.made = planSignature(after?.exercises);
   /* What the answer did, in one line, kept with the snapshot so the card can
      say it for as long as the offer to go back is on screen. */
   snapshot.changed = budgetChangeLine(snapshot.from, {
-    exercises: TODAY_WORKOUT?.exercises,
-    minutes: sessionEstimateMinutes(TODAY_WORKOUT?.exercises, planMobility()),
+    exercises: after?.exercises,
+    minutes: sessionEstimateMinutes(after?.exercises, planMobility(after)),
   }, { restCompressed: LAST_GEN_SESSION?.restCompressed === true });
   /* The reveal is already on screen by now and the card behind it was rendered
      before `made` was stamped, so it is redrawn with the offer on it. */
@@ -36921,12 +36924,6 @@ function plannedDayListHTML(date, showing) {
           </button>`;
         }).join("")}
       </div>` : ""}
-      <button type="button" class="tsl-add" id="tslPlanAddBtn" data-add-date="${escapeHtml(date)}">${icon("plus", 15)} Add another activity</button>
-      ${/* The same sentence today's list makes, for the same reason: somebody
-            looking at two rows under one date is entitled to wonder whether
-            the week is about to count them twice. gymDaysInWeek counts
-            distinct dates, so it cannot. */ ""}
-      ${rows.length > 1 ? `<p class="tsl-note">${rows.length} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
     </section>`;
 }
 
@@ -37035,10 +37032,18 @@ function renderPlanPreview(opts) {
      SESSION would strand the sets already done against exercises that are no
      longer on the plan. Gone for a coached client for the same reason
      Regenerate is: their coach writes this. And gone while reviewing another
-     day, where "how long have you got" is a question about a day nobody is
-     standing in yet. */
+     DAY, where "how long have you got" is a question about a day nobody is
+     standing in yet.
+
+     A second session opened today (review:true, but plan.entry_date is still
+     today) is not that: Mo, 2026-09-21, generated a second activity and could
+     not find the time control that the first one has. `review` alone used to
+     gate this and conflated "a different day" with "a different slot", so the
+     tool vanished from today's own second session along with the days it was
+     meant to hide from. reviewingOtherDay is the narrower question. */
+  const reviewingOtherDay = review && (plan.entry_date || todayStr()) !== todayStr();
   const estMin = sessionEstimateMinutes(exercises, planMobility(plan));
-  const oneOff = (!review && ONE_OFF_SESSION?.date === (plan.entry_date || todayStr())
+  const oneOff = (!reviewingOtherDay && ONE_OFF_SESSION?.date === (plan.entry_date || todayStr())
     && ONE_OFF_SESSION.made === planSignature(exercises)) ? ONE_OFF_SESSION : null;
   /* The number against the number they gave. The estimate costs the real
      seconds and the engine allows itself some slack over the budget and calls
@@ -37050,7 +37055,7 @@ function renderPlanPreview(opts) {
   const askedMin = oneOff?.minutes ?? (Number(MY_PROFILE?.session_minutes) || null);
   const overMin = estMin && askedMin ? estMin - askedMin : 0;
   const overLine = overMin > 2 ? `${overMin} min over the ${askedMin} you asked for. Tap the time to fit it.` : "";
-  const timeRow = (review || started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
+  const timeRow = (reviewingOtherDay || started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
     <div class="plan-time-row">
       <button type="button" class="plan-time" id="planTimeBtn" aria-label="About ${estMin} minutes.${overLine ? " " + overLine : ""} Change how long you have today.">
         ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
@@ -37166,7 +37171,9 @@ function renderPlanPreview(opts) {
   const overview = ovP?.real ? `
     <div class="plan-ov">
       <div class="plan-ov-words">
-        <p class="plan-ov-sub">${escapeHtml(matchReading(ovP.match))}</p>
+        ${/* Mo, 2026-09-21: no subtext under a match reading anywhere; the
+              ring beside this, data-info="planMatchWhy", is the tap that
+              already says it in full. */ ""}
         ${(ovP.muscles || []).length
           ? `<p class="plan-ov-line">Trains ${escapeHtml(ovP.muscles.map((m) => m.name.toLowerCase()).join(", "))}</p>`
           : ""}
@@ -37255,6 +37262,7 @@ function renderPlanPreview(opts) {
          <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>
          ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>
            <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`}
+    ${addSessionFootHTML(date || todayStr(), review)}
     ${delToday}`;
   wireTodaySessions($("workoutContent"));
   /* The other session on a day that has not arrived. Straight back through this
