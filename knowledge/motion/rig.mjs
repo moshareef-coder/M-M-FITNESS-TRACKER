@@ -1045,6 +1045,29 @@ function drawHead(ctx, S, C, fill) {
     }
     ctx.restore();
   }
+  // In profile there is no "along" a full mark can rotate onto: rotating the
+  // whole seven-rect shape toward wherever the head happens to be facing (an
+  // early attempt did exactly this) put half of it outside the head, because
+  // the mark's own width assumes it is seen face on. What a dumbbell actually
+  // looks like turned edge on is one end: a single housing plate and its
+  // pad, drawn upright rather than rotated, because a plate and a centred pad
+  // are left-right symmetric and have no "along" to align in the first
+  // place. Same units as MARK_DARK (housing: 147.27 x 375.30, r 47.51; pad:
+  // 62.95 x 186.46, r 31.47), just the one of each rather than the mirrored
+  // pair.
+  function drawMarkEye(ctx, center, scale, squash, dark, lime) {
+    ctx.save();
+    ctx.translate(center.x, center.y);
+    ctx.fillStyle = dark;
+    const hw = 147.27 * scale, hh = 375.30 * scale, hr = 47.51 * scale;
+    roundRect(ctx, -hw / 2, -hh / 2, hw, hh, hr);
+    ctx.fill();
+    ctx.fillStyle = lime;
+    const pw = 62.95 * scale, ph = 186.46 * scale * (squash ? 0.12 : 1), pr = 31.47 * scale;
+    roundRect(ctx, -pw / 2, -ph / 2, pw, ph, pr);
+    ctx.fill();
+    ctx.restore();
+  }
   // The face. Placed from the head's PROJECTED axes so it lands right in any
   // view: forward along the anterior axis (which foreshortens to nothing face
   // on and to full length side on), spread along the lateral axis (the other
@@ -1073,13 +1096,16 @@ function drawHead(ctx, S, C, fill) {
         //
         // "mark" is the same face with one part swapped: where the visor and
         // its two eyes went, the actual dumbbell mark goes instead (see
-        // drawMarkFace above). Everything else below, mouth, grille, chin
-        // light, ear disc, the tiny-size fallback, is shared and unchanged,
-        // because Mo's approved design in the film keeps buddy's mouth and
-        // only replaces the eyes. It only takes over face on: the mark does
-        // not foreshorten sensibly in profile the way a pair of eyes does, so
-        // side on (latLen < 0.28, the same test buddy already uses to wrap
-        // its own visor to the front of the head) this still draws buddy.
+        // drawMarkFace and drawMarkEye above). Everything else below, mouth,
+        // grille, chin light, ear disc, the tiny-size fallback, is shared and
+        // unchanged, because Mo's approved design in the film keeps buddy's
+        // mouth and only replaces the eyes. It draws differently on the two
+        // sides of latLen < 0.28 (the same test buddy already uses to wrap
+        // its own visor to the front of the head), not because one of them
+        // still draws buddy: the full seven-rect mark assumes a face-on view
+        // and does not have a rotation that makes it look right side on, so
+        // profile gets one plate, drawMarkEye, standing in for the one end of
+        // the dumbbell a profile view would actually show.
         const up = norm2(ax.y);
         const px = (ctx.getTransform ? ctx.getTransform().a : 2) * R;   // head radius in device pixels
         const big = px > 14;
@@ -1095,7 +1121,7 @@ function drawHead(ctx, S, C, fill) {
         const along = latLen < 0.28 ? scl(F, 0.9) : Lt;     // visor runs across the face, or along it side on
         const alongLen = latLen < 0.28 ? 0.9 : latLen;
         const a = add(vis, scl(along, halfW)), b = add(vis, scl(along, -halfW));
-        const useMark = FACE === "mark" && !sideOn;
+        const useMark = FACE === "mark";
         ctx.fillStyle = C.seam;
         // The mark has no visor plate behind it, the same way the real
         // artwork has open air between its own bar and end plates, so this
@@ -1114,7 +1140,15 @@ function drawHead(ctx, S, C, fill) {
         const eyeAt = [add(vis, scl(along, eyeSpread)), add(vis, scl(along, -eyeSpread))];
         const eyeH = R * 0.26, eyeW = R * 0.105;
         const mood = MOOD || "neutral";
-        if (useMark) {
+        if (useMark && sideOn) {
+          // One plate rather than the full mark rotated sideways: rotating
+          // the whole shape toward "along" put half of it past the head's
+          // silhouette, because the mark's own width assumes a face-on view.
+          // Scaled so its height matches what a single buddy eye occupies
+          // here (eyeH is the sideOn eye's own half-height), so the mark does
+          // not suddenly change size crossing the front/profile line.
+          drawMarkEye(ctx, vis, (eyeH * 2) / 375.30, blink || mood === "sleepy", C.seam, lime);
+        } else if (useMark) {
           // Only blink ports: happy/focused/surprised have no equivalent on
           // a fixed rounded-rect pad the way they do on a drawn eye, and
           // faking one would be guessing at a design Mo has not seen. Sleepy
