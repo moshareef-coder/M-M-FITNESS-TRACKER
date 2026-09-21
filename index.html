@@ -2932,6 +2932,27 @@
   /* The track sits on the sheet, not on a panel, so it takes the sheet's key
      tint rather than --panel, which is invisible on the near-black. */
   .stretch-hold .rest-track { height: 3px; background: var(--sess-key); }
+  /* The prep. Bigger than any other number in the app and in the accent, because
+     it is counted from a mat at arm's length rather than read off a screen in
+     your hand, and because it has to be obvious that the hold has not started
+     yet. Tabular so ten does not shove the digits about on its way to nine. */
+  .stretch-hold.prep .stretch-clock { font-size: 88px; color: var(--accent-ink); margin: 4px 0 12px; }
+  /* Three ways out of a mistimed move, under the hold and above Finish. A mat is
+     where you tap the wrong thing, so none of these costs anything: Back is the
+     move before, the middle one is whatever this moment needs, Skip moves on.
+     Equal thirds because they are equals, and quiet next to the one primary. */
+  .move-row { display: flex; gap: 8px; margin-top: 14px; }
+  .move-btn {
+    flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 3px;
+    padding: 0 6px; border-radius: 12px; border: 1px solid var(--sess-key); background: none;
+    font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: -.01em;
+    color: var(--sess-ink); cursor: pointer; transition: transform .1s ease, opacity .12s ease;
+  }
+  .move-btn.key { background: var(--sess-key); }
+  .move-btn:active { transform: scale(.97); opacity: .72; }
+  .move-btn[disabled] { opacity: .32; }
+  .move-btn svg { width: 18px; height: 18px; flex: 0 0 18px; }
+  @media (prefers-reduced-motion: reduce) { .move-btn:active { transform: none; } }
   /* The seconds, the side and what the move is for, under the name. The lift
      puts nothing here because its numbers live in the dials; a stretch has no
      dials, and "40s, left side, for your squats" is the whole brief. */
@@ -22197,20 +22218,112 @@ function cardioEffortLine(card) {
 /* Which move the clock is on. Derived from elapsed rather than tracked with its
    own timer, so it survives a backgrounded tab for the same reason the clock
    does: there is only ever one source of truth and it is the timestamps. */
+/* Mo: "always remember to give the 10 second prep time before every exercise."
+   On a mat that is not a nicety: a pose that starts the instant the last one
+   ended is a pose you spend the first ten seconds of anyway. So every move owns
+   two phases and the prep is part of its slot on the clock rather than a second
+   timer running beside it, which is what keeps the whole screen derived from
+   elapsed milliseconds and keeps it right after a backgrounded tab or a reload.
+
+   A run gets none of this. There is no plan behind one, so csnMoveAt hands back
+   null and nothing below ever runs: a run is one effort held for half an hour
+   and there is no shape to get into. */
+const CSN_PREP_SEC = 10;
+
+/* A move's whole slot: the prep, then the hold, twice over for a per-side one. */
+function csnMoveCost(m) {
+  return CSN_PREP_SEC + m.seconds * (m.perSide ? CSN_PER_SIDE : 1);
+}
+
+/* Where move n begins, in plan time. What every jump is expressed in. */
+function csnMoveStartMs(n) {
+  const moves = CARDIO_SES?.plan?.moves || [];
+  let acc = 0;
+  for (let i = 0; i < Math.min(n, moves.length); i++) acc += csnMoveCost(moves[i]);
+  return acc * 1000;
+}
+
 function csnMoveAt(ms) {
   const plan = CARDIO_SES?.plan;
   if (!plan?.moves?.length) return null;
-  const sec = ms / 1000;
+  /* `seek` is the gap between how long this person has been training and where
+     the class has got to. See csnSeekTo: skipping a pose may not shorten the
+     session, because the session is what actually happened. */
+  const sec = Math.max(0, ms + (CARDIO_SES.seek || 0)) / 1000;
   let acc = 0;
   for (let i = 0; i < plan.moves.length; i++) {
     const m = plan.moves[i];
-    const cost = m.seconds * (m.perSide ? 2 : 1);
-    if (sec < acc + cost) {
-      return { i, move: m, left: Math.max(0, Math.ceil(acc + cost - sec)), next: plan.moves[i + 1] || null };
+    const hold = m.seconds * (m.perSide ? CSN_PER_SIDE : 1);
+    const next = plan.moves[i + 1] || null;
+    if (sec < acc + CSN_PREP_SEC) {
+      return { i, move: m, next, phase: "prep", cost: CSN_PREP_SEC, left: Math.max(0, Math.ceil(acc + CSN_PREP_SEC - sec)) };
     }
-    acc += cost;
+    if (sec < acc + CSN_PREP_SEC + hold) {
+      return { i, move: m, next, phase: "hold", cost: hold, left: Math.max(0, Math.ceil(acc + CSN_PREP_SEC + hold - sec)) };
+    }
+    acc += CSN_PREP_SEC + hold;
   }
-  return { i: plan.moves.length, move: null, left: 0, next: null, done: true };
+  return { i: plan.moves.length, move: null, next: null, phase: "done", cost: 0, left: 0, done: true };
+}
+
+/* ---- Going back, restarting, skipping: the class as something you can steer ----
+
+   Mo: "you can always go back and restart that exercise. be understanding that
+   these mistakes can happen, in real human time." Nothing here is destructive
+   and nothing here is a second source of truth.
+
+   The top clock is how long this person has been training, and it is the number
+   that gets saved. It may never be rewound to move the class along, so `seek`
+   carries the difference instead: the session time keeps counting what really
+   happened while the choreography is moved to wherever they asked for. It rides
+   on CARDIO_SES so a reload comes back on the same pose rather than at the top
+   of the class. */
+function csnSeekTo(planMs) {
+  if (!CARDIO_SES) return;
+  CARDIO_SES.seek = planMs - csnElapsedMs();
+  CSN_BEEP_AT = null;                 // a phase you jumped into counts itself in from scratch
+  csnSave();
+  renderCardioStage();
+}
+
+/* Any move, in either direction, always landing on its prep: a pose you jumped
+   to has not been got into yet, and one you came back to is being taken from
+   the top. `moves.length` is the end of the sequence, which is what Skip on the
+   last move means. */
+function csnGoToMove(n) {
+  const moves = CARDIO_SES?.plan?.moves || [];
+  if (!moves.length) return;
+  buzz(12);
+  csnSeekTo(csnMoveStartMs(Math.max(0, Math.min(n, moves.length))));
+}
+
+/* Already in the shape. Drops the rest of the prep and starts the hold. */
+function csnStartMoveNow() {
+  const at = csnMoveAt(csnElapsedMs());
+  if (!at || at.done) return;
+  buzz(12);
+  csnSeekTo(csnMoveStartMs(at.i) + CSN_PREP_SEC * 1000);
+}
+
+/* A prep is a count of seconds so it is drawn as one: a bare numeral, because
+   from a mat with the phone on the floor "7" reads and "00:07" does not. */
+function csnPhaseClock(at) {
+  if (!at || at.done) return csnClock(0);
+  return at.phase === "prep" ? String(at.left) : csnClock((at.left || 0) * 1000);
+}
+
+/* The last three seconds of a prep, out loud, because the phone is on the floor
+   and the countdown that matters is the one you can hear. Three quiet low ticks
+   and then the ring this app already uses for "go, you are not looking at me".
+   Keyed on the exact second so the half-second painter cannot ring one twice,
+   and silent on a muted phone because sfx already asks. */
+let CSN_BEEP_AT = null;
+function csnCountIn(at) {
+  if (!at || at.phase !== "prep" || !CARDIO_SES?.since) return;
+  const k = `${at.i}-${at.left}`;
+  if (k === CSN_BEEP_AT) return;
+  CSN_BEEP_AT = k;
+  if (at.left <= 3 && at.left >= 1) { sfx.play("restStart"); buzz(10); }
 }
 
 /* How far through the whole session, as a fraction, for the one continuous
@@ -22240,10 +22353,18 @@ function paintActivityLive() {
   const plan = CARDIO_SES?.plan;
   if (plan) {
     const at = csnMoveAt(ms);
-    const key = at?.done ? "done" : at?.i;
-    if (key !== CSN_LIVE_AT) { renderCardioStage(); return false; }
-    const cost = at?.move ? at.move.seconds * (at.move.perSide ? CSN_PER_SIDE : 1) : 0;
-    if (big) big.textContent = csnClock((at?.left || 0) * 1000);
+    const key = at?.done ? "done" : `${at.i}-${at.phase}`;
+    if (key !== CSN_LIVE_AT) {
+      /* The prep handing over to the hold, rung rather than only drawn. It is
+         the one instruction on this screen nobody is looking at. Only when the
+         clock rolled over on its own: a tap on Start now already answered. */
+      if (at?.phase === "hold" && CSN_LIVE_AT === `${at.i}-prep`) { sfx.play("restEnd"); buzz([18, 60, 18]); }
+      renderCardioStage();
+      return false;
+    }
+    csnCountIn(at);
+    const cost = at?.cost || 0;
+    if (big) big.textContent = csnPhaseClock(at);
     if (fill) fill.style.width = cost ? `${Math.max(0, Math.min(100, ((cost - at.left) / cost) * 100)).toFixed(1)}%` : "0%";
   } else {
     if (big) big.textContent = csnClock(ms);
@@ -22434,9 +22555,12 @@ function renderActivityLive(a, stage) {
   const at = plan ? csnMoveAt(ms) : null;
   const done = !!(plan && at?.done);
   const move = at && !done ? at.move : null;
-  CSN_LIVE_AT = plan ? (done ? "done" : at.i) : null;
+  CSN_LIVE_AT = plan ? (done ? "done" : `${at.i}-${at.phase}`) : null;
+  /* The ten seconds before the hold, which is a different thing to be doing and
+     so a different thing for this screen to say. */
+  const prep = !!move && at.phase === "prep";
 
-  const moveCost = move ? move.seconds * (move.perSide ? CSN_PER_SIDE : 1) : 0;
+  const moveCost = move ? at.cost : 0;
   /* Mo: "I don't want you to say like tempo run or anything, just have it be
      run. Walk, cycling, stairs. I don't need easy spin, bike intervals,
      recovery." So a cardio session is titled by what he is doing and not by
@@ -22537,14 +22661,16 @@ function renderActivityLive(a, stage) {
         <!-- Where the lift keeps its weight and rep dials. There is nothing to
              log in a pose, so the same slot holds the number that IS the
              instruction: how long you are in it, and how far through. -->
-        <div class="stretch-hold">
+        <div class="stretch-hold${prep ? " prep" : ""}">
           <div class="sess-lastline">
-            <span class="last${paused ? " held" : ""}">${paused ? "Paused" : plan ? (done ? "Done" : `Hold${move?.perSide ? ", both sides" : ""}`) : "Elapsed"}</span>
+            <span class="last${paused ? " held" : prep ? " ask" : ""}">${paused ? "Paused" : plan ? (done ? "Done" : prep ? "Get into position" : `Hold${move?.perSide ? ", both sides" : ""}`) : "Elapsed"}</span>
             <span class="beat">${plan
-              ? (done ? "Nothing left" : at.next ? `Next: ${escapeHtml(at.next.name)}` : "Last one")
+              ? (done ? "Nothing left"
+                : prep ? `Then hold ${move.seconds}s${move.perSide ? " a side" : ""}`
+                  : at.next ? `Next: ${escapeHtml(at.next.name)}` : "Last one")
               : CARDIO_SES.minutes ? `of ${CARDIO_SES.minutes} min` : ""}</span>
           </div>
-          <div class="stretch-clock" id="csnBigClock" aria-live="off">${csnClock(plan ? (at?.left || 0) * 1000 : ms)}</div>
+          <div class="stretch-clock" id="csnBigClock" aria-live="off">${plan ? csnPhaseClock(at) : csnClock(ms)}</div>
           ${/* The track under the clock is the MOVE's, and only a class has
                 one. A run's progress is the single segment at the top of the
                 screen, and drawing the same fraction twice on one screen says
@@ -22553,6 +22679,17 @@ function renderActivityLive(a, stage) {
             moveCost ? Math.max(0, Math.min(100, ((moveCost - at.left) / moveCost) * 100)).toFixed(1) : "0"
           }%"></div></div>` : ""}
         </div>
+
+        ${/* Only a class has moves to steer. A run has one continuous effort and
+              nothing to go back to, so it keeps the screen it always had. */ ""}
+        ${plan && at ? `<div class="move-row">
+          <button type="button" class="move-btn" id="csnBack"${at.i === 0 ? " disabled" : ""}
+            aria-label="Back to the move before this one">${icon("chevronLeft", 18)}<span>Back</span></button>
+          ${done ? "" : `<button type="button" class="move-btn key" id="csnMid"
+            aria-label="${prep ? "Start this move now" : "Take this move from the top"}">${prep ? "Start now" : "Restart"}</button>
+          <button type="button" class="move-btn" id="csnSkip"
+            aria-label="Skip to the next move">Skip${icon("chevronRight", 18)}</button>`}
+        </div>` : ""}
 
         <div class="sess-cta">
           <!-- Pause is in the top bar, where the lift keeps it, so the one
@@ -22565,13 +22702,13 @@ function renderActivityLive(a, stage) {
         ${remaining.length ? `<div class="upnext">
           <div class="upnext-label">Up next</div>
           <div class="upnext-rail">
-            ${remaining.map(({ m }) => `<div class="upnext-card">
+            ${remaining.map(({ m, n }) => `<button type="button" class="upnext-card" data-jump-move="${n}">
               <span class="upnext-fig" data-fig="${escapeHtml(m.name || "")}" data-fig-static></span>
               <span class="upnext-text">
                 <span class="upnext-name">${escapeHtml(m.name || "")}</span>
                 <span class="upnext-meta">${m.seconds}s${m.perSide ? " a side" : ""}</span>
               </span>
-            </div>`).join("")}
+            </button>`).join("")}
           </div>
         </div>` : ""}
       </div>
@@ -22587,6 +22724,25 @@ function renderActivityLive(a, stage) {
     csnSave(); renderCardioStage();
   };
   $("csnEnd").onclick = () => endActivityNow({ overlay: true });
+  /* Steering the class. Back is the move before this one and it is the whole of
+     "undo": a jump made from the rail is walked back the same way, one move at a
+     time, because one rule somebody can predict beats a special case for the
+     last thing they happened to tap. From the finished sequence it steps back
+     into the last move, which is the way out of ending the class by accident. */
+  if (plan && at) {
+    const back = $("csnBack");
+    if (back && !back.disabled) back.onclick = () => csnGoToMove(at.i - 1);
+    if (!done) {
+      $("csnMid").onclick = () => (prep ? csnStartMoveNow() : csnGoToMove(at.i));
+      $("csnSkip").onclick = () => csnGoToMove(at.i + 1);
+    }
+    /* Tapping a card goes straight to that move, which is what tapping one does
+       on the lift screen and in the stretch block. Skipping the pose you are IN
+       is the Skip button above; the rail is for going somewhere further down. */
+    stage.querySelectorAll("[data-jump-move]").forEach((b) => {
+      b.onclick = () => csnGoToMove(parseInt(b.dataset.jumpMove, 10));
+    });
+  }
   /* The sheet's own handle and drag, the lift's exact one, told which nodes to
      work on: this screen cannot use the ids because a paused lifting session
      may still be holding its own #sessSheet in the document. */
