@@ -643,24 +643,6 @@
   .rcv-move-t { min-width: 0; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rcv-move-t span { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
 
-  /* The goal, and the one or two numbers it turns on. Deliberately smaller
-     than the figures in the cards below: this card points at them, it does not
-     say them again in the same size and start an argument about which is the
-     real one. They wrap at 390 rather than shrink. */
-  .rcv-goal-nums { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 11px; }
-  .rcv-goal-num {
-    display: flex; align-items: baseline; gap: 5px; min-width: 0;
-    background: var(--panel); border-radius: 11px; padding: 7px 10px;
-  }
-  .rcv-goal-num b {
-    font-family: var(--font-display); font-weight: 800; font-size: 17px; line-height: 1;
-    letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums;
-  }
-  .rcv-goal-num i { font-style: normal; font-size: 11.5px; font-weight: 600; color: var(--muted); }
-  /* His voice, so it is the text colour and not the muted grey the footnotes
-     use: these two lines are the reason the card exists. */
-  .rcv-goal-line { margin: 0; font-size: 13px; color: var(--text); line-height: 1.45; }
-  .rcv-goal-line + .rcv-goal-line { margin-top: 7px; }
 
   /* The honest reading of the week: one row per true thing, no bars. */
   .rcv-week { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -35228,171 +35210,6 @@ function listWords(words) {
   return `${list.slice(0, -1).join(", ")} and ${list[list.length - 1]}`;
 }
 
-/* ---- The goal, said at the top ----
-
-   Mo, 2026-09-18: "Showcase the goal in the recovery section. In order for you
-   to reach this you need to do this, if it's weight or etc."
-
-   So the first card under his line names the goal this account is actually on
-   and says the one thing recovery has to do with reaching it. Per goal,
-   because "recovery matters" is true of all seven and useful for none of
-   them: a cut turns on calories and protein, a strength goal turns on sleep
-   and the day off, and somebody who wants to move better needs the block
-   below this and nothing else on the screen.
-
-   Every number is handed in, never worked out again here. `fuel` is the same
-   object the Eat and Drink cards print, `inARow` is the same count the sleep
-   card's week rows read, and the stretch minutes are written in by the block
-   itself once the engine answers. Two numbers for the same thing on one
-   screen is how an app loses the argument about whether either is true.
-
-   Nothing here claims a result. Every line says what the number supports,
-   which is the only thing the maths underneath can stand behind. */
-function recoveryGoalCard({ fuel, inARow, restDue, resting }) {
-  const tile = recoveryGoalTile();
-
-  /* Setup owns the body stats and the goal page owns the goal, so a card that
-     cannot fill a number points at whichever screen takes the answer. */
-  const statsLink = `<button type="button" class="wkt-btn-soft sm" data-rcv-setup="stats">Take me where I can tell you</button>`;
-  const goalLink = `<button type="button" class="wkt-btn-soft sm" data-rcv-setup="goal">Pick my goal</button>`;
-
-  /* Null is a number this profile cannot support yet, and it becomes the ask
-     at the bottom of the card rather than a blank or a guess. */
-  const NUM = {
-    calories: fuel.calories ? { v: fuel.calories.toLocaleString(), u: "cal a day" } : null,
-    protein: fuel.protein ? { v: fuel.protein, u: "g protein" } : null,
-    water: fuel.water ? { v: fuel.water, u: "oz of water" } : null,
-    sleep: { v: SLEEP_RANGE, u: "hrs sleep" },
-    inARow: { v: inARow, u: inARow === 1 ? "day in a row" : "days in a row" },
-    /* Written in by the holds once they land, because the picker is a lazy
-       import and this card is drawn before it answers. It opens on the floor
-       every block on this screen is built to (RECOVERY_STRETCH_SECONDS) and on
-       "a day", which is true whatever lands: five minutes daily is the whole
-       of Mo's note on this goal. When a block does land, the number and the
-       word both change to it, off the same arithmetic the button under the
-       holds prints. A day the robot offers yoga instead never has a block, so
-       it keeps the daily floor rather than quoting a length nothing measured. */
-    stretch: { v: `<span id="rcvGoalMin">${Math.round(RECOVERY_STRETCH_SECONDS / 60)}</span>`, u: `<span id="rcvGoalMinUnit">min a day</span>` },
-  };
-
-  /* The day off reading, in the same words the sleep card's week rows use and
-     off the same count, so the top of the screen and the bottom of it cannot
-     disagree about whether a rest day is owed. */
-  const dayOffLine = restDue
-    ? `That is ${inARow} days in a row. Take the day off on purpose and it costs you nothing.`
-    : resting
-      ? "Today is a rest day, and the rest day is the part that does the work."
-      : inARow > 0
-        ? `${inARow} day${inARow === 1 ? "" : "s"} in a row so far. I will tell you when a day off is due.`
-        : "Nothing logged today, so tonight is the whole job.";
-
-  const showUpLine = inARow > 0
-    ? `${inARow} day${inARow === 1 ? "" : "s"} in a row. That is the thing that works, and it is already happening.`
-    : resting
-      ? "Today is a rest day, and turning up to a rest day still counts."
-      : "Nothing logged today. One session starts the count.";
-
-  const PER_GOAL = {
-    "lose-weight": {
-      nums: [NUM.calories, NUM.protein],
-      lines: [
-        "Weight comes off when you eat under what you burn. That is the whole job, and it happens here, not in the gym.",
-        "Keep the protein high while you do it, so what comes off is fat and the muscle you are training for stays on.",
-      ],
-    },
-    /* The calorie number on this goal is maintenance, because the goal tile
-       claims "flat" and estimateGoalTimeline is never asked for a direction.
-       So the line says maintenance. Telling somebody to eat under what they
-       burn while the card below them prints what they burn is the screen
-       arguing with itself, and the number is the part that is checkable. */
-    "tone-lean-abs": {
-      nums: [NUM.calories, NUM.protein],
-      lines: [
-        "Same weight, different shape. Eat about what you burn and expect the scale to sit still, because it is going to.",
-        "Protein high every day is what decides which one you lose. Keep it there and what comes off is fat.",
-      ],
-    },
-    "build-muscle": {
-      nums: [NUM.protein, NUM.sleep],
-      lines: [
-        "Muscle is built between sessions, not during them. The session is the ask. This screen is the answer.",
-        "Hit the protein every day and sleep like it is part of the plan, because it is.",
-      ],
-    },
-    "get-stronger": {
-      nums: [NUM.sleep, NUM.inARow],
-      lines: [
-        "Strength is recovery. A tired lift is a weaker lift, and a weaker lift teaches your body nothing.",
-        dayOffLine,
-      ],
-    },
-    "build-endurance": {
-      nums: [NUM.water, NUM.inARow],
-      lines: [
-        "Easy days are the training. The engine gets built on the days that do not hurt.",
-        `Drink your number and keep the easy days easy. ${dayOffLine}`,
-      ],
-    },
-    "move-better": {
-      nums: [NUM.stretch],
-      lines: [
-        "Little and often beats one long one. A few minutes today does more than an hour on Sunday.",
-        "Your block is right under this one. Do it today, then do it again tomorrow.",
-      ],
-    },
-    consistent: {
-      nums: [NUM.inARow],
-      lines: [
-        "No goal picked yet, so the goal is showing up. Choose one when you are ready and I will aim the rest at it.",
-        showUpLine,
-      ],
-    },
-  };
-
-  /* No tile at all is a real account: goal_bubble is the modern field and the
-     legacy fallbacks in recoveryGoalTile can still come back empty. Saying so
-     and opening the goal page beats printing somebody else's goal. */
-  const plan = PER_GOAL[tile?.id] || {
-    nums: [NUM.inARow],
-    ask: "goal",
-    lines: [
-      "You have not told me a goal yet, so I will keep this simple. Turn up, eat, drink, sleep.",
-      showUpLine,
-    ],
-  };
-
-  /* Every value in a chip is a number this screen computed or a constant it
-     owns, so there is nothing here to escape, and NUM.stretch is markup on
-     purpose: the holds write into it. */
-  const chips = plan.nums.filter(Boolean)
-    .map((n) => `<span class="rcv-goal-num"><b>${n.v}</b><i>${n.u}</i></span>`).join("");
-  const short = plan.nums.some((n) => !n);
-
-  const ask = plan.ask === "goal"
-    ? `<div style="margin-top:12px;">${goalLink}</div>`
-    : short
-      ? (fuel.missing.length ? `
-        <p class="rcv-line" style="margin-top:10px;">${/* Not "about what you eat", which is the Eat card's line: the number
-                 missing here can just as easily be the water one. */ ""}I need ${escapeHtml(listWords(fuel.missing))} before I can put a number on that. Guessing it would be worse than asking you.</p>
-        <div style="margin-top:12px;">${statsLink}</div>`
-        : `${/* Nothing missing, the formula modules simply have not landed.
-                 renderRecoveryScreen schedules the repaint. */ ""}
-        <p class="rcv-line" style="margin-top:10px;">Working that one out. One moment.</p>`)
-      : "";
-
-  return `
-    <section class="rcv-card" id="rcvGoal">
-      <p class="wkt-eyebrow">Your goal</p>
-      <div class="rcv-head">
-        <span class="rcv-ico">${icon(tile?.ico || "info", 18)}</span>
-        <h3>${escapeHtml(tile?.title || "Not picked yet")}</h3>
-      </div>
-      ${chips ? `<div class="rcv-goal-nums">${chips}</div>` : ""}
-      ${plan.lines.map((l) => `<p class="rcv-goal-line">${escapeHtml(l)}</p>`).join("")}
-      ${ask}
-    </section>`;
-}
-
 function renderRecoveryScreen() {
   $("workoutCardTitle").textContent = "";
   $("workoutFocusRow").textContent = "";
@@ -35511,7 +35328,6 @@ function renderRecoveryScreen() {
         <p class="rcv-say" id="rcvSay"></p>
       </div>
     </section>
-    ${recoveryGoalCard({ fuel, inARow, restDue, resting })}
     <section class="rcv-card" id="rcvStretch">
       <div class="rcv-head"><span class="rcv-ico">${icon("body", 18)}</span><h3 id="rcvStretchTitle">${escapeHtml(timeOfDay().label)}</h3></div>
       <div id="rcvStretchBody"><p class="rcv-line">Picking the right ones for today...</p></div>
@@ -36390,21 +36206,38 @@ function openWeekGenCard(rows) {
     </div>`;
   document.body.appendChild(scrim);
   const state = { done: "Done", at: "Building", waiting: "Waiting", failed: "Failed" };
+  /* One row per DAY, not per session. This used to be one row per row, so a
+     day carrying a lift, a run and a yoga class read as three separate rows
+     all called "Thursday", told apart only by "Thursday, 2nd" and "Thursday,
+     3rd" tacked on the name. Mo: "this looks so weird... simplify it." A week
+     with three stacked days was fourteen rows of that, most of them the same
+     word with a different ordinal glued on. Grouped by date instead: the day
+     is the row, what it is building is the subtitle, and the row only reads
+     done once every session on it has landed, since a lift finished and a run
+     still building is not a day you could call finished. Rows are pushed as
+     they are discovered rather than in day order (see the comment above this
+     function), so the groups are sorted back into date order on every paint
+     rather than trusting insertion order. */
   const paint = (say) => {
     const el = scrim.querySelector("#wgSay");
     if (el && say) el.textContent = say;
-    /* "Friday, 2nd" and "Friday, 3rd": which session on the day, counted
-       down the card, because three rows all called Friday read as a mistake. */
-    const nth = ["", "2nd", "3rd", "4th"];
-    const seen = new Map();
-    scrim.querySelector("#wgRows").innerHTML = rows.map((r) => {
-      const at = seen.get(r.date) || 0;
-      seen.set(r.date, at + 1);
+    const byDate = new Map();
+    for (const r of rows) {
+      if (!byDate.has(r.date)) byDate.set(r.date, []);
+      byDate.get(r.date).push(r);
+    }
+    const days = [...byDate.values()].sort((a, b) => a[0].date < b[0].date ? -1 : 1);
+    scrim.querySelector("#wgRows").innerHTML = days.map((group) => {
+      const first = group[0];
+      const dayState = group.some((r) => r.state === "failed") ? "failed"
+        : group.every((r) => r.state === "done") ? "done"
+        : group.some((r) => r.state === "at") ? "at" : "waiting";
+      const whats = group.map((r) => r.what || weekGenKindWord(r.kind)).filter(Boolean);
       return `
-      <div class="wg-row ${r.state}">
-        <span class="wg-day">${escapeHtml(at ? `${r.name}, ${nth[at] || at + 1}` : r.name)}</span>
-        <span class="wg-what">${escapeHtml(r.what || weekGenKindWord(r.kind))}</span>
-        <span class="wg-state">${r.state === "done" ? icon("check", 14) : escapeHtml(state[r.state] || "")}</span>
+      <div class="wg-row ${dayState}">
+        <span class="wg-day">${escapeHtml(first.name)}</span>
+        <span class="wg-what">${escapeHtml(listWords(whats))}</span>
+        <span class="wg-state">${dayState === "done" ? icon("check", 14) : escapeHtml(state[dayState] || "")}</span>
       </div>`;
     }).join("");
   };
