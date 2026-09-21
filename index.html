@@ -30458,18 +30458,125 @@ function startStretchTicker() {
   STRETCH_TICKER = setInterval(paintStretch, 250);
 }
 
+/* THE GET READY, the class's ten seconds brought over to the mat. Mo: "10
+   seconds for it to get ready. You remember how we did it for the yoga." It is
+   CSN_PREP_SEC rather than a ten of its own, because two numbers that mean the
+   same thing are two numbers that drift apart.
+
+   One stamp, two phases. `stretchStartedAt` is when the get ready began and
+   the hold starts a prep after it, so the phase is derived the way csnMoveAt
+   derives the class off elapsed milliseconds rather than stored beside the
+   clock. A stored phase is a second source of truth, and a pause, a reload or
+   a backgrounded tab is exactly where it would start disagreeing with the
+   clock it is supposed to describe. */
+function stretchPrepSec(move) {
+  /* Side two is not a new shape. You are already in it and swapping a leg, so
+     it gets half the window rather than ten seconds of standing about with
+     nothing to get into. The line above the numeral says "Switch sides" rather
+     than "Get into position", so the shorter count is explained where it is
+     counted. */
+  return move?.perSide && SESSION?.stretchSide === 2 ? CSN_PREP_SEC / 2 : CSN_PREP_SEC;
+}
+
+function stretchAt(move) {
+  const hold = Math.max(1, Number(move?.seconds) || 30);
+  const prep = stretchPrepSec(move);
+  const sec = (Date.now() - (SESSION?.stretchStartedAt || Date.now())) / 1000;
+  /* The prep counts in whole seconds because it is drawn as a bare numeral;
+     the hold keeps its fraction so the track under it drains smoothly. */
+  if (sec < prep) return { phase: "prep", cost: prep, left: Math.max(0, Math.ceil(prep - sec)), hold };
+  return { phase: "hold", cost: hold, left: Math.max(0, hold - (sec - prep)), hold };
+}
+
+/* The head of the sheet: the number this screen is about, and the line above
+   it saying what that number is. It is the only part of the screen the get
+   ready and the hold disagree about, so it is written once here and used both
+   by the full render and by the handover between the two. */
+function stretchHeadHTML(list, at) {
+  const i = SESSION.stretchIndex || 0;
+  const move = list[i] || {};
+  const isWarm = SESSION.phase === "warmup";
+  const prep = at.phase === "prep";
+  const otherSide = !!move.perSide && SESSION.stretchSide === 1;
+  const secondSide = !!move.perSide && SESSION.stretchSide === 2;
+  const side = move.perSide ? (SESSION.stretchSide === 1 ? "left side" : "right side") : "";
+  const next = list[i + 1];
+  const nextUp = otherSide ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
+  return `
+          <div class="sess-lastline">
+            <span class="last${prep ? " ask" : ""}">${prep
+              ? (secondSide ? "Switch sides" : "Get into position")
+              : `${isWarm ? "Moving" : "Hold"}${side ? `, ${side}` : ""}`}</span>
+            <span class="beat">${prep
+              ? `Then ${isWarm ? "move for" : "hold"} ${at.hold}s${side ? `, ${side}` : ""}`
+              : `Next: ${escapeHtml(nextUp)}`}</span>
+          </div>
+          <!-- A get ready is a count of seconds so it is drawn as one, a bare
+               numeral, for the same reason the class draws one: from a mat with
+               the phone on the floor "7" reads and "00:07" does not. -->
+          <div class="stretch-clock" id="stretchClock" aria-live="off">${prep ? at.left : formatRest(at.left * 1000)}</div>
+          <div class="rest-track"><div class="rest-fill" id="stretchFill" style="width:${((at.left / at.cost) * 100).toFixed(1)}%"></div></div>`;
+}
+
+/* The head redrawn on its own, for the three moments where nothing else on the
+   screen changes: the get ready handing over to the hold, and the two things
+   the middle button does. A full render would take his line off the screen
+   with it, because the bubble lives in the slot renderStretchPhase rebuilds,
+   and Mo asked on 2026-09-21 for that line to stay up. It would also remount
+   the figure mid-hold, in front of somebody lying still and watching it. */
+function paintStretchHead(list, at) {
+  const box = document.getElementById("stretchTimer");
+  if (!box || !SESSION) return;
+  STRETCH_LIVE_AT = `${SESSION.stretchIndex}-${SESSION.stretchSide}-${at.phase}`;
+  box.className = `stretch-hold${at.phase === "prep" ? " prep" : ""}`;
+  box.innerHTML = stretchHeadHTML(list, at);
+  const mid = document.getElementById("stretchMid");
+  if (mid) {
+    mid.textContent = at.phase === "prep" ? "Start now" : "Restart";
+    mid.setAttribute("aria-label", at.phase === "prep" ? "Start this hold now" : "Take this hold from the top");
+  }
+  pushLiveActivity();   // the Lock Screen is counting the same hold
+}
+
+/* The hold the screen was last drawn for, as move, side and phase. Read by the
+   painter to know when the head has to be redrawn rather than patched. */
+let STRETCH_LIVE_AT = null;
+
+/* The last three seconds of the get ready, out loud, the same three ticks the
+   class counts in with: the phone is on the floor and the person is looking at
+   the ceiling, so the countdown that matters is the one you can hear. Keyed on
+   the exact second so the quarter-second painter cannot ring one twice. */
+let STRETCH_BEEP_AT = null;
+function stretchCountIn(at) {
+  if (at.phase !== "prep") return;
+  const k = `${SESSION.stretchIndex}-${SESSION.stretchSide}-${at.left}`;
+  if (k === STRETCH_BEEP_AT) return;
+  STRETCH_BEEP_AT = k;
+  if (at.left <= 3 && at.left >= 1) { sfx.play("restStart"); buzz(10); }
+}
+
 function paintStretch() {
   if (!SESSION || (SESSION.phase !== "warmup" && SESSION.phase !== "cooldown")) { stopStretchTicker(); return; }
-  if (SESSION.pausedAt) return;   // a paused workout holds the stretch where it is
+  if (SESSION.pausedAt) return;   // a paused workout holds the stretch, get ready and all, where it is
   const move = stretchList()[SESSION.stretchIndex];
   const clock = document.getElementById("stretchClock");
   const fill = document.getElementById("stretchFill");
   if (!move || !clock) { stopStretchTicker(); return; }
-  const total = Math.max(1, Number(move.seconds) || 30);
-  const left = total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000;
-  if (left <= 0) { buzz([18, 60, 18]); stretchAdvance(); return; }
-  clock.textContent = formatRest(left * 1000);
-  if (fill) fill.style.width = `${((left / total) * 100).toFixed(1)}%`;
+  const at = stretchAt(move);
+  if (at.phase === "hold" && at.left <= 0) { buzz([18, 60, 18]); stretchAdvance(); return; }
+  /* The get ready handing over to the hold. Everything at the head of the
+     sheet changes with it, the numeral, the line above it and what the track
+     is counting against, and nothing below it does, so the head is redrawn on
+     its own. Rung as well as drawn: nobody in a forward fold is watching. */
+  const key = `${SESSION.stretchIndex}-${SESSION.stretchSide}-${at.phase}`;
+  if (key !== STRETCH_LIVE_AT) {
+    if (at.phase === "hold") { sfx.play("restEnd"); buzz([18, 60, 18]); }
+    paintStretchHead(stretchList(), at);
+    return;   // the head it just drew already carries this tick's numbers
+  }
+  stretchCountIn(at);
+  clock.textContent = at.phase === "prep" ? String(at.left) : formatRest(at.left * 1000);
+  if (fill) fill.style.width = `${((at.left / at.cost) * 100).toFixed(1)}%`;
 }
 
 /* Next side, next move, or the end of the block. */
@@ -30497,12 +30604,82 @@ function jumpToStretch(n) {
   if (!SESSION) return;
   const list = stretchList();
   if (n < 0 || n >= list.length) return;
+  buzz(12);
   SESSION.stretchIndex = n;
   SESSION.stretchSide = 1;
   SESSION.stretchStartedAt = Date.now();
   saveSessionToStorage();
   renderStretchPhase();
 }
+
+/* ---- Going back, restarting, skipping: the block as something you can steer ----
+
+   Mo: "you can skip, you can go back, you can do all that stuff. Do it that
+   same one as well for the stretching." So these are the class's three, doing
+   what they do there, and nothing here is destructive: a stretch writes no
+   rows, so there is nothing a wrong tap can cost.
+
+   Where the two runners differ is the unit. A per-side move is one slot on the
+   class clock, held both sides, and two holds on this screen with a side each.
+   Back and Skip step what was actually on screen, a SIDE, because "the one
+   before this" has to mean the thing the person just saw. Whatever you arrive
+   at is taken from the top, its get ready first, which is csnGoToMove's rule:
+   a hold you jumped to has not been held yet and one you came back to is being
+   taken again. */
+
+/* Both of the middle button's jobs are this hold with its clock moved, so they
+   write the stamp and redraw the head rather than the screen. */
+function stretchStampAt(ms) {
+  SESSION.stretchStartedAt = ms;
+  saveSessionToStorage();
+  const list = stretchList();
+  paintStretchHead(list, stretchAt(list[SESSION.stretchIndex]));
+}
+
+function stretchRestart() {
+  if (!SESSION) return;
+  buzz(12);
+  stretchStampAt(Date.now());
+}
+
+/* Already in the shape. Drops the rest of the get ready and starts the hold by
+   backdating the stamp both phases are read off, so there is still one clock. */
+function stretchStartNow() {
+  if (!SESSION) return;
+  buzz(12);
+  stretchStampAt(Date.now() - stretchPrepSec(stretchList()[SESSION.stretchIndex]) * 1000);
+}
+
+/* Which of the two it is, asked of the clock at the moment of the tap. The
+   label is patched in place rather than re-rendered, so a handler holding on
+   to the phase its render was drawn in would be answering for the wrong one. */
+function stretchMidTap() {
+  if (!SESSION) return;
+  const at = stretchAt(stretchList()[SESSION.stretchIndex]);
+  if (at.phase === "prep") stretchStartNow(); else stretchRestart();
+}
+
+function stretchBack() {
+  if (!SESSION) return;
+  const i = SESSION.stretchIndex || 0;
+  const move = stretchList()[i];
+  // The second side steps back to the first rather than out of the move. The
+  // side is written in four places on this screen, so this one redraws it all.
+  if (move?.perSide && SESSION.stretchSide === 2) {
+    buzz(12);
+    SESSION.stretchSide = 1;
+    SESSION.stretchStartedAt = Date.now();
+    saveSessionToStorage();
+    renderStretchPhase();
+    return;
+  }
+  if (i > 0) jumpToStretch(i - 1);
+}
+
+/* On to the next one, with the tap you can feel that the class's Skip gives
+   it. The hold running out on its own comes through stretchAdvance too, and
+   buzzes its own way there, which is why the feedback is here and not inside. */
+function stretchSkip() { buzz(12); stretchAdvance(); }
 
 function endStretchPhase() {
   if (!SESSION) return;
@@ -30580,7 +30757,12 @@ function stretchBlockSeconds(list) {
    already in the past, so paintStretch found the hold expired and advanced.
    Every route back in skipped the move you were standing on, with no input
    from you. Resuming restarts the hold, which is also the honest behaviour:
-   you stopped holding it when you put the phone down. */
+   you stopped holding it when you put the phone down.
+
+   With the get ready in front of it, restarting the clock puts you back at the
+   top of that rather than straight into the hold, which is what somebody
+   picking the phone back up needs anyway: the ten seconds are there to get
+   into the shape, and coming back is getting into it again. */
 function restampStretchClock() {
   if (!SESSION) return;
   if (SESSION.phase !== "warmup" && SESSION.phase !== "cooldown") return;
@@ -30604,12 +30786,11 @@ function renderStretchPhase() {
      so nothing may say "cool-down", "finish workout" or "your lifts are
      banked", all of which would be talking about a workout that never ran. */
   const solo = !!SESSION.standaloneStretch;
-  const total = Math.max(1, Number(move.seconds) || 30);
-  const left = Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
-  const next = list[i + 1];
-  const otherSide = !!move.perSide && SESSION.stretchSide === 1;
-  const nextUp = otherSide ? "other side" : next ? next.name : (isWarm ? "first lift" : "finish");
-  const lastHold = !otherSide && !next;
+  const at = stretchAt(move);
+  const prep = at.phase === "prep";
+  const total = at.hold;
+  const secondSide = !!move.perSide && SESSION.stretchSide === 2;
+  STRETCH_LIVE_AT = `${i}-${SESSION.stretchSide}-${at.phase}`;   // what the painter compares against
   SESSION_LAST_EX = null;   // the first lift after the warm-up slides in like a new exercise
   const card = $("sessionCard");
   /* Same skeleton as the lift (the stage and the sheet, one screen that does
@@ -30672,18 +30853,27 @@ function renderStretchPhase() {
 
         <!-- The hold, where the lift keeps its set chips: the one number this
              screen is about, with the side and what follows above it. -->
-        <div class="stretch-hold" id="stretchTimer">
-          <div class="sess-lastline">
-            <span class="last">${isWarm ? "Moving" : "Hold"}${side ? `, ${side}` : ""}</span>
-            <span class="beat">Next: ${escapeHtml(nextUp)}</span>
-          </div>
-          <div class="stretch-clock" id="stretchClock" aria-live="off">${formatRest(left * 1000)}</div>
-          <div class="rest-track"><div class="rest-fill" id="stretchFill" style="width:${((left / total) * 100).toFixed(1)}%"></div></div>
-        </div>
+        <div class="stretch-hold${prep ? " prep" : ""}" id="stretchTimer">${stretchHeadHTML(list, at)}</div>
         ${move.cue ? `<p class="stretch-cue">${escapeHtml(move.cue)}</p>` : ""}
 
+        <!-- The class's three ways out of a mistimed hold, in the class's own
+             row. Back is disabled only where there is genuinely nothing behind
+             you, which is the first side of the first move. -->
+        <div class="move-row">
+          <button type="button" class="move-btn" id="stretchBack"${i === 0 && !secondSide ? " disabled" : ""}
+            aria-label="Back to the hold before this one">${icon("chevronLeft", 18)}<span>Back</span></button>
+          <button type="button" class="move-btn key" id="stretchMid"
+            aria-label="${prep ? "Start this hold now" : "Take this hold from the top"}">${prep ? "Start now" : "Restart"}</button>
+          <button type="button" class="move-btn" id="stretchSkip"
+            aria-label="Skip to the next hold">Skip${icon("chevronRight", 18)}</button>
+        </div>
+
         <div class="sess-cta">
-          <button type="button" class="btn-big btn-primary" id="stretchNext">${lastHold ? (solo ? "That&rsquo;s me done" : isWarm ? "Start lifting" : "Finish workout") : "Next"}</button>
+          <!-- Moving along the block is the row above, so the one big button is
+               the one decision left, the way it is on the class screen: whether
+               you are done stretching. It used to read "Next" and be the only
+               way on, which now has a Skip of its own. -->
+          <button type="button" class="btn-big btn-primary" id="stretchNext">${solo ? "That&rsquo;s me done" : isWarm ? "Start lifting" : "Finish workout"}</button>
         </div>
         <button type="button" class="stretch-skip" id="stretchSkipAll">${solo ? "Stop here" : isWarm ? "Skip warm-up" : "Skip cool-down"}</button>
         ${/* Mo asked for "nothing to log and nothing to finish, this is the
@@ -30708,8 +30898,12 @@ function renderStretchPhase() {
       </div>
     </div>`;
 
-  $("stretchNext").onclick = stretchAdvance;
+  $("stretchNext").onclick = endStretchPhase;
   $("stretchSkipAll").onclick = skipStretchPhase;
+  const back = $("stretchBack");
+  if (!back.disabled) back.onclick = stretchBack;
+  $("stretchMid").onclick = stretchMidTap;
+  $("stretchSkip").onclick = stretchSkip;
   $("sessionBody").querySelectorAll("[data-jump-stretch]").forEach((b) => {
     b.onclick = () => jumpToStretch(parseInt(b.dataset.jumpStretch, 10));
   });
@@ -31936,15 +32130,19 @@ function stretchLiveFields() {
   }
   const list = stretchList();
   const move = list[SESSION.stretchIndex];
-  const total = Math.max(1, Number(move?.seconds) || 30);
   /* Seconds left, which the native side turns into an end date. A hold counts
      DOWN against a fixed length, the opposite of rest, so an end date is the
      honest thing here and Text(timerInterval:) then runs it with the app
      asleep and it costs no updates. A paused session sends zero, which stops
-     the card's clock the same way it stops the screen's. */
-  const left = SESSION.pausedAt
-    ? 0
-    : Math.max(0, total - (Date.now() - (SESSION.stretchStartedAt || Date.now())) / 1000);
+     the card's clock the same way it stops the screen's.
+
+     Through the get ready it is the whole move that is counted, the seconds
+     still to wait plus the hold behind them, because the card has one number
+     and a lock screen cannot explain a phase. It stays continuous: the head is
+     redrawn when the hold starts and pushes the card again, so the moment the
+     two could disagree is the moment it is re-sent. */
+  const at = stretchAt(move);
+  const left = SESSION.pausedAt ? 0 : at.phase === "prep" ? at.left + at.hold : at.left;
   return {
     phase: SESSION.phase,
     stretchName: move?.name || "",
