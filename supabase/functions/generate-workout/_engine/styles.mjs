@@ -75,11 +75,31 @@ export const STYLE_KEYS = Object.freeze([
 ]);
 
 /* Which of them are resistance training, which are cardio and what cardio mode
-   each one means in the cardio library's own words. `equipment` is what a style
-   implies you can reach, and it only matters for the resistance pair. */
+   each one means in the cardio library's own words.
+
+   `equipment` and `declares` both belong to the resistance pair alone, and they
+   are two different claims about the same tick. The difference between them is
+   the whole of the 2026-09-21 fix.
+
+   `equipment` is what the plan MAY use, and it is deliberately generous: the
+   library has no bodyweight biceps-primary movement and no bodyweight calf
+   raise, so a strictly bodyweight reach hands somebody a week with holes in
+   it. `declares` is what the person SAID THEY HAVE, read off the words on the
+   sheet they ticked, and plan.mjs prefers a movement that uses it.
+
+   They differ on `home` alone, and they have to. The tile reads "Without
+   equipment / Bodyweight, a mat, maybe bands", so dumbbells are a fallback the
+   plan is allowed to reach for, not a rack somebody told us about, and steering
+   that person TOWARDS dumbbells would be the same failure as this fix, pointed
+   the other way. The tile above reads "With equipment / Barbells, dumbbells,
+   machines", which is a statement, and it is the one that was doing nothing. */
 const STYLE_KIND = {
-  lifting: { kind: "resistance", equipment: ["bodyweight", "dumbbell", "barbell", "cable", "machine"] },
-  home: { kind: "resistance", equipment: ["bodyweight", "dumbbell"] },
+  lifting: {
+    kind: "resistance",
+    equipment: ["bodyweight", "dumbbell", "barbell", "cable", "machine"],
+    declares: ["bodyweight", "dumbbell", "barbell", "cable", "machine"],
+  },
+  home: { kind: "resistance", equipment: ["bodyweight", "dumbbell"], declares: ["bodyweight"] },
   running: { kind: "cardio", mode: "running" },
   cycling: { kind: "cardio", mode: "cycling" },
   walking: { kind: "cardio", mode: "walking" },
@@ -116,6 +136,7 @@ export function normalizeStyles(value) {
  *   resistance       may a lifting day be built
  *   cardio / flow    are those on the table at all
  *   equipmentMissing implements to subtract, in limits.mjs vocabulary
+ *   equipmentDeclared implements they told us they HAVE, or null if never asked
  *   cardioModes      modes to spend against the cardio library
  *   flowTrainings    yoga, pilates, or both, in the order they ticked them
  *   note             what to say when the week really has no lifting in it
@@ -127,7 +148,8 @@ export function readStyles(value) {
   if (!styles) {
     return {
       asked: false, styles: [], resistance: true, cardio: true, flow: true,
-      equipmentMissing: [], cardioModes: [], flowTrainings: [], note: null, refusal: null,
+      equipmentMissing: [], equipmentDeclared: null,
+      cardioModes: [], flowTrainings: [], note: null, refusal: null,
     };
   }
   const kinds = styles.map((s) => STYLE_KIND[s]).filter(Boolean);
@@ -146,10 +168,23 @@ export function readStyles(value) {
      plan screen. */
   const ALL = ["bodyweight", "dumbbell", "barbell", "cable", "machine"];
   let equipmentMissing = [];
+  /* The same union said forwards, which is a different claim from the one
+     above and the plan needs both. `equipmentMissing` is what to subtract, and
+     subtracting is all a tick could do until 2026-09-21: ticking Lifting
+     removed nothing, so it changed nothing, and a person who told us they have
+     a gym was handed the same push-ups as somebody who told us nothing.
+     `equipmentDeclared` is what they SAID THEY HAVE, which plan.mjs reads as a
+     reason to prefer a movement that uses it. Null when nobody was asked, and
+     null has to stay null: a legacy profile with no styles column keeps the
+     week it already had, which is CONTRACT.md's promise about this field. */
+  let equipmentDeclared = [];
   if (resistance) {
     const reach = new Set();
     for (const k of kinds) if (k.kind === "resistance") for (const e of k.equipment) reach.add(e);
     equipmentMissing = ALL.filter((e) => e !== "bodyweight" && !reach.has(e));
+    const said = new Set();
+    for (const k of kinds) if (k.kind === "resistance") for (const e of k.declares || []) said.add(e);
+    equipmentDeclared = ALL.filter((e) => said.has(e));
   }
 
   return {
@@ -159,6 +194,7 @@ export function readStyles(value) {
     cardio,
     flow,
     equipmentMissing,
+    equipmentDeclared,
     cardioModes: kinds.filter((k) => k.kind === "cardio" && k.mode).map((k) => k.mode),
     flowTrainings: kinds.filter((k) => k.kind === "flow").map((k) => k.training),
     note: resistance ? null : styleNote(cardio, flow),

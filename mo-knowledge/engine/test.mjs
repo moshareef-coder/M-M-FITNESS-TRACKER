@@ -4148,15 +4148,185 @@ test("the refusal sentence still says what they are holding, and no tick reaches
   }
 });
 
-test("ticking a resistance style leaves the week exactly as it was", async () => {
-  /* The regression this pair guards: none of the above may reach anybody who
-     did tick lifting, and least of all anybody who was never asked. */
+test("ticking a resistance style still gets a lifting week, and says nothing else", async () => {
+  /* The regression this guards: none of the cardio and flow behaviour above may
+     reach anybody who ticked a resistance style, and least of all anybody who
+     was never asked. It was called "leaves the week exactly as it was" until
+     2026-09-21, and that stopped being true of `lifting` on the day ticking it
+     started meaning something (see the equipment section below). It was never a
+     claim about the exercises anyway: length, `honoured` and `note` are all it
+     ever checked. */
   for (const styles of [["lifting"], ["home"], ["lifting", "running"], ["home", "yoga"], null, []]) {
     const out = await generateFromPayload(stylePayload(styles));
     assert.ok(out.workout.exercises.length >= 4, `${JSON.stringify(styles)} should still lift`);
     assert.equal(out.meta.styles.honoured, true);
     assert.equal(out.meta.styles.note, null);
   }
+});
+
+/* =========================================================================
+ * "With equipment" is a claim about the room, not the absence of a limit
+ * =========================================================================
+ *
+ * The bug, reported on 2026-09-21: "In the How You Train section, I have With
+ * Equipment and Yoga, but I'm getting Without Equipment exercises." He was
+ * right, and the equipment filter was not the culprit. `lifting` was defined as
+ * the absence of a restriction, so it subtracted nothing and therefore did
+ * nothing, while the slot picker prefers the simplest movement and the library
+ * tags the bodyweight version of nearly every pattern beginner and the loaded
+ * version intermediate. A man who told us he has a gym opened on Goblet Squat,
+ * Push-Up, Inverted Row, Cable Pull-Through and Plank, and the only route out
+ * was to log a bench press nothing had ever prescribed him.
+ *
+ * The fix is one axis, not a hole in the earning rule: what somebody SAID THEY
+ * HAVE now reorders the movements they were already allowed to be shown. It
+ * makes nothing newly eligible, and the two hard filters still come first.
+ * These four tests are the four things that had to stay true.
+ */
+
+const GYM_TODAY = new Date("2026-09-21T12:00:00Z");
+const gymPayload = (train_styles, extra = {}) => ({
+  goal_bubble: "build-muscle", challenge_target: 4, session_minutes: 45,
+  current_weight: 180, sex: "Male", train_styles, ...extra,
+});
+const gymWeek = async (train_styles, extra) =>
+  (await generateFromPayload(gymPayload(train_styles, extra), { today: GYM_TODAY, includePlan: true })).plan.week;
+const allOf = (week) => week.flatMap((d) => d.exercises);
+const levelOf = (name) => LIBRARY_POOL.find((e) => e.name === name)?.level ?? null;
+
+/* Main and accessory are not fields on the response, and exactly one thing on
+   it tells them apart: plan.mjs gives a main the goal's whole rest interval and
+   an accessory seven tenths of it. So a day's MAIN MOVEMENTS are the movements
+   that rest longest in it, which is also what "main" means to the person doing
+   the session. Measured here rather than asserted as a vibe about the first
+   two rows of a card. */
+const mainsOf = (day) => {
+  const longest = Math.max(...day.exercises.map((e) => e.restSec));
+  return day.exercises.filter((e) => e.restSec === longest);
+};
+
+test("a person who says they have a gym is given the gym, with nothing logged", async () => {
+  const week = await gymWeek(["lifting", "yoga"]);
+  for (const d of week) {
+    for (const e of mainsOf(d)) {
+      assert.notEqual(e.equipment, "bodyweight",
+        `${d.name}: ${e.name} is a main movement of the day and it uses nothing they told us they have`);
+    }
+  }
+  /* Deliberately stronger than the ask, and true as measured on 2026-09-21: not
+     one bodyweight movement anywhere in the week, accessories included. The
+     three the owner named, Push-Up, Inverted Row and Plank, were two accessories
+     and a main. */
+  assert.equal(allOf(week).filter((e) => e.equipment === "bodyweight").length, 0,
+    "a gym member's week has no bodyweight movement in it at all");
+
+  /* The control, and the half of this that is a promise rather than a fix:
+     somebody who was never asked keeps the week they already had, bodyweight
+     mains and all. CONTRACT.md says a null train_styles builds exactly the plan
+     built before the column existed, and this is the only thing checking it
+     against the exercises rather than against a flag. */
+  const never = await gymWeek(null);
+  assert.ok(never.some((d) => mainsOf(d).some((e) => e.equipment === "bodyweight")),
+    "nobody was asked, so nothing was declared, so nothing was reordered");
+});
+
+test("without equipment still means without equipment, and the week does not move", async () => {
+  /* The case that must not regress, and the trap inside it. The engine lets a
+     `home` week REACH for a dumbbell, because the library has no bodyweight
+     biceps-primary movement and no bodyweight calf raise, so a strictly
+     bodyweight pool hands somebody a week with holes. The tile they ticked,
+     though, reads "Without equipment / Bodyweight, a mat, maybe bands". What
+     the plan may use and what they said they own are two different claims, and
+     only the second one may steer the picker: steering a bodyweight person
+     towards dumbbells is this same bug pointed the other way. */
+  assert.deepEqual(readStyles(["home"]).equipmentDeclared, ["bodyweight"],
+    "they declared nothing loadable, so there is no rack to prefer");
+  assert.deepEqual(readStyles(["lifting"]).equipmentDeclared,
+    ["bodyweight", "dumbbell", "barbell", "cable", "machine"]);
+  assert.equal(readStyles(null).equipmentDeclared, null, "never asked stays never asked");
+
+  const week = await gymWeek(["home"]);
+  const used = new Set(allOf(week).map((e) => e.equipment));
+  assert.deepEqual([...used].sort(), ["bodyweight", "dumbbell"], "still bodyweight and dumbbells only");
+  /* And the picker really did not move: the same bodyweight mains are still
+     there. Before the declaration existed this week opened on Push-Up, and it
+     still does. */
+  assert.ok(week.some((d) => mainsOf(d).some((e) => e.equipment === "bodyweight")),
+    "a home week still opens on movements that need nothing");
+});
+
+test("a first timer with a full gym is still not opening on maximal barbell work", async () => {
+  const week = await gymWeek(["lifting"]);
+  const all = allOf(week);
+
+  /* What protects them, in the order it bites.
+     1. No weight is prescribed at all. There is nothing in the logs to read a
+        load off, so every card comes back with feeler sets and load.mjs's own
+        sentence. "Maximal" is not reachable from a week that names no number. */
+  assert.ok(all.every((e) => e.weight === null),
+    "nothing logged means no weight prescribed, whatever the movement is");
+  /* 2. Nothing they have not earned. `earnedMovements` is empty for somebody
+        with no logs and no swaps, so every movement in this week is one the
+        default pool already allowed, which is the same pool as before. */
+  assert.equal(earnedMovements({ logs: [], swaps: [] }).size, 0);
+  assert.equal(all.filter((e) => levelOf(e.name) === "advanced").length, 0,
+    "the 34 advanced movements stay behind the earning rule, declaration or not");
+  /* 3. The accessory half of the default pool is still beginner only. */
+  for (const d of week) {
+    const mains = new Set(mainsOf(d));
+    for (const e of d.exercises) {
+      if (mains.has(e)) continue;
+      assert.equal(levelOf(e.name), "beginner", `${e.name} is an accessory and it is not a beginner movement`);
+    }
+  }
+  /* 4. And the readiness ladder still outranks the equipment axis on a main
+        slot: the declaration decides WHICH loaded movement, the level decides
+        HOW HARD, so the week opens on a leg press and a machine chest press
+        rather than a back squat and a bench. Measured 2026-09-21: sixteen
+        movements, fifteen of them beginner tagged. The one that is not is a
+        Romanian Deadlift on the second lower day, and it is there because the
+        beginner hinge, Cable Pull-Through, was already spent on the first.
+        The number is pinned rather than described: if it climbs, the ladder
+        has started losing arguments it used to win and somebody should look. */
+  assert.ok(all.filter((e) => levelOf(e.name) !== "beginner").length <= 1,
+    "declaring a rack moved at most one movement up the difficulty ladder");
+});
+
+test("a hurt joint and a missing implement still beat anything they declared", async () => {
+  /* Both are facts and the declaration is a preference, so both win. A barbell
+     they do not own is not a workout, and neither is a press on a shoulder
+     they told us hurts. */
+  const noBar = await gymWeek(["lifting"], { limits: { missing: ["barbell"] } });
+  assert.equal(allOf(noBar).filter((e) => e.equipment === "barbell").length, 0,
+    "ticking With equipment does not conjure a barbell they said they do not have");
+
+  const nothing = await gymWeek(["lifting"], { limits: { missing: ["none"] } });
+  assert.deepEqual([...new Set(allOf(nothing).map((e) => e.equipment))], ["bodyweight"],
+    "no equipment at all outranks a declaration of a whole gym");
+
+  /* A named joint is softer than a missing implement, on purpose and from
+     before this change: it filters the ranked pool and it never empties a slot,
+     because a hole in the week is worse than one movement that is not ideal, and
+     the plan says out loud which limit it could not keep. The claim here is
+     therefore not that no shoulder movement survives, it is that declaring a
+     gym changes NOTHING about which ones do. */
+  const barred = new Set(applyLimits({ pool: LIBRARY_POOL, limits: normalizeLimits({ hurts: ["shoulder"] }) })
+    .excluded.filter((e) => e.excluded !== false).map((e) => e.name));
+  const survivors = async (styles) => {
+    const week = await gymWeek(styles, { limits: { hurts: ["shoulder"] } });
+    const out = [];
+    for (const d of week) {
+      const mains = new Set(mainsOf(d));
+      for (const e of d.exercises) {
+        if (!barred.has(e.name)) continue;
+        assert.ok(mains.has(e), `${e.name} loads the named shoulder and it is only an accessory`);
+        out.push(e.name);
+      }
+    }
+    return out.sort();
+  };
+  assert.deepEqual(await survivors(["lifting"]), await survivors(null),
+    "the declaration did not cost them one more movement on the joint they named");
 });
 
 test("cardioSessionFor builds nothing rather than something wrong", () => {
