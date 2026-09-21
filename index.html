@@ -6659,10 +6659,6 @@
   .act-move-b { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .act-move-b b { font-size: 14.5px; font-weight: 650; }
   .act-move-b i { font-style: normal; font-size: 12.5px; color: var(--muted); }
-  /* Still the reveal card's line, which cuts at eight on purpose: that screen is
-     read standing on a mat with the clock about to start. The plan screen no
-     longer uses it. */
-  .act-move-more { margin: 2px 0 0 35px; font-size: 12.5px; color: var(--muted); }
   /* ---- Picking the class yourself ----
      The swap sheet's row with the order written into its icon slot, so
      choosing a pose and seeing where it landed in the class are one thing to
@@ -22483,7 +22479,9 @@ async function csnStart() {
 
 /* Gated exactly where generateWorkout is gated, and for the same reason:
    building a session out of a library is the thing he is hired for. Picking an
-   activity and starting a clock is not, and stays free. */
+   activity and starting a clock is not, and stays free. Neither is picking the
+   poses by hand, or editing what this built once it is on the screen: see
+   csnOpenPicker for where that line sits and why. */
 async function csnGenerate() {
   const a = csnAct();
   if (!await requirePremium()) return;
@@ -22561,6 +22559,10 @@ async function csnGenerate() {
 let CSN_PICK_POOL = null;
 let CSN_PICK_FOR = null;
 let CSN_PICK_OUT = new Set();
+/* The engine module itself, once it has landed, because csnPlanFromPicks is
+   synchronous and an edited class is filled to its minutes by the engine's own
+   fillRounds rather than a copy of it. */
+let CSN_PICK_ENGINE = null;
 
 /* The library's own word for one thing in a class. A Pilates class holds moves
    and a yoga class holds poses; calling a pose a move is the app talking about
@@ -22570,25 +22572,21 @@ function actMoveWord(a, plural = false) {
   return plural ? (pose ? "poses" : "moves") : (pose ? "pose" : "move");
 }
 
-/* Gated where csnGenerate is gated and for the same reason: the library is
-   what he is hired for, and a second door onto the same 37 poses that skipped
-   the paywall would make the first one arbitrary. Picking is a different act
-   from generating, not a cheaper one. */
-async function csnOpenPicker() {
-  const a = csnAct();
-  if (!a.training) return;
-  if (!await requirePremium()) return;
-  /* Re-read after the await, the same trap csnGenerate documents: the paywall
-     is a whole screen and this sheet can be closed behind it. */
-  if (!CARDIO_SES || CARDIO_SES.state !== "setup" || CARDIO_SES.act !== a.key) return;
+/* The pool, which activity it is for, and what the generator would have left
+   out, loaded for whichever screen is about to change the picks. The picker
+   and the remove control on the reveal both build the class through
+   csnPlanFromPicks, and that reads the pool, so both load it here. Answers
+   false when the library has not landed, and says so: it and the engine both
+   arrive by dynamic import after first paint, and a button that does nothing
+   is worse than one that explains. */
+async function csnLoadPickPool(a) {
   const engine = await ensureSessionEngine();
   const training = (EXERCISE_TRAININGS || []).find((t) => t.id === a.training);
   if (!engine?.movesAtOrBelow || !training) {
-    /* Said rather than swallowed: both arrive by dynamic import after first
-       paint, and a button that does nothing is worse than one that explains. */
     toast("Still loading the move library. Try again in a moment.");
-    return;
+    return false;
   }
+  CSN_PICK_ENGINE = engine;
   CSN_PICK_POOL = engine.movesAtOrBelow(training, "advanced");
   CSN_PICK_FOR = a.key;
   /* What the generator would have refused over what they said hurts. Asked of
@@ -22602,10 +22600,59 @@ async function csnOpenPicker() {
     minutes: 30, level: "advanced", limits: MY_PROFILE?.limits ?? null,
   });
   CSN_PICK_OUT = new Set((probe?.excluded || []).map((e) => e.name));
-  if (!Array.isArray(CARDIO_SES.picks)) CARDIO_SES.picks = [];
+  return true;
+}
+
+/* FREE, unlike csnGenerate above it, and the line between the two is the
+   paywall in one sentence: building a class is what he is hired for, and
+   choosing poses off a list is the person's own work. This opened behind the
+   paywall for a day, on the argument that a second door onto the same 37
+   poses made the first one arbitrary. It does not: the doors do different
+   things, and a list with the names on it is what the Plan screen's swap
+   sheet already shows anybody. Mo, 2026-09-21: "for the yoga picker, yes,
+   let's do it. Even when they do generate, they're able to go in, see what
+   they're exactly doing, and be able to swap out different yoga exercises."
+
+   `from` is which screen opened it, and it decides two things: what the list
+   starts as, and where Back goes. From setup it is a fresh pick. From the
+   reveal it is the class that was just built, its sequence pre ticked in
+   order and its length kept as a budget, so editing a generated class is this
+   picker with the boxes already filled rather than a second screen taught the
+   same rows. See csnPickShape for what the budget does. */
+async function csnOpenPicker(from = "setup") {
+  const a = csnAct();
+  if (!a.training) return;
+  if (!await csnLoadPickPool(a)) return;
+  /* Re-read after the await: the engine is a dynamic import and this sheet
+     can be closed, or moved along, while it loads. */
+  if (!CARDIO_SES || CARDIO_SES.state !== from || CARDIO_SES.act !== a.key) return;
+  if (from === "reveal" && CARDIO_SES.plan?.moves?.length) {
+    CARDIO_SES.picks = flowSequence(CARDIO_SES.plan).map((m) => m.name);
+    CARDIO_SES.pickBudget = csnPlanBudget(CARDIO_SES.plan);
+  } else {
+    if (!Array.isArray(CARDIO_SES.picks)) CARDIO_SES.picks = [];
+    CARDIO_SES.pickBudget = null;
+  }
+  CARDIO_SES.pickBack = from;
   CARDIO_SES.state = "pick";
   csnSave();
   renderCardioStage();
+}
+
+/* The picks, on the session, as the class: what "See the class" does and what
+   taking a pose out on the reveal does, so both doors land on the same class.
+   The class's own length wins over the stepper, exactly as it does for a
+   generated one: what is on the clock has to be what is on the mat. */
+function csnApplyPicks() {
+  const plan = csnPlanFromPicks();
+  if (!plan) return false;
+  CARDIO_SES.plan = plan;
+  CARDIO_SES.card = null;
+  CARDIO_SES.minutes = plan.minutes;
+  CARDIO_SES.state = "reveal";
+  csnSave();
+  renderCardioStage();
+  return true;
 }
 
 /* The moves they have picked, in their order, as library entries. Names are
@@ -22617,17 +22664,67 @@ function csnPickedMoves() {
   return (CARDIO_SES?.picks || []).map((n) => CSN_PICK_POOL.find((m) => m.name === n)).filter(Boolean);
 }
 
+/* How long a class being edited was built for, in minutes, or null when it
+   was picked once through. A generated class carries no `budget` field and its
+   `minutes` are the minutes it was asked for; a class that came through
+   csnPlanFromPicks says which it was. Read this rather than `minutes`, because
+   a once through class's minutes are what its picks add up to and filling to
+   that number would run the same two poses twice. */
+function csnPlanBudget(plan) {
+  if (!plan) return null;
+  if ("budget" in plan) return plan.budget || null;
+  return Number(plan.minutes) || null;
+}
+
+/* The picks as a sequence of rounds, and the length that goes with them, in
+   the two ways a picked class can be shaped.
+
+   Once through, for a class picked from nothing: the picks in order, one
+   round, and the minutes are what that adds up to with the preps in.
+
+   Filled to a budget, for a generated class that was edited. Mo: "even when
+   they do generate, they're able to go in and swap out different yoga
+   exercises." The generated class was 18 poses run into 30 minutes, three
+   rounds with the last one stopping short; a person who swaps one pose out of
+   that has changed the sequence, not the half hour they asked for, and
+   running the new sequence as three whole rounds would hand them fifty
+   minutes for an edit that changed nothing. So the edited sequence is filled
+   the way the generator filled the original, by the engine's own fillRounds
+   rather than a copy of it, into the same minutes. Those minutes are the
+   generator's kind, holds without the preps, so an untouched edit is the same
+   class with the same number on it. */
+function csnPickShape(picks) {
+  const budget = Number(CARDIO_SES?.pickBudget) || null;
+  const fill = budget && CSN_PICK_ENGINE?.fillRounds;
+  if (fill) {
+    const { moves, seconds, rounds } = CSN_PICK_ENGINE.fillRounds(picks, budget * 60);
+    /* Something in the picks is longer than the whole budget, so nothing fit.
+       Once through is the only honest class left, and the budget is dropped
+       with it so the reveal does not claim minutes it is not running. */
+    if (moves.length) return { moves, seconds, rounds, minutes: budget, budget };
+  }
+  const seconds = picks.reduce((n, m) => n + m.seconds * (m.perSide ? CSN_PER_SIDE : 1), 0);
+  const withPrep = picks.reduce((n, m) => n + csnMoveCost(m), 0);
+  return {
+    moves: picks.map((m) => ({ ...m, round: 1 })),
+    seconds, rounds: 1, minutes: Math.max(1, Math.round(withPrep / 60)), budget: null,
+  };
+}
+
 /* The class they built, in the shape buildGuidedPlan hands back, field for
    field, because the reveal, the live player, the Up next rail and the saved
    row all read that shape and a second one would have to be taught to four
    screens. Three fields mean something different from a generated class and
    all three are said out loud on the screen:
 
-     `rounds` is 1. A sequence somebody chose is the sequence; running it twice
-     would be the app adding work nobody picked.
+     `rounds` is 1 for a class picked from nothing: a sequence somebody chose
+     is the sequence, and running it twice would be the app adding work nobody
+     picked. A generated class that was then edited is the exception, and
+     csnPickShape says why.
      `minutes` is what the picks add up to WITH the ten second preps, because
      that is what the clock is actually going to run, not what the stepper on
-     the screen behind said.
+     the screen behind said. Again the edited class is the exception: its
+     minutes are the minutes it was generated for.
      `level` is the hardest thing in the class rather than a level the person
      has earned, which is the only true thing that word can mean here. */
 function csnPlanFromPicks() {
@@ -22635,8 +22732,9 @@ function csnPlanFromPicks() {
   const picks = csnPickedMoves();
   if (!picks.length) return null;
   const training = (EXERCISE_TRAININGS || []).find((t) => t.id === a.training);
-  const seconds = picks.reduce((n, m) => n + m.seconds * (m.perSide ? CSN_PER_SIDE : 1), 0);
-  const withPrep = picks.reduce((n, m) => n + csnMoveCost(m), 0);
+  const shape = csnPickShape(picks);
+  const { rounds, budget } = shape;
+  const seconds = shape.seconds;
   const rank = ["beginner", "intermediate", "advanced"];
   const level = picks.reduce((top, m) => (rank.indexOf(m.level) > rank.indexOf(top) ? m.level : top), "beginner");
   const warned = picks.filter((m) => CSN_PICK_OUT.has(m.name));
@@ -22651,8 +22749,11 @@ function csnPlanFromPicks() {
   /* Short on purpose: this is the line his bubble carries into the live screen,
      where two lines is all there is and a third sentence would be cut off
      mid-word. Both facts a picked class has to state are in it, that the order
-     is theirs and that it runs once. */
-  notes.push(`Your own ${picks.length} ${word}, in the order you picked them, once through.`);
+     is theirs and how it runs: once through, or filled into the minutes the
+     generated class it was edited from was asked for. */
+  notes.push(`Your own ${picks.length} ${word}, in the order you picked them, ${budget
+    ? `${rounds > 1 ? `${rounds} rounds` : "once"} to fill ${budget} minutes`
+    : "once through"}.`);
   return {
     ok: true,
     training: a.training,
@@ -22661,21 +22762,24 @@ function csnPlanFromPicks() {
        your pick" is the honest name for one nobody generated. */
     style: { key: "picked", label: "your pick" },
     level,
-    minutes: Math.max(1, Math.round(withPrep / 60)),
+    minutes: shape.minutes,
     seconds,
-    rounds: 1,
-    uniqueSeconds: seconds,
+    rounds,
+    uniqueSeconds: picks.reduce((n, m) => n + m.seconds * (m.perSide ? CSN_PER_SIDE : 1), 0),
+    /* What the class was filled to, or null for once through, so an edit of an
+       edit keeps the same rule: see csnPlanBudget. */
+    budget,
     /* Written in the shape a flow move is written in everywhere else, and no
        wider: the library entry also carries `primary` and `secondary` muscle
        lists that a session row deliberately does not, for the reason
        applyFlowSwap gives. `categoryLabel` is what the live screen prints
        under the pose name and `category` is what a saved row carries, so both
        are set rather than leaving one screen guessing. */
-    moves: picks.map((m) => ({
+    moves: shape.moves.map((m) => ({
       name: m.name,
       seconds: m.seconds,
       perSide: !!m.perSide,
-      round: 1,
+      round: m.round || 1,
       category: m.categoryLabel || m.category || null,
       categoryLabel: m.categoryLabel || null,
       cue: m.cue || null,
@@ -23188,7 +23292,9 @@ function renderCardioStage() {
       b.onclick = () => { CARDIO_SES.minutes = Number(b.dataset.preset); csnSave(); renderCardioStage(); };
     });
     if ($("csnGen")) $("csnGen").onclick = csnGenerate;
-    if ($("csnPick")) $("csnPick").onclick = csnOpenPicker;
+    /* Told which screen it is on rather than handed the click, since the
+       argument is a screen name and a MouseEvent is not one. */
+    if ($("csnPick")) $("csnPick").onclick = () => csnOpenPicker("setup");
     /* The free door. A clock and nothing else, which is what it says, and the
        reason it does not quietly build a session first: the generated one is
        what he is hired for. */
@@ -23215,10 +23321,18 @@ function renderCardioStage() {
     const pool = CSN_PICK_FOR === a.key && CSN_PICK_POOL ? CSN_PICK_POOL : [];
     const picks = csnPickedMoves();
     const order = new Map(picks.map((m, i) => [m.name, i + 1]));
-    /* The preps are in it because the clock will run them. A class of eight
-       poses is eighty seconds of getting into them, and a number that left
-       that out would be eighty seconds wrong by the time they finished. */
-    const mins = Math.max(1, Math.round(picks.reduce((n, m) => n + csnMoveCost(m), 0) / 60));
+    /* Opened off the reveal, over a class that already exists: the rows are
+       the same, what changes is the heading, where Back goes, and that the
+       class behind is left alone until they press See the class. */
+    const editing = CARDIO_SES.pickBack === "reveal" && !!CARDIO_SES.plan;
+    /* The same shape the class will be built in, so the number on the bar is
+       the number on the reveal. Once through, the preps are in it because the
+       clock will run them: a class of eight poses is eighty seconds of getting
+       into them, and a number that left that out would be eighty seconds
+       wrong by the time they finished. Filled to a budget, it is the budget,
+       and the rounds say how the picks were run into it. */
+    const shape = picks.length ? csnPickShape(picks) : { rounds: 1, minutes: 0 };
+    const rounds = shape.rounds, mins = shape.minutes;
     const cats = [];
     for (const m of pool) {
       const key = m.categoryLabel || m.category || "";
@@ -23229,10 +23343,14 @@ function renderCardioStage() {
     const word = actMoveWord(a, true);
     stage.innerHTML = `
       <div class="csn-head">
-        <h2>Pick your ${escapeHtml(word)}</h2>
+        <h2>${editing ? "Edit the" : "Pick your"} ${escapeHtml(word)}</h2>
         <button type="button" class="csn-x" id="csnX" aria-label="Back">${icon("chevronLeft", 18)}</button>
       </div>
-      <p class="csn-guided">${icon("info", 15)} <span>Tap to add. The class runs in the order you tap them, and it is as long as what you put in it.</span></p>
+      <p class="csn-guided">${icon("info", 15)} <span>${editing
+        ? `Tap a numbered one to take it out, tap another to add it. The class runs in the order of the numbers${CARDIO_SES.pickBudget
+          ? `, into the ${CARDIO_SES.pickBudget} minutes you asked for.`
+          : ", and it is as long as what is in it."}`
+        : "Tap to add. The class runs in the order you tap them, and it is as long as what you put in it."}</span></p>
       ${pool.length ? cats.map((c) => `
         <h3 class="csn-pick-cat">${escapeHtml(c.key)}</h3>
         <div class="sv-rows">
@@ -23252,10 +23370,12 @@ function renderCardioStage() {
         </div>`).join("")
         : `<p class="muted-note">The move library has not landed yet. Close this and open it again in a moment.</p>`}
       <div class="csn-pick-bar">
-        <b>${picks.length ? `${picks.length} ${escapeHtml(actMoveWord(a, picks.length !== 1))} \u00b7 ${mins} min` : `Nothing picked yet`}</b>
+        <b>${picks.length ? `${picks.length} ${escapeHtml(actMoveWord(a, picks.length !== 1))} \u00b7 ${rounds > 1 ? `${rounds} rounds \u00b7 ` : ""}${mins} min` : `Nothing picked yet`}</b>
         <button type="button" class="btn-primary" id="csnPickGo"${picks.length ? "" : " disabled"}>See the class</button>
       </div>`;
-    $("csnX").onclick = () => { CARDIO_SES.state = "setup"; csnSave(); renderCardioStage(); };
+    /* Back is back to where this was opened from, with the class behind it as
+       it was: an edit that was not sent is not an edit. */
+    $("csnX").onclick = () => { CARDIO_SES.state = editing ? "reveal" : "setup"; csnSave(); renderCardioStage(); };
     stage.querySelectorAll("[data-pick]").forEach((b) => {
       b.onclick = () => {
         const name = b.dataset.pick;
@@ -23272,19 +23392,7 @@ function renderCardioStage() {
         renderCardioStage();
       };
     });
-    $("csnPickGo").onclick = () => {
-      const plan = csnPlanFromPicks();
-      if (!plan) return;
-      sfx.play("set");
-      CARDIO_SES.plan = plan;
-      CARDIO_SES.card = null;
-      /* The class's own length wins over the stepper, exactly as it does for a
-         generated one: what is on the clock has to be what is on the mat. */
-      CARDIO_SES.minutes = plan.minutes;
-      CARDIO_SES.state = "reveal";
-      csnSave();
-      renderCardioStage();
-    };
+    $("csnPickGo").onclick = () => { if (csnApplyPicks()) sfx.play("set"); };
     return;
   }
 
@@ -23297,10 +23405,19 @@ function renderCardioStage() {
     const card = CARDIO_SES.card, plan = CARDIO_SES.plan;
     const name = card?.name
       || (plan ? `${plan.label}${plan.style?.label ? `, ${plan.style.label}` : ""}` : actTitle(a));
+    /* The sequence and the repeat, not the flat list of forty: the rows under
+       this are the sequence, and the plan screen already settled that two
+       counts for one class is the card arguing with itself. */
+    const seq = plan ? flowSequence(plan) : [];
+    const rounds = Number(plan?.rounds) || 1;
+    const stopsAt = plan ? flowStopsAt(plan) : null;
+    /* A class made of moves can be edited here, a cardio card cannot: there is
+       no list in "25 minutes at an effort" to take a row out of. */
+    const editable = !!plan && !!a.training && seq.length > 0;
     const structure = card
       ? (card.structure || `${card.minutes} min, held at one effort`)
       : plan
-        ? `${plan.moves.length} ${actMoveWord(a, plan.moves.length !== 1)}${plan.rounds > 1 ? `, ${plan.rounds} rounds` : ""}`
+        ? `${seq.length} ${actMoveWord(a, seq.length !== 1)}${rounds > 1 ? `, ${rounds} rounds` : ""}`
         : "";
     const cue = card?.cue || (plan?.notes || [])[0] || "";
     const named = (v) => { const t = String(v || ""); return t ? t[0].toUpperCase() + t.slice(1) : ""; };
@@ -23311,7 +23428,7 @@ function renderCardioStage() {
        session this is instead. */
     const facts = card
       ? [["Minutes", `${card.minutes}`], ["Effort", `${card.effort} of 10`], ["Type", named(card.kind)]]
-      : [["Minutes", `${plan.minutes}`], ["Moves", `${plan.moves.length}`], ["Level", named(plan.level)]];
+      : [["Minutes", `${plan.minutes}`], ["Moves", `${seq.length}`], ["Level", named(plan.level)]];
     stage.innerHTML = `
       <div class="csn-head">
         <h2>Your session</h2>
@@ -23329,22 +23446,54 @@ function renderCardioStage() {
         </div>
         <div class="act-hero-acts">
           <button type="button" class="btn-primary" id="csnRevealGo">${icon("play", 17)} Start it</button>
+          ${/* Mo, 2026-09-21: "even when they do generate, they're able to go
+                in, see what they're exactly doing, and be able to swap out
+                different yoga exercises." The same picker, with this class
+                already ticked: see csnOpenPicker. */ ""}
+          ${editable ? `<button type="button" class="btn-secondary" id="csnRevealEdit">${icon("pencil", 17)} Edit the ${escapeHtml(actMoveWord(a, true))}</button>` : ""}
           <button type="button" class="btn-secondary" id="csnRevealBack">Something else</button>
         </div>
       </section>
       ${cue ? `<p class="csn-guided">${icon("wand", 15)} <span>${escapeHtml(cue)}</span></p>` : ""}
       ${card?.note ? `<p class="csn-guided">${icon("info", 15)} <span>${escapeHtml(card.note)}</span></p>` : ""}
+      ${/* Every move, not the first eight. This list cut at eight until
+            2026-09-21 on the argument that it is read standing on a mat, and
+            that was true; but a class you can edit is a class you have to be
+            able to read to the end, and "and 6 more" is exactly the six that
+            cannot be taken out. Each row carries the one act that does not
+            need the whole picker, which is taking that pose out. */ ""}
       ${plan ? `<div class="act-moves">
-        ${plan.moves.slice(0, 8).map((m, i) => `<div class="act-move">
+        ${rounds > 1 ? `<p class="act-seq-note">All ${seq.length} ${escapeHtml(actMoveWord(a, seq.length !== 1))}, in order. <b>The class runs the sequence ${rounds} times.</b>${stopsAt ? ` The last round stops after ${escapeHtml(stopsAt)}.` : ""}</p>` : ""}
+        ${seq.map((m, i) => `<div class="act-move">
           <span class="act-move-n">${i + 1}</span>
           <span class="act-move-b"><b>${escapeHtml(m.name)}</b><i>${m.seconds}s${m.perSide ? " a side" : ""}</i></span>
+          ${/* Not on the last one: a class with nothing in it is not a class,
+                and Something else is the door for that. */ ""}
+          ${editable && seq.length > 1 ? `<button type="button" class="wp-chip" data-remove="${escapeHtml(m.name)}" aria-label="Take out ${escapeHtml(m.name)}">${icon("close", 15)}</button>` : ""}
         </div>`).join("")}
-        ${plan.moves.length > 8 ? `<p class="act-move-more">and ${plan.moves.length - 8} more</p>` : ""}
       </div>` : ""}`;
     const back = () => { CARDIO_SES.state = "setup"; csnSave(); renderCardioStage(); };
     $("csnX").onclick = back;
     $("csnRevealBack").onclick = back;
     $("csnRevealGo").onclick = csnStart;
+    if ($("csnRevealEdit")) $("csnRevealEdit").onclick = () => csnOpenPicker("reveal");
+    stage.querySelectorAll("[data-remove]").forEach((b) => {
+      b.onclick = async () => {
+        const name = b.dataset.remove;
+        if (!await csnLoadPickPool(a)) return;
+        /* Re-read after the await, as the picker does: the sheet can be closed
+           or started while the library loads. */
+        if (!CARDIO_SES || CARDIO_SES.state !== "reveal" || CARDIO_SES.act !== a.key) return;
+        /* Through the one builder, fed the sequence minus this pose, so a
+           class with a pose taken out here and one with the same pose unticked
+           in the picker are the same class: same budget, same fill, same
+           "your pick" on the name. */
+        CARDIO_SES.picks = flowSequence(CARDIO_SES.plan).map((m) => m.name).filter((n) => n !== name);
+        CARDIO_SES.pickBudget = csnPlanBudget(CARDIO_SES.plan);
+        CARDIO_SES.pickBack = "reveal";
+        if (csnApplyPicks()) buzz(10);
+      };
+    });
     return;
   }
 
@@ -35989,6 +36138,20 @@ function flowSequence(f) {
   return first.length ? first : moves;
 }
 
+/* Where the last round stops, when it stops short: the bell can land mid
+   sequence, and fillRounds allows it. Saying so is the difference between a
+   list you can follow to the end and a list that quietly does not match the
+   clock. Null when every round is whole. An edited class can stop short too,
+   since csnPickShape fills it with the same function. */
+function flowStopsAt(f) {
+  const moves = Array.isArray(f?.moves) ? f.moves : [];
+  const rounds = Number(f?.rounds) || 1;
+  if (rounds <= 1) return null;
+  const seq = flowSequence(f);
+  const last = moves.filter((m) => (Number(m.round) || 1) === rounds);
+  return last.length && last.length < seq.length ? last[last.length - 1].name : null;
+}
+
 /* What an activity day looks like on the plan screen, and the only thing that
    draws one. A run and a class are the same kind of day, so they print through
    one function rather than each card inventing its own way of saying what a day
@@ -36016,14 +36179,9 @@ function activityDayHTML(s, { eyebrow = "Today’s session", head = true, swap =
   if (!s) return "";
   if (s.kind === "cardio") return cardioPlanHTML(s.card, { eyebrow, head });
   const f = s.flow;
-  const moves = Array.isArray(f.moves) ? f.moves : [];
   const seq = flowSequence(f);
   const rounds = Number(f.rounds) || 1;
-  /* The bell can land mid sequence, and fillRounds allows it. Saying where the
-     last round stops is the difference between a list you can follow to the end
-     and a list that quietly does not match the clock. */
-  const last = rounds > 1 ? moves.filter((m) => (Number(m.round) || 1) === rounds) : [];
-  const stopsAt = last.length && last.length < seq.length ? last[last.length - 1].name : null;
+  const stopsAt = flowStopsAt(f);
   const act = CARDIO_ACTS.find((a) => a.training === f.training);
   return `
     ${head ? `<div class="cdy-head">

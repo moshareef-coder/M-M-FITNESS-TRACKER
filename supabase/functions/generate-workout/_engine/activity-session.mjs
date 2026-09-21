@@ -157,8 +157,13 @@ function buildSequence(pool, rand) {
  * a flow you repeat by definition. The round is NUMBERED so nobody has to work
  * out why a move came around again, and the note says out loud how much unique
  * work there was. A partial final round is allowed, because stopping a class
- * halfway through a sequence at the bell is also what happens. */
-function fillRounds(seq, budgetSeconds) {
+ * halfway through a sequence at the bell is also what happens.
+ *
+ * Exported since 2026-09-21 because the app lets somebody edit a class this
+ * built and then fills the edited sequence back into the minutes they asked
+ * for. It has to be this fill, partial last round and all, or an edit that
+ * changed nothing would come back a different length. */
+export function fillRounds(seq, budgetSeconds) {
   const out = [];
   let spent = 0;
   let round = 1;
