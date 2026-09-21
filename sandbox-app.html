@@ -6766,7 +6766,15 @@
     background: var(--panel); border: 1px solid var(--border);
     transition: transform .12s ease, filter .12s ease;
   }
-  .nxt-pick.on { border-color: var(--accent-ink); }
+  /* The same badge and border the onboarding styles picker wears, per Mo,
+     2026-09-21: "Recommended should be highlighted like how we always have
+     recommended." The plain white card read as no opinion at all next to the
+     tinted ones everywhere else this word appears. Position and top padding
+     mirror .ob-style, which carries the same .obs-rec badge. */
+  .nxt-pick.on {
+    position: relative; padding-top: 19px; border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  }
   .nxt-pick:active { transform: translateY(1px); filter: brightness(.97); }
   .nxt-ico {
     flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
@@ -8876,7 +8884,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.14";
+const APP_VERSION = "2026.09.21.15";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -11178,6 +11186,8 @@ function renderGoalTilesStep(data = {}) {
       <h1>What is your goal?</h1>
       <p class="sub">Pick as many as you like. The first one is your main goal.</p>
       <div class="goal-tile-grid plain" id="goalTileGrid"></div>
+      <p class="muted-note">You can change this later. Nothing is locked in.</p>
+      <button type="button" class="btn-ghost" id="goalSkipBtn">Skip for now</button>
       <button type="button" class="btn-ghost" id="goalBackBtn">Back</button>
     </div>`;
   initGoalTiles($("goalTileGrid"), {
@@ -11200,6 +11210,14 @@ function renderGoalTilesStep(data = {}) {
       renderOnboardStep("about", { ...next, detail: child ? label : null, tuneIdx: 0 });
     },
   });
+  /* Required like every tile grid the app has: Pick a goal first sits on the
+     confirm button until something is tapped. Skip is the way past that for
+     somebody who wants to look around before committing to a goal, and it
+     writes nothing, the same way a fresh account that never opened this
+     screen would carry no goal fields either. finishOnboardingFromDraft
+     already falls back to the last GOALS entry when goalKey is missing, so a
+     skipped goal is not a broken one, it is a deferred one. */
+  $("goalSkipBtn").onclick = () => renderOnboardStep("about", { ...data, tuneIdx: 0 });
   $("goalBackBtn").onclick = () => renderOnboardStep("intro", { ...data, introIdx: ONBOARD_INTRO.length - 1 });
 }
 
@@ -13128,6 +13146,21 @@ const STYLE_FREQ = [
 const STYLE_FREQ_IDS = STYLE_FREQ.map((f) => f.id);
 const freqDays = (id) => STYLE_FREQ.find((f) => f.id === id)?.days || 0;
 
+/* What "every day" on a CARDIO OR FLOW style is worth, days_per_week's cap
+   read the same way composeWeek reads it (styles.mjs, 2026-09-21): a runner
+   who lifts four days a week ticking "every day" means a run on those four
+   days, not seven, so the preview under the grid has to say four or the note
+   and the generated week would disagree. Resistance styles are untouched,
+   same as the engine. With nothing resistance ticked there is no training
+   days number to cap against, so daily still means seven, the total this
+   picker has always shown for a cardio or flow only week. */
+const styleDaysOf = (id, picked, freq) => {
+  const word = (freq || {})[id];
+  if (word !== "daily" || isResistanceStyle(id)) return freqDays(word);
+  const res = picked.filter(isResistanceStyle);
+  return res.length ? Math.max(...res.map((r) => freqDays((freq || {})[r]))) : 7;
+};
+
 /* The nearest word for a count of days, the direction days_per_week is read
    back into the resistance dial. Same table as frequencyForDays in styles.mjs
    and not its inverse: four days is "most days", because that is what a
@@ -13301,11 +13334,83 @@ function trainStyleNote(picked, freq = null) {
      class), and never two of a kind, which is composeWeek's rule and the
      week builder's. A single generated session on its own is still the
      lifting day; the runs and the classes arrive through the week. */
-  const total = picked.filter((id) => !isResistanceStyle(id)).reduce((n, id) => n + freqDays((freq || {})[id]), 0)
+  const total = picked.filter((id) => !isResistanceStyle(id)).reduce((n, id) => n + styleDaysOf(id, picked, freq), 0)
     + Math.max(0, ...picked.filter(isResistanceStyle).map((id) => freqDays((freq || {})[id])));
   return total > 7
     ? `${shape} That is more than seven, so some days hold two or three sessions: a lift, a run and a class can share a day, two of a kind cannot.`
     : `${shape} Generate the week and that is what it lays down. A single session on its own is still a lifting day.`;
+}
+
+/* What he says right after a tap, said in front of the summary rather than
+   instead of it: Mo wants the screen to react in the moment ("Okay perfect,
+   we'll go on a nice morning or night run"), and the summary still has to
+   say the thing that matters, which day this became a two or three session
+   one, or that nothing is on the resistance card. Same character as
+   quips.mjs and OB_ROBOT: deadpan, warm, never a bit at the user's expense.
+   Keyed by style id, then "on"/"off" for a tick and the four dial words for
+   a turn. Onboarding only, because Setup > Training already says what
+   changed in trainStyleSetupNote and a second voice on top of that one would
+   be the app talking over itself. */
+const STYLE_TAP = {
+  lifting: {
+    on: "Okay, the weight room it is. I'll build around what's there.",
+    off: "Lifting's off. I won't reach for a barbell again.",
+    daily: "Every day with weights. I'll pace the sets so that actually holds up.",
+    most: "Most days lifting, got it.",
+    some: "Lifting sometimes, worked in around the rest.",
+    rare: "Rarely lifting. Noted.",
+  },
+  home: {
+    on: "Okay, we'll work in some bodyweight and bands, no gym required.",
+    off: "Bodyweight work's off.",
+    daily: "Bodyweight every day. I'll keep it interesting.",
+    most: "Most days without equipment, noted.",
+    some: "Bodyweight sometimes, folded into the rest.",
+    rare: "Rarely without equipment. Got it.",
+  },
+  running: {
+    on: "Perfect, a run's going in.",
+    off: "No running. I won't bring it up again.",
+    daily: "A run every day. I'll find you a nice morning or evening one.",
+    most: "Running most days, on it.",
+    some: "A run now and then, in the mix.",
+    rare: "Rarely running, understood.",
+  },
+  cycling: {
+    on: "Nice, cycling's on the board.",
+    off: "Cycling's off. Consider it forgotten.",
+    daily: "Cycling every day. I'll spread the effort so your legs forgive you.",
+    most: "Most days on the bike, noted.",
+    some: "A ride now and then.",
+    rare: "Rarely cycling, got it.",
+  },
+  walking: {
+    on: "Good, walking counts and it's in.",
+    off: "Walking's off the list.",
+    daily: "A walk every day. That adds up more than people think.",
+    most: "Most days walking, got it.",
+    some: "Walking sometimes, in the mix.",
+    rare: "Rarely walking, noted.",
+  },
+  pilates: {
+    on: "Good call, Pilates is on.",
+    off: "Pilates is off for now.",
+    daily: "Pilates every day. Your core will notice.",
+    most: "Most days of Pilates, noted.",
+    some: "Pilates now and then.",
+    rare: "Rarely Pilates, got it.",
+  },
+  yoga: {
+    on: "Good, yoga's in. Breathing included.",
+    off: "Yoga's off. Noted.",
+    daily: "Yoga every day. Not every class has to be hard.",
+    most: "Most days of yoga, got it.",
+    some: "Yoga now and then.",
+    rare: "Rarely yoga, noted.",
+  },
+};
+function trainStyleTapLine(id, action) {
+  return STYLE_TAP[id]?.[action] || null;
 }
 
 /* "Lifting most days, bodyweight work rarely, running sometimes." The
@@ -13623,7 +13728,20 @@ function renderOnboardStep(step, data = {}) {
 
      "Rather not say" is a tile, not an "other". It is stored as nothing,
      because that is what it is, and the figure falls back to the same drawing
-     an unanswered profile has always got. */
+     an unanswered profile has always got.
+
+     Age moved here from Setup on 2026-09-21, the same trip height and weight
+     already made: BMR and the strength standards both read profiles.age
+     (calculateBMR, ageStrengthFactor) and used to get it only from whoever
+     found their way to Setup > Your Body on their own, which on a fresh
+     account is nobody. Same column, same clamp (13 to 100), one field
+     answered twice instead of two places that could disagree.
+
+     The step is required now, not because a personal question is owed an
+     answer, but because a figure and a BMR drawn off nothing is a worse
+     first impression than asking once. Skip is the honest way out of that:
+     it leaves every one of these four fields exactly as unanswered as they
+     were, rather than the app inventing a body to draw. */
   if (step === "about") {
     const SEX_TILES = [
       { id: "Male", label: "Male" },
@@ -13649,6 +13767,10 @@ function renderOnboardStep(step, data = {}) {
         <div class="ob-sexes" id="sexGrid">
           ${SEX_TILES.map((s) => `<button type="button" class="ob-sex${sexPick === s.id ? " on" : ""}" data-sex="${s.id}">${escapeHtml(s.label)}</button>`).join("")}
         </div>
+        <label class="ob-lab">Age <span class="ob-opt">for the calorie estimate and the strength standards, both age adjusted</span></label>
+        <div class="ob-row">
+          <input id="obAge" type="number" inputmode="numeric" min="13" max="100" placeholder="years" value="${data.age || ""}" />
+        </div>
         <label class="ob-lab">Height <span class="ob-opt">for the healthy-weight line and the calorie estimate, not the training</span></label>
         <div class="ob-row">
           <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
@@ -13663,29 +13785,47 @@ function renderOnboardStep(step, data = {}) {
         <div class="ob-row">
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
-        <button class="btn-primary" id="aboutNext">Looks like me</button>
+        <p class="muted-note">You can change this later. Nothing is locked in.</p>
+        <button class="btn-primary" id="aboutNext" disabled>Looks like me</button>
+        <button class="btn-ghost" id="aboutSkip">Skip for now</button>
         <button class="btn-ghost" id="aboutBack">Back</button>
       </div>`;
-    ob.querySelectorAll("[data-sex]").forEach((b) => b.onclick = () => {
-      sexPick = b.dataset.sex;
-      ob.querySelectorAll("[data-sex]").forEach((x) => x.classList.toggle("on", x === b));
-    });
     const readHeight = () => {
       const f = parseInt($("obFt").value, 10) || 0;
       const i = parseInt($("obIn").value, 10) || 0;
       return f || i ? f * 12 + i : null;
     };
-    /* Nothing here is required. Continue is never disabled, because every one
-       of these three is a personal question and a wizard that will not let you
-       past one is the app deciding it is owed an answer. */
+    /* One real answer anywhere on the screen is enough to unlock Continue: a
+       sex tile, an age, a height, or a weight. Requiring all four would make
+       "About you" the one step in the run that punishes somebody for
+       answering less than everything, which is worse than the old
+       never-disabled button, not better. Skip is what covers the person who
+       wants none of it. */
+    const anyAnswered = () => !!(sexPick || $("obAge").value || readHeight() || $("obLb").value);
+    const refresh = () => { $("aboutNext").disabled = !anyAnswered(); };
+    ob.querySelectorAll("[data-sex]").forEach((b) => b.onclick = () => {
+      sexPick = b.dataset.sex;
+      ob.querySelectorAll("[data-sex]").forEach((x) => x.classList.toggle("on", x === b));
+      refresh();
+    });
+    ["obAge", "obFt", "obIn", "obLb"].forEach((id) => { $(id).oninput = refresh; });
+    refresh();
     $("aboutNext").onclick = () => {
       const next = {
         ...data,
+        age: clampNum($("obAge").value, 13, 100),
         height_in: readHeight(),
         weight_lb: parseFloat($("obLb").value) || null,
         ...(sexPick ? { sex: sexPick === "none" ? null : sexPick, sex_asked: true } : {}),
       };
       renderOnboardStep(tuneQueue(next).length ? "tune" : "styles", { ...next, tuneIdx: 0 });
+    };
+    /* Skip moves on without writing any of the four fields, same as never
+       having opened this screen: whatever was mid-typed is discarded rather
+       than half-saved, so a null here always means "never asked", not "asked
+       and gave up partway". */
+    $("aboutSkip").onclick = () => {
+      renderOnboardStep(tuneQueue(data).length ? "tune" : "styles", { ...data, tuneIdx: 0 });
     };
     $("aboutBack").onclick = () => renderOnboardStep("goal", data);
     return;
@@ -13728,7 +13868,9 @@ function renderOnboardStep(step, data = {}) {
               ${o.sub ? `<span class="occ-sub">${escapeHtml(o.sub)}</span>` : ""}
             </button>`).join("")}
           </div>
+          <p class="muted-note">You can change this later. Nothing is locked in.</p>
           <button type="button" class="btn-primary" id="tuneNext"${chosen ? "" : " disabled"}>That one</button>
+          <button type="button" class="btn-ghost" id="tuneSkip">Skip for now</button>
           <button type="button" class="btn-ghost" id="tuneBack">Back</button>
         </div>`;
       let pick = chosen;
@@ -13738,6 +13880,10 @@ function renderOnboardStep(step, data = {}) {
         $("tuneNext").disabled = false;
       });
       $("tuneNext").onclick = () => onNext({ [spec.field]: pick });
+      /* Writes the field null rather than leaving it at whatever a draft
+         reopen found, so Skip always means "never asked" even on a second
+         look at this screen. */
+      $("tuneSkip").onclick = () => onNext({ [spec.field]: null });
       $("tuneBack").onclick = back;
       return;
     }
@@ -13760,6 +13906,7 @@ function renderOnboardStep(step, data = {}) {
           <h1>${escapeHtml(spec.title)}</h1>
           <p class="sub">${escapeHtml(spec.sub)}</p>
           <div class="limit-chips" id="tuneHurtChips"><p class="muted-note">Loading the options...</p></div>
+          <p class="muted-note">You can change this later. Nothing is locked in.</p>
           <button type="button" class="btn-primary" id="tuneNext">Nothing hurts</button>
           <button type="button" class="btn-ghost" id="tuneBack">Back</button>
         </div>`;
@@ -13809,6 +13956,7 @@ function renderOnboardStep(step, data = {}) {
         <h1>${escapeHtml(spec.title)}</h1>
         <p class="sub">${escapeHtml(spec.sub)}</p>
         <div id="bodyPickRoot">${bodyRegionPickerHTML({ sex: data.sex, selected: picked, sore: spec.kind === "sore" })}</div>
+        <p class="muted-note">You can change this later. Nothing is locked in.</p>
         <button type="button" class="btn-primary" id="tuneNext">Those ones</button>
         <button type="button" class="btn-ghost" id="tuneBack">Back</button>
       </div>`;
@@ -13857,15 +14005,27 @@ function renderOnboardStep(step, data = {}) {
         <h1>Pick your workouts</h1>
         <p class="sub">We have ticked what suits your goals. Change any of it, and say how often. We only ever plan what is ticked here.</p>
         ${trainStylePickerHTML(picked, recs, freq)}
-        <p class="ob-style-note" id="styleNote"></p>
+        <p class="ob-style-note" id="styleNote" aria-live="polite"></p>
+        <p class="sub">You can change this later. Nothing is locked in.</p>
         <button type="button" class="btn-primary" id="styleNext">On to the fun stuff</button>
+        <button type="button" class="btn-ghost" id="styleSkip">Skip for now</button>
         <button type="button" class="btn-ghost" id="styleBack">Back</button>
       </div>`;
-    const note = () => {
-      $("styleNote").textContent = trainStyleNote(picked, freq);
+    /* `tap` is the last thing they touched, a tick/untick or a turn of a
+       dial, so the note can react to it before falling back to the plain
+       summary. Cleared once said: the reactive line is about the tap that
+       just happened, not a fact that should still be true next time
+       something else changes it. */
+    const note = (tap = null) => {
+      const said = tap ? trainStyleTapLine(tap.id, tap.action) : null;
+      $("styleNote").textContent = [said, trainStyleNote(picked, freq)].filter(Boolean).join(" ");
       $("styleNext").disabled = !picked.length;
     };
-    wireTrainStylePicker(ob, picked, (ids) => { picked = ids; note(); }, { freq, onFreq: () => note() });
+    wireTrainStylePicker(ob, picked, (ids, id) => {
+      const action = picked.includes(id) ? "off" : "on";
+      picked = ids;
+      note({ id, action });
+    }, { freq, onFreq: (id, level) => note({ id, action: level }) });
     note();
     /* Only the ticked styles' words travel, and days_per_week becomes the
        BUSIEST resistance word's count, not any one dial's: the week has one
@@ -13886,6 +14046,18 @@ function renderOnboardStep(step, data = {}) {
       }
       renderOnboardStep("days", next);
     };
+    /* Zero styles is not a coherent thing to save: normalizeStyles in
+       styles.mjs folds an empty array back into null anyway, so writing one
+       here would not mean "plan nothing", it would silently mean "never
+       asked" through a route that looks deliberate and is not. That is
+       exactly the state this Skip is for, reached honestly: train_styles and
+       style_frequency are left off `next` entirely, so the draft carries
+       forward whatever it already had (nothing, for a first run), the same
+       null the column would hold if this screen had never existed. The
+       account gets the unrestricted plan every profile got before the
+       question did, and Setup > Training is right there whenever they want
+       to answer it for real. */
+    $("styleSkip").onclick = () => renderOnboardStep("days", { ...data, train_styles: undefined, style_frequency: undefined });
     $("styleBack").onclick = () => {
       const q = tuneQueue(data);
       if (q.length) renderOnboardStep("tune", { ...data, tuneIdx: q.length - 1 });
@@ -13894,6 +14066,15 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
+  /* No Skip here, on purpose, unlike the required steps below it. Every other
+     required step has a real fallback the rest of the app already knows how
+     to read (no goal, no sex, no age, no intensity all mean "never asked"
+     somewhere downstream), but ME has no such fallback: it is read as a
+     literal string all over the app, from the greeting to who a partner sees
+     training with them, and ME = data.name in finishOnboarding is the whole
+     account taking a name from a variable that is a blank string. Skipping a
+     name does not defer a question, it ships a broken account, so this one
+     stays required with no way past it. */
   if (step === "name") {
     ob.innerHTML = `
       <div class="ob-step">
@@ -14026,9 +14207,18 @@ function renderOnboardStep(step, data = {}) {
         <p class="sub">Pick the one you would still do in a bad week. All of it moves later.</p>
         <div class="ob-tiers" id="tierGrid"><p class="muted-note">Working out what this goal needs...</p></div>
         <button class="btn-primary" id="daysNext" disabled>Show me the plan</button>
+        <button class="btn-ghost" id="daysSkip">Skip for now</button>
         <button class="btn-ghost" id="daysBack">Back</button>
       </div>`;
     $("daysNext").onclick = () => renderOnboardStep("plan", data);
+    /* Same null the "could not load this goal's range" fallback below already
+       writes when there was nothing to pick from: intensity, days_per_week
+       and days_range all stay unset, and the plan step falls back to the
+       goal's own legacy day count exactly as it does for that fallback. */
+    $("daysSkip").onclick = () => {
+      data.intensity = null; data.days_per_week = null; data.days_range = null;
+      renderOnboardStep("plan", data);
+    };
     $("daysBack").onclick = () => renderOnboardStep("styles", data);
     goalDayRange({ bubble: data.goal_bubble, child: data.goal_child, secondary: data.goal_secondary }).then((range) => {
       if (!$("tierGrid")) return;   // navigated on before the engine arrived
@@ -14300,6 +14490,7 @@ function finishOnboardingFromDraft(data) {
     challenge_target: days,
     goal_key: g.key,
     height_in: data.height_in || null,
+    age: data.age || null,
     /* Undefined when the about step was never answered, which must not
        overwrite a sex already on the profile. Declining is stored as the
        literal "Rather not say", because that is what Setup's own select
@@ -14386,6 +14577,10 @@ async function finishOnboarding(data) {
     ...(data.committed_at ? { committed_at: data.committed_at } : {}),
     goal_detail: data.goal_detail || null,
     ...(data.height_in ? { height_in: data.height_in } : {}),
+    /* Same conditional as height_in, for the same reason: a fresh account
+       that skipped About must not overwrite whatever Setup > Your Body has
+       already got on file with a null. */
+    ...(data.age ? { age: data.age } : {}),
     /* Sent only when the about step was actually answered: undefined here
        means never asked, and a fresh account that skipped the screen should
        not have anything written over whatever a later Setup visit puts there.
@@ -23539,10 +23734,6 @@ function renderCardioStage() {
        name and its reason, and the same sentence twice on one screen is the app
        padding. */
     const picks = nextUp ? nextUp.picks.filter((x) => x.key !== a.key) : [];
-    /* The lifting door is a row up there or a tile down here, never both. It
-       used to be both, which printed its one sentence twice on any day that
-       recommended it. */
-    const liftPicked = picks.some((x) => x.key === "lift");
     /* An opinion is stated once, in the highest place it has on the screen.
        The hero already wears it in its eyebrow, and a Recommended block below
        the hero says everything else we would argue for, with the reason
@@ -23554,6 +23745,20 @@ function renderCardioStage() {
        that is the honest state of it: a clock and a minutes field. */
     const canGenerate = !!(a.cardio || a.training);
     const libNote = a.cardio ? (ACT_LIB_NOTES[a.key] || "") : "";
+    /* HIIT and Other stay in CARDIO_ACTS, because actForExerciseName and
+       ACT_MET_NAME still have to answer for anyone who logged one before Mo
+       pulled them from the list, 2026-09-21: "remove HIIT," "remove other."
+       They are filtered out here, the same way openActivityInstead already
+       keeps "Other" off its own list, rather than out of the array itself. */
+    const gridActs = CARDIO_ACTS.filter((x) => x.key !== "hiit" && x.key !== "other");
+    /* Elliptical carries no `cardio` mode (see the note on CARDIO_ACTS), so a
+       tap on it opens the same bare clock as Other, not the built session its
+       venue neighbours now generate. Grouping it by venue said it belonged
+       next to the treadmill and the rower, which was no longer true, so it is
+       pulled out of "In the gym" and drawn on its own after every venue,
+       where the bare-clock tier already lived. */
+    const ellipticalAct = gridActs.find((x) => x.key === "elliptical");
+    const groupActs = gridActs.filter((x) => x.key !== "elliptical");
     stage.innerHTML = `
       <div class="csn-head">
         ${/* "Add a session" is for a day that already has one. Arriving here
@@ -23632,7 +23837,8 @@ function renderCardioStage() {
       ${picks.length ? `
       <p class="act-q">Recommended</p>
       <div class="nxt-picks">
-        ${picks.map((x) => `<button type="button" class="nxt-pick" data-next="${escapeHtml(x.key)}">
+        ${picks.map((x) => `<button type="button" class="nxt-pick on" data-next="${escapeHtml(x.key)}">
+          <span class="obs-rec">Recommended</span>
           <span class="nxt-ico">${icon(x.ico, 18)}</span>
           <span class="nxt-b"><b>${escapeHtml(x.label)}</b><i>${escapeHtml(x.why)}</i></span>
           <span class="nxt-go">${icon("chevronRight", 15)}</span>
@@ -23648,7 +23854,7 @@ function renderCardioStage() {
             signs are gone, and a gap between the grids does the grouping. */ ""}
       <p class="act-q${picks.length ? " act-q-rest" : ""}">${picks.length ? "Everything else" : "What do you want to do?"}</p>
       ${ACT_GROUPS.map((g) => {
-        const list = CARDIO_ACTS.filter((x) => (x.venue || null) === g.venue);
+        const list = groupActs.filter((x) => (x.venue || null) === g.venue);
         if (!list.length) return "";
         return `
           <div class="ob-styles act-styles">
@@ -23659,6 +23865,17 @@ function renderCardioStage() {
             </button>`).join("")}
           </div>`;
       }).join("")}
+      ${/* Elliptical, on its own after every venue: see the note above
+            gridActs for why it no longer sits with the treadmill and the
+            rower. */ ""}
+      ${ellipticalAct ? `
+          <div class="ob-styles act-styles">
+            <button type="button" class="ob-style${ellipticalAct.key === a.key ? " on" : ""}" data-act="${ellipticalAct.key}">
+              ${flagged(ellipticalAct) ? `<span class="obs-rec">Recommended</span>` : ""}
+              <span class="obs-ico">${icon(ellipticalAct.ico, 20)}</span>
+              <span class="obs-label">${escapeHtml(actTitle(ellipticalAct))}</span>
+            </button>
+          </div>` : ""}
       ${/* A lift used to be offered at the bottom of this sheet, handing off
             to the screen that builds plans. Mo, 2026-09-19: "I don't like how
             when I start an activity I see lifting workout, that shouldn't be
@@ -23672,19 +23889,14 @@ function renderCardioStage() {
             to ask me whether I want an activity, and one of those activities
             will be weightlifting, let's make sure to have that." Nobody chose
             lifting-or-activity on the way to this screen, so this screen owes
-            them both. Everywhere else it stays gone. */ ""}
+            them both. Everywhere else it stays gone.
+
+            Reversed the next day: Mo, 2026-09-21, "remove weightlifting."
+            The "lift" key stays valid in secondSessionPicks, so a day where
+            lifting IS the recommendation still argues for it up in the
+            Recommended cards; only this standalone door, the one this same
+            tile existed to add, is gone. */ ""}
       ${!nextUp ? "" : `
-        ${/* Only when it is not already a row up there. On a day the week has
-              room for a lift it IS one of the recommendations, with the same
-              sentence under it, and this used to draw it a second time. */ ""}
-        ${liftPicked ? "" : `
-        <div class="ob-styles act-styles">
-          <button type="button" class="ob-style" data-next="lift">
-            <span class="obs-ico">${icon("dumbbell", 20)}</span>
-            <span class="obs-label">Weightlifting</span>
-          </button>
-        </div>
-        ${nextUp.liftWhy ? `<p class="nxt-note">${escapeHtml(nextUp.liftWhy)}</p>` : ""}`}
         ${/* Said before the tap rather than discovered after it, and only while
               it is still true. ai_workouts WAS unique on (email, entry_date), so
               a second plan built today landed on top of this morning's row: the
