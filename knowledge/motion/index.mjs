@@ -259,6 +259,12 @@ export function mountMove(canvas, name, opts = {}) {
       pump();
       return api;
     },
+    setFace(face) {
+      m.face = face;
+      m.dirty = true;
+      pump();
+      return api;
+    },
     setSkin(skin) {
       m.skin = skin;
       m.colors = palette(m.theme, m.accent, skin, m.bodyKind);
