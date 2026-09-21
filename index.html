@@ -5946,26 +5946,12 @@
   .bi-period button:active { transform: scale(.96); }
   .bi-period button.active { background: var(--accent); color: var(--on-accent); }
 
-  .bi-grid { display: grid; grid-template-columns: minmax(0, 1fr) 56%; gap: 8px; align-items: start; }
-  .bi-head { font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; margin: 0 0 16px; }
-  .bi-grid .bi-head { position: relative; z-index: 1; }
-  /* Single-line rows now that the bars are gone, so they sit closer together
-     and read as one ranked list rather than five floating lines. The 44px
-     height stays: it was bought for a finger, but it is also what keeps this
-     column the same height as the figure beside it. */
-  .bi-list { display: flex; flex-direction: column; }
-  .bi-row { display: flex; align-items: center; min-height: 44px; width: 100%; }
-  .bi-row-top { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12.5px; }
-  /* The "top 5 of 10" line sat on the list's gap, which is gone. */
-  .bi-row + .bi-empty { margin-top: 8px; }
-  .bi-row-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bi-row-level { color: var(--muted); font-weight: 500; flex-shrink: 0; }
-  .bi-empty { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .bi-note { margin: 12px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
   /* Both figures are always the same pixel size, in every mode. Every Rive instance on
      the page shares one WebGL2 renderer whose render target follows whichever canvas drew
      last, so two canvases of different sizes make it resize twice a frame and one of them
      comes out blank. */
-  .bi-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin-top: -10px; }
+  .bi-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
   .bi-fig { position: relative; overflow: hidden; min-width: 0; }
   .bi-canvas { width: 100%; height: 250px; display: block; touch-action: manipulation; }
 
@@ -6833,7 +6819,6 @@
   @keyframes biPop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.12); opacity: 1 } 100% { transform: scale(1) } }
 
   @media (max-width: 380px) {
-    .bi-grid { grid-template-columns: minmax(0, 1fr) 52%; }
     .bi-canvas { height: 220px; }
     .bi-ring-svg { width: 56px; height: 56px; }
     .bi-ring-val { font-size: 12.5px; }
@@ -7452,18 +7437,23 @@
         <button type="button" data-period="week">This week</button>
         <button type="button" data-period="lastweek">Last week</button>
       </div>
-      <div class="bi-grid" id="biGrid">
-        <div class="bi-col-list">
-          <h3 class="bi-head" id="biHead">Muscles Hit <span id="biLevelsInfo"></span></h3>
-          <div class="bi-list" id="biList"></div>
-        </div>
-        <div class="bi-figures" id="biFigures">
-          <div class="bi-fig" data-view="Front"><canvas id="bodyDiagramFront" class="bi-canvas"></canvas></div>
-          <div class="bi-fig" data-view="Back"><canvas id="bodyDiagramBack" class="bi-canvas"></canvas></div>
-        </div>
+      <!-- Muscles Hit stood here: a ranked list of the same five groups the
+           rings below already draw, off the same bodyImpactRank() call, saying
+           "High" where the ring says 82%. Mo, 2026-09-20: "we're going to have
+           training impact in the body section, I think we should remove the
+           muscles hit because they're kind of the same concept." They were the
+           same concept, so the figures take the width the list was using. -->
+      <div class="bi-figures" id="biFigures">
+        <div class="bi-fig" data-view="Front"><canvas id="bodyDiagramFront" class="bi-canvas"></canvas></div>
+        <div class="bi-fig" data-view="Back"><canvas id="bodyDiagramBack" class="bi-canvas"></canvas></div>
       </div>
       <div class="bi-section"><span>Training Impact</span> <span id="biInfoSlot"></span></div>
       <div class="bi-rings" id="biRings"></div>
+      <!-- Outside the rings, which are a five column grid a note would join as
+           a sixth cell. It carries what the muscles list used to say and the
+           rings never did: that an empty period is empty, and whether that was
+           a rest day you chose or a week you have not started. -->
+      <p class="bi-note" id="biRingsNote"></p>
     </div>
 
     <div class="card bi-anim" style="--d:80ms">
@@ -14139,7 +14129,6 @@ function showApp() {
     });
   });
   $("biInfoSlot").innerHTML = infoDot("impact", "What training impact means");
-  $("biLevelsInfo").innerHTML = infoDot("muscleLevels", "What low, medium and high mean");
   $("biShareInfoSlot").innerHTML = infoDot("share", "What your partner sees");
   $("adminGymToggleWrap").onclick = () => {
     setTimeout(() => $("adminGymToggleWrap").classList.toggle("checked", $("adminEntryGym").checked), 0);
@@ -15382,18 +15371,15 @@ const INFO_TOPICS = {
     ],
     paras: ["Your row is on top in blue, theirs underneath in coral. An empty dashed square is a day nobody logged."],
   }),
-  muscleLevels: () => ({
-    eyebrow: "Low, medium, high",
-    paras: [
-      "The word beside each muscle is how much work it got against a full dose. A full dose is what your own plan asks of that muscle: its sets for the week, or on Today, its biggest single session. A muscle your plan has no number for is measured against about eight hard sets in a day, or fourteen across a week.",
-      "High is three quarters of that dose or more, medium is at least four tenths of it, low is everything under. Across a week that puts high from about ten and a half sets and low at anything up to five and a half.",
-      "Helping muscles count for half. A row trains your lats and helps your biceps, so the biceps level moves at half speed.",
-    ],
-  }),
+  /* muscleLevels, which explained the Low/Medium/High words on the muscles
+     list, was deleted with the list. Its reading of a full dose was the better
+     one and it was describing the same numbers these rings draw, so it is
+     folded in here rather than lost: both came off one bodyImpactRank() call. */
   impact: () => ({
     eyebrow: "Training impact",
     paras: [
-      "Each ring is one muscle group against a full training dose for the period you are looking at: about eight hard sets in a day, fourteen in a week.",
+      "Each ring is one muscle group against a full dose for the period you are looking at. A full dose is what your own plan asks of that group: its sets for the week, or on Today, its biggest single session. A group your plan has no number for is measured against about eight hard sets in a day, or fourteen across a week.",
+      "Helping muscles count for half. A row trains your lats and helps your biceps, so the biceps ring moves at half speed.",
       "100% does not mean stop. It means that group has had a full dose for the period you are looking at, which is the point at which more sets stop paying you back.",
     ],
   }),
@@ -37204,11 +37190,7 @@ function renderBodyTab(animate = false) {
   BODY_LAST_KEY = key;
 
   document.querySelectorAll("#biPeriod button").forEach((b) => b.classList.toggle("active", b.dataset.period === BODY_PERIOD));
-  /* Rewritten whole, dot included: setting textContent here used to delete the
-     info dot the wire-up had put inside this heading, on the first render. */
-  $("biHead").innerHTML = `Muscles Hit <span id="biLevelsInfo">${infoDot("muscleLevels", "What low, medium and high mean")}</span>`;
 
-  renderBodyList(ranked, animate);
   renderBodyRings(ranked, animate);
   renderBodyDiagram(animate);
   renderBodyNext(animate);
@@ -37224,25 +37206,6 @@ function bodyEmptyLine() {
     return "Rest day. Nothing logged, and that is the point. Streak kept.";
   }
   return `Nothing logged ${bodyPeriodWord(BODY_PERIOD)} yet. Finish a session and the muscles you hit light up here.`;
-}
-
-function renderBodyList(ranked, animate) {
-  const el = $("biList");
-  el.classList.toggle("no-anim", !animate);
-  const top = ranked.slice(0, 5);
-  if (!top.length) {
-    el.innerHTML = `<div class="bi-empty">${escapeHtml(bodyEmptyLine())}</div>`;
-    return;
-  }
-  el.innerHTML = top.map((m) =>
-    `<div class="bi-row" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
-      <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}</span></div>
-    </div>`).join("")
-    // The list is a top five under a heading that reads as all of them, and ten
-    // groups can have work, so say how many are not shown.
-    + (ranked.length > top.length
-      ? `<div class="bi-empty">Top ${top.length} of ${ranked.length} groups with work ${bodyPeriodWord(BODY_PERIOD)}.</div>`
-      : "");
 }
 
 function renderBodyRings(ranked, animate) {
@@ -37269,6 +37232,14 @@ function renderBodyRings(ranked, animate) {
       <div class="bi-ring-label">${escapeHtml(m.label)}</div>
     </div>`;
   }).join("");
+  /* Five rings over ten groups with work is a reading that hides half of
+     itself, so say how much is not shown. Nothing at all gets the sentence
+     that knows the difference between a rest day and a quiet week. */
+  const note = $("biRingsNote");
+  note.textContent = !ranked.length ? bodyEmptyLine()
+    : ranked.length > 5 ? `Top 5 of ${ranked.length} groups with work ${bodyPeriodWord(BODY_PERIOD)}.`
+    : "";
+  note.classList.toggle("hidden", !note.textContent);
   if (!animate) return;
   requestAnimationFrame(() => requestAnimationFrame(() => {
     el.querySelectorAll(".fill").forEach((f) => { f.style.strokeDashoffset = f.dataset.off; });
@@ -38110,7 +38081,6 @@ async function renderBodyNext(animate) {
     const volumes = computeMuscleVolumeBetween(ME, start, end);
     const ranked = bodyImpactRank(volumes, BODY_PERIOD);
     BODY_LAST_KEY = `${ME}|${BODY_PERIOD}|${JSON.stringify(volumes)}|${BODY_PLAN_TARGETS?.key || ""}`;
-    renderBodyList(ranked, false);
     renderBodyRings(ranked, false);
     renderBodyDiagram(false);
   }
