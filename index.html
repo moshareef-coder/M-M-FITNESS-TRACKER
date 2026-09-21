@@ -6430,8 +6430,11 @@
   .csn-dur-v { font-family: var(--font-display); font-size: 52px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
   .csn-dur-v i { font-style: normal; font-size: 17px; font-weight: 600; color: var(--muted); margin-left: 5px; }
   .csn-presets { display: flex; gap: 8px; justify-content: center; }
+  /* 44 high, measured, not guessed: with the effort segment gone these four are
+     the only chips left on the sheet and they are the fast way to answer its
+     one question. They were 36. */
   .csn-preset {
-    min-height: 34px; padding: 7px 15px; border-radius: 100px; cursor: pointer; font: inherit;
+    min-height: 44px; padding: 10px 16px; border-radius: 100px; cursor: pointer; font: inherit;
     font-size: 13px; font-weight: 700;
     background: var(--panel-2); border: 1px solid transparent; color: var(--muted);
   }
@@ -6490,7 +6493,7 @@
      shared is the shape, which is the part Mo asked to be the same. */
   .act-hero {
     display: grid; grid-template-columns: 1fr auto;
-    grid-template-areas: "words face" "seg seg" "dur dur" "acts acts";
+    grid-template-areas: "words face" "dur dur" "acts acts";
     align-items: start; gap: 12px 10px;
     padding: 16px; margin-bottom: 16px; border-radius: 20px;
     background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-card);
@@ -6506,19 +6509,11 @@
     letter-spacing: -.025em; line-height: 1.08; text-wrap: balance;
   }
   .act-why { margin: 7px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
-  .act-knob-seg { grid-area: seg; }
   .act-knob-dur { grid-area: dur; text-align: center; }
   .act-knob .csn-dur-k { text-align: center; margin-bottom: 7px; }
-  /* Three answers, one row, the middle one lit. Same lozenge as .csn-preset so
-     the sheet has one selected-chip look rather than two. */
-  .act-seg { display: flex; gap: 6px; padding: 4px; border-radius: 13px; background: var(--panel-2); }
-  .act-seg button {
-    flex: 1; min-height: 38px; border-radius: 10px; cursor: pointer; font: inherit;
-    font-size: 13.5px; font-weight: 700; color: var(--muted);
-    background: none; border: 1px solid transparent;
-  }
-  .act-seg button.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
-  .act-seg-note { margin: 7px 0 0; text-align: center; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  /* What the minutes actually govern, said under them. One line, and only on an
+     activity there is something to build for. */
+  .act-knob-note { margin: 10px 0 0; text-align: center; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
   /* The stepper is the sheet's own, one size down: inside a card it does not
      need to be the biggest number on the screen, because the session's name is. */
   .act-knob-dur .csn-dur-row { gap: 16px; margin: 6px 0 10px; }
@@ -6526,7 +6521,12 @@
   .act-knob-dur .csn-dur-v i { font-size: 14px; }
   .act-hero-acts { grid-area: acts; display: flex; flex-direction: column; gap: 9px; }
   .act-hero-acts .btn-primary, .act-hero-acts .btn-secondary { margin: 0; }
-  .act-q { margin: 4px 0 12px; font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+  /* The sheet has two of these now and no others. 17px is the scale's own
+     section step, which the 16px it was is not. */
+  .act-q { margin: 4px 0 12px; font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+  /* The gap that used to be a heading. Everything under here is the rest of the
+     list, and the space is what says so. */
+  .act-q-rest { margin-top: 24px; }
   /* What to do second, with the reason under it. A row is wide because the
      reason is the point: a tile with a Recommended flag on it says we have an
      opinion, this says what the opinion is made of. */
@@ -6550,14 +6550,15 @@
   /* The lifting door, and the sentence that talks you out of it on a day you
      have already lifted. Muted rather than hidden: it is still a choice. */
   .nxt-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
-  .act-group {
-    margin: 14px 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .09em;
-    text-transform: uppercase; color: var(--muted);
-  }
   .act-styles { margin: 0; }
+  /* One shelf per venue, with air between them instead of a label over each.
+     Twice the 10px gap inside a grid, so the break between shelves is legible
+     at a glance, and short of the 24px under a heading, so the whole thing
+     still reads as one list broken into blocks rather than as three sections. */
+  .act-styles + .act-styles { margin-top: 20px; }
   /* What the generated session is, in three numbers, because a name and a cue
      are not enough to decide with. */
-  .act-facts { grid-area: seg; display: flex; gap: 8px; }
+  .act-facts { grid-area: dur; display: flex; gap: 8px; }
   .act-fact {
     flex: 1; min-width: 0; padding: 10px 8px; border-radius: 13px; text-align: center;
     background: var(--panel-2);
@@ -21694,22 +21695,6 @@ function cardioSeedIndex(str, n) {
   return n > 0 ? h % n : 0;
 }
 
-/* How hard, which is the one preference this screen takes.
-
-   It is deliberately not a length. The library already says how long each of
-   its sessions is meant to be, and overriding that with a number somebody spun
-   a stepper to is how a twenty minute interval session becomes a fifty minute
-   one nobody can hold. So the preference picks WHICH session, ordered by the
-   library's own effort rating, and the session brings its minutes with it.
-
-   Three answers rather than a slider, and the same three words the intensity
-   step already uses, so a person meets this vocabulary once. */
-const ACT_PREFS = [
-  { key: "easy", label: "Easy" },
-  { key: "steady", label: "Steady" },
-  { key: "hard", label: "Hard" },
-];
-
 /* Where the preference starts before anybody touches it. The tier somebody
    tapped on the intensity step is NOT stored: finishOnboardingFromDraft writes
    days_per_week and session_minutes and nothing else, so `intensity` exists only
@@ -21723,6 +21708,32 @@ function defaultActivityPref() {
   const mins = Number(MY_PROFILE?.session_minutes);
   if (Number.isFinite(mins) && mins > 0) return mins <= 30 ? "easy" : mins <= 45 ? "steady" : "hard";
   return "steady";
+}
+
+/* How hard a session this sheet asks the library for, now that it asks nobody.
+
+   Mo, 2026-09-20, about the segment that used to sit above the minutes:
+   "remove 'How hard,' 'Easy,' 'Steady,' and 'Hard.' Let's just remove that. I
+   don't like that at all." He is right about the question. Somebody opening
+   this sheet has named an activity, not a difficulty, and grading an effort
+   you have not made yet is the app handing a person its own job.
+
+   So the answer is derived, and it is capped. defaultActivityPref reads the
+   tier back out of days_per_week, where five or six days reads as "hard", and
+   that inference is the part that cannot be left standing: how OFTEN somebody
+   trains is not how hard a session they want, and with no control on screen
+   there is nothing left to correct a wrong guess with. Hard is also the only
+   band that opens the library's advanced tier, which is two rows (Sprint
+   Intervals and a Threshold Row) and a genuinely different kind of day. Easy
+   still comes through, because an easy session nobody asked for costs nobody
+   anything.
+
+   It is the same line a planned activity already draws for the week it builds:
+   "they named an activity, not a difficulty". That line now holds for every
+   session this app builds rather than only the ones planned in advance. */
+function sessionEffort() {
+  const pref = defaultActivityPref();
+  return pref === "hard" ? "steady" : pref;
 }
 
 /* The library's sessions for one activity, and an honest word about anything
@@ -22114,7 +22125,7 @@ function openCardioSession(state, act, { after = false } = {}) {
       || habit[0] || CARDIO_ACTS[0];
     CARDIO_SES = {
       state: state || "setup", act: first.key, minutes: 30,
-      pref: defaultActivityPref(), accum: 0, since: null,
+      pref: sessionEffort(), accum: 0, since: null,
       /* How this screen was reached, because it changes what it owes the
          person: somebody adding a second session to a day never answered
          "lifting or activity" on the way in. It rides on the session rather
@@ -22187,7 +22198,13 @@ async function csnGenerate() {
   if (!CARDIO_SES || CARDIO_SES.state !== "setup" || CARDIO_SES.act !== a.key) return;
   const btn = $("csnGen");
   if (btn) { btn.disabled = true; btn.textContent = "Building it\u2026"; }
-  const pref = CARDIO_SES.pref || defaultActivityPref();
+  /* Asked for fresh rather than read off the session. Nothing on screen can
+     change this any more, so a `pref` in storage is either the same answer or
+     a stale one written by a door that opened this sheet with its own default
+     on it, and a session built at an effort nobody can see is the worst of the
+     two. It is still written back below, so a saved session records what
+     actually built it. */
+  const pref = sessionEffort();
   const plan = a.training ? await buildGuidedPlan(a, CARDIO_SES.minutes) : null;
   const card = a.training ? null : await buildCardioCard(a, pref);
   if (!CARDIO_SES || CARDIO_SES.state !== "setup" || CARDIO_SES.act !== a.key) return;
@@ -22465,11 +22482,31 @@ function renderCardioStage() {
     const nextUp = after ? secondSessionPicks() : null;
     /* The goal-and-ticks recommendation is about the kind of training this
        person does. It is not about the session they finished forty minutes
-       ago, so on this screen it steps aside for the one that is. */
-    const recs = nextUp ? nextUp.acts : recommendedActivities(MY_PROFILE);
+       ago, so on this screen it steps aside for the one that is.
+
+       Unless the day leaves it nothing to say, which is what a flow day does:
+       dayMuscleLoad reads no muscles off a yoga class, so the only thing
+       secondSessionPicks can argue for is a lift and the list below would
+       carry no recommendation at all. The goal one is still a true thing about
+       the person, so it comes back rather than leaving the sheet blank. */
+    const recs = nextUp?.acts?.length ? nextUp.acts : recommendedActivities(MY_PROFILE);
     const isRec = recs.some((r) => r.key === a.key);
     const whyNow = nextUp ? (nextUp.picks.find((x) => x.key === a.key)?.why || "") : "";
-    const pref = CARDIO_SES.pref || defaultActivityPref();
+    /* Never the one the card above is already showing: the hero says that one's
+       name and its reason, and the same sentence twice on one screen is the app
+       padding. */
+    const picks = nextUp ? nextUp.picks.filter((x) => x.key !== a.key) : [];
+    /* The lifting door is a row up there or a tile down here, never both. It
+       used to be both, which printed its one sentence twice on any day that
+       recommended it. */
+    const liftPicked = picks.some((x) => x.key === "lift");
+    /* An opinion is stated once, in the highest place it has on the screen.
+       The hero already wears it in its eyebrow, and a Recommended block below
+       the hero says everything else we would argue for, with the reason
+       attached. So a tile flag is what is left when neither of those exists,
+       and under a heading that says Everything else there are no flags at all,
+       which is the only way that heading is true. */
+    const flagged = (x) => !picks.length && x.key !== a.key && recs.some((r) => r.key === x.key);
     /* Anything with a library behind it can be generated. Other cannot, and
        that is the honest state of it: a clock and a minutes field. */
     const canGenerate = !!(a.cardio || a.training);
@@ -22490,7 +22527,10 @@ function renderCardioStage() {
             they belong to THIS session and not to the menu. */ ""}
       <section class="act-hero">
         <div class="act-hero-words">
-          <p class="act-eyebrow">${whyNow ? "What I&rsquo;d do next" : isRec ? "Recommended for you" : "Your pick"}</p>
+          ${/* One word wherever this sheet has an opinion. Mo: "we just have
+                'Recommended'". It used to say three different things in the
+                same slot, which made the same fact read as three. */ ""}
+          <p class="act-eyebrow">${whyNow || isRec ? "Recommended" : "Your pick"}</p>
           <h3>${escapeHtml(actTitle(a))}</h3>
           ${/* The reason this one, today, read off what the day already holds.
                 Only when there is one: the goal line underneath is a true
@@ -22498,16 +22538,13 @@ function renderCardioStage() {
           <p class="act-why">${escapeHtml(whyNow || activityWhy(a, MY_PROFILE, isRec))}</p>
         </div>
         <div class="act-hero-face">${robotFaceSVG(56, "", { bust: true })}</div>
-        ${canGenerate ? `
-        <div class="act-knob act-knob-seg">
-          <div class="csn-dur-k">How hard</div>
-          <div class="act-seg" role="group" aria-label="How hard">
-            ${ACT_PREFS.map((p) => `<button type="button" class="${p.key === pref ? "on" : ""}" data-pref="${p.key}">${p.label}</button>`).join("")}
-          </div>
-          <p class="act-seg-note">${a.training
-            ? "Sets how long I build the class for."
-            : "Picks the session. The session brings its own minutes."}</p>
-        </div>` : ""}
+        ${/* The only question left. A segment above this one asked how hard,
+              and it is gone: see sessionEffort for where that answer comes from
+              now. What the segment's own note said out loud has to survive it
+              though, because it was never really about effort. A built cardio
+              session brings the library's minutes with it and this stepper only
+              governs the clock, and a sheet that asks a question it then
+              ignores is worse than one that never asked. */ ""}
         <div class="act-knob act-knob-dur">
           <div class="csn-dur-k">How long</div>
           <div class="csn-dur-row">
@@ -22518,6 +22555,9 @@ function renderCardioStage() {
           <div class="csn-presets">
             ${CSN_PRESETS.map((m) => `<button type="button" class="csn-preset${m === CARDIO_SES.minutes ? " on" : ""}" data-preset="${m}">${m}</button>`).join("")}
           </div>
+          ${canGenerate ? `<p class="act-knob-note">${a.training
+            ? "I&rsquo;ll build the class to fit."
+            : "Sets the clock. A session I build brings its own length."}</p>` : ""}
         </div>
         <div class="act-hero-acts">
           ${canGenerate ? `<button type="button" class="btn-primary" id="csnGen">${icon("wand", 17)} Build my ${escapeHtml(actNoun(a))}</button>` : ""}
@@ -22533,29 +22573,38 @@ function renderCardioStage() {
             here is a number off another screen: what today cost muscle by
             muscle, what the rest of the week already holds, how much room the
             week has left for a lift. With nothing it can argue from, this
-            block is simply not drawn. */ ""}
-      ${/* Never the one the card above is already showing: the hero says that
-            one's name and its reason, and printing the same sentence twice on
-            one screen is the app padding. */ ""}
-      ${nextUp && nextUp.picks.filter((x) => x.key !== a.key).length ? `
-      <p class="act-q">${whyNow ? "Also worth doing" : "What I&rsquo;d do next"}</p>
+            block is simply not drawn.
+
+            One heading over the lot of it, and the word is Recommended. It
+            read "Also worth doing" over these same rows until Mo, 2026-09-20:
+            "remove 'Worth doing'". He is right that it was a second grade of
+            recommendation, and a sheet cannot ask somebody to tell two grades
+            of our opinion apart. Either we would do it next or we would not. */ ""}
+      ${picks.length ? `
+      <p class="act-q">Recommended</p>
       <div class="nxt-picks">
-        ${nextUp.picks.filter((x) => x.key !== a.key).map((x) => `<button type="button" class="nxt-pick" data-next="${escapeHtml(x.key)}">
+        ${picks.map((x) => `<button type="button" class="nxt-pick" data-next="${escapeHtml(x.key)}">
           <span class="nxt-ico">${icon(x.ico, 18)}</span>
           <span class="nxt-b"><b>${escapeHtml(x.label)}</b><i>${escapeHtml(x.why)}</i></span>
           <span class="nxt-go">${icon("chevronRight", 15)}</span>
         </button>`).join("")}
-      </div>
-      <p class="act-q" style="margin-top:16px;">Or something else</p>`
-      : `<p class="act-q">${whyNow ? "Or something else" : "What do you want to do?"}</p>`}
+      </div>` : ""}
+      ${/* And then the rest of it. Mo: "this is kind of messy when I go to add
+            a session." It was: three venue headings in the same uppercase as
+            the knobs above them, over two or three tiles each, so the sheet
+            read as six labelled groups rather than one list. The headings said
+            nothing the tiles did not already say, because every one of them is
+            named for where it happens: Run outside and Treadmill are not two
+            rows that needed a sign over them. So the shelves are kept and the
+            signs are gone, and a gap between the grids does the grouping. */ ""}
+      <p class="act-q${picks.length ? " act-q-rest" : ""}">${picks.length ? "Everything else" : "What do you want to do?"}</p>
       ${ACT_GROUPS.map((g) => {
         const list = CARDIO_ACTS.filter((x) => (x.venue || null) === g.venue);
         if (!list.length) return "";
         return `
-          <p class="act-group">${escapeHtml(g.head)}</p>
           <div class="ob-styles act-styles">
             ${list.map((x) => `<button type="button" class="ob-style${x.key === a.key ? " on" : ""}" data-act="${x.key}">
-              ${recs.some((r) => r.key === x.key) ? `<span class="obs-rec">Recommended</span>` : ""}
+              ${flagged(x) ? `<span class="obs-rec">Recommended</span>` : ""}
               <span class="obs-ico">${icon(x.ico, 20)}</span>
               <span class="obs-label">${escapeHtml(actTitle(x))}</span>
             </button>`).join("")}
@@ -22576,15 +22625,17 @@ function renderCardioStage() {
             lifting-or-activity on the way to this screen, so this screen owes
             them both. Everywhere else it stays gone. */ ""}
       ${!nextUp ? "" : `
-        <p class="act-group">Lifting</p>
+        ${/* Only when it is not already a row up there. On a day the week has
+              room for a lift it IS one of the recommendations, with the same
+              sentence under it, and this used to draw it a second time. */ ""}
+        ${liftPicked ? "" : `
         <div class="ob-styles act-styles">
           <button type="button" class="ob-style" data-next="lift">
-            ${nextUp.picks.some((x) => x.key === "lift") ? `<span class="obs-rec">Recommended</span>` : ""}
             <span class="obs-ico">${icon("dumbbell", 20)}</span>
             <span class="obs-label">Weightlifting</span>
           </button>
         </div>
-        ${nextUp.liftWhy ? `<p class="nxt-note">${escapeHtml(nextUp.liftWhy)}</p>` : ""}
+        ${nextUp.liftWhy ? `<p class="nxt-note">${escapeHtml(nextUp.liftWhy)}</p>` : ""}`}
         ${/* Said before the tap rather than discovered after it. ai_workouts is
               unique on (email, entry_date) and every writer in this file
               upserts on exactly that, so a second plan built today lands on
@@ -22616,9 +22667,6 @@ function renderCardioStage() {
         switchTab("workout");
         generateWorkout(todayStr(), { keepFocus: nextUp?.liftFocus || null });
       };
-    });
-    stage.querySelectorAll("[data-pref]").forEach((b) => {
-      b.onclick = () => { CARDIO_SES.pref = b.dataset.pref; csnSave(); renderCardioStage(); };
     });
     stage.querySelectorAll("[data-step]").forEach((b) => {
       b.onclick = () => {
