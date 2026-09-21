@@ -1020,7 +1020,12 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
        limit rather than opening a second path through the builder. A limit set
        by hand on the limits sheet survives the merge, because both are the
        same claim: the plan cannot use that thing. */
-    const styles = readStyles(payload.train_styles);
+    /* And how often, from profiles.style_frequency, the map beside the list.
+       Read here and spent in styles.mjs alone: the single day this function
+       builds is weighted by it (styleDayFor) and the week the app composes is
+       composed by it (composeWeek). A missing map is the week they already
+       had, which is the same promise the list keeps for null. */
+    const styles = readStyles(payload.train_styles, payload.style_frequency);
     const planLimits = styles.asked ? mergeStyleLimits(limits, styles) : limits;
 
     step = "age";
@@ -1337,6 +1342,10 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
              from a missing key to know whether to trust the rest of it. */
           asked: styles.asked,
           picked: styles.styles,
+          /* How often, one word per picked style, defaults filled in. The
+             screen that says "running most days" reads it from here rather
+             than re-deriving the default and getting it differently. */
+          frequency: styles.frequency,
           resistance: styles.resistance,
           honoured: stylesHonoured,
           equipmentMissing: styles.equipmentMissing,

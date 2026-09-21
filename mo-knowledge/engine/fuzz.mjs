@@ -532,7 +532,7 @@ const META_SUBKEYS = {
      progression, and this table is walked as objects only. */
   progression: ["rule", "detail"],
   volume: ["byGroup", "under", "frequencyCapped"],
-  styles: ["asked", "picked", "resistance", "honoured", "equipmentMissing", "equipmentDeclared", "cardioModes", "flowTrainings", "note"],
+  styles: ["asked", "picked", "frequency", "resistance", "honoured", "equipmentMissing", "equipmentDeclared", "cardioModes", "flowTrainings", "note"],
 };
 const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets", "cardio", "flow"]);
 const CARDIO_KEYS = new Set(["name", "mode", "minutes", "effort", "cue", "structure"]);
