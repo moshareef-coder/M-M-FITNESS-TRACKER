@@ -6198,6 +6198,32 @@
   }
   .bi-ring.dim .bi-ring-svg .fill { stroke: var(--border); }
   .bi-ring.dim .bi-ring-val, .bi-ring.dim .bi-ring-label { color: var(--muted); }
+  /* The whole row is the button, laid out exactly like .bi-rings because it
+     replaces it one for one. A native <button> reset to grid rather than a
+     div with a click handler, so this is reachable and announced the same way
+     every other control in the app is.
+
+     #biRings is ITSELF a 5 column grid (.bi-rings), and this button is its
+     only child, so without the span below it sits in column 1 alone and its
+     own 5 column grid then divides that one narrow track by 5, five slivers
+     stacked at the left edge rather than five rings across the card. The span
+     hands it the full row before it subdivides anything. */
+  .bi-rings-lock {
+    grid-column: 1 / -1;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; width: 100%;
+    background: none; border: none; padding: 0; margin: 0; cursor: pointer; font: inherit; color: inherit;
+  }
+  .bi-rings-lock:active .bi-ring-svg { opacity: .7; }
+  /* Same shape as the rings lock: a native button standing in for the row it
+     replaces, not a card floating inside the card. */
+  .nx-lock {
+    display: flex; align-items: center; gap: 11px; width: 100%; padding: 2px 0 14px;
+    background: none; border: none; cursor: pointer; font: inherit; color: var(--text); text-align: left;
+  }
+  .nx-lock:active { opacity: .75; }
+  .nx-lock-face { flex: none; }
+  .nx-lock-line { flex: 1; font-size: 13.5px; font-weight: 600; line-height: 1.4; }
+  .nx-lock svg:last-child { flex: none; color: var(--muted); }
 
   .bi-insights { display: flex; flex-direction: column; gap: 8px; }
   /* start, not stretch: the icon tile used to grow to the height of whatever
@@ -39609,9 +39635,17 @@ function bodyEmptyLine() {
   return `Nothing logged ${bodyPeriodWord(BODY_PERIOD)} yet. Finish a session and the muscles you hit light up here.`;
 }
 
+/* Mo, 2026-09-21: the figure stays free, real, green on what you hit. The
+   rings are the paid part, because a ring is a number, and the number is the
+   reading somebody is being asked to pay for. Gated by showing the same five
+   rings with the same labels and no fill, rather than by hiding the row: the
+   shape of what you'd get is the offer, same as a swatch you cannot press
+   yet. Tapping the row is the ask, not a button living inside a pitch card
+   sitting there uninvited. */
 function renderBodyRings(ranked, animate) {
   const el = $("biRings");
   el.classList.toggle("no-anim", !animate);
+  if (!hired()) { renderBodyRingsLocked(el, ranked); return; }
   const shown = ranked.slice(0, 5);
   for (const g of BODY_RING_FILLERS) {
     if (shown.length >= 5) break;
@@ -39646,6 +39680,36 @@ function renderBodyRings(ranked, animate) {
     el.querySelectorAll(".fill").forEach((f) => { f.style.strokeDashoffset = f.dataset.off; });
     el.querySelectorAll(".bi-ring-val").forEach((v, i) => bodyCountUp(v, Number(v.dataset.target), 1000, i * 90));
   }));
+}
+
+/* The real five groups and their real labels, ranked exactly as they would be
+   for a hired account, with no fill drawn and a lock in place of the number.
+   ranked is already computed by the caller from real logs, so nothing here is
+   invented to fill the row: whichever five muscles are actually first is what
+   shows, dimmed, which is the correct five to be dimming. */
+function renderBodyRingsLocked(el, ranked) {
+  const shown = ranked.slice(0, 5);
+  for (const g of BODY_RING_FILLERS) {
+    if (shown.length >= 5) break;
+    if (!shown.some((m) => m.key === g)) shown.push({ key: g, label: BODY_GROUP_LABELS[g] });
+  }
+  const r = 42, c = 2 * Math.PI * r;
+  el.innerHTML = `<button type="button" class="bi-rings-lock" data-hire="1" aria-label="Hire me to see your impact">
+    ${shown.map((m) => `
+      <div class="bi-ring dim">
+        <div class="bi-ring-svg">
+          <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="${r}" fill="none" stroke-width="9"/></svg>
+          <div class="bi-ring-val">${icon("lock", 14)}</div>
+        </div>
+        <div class="bi-ring-label">${escapeHtml(m.label)}</div>
+      </div>`).join("")}
+  </button>`;
+  const note = $("biRingsNote");
+  note.textContent = "Hire me to see your impact.";
+  note.classList.remove("hidden");
+  el.querySelector("[data-hire]").onclick = async () => {
+    if (await requirePremium()) renderBodyTab(true);
+  };
 }
 
 function bodyCountUp(el, target, ms, delay) {
@@ -40477,7 +40541,28 @@ function bodyNextEngineAnswer(r) {
   };
 }
 
+/* One tappable row where the answer would be, in the mascot's own voice
+   rather than a header restating "What to train next" a second time. The
+   section title above this card already says what it is; this says what
+   pressing it gets you. */
+function renderBodyNextLocked() {
+  $("biNext").innerHTML = `<button type="button" class="nx-lock" data-hire="1">
+    ${robotFaceSVG(34, "nx-lock-face")}
+    <span class="nx-lock-line">Hire me and I'll say what to train next.</span>
+    ${icon("chevronRight", 16)}
+  </button>`;
+  $("biNext").querySelector("[data-hire]").onclick = async () => {
+    if (await requirePremium()) renderBodyNext(true);
+  };
+  $("biNextInfoSlot").innerHTML = "";
+}
+
 async function renderBodyNext(animate) {
+  /* Not hired, no reading, and no ask for one either: bodyNextReading runs the
+     same generator the paid Generate button does, so calling it here just to
+     throw the answer away is asking the paid feature to work for free. The
+     locked row is a fixed render with nothing behind it to compute. */
+  if (!hired()) { renderBodyNextLocked(); return; }
   const reading = await bodyNextReading();
   /* The list, rings and figure painted before the engine answered, against
      the fallback dose. Redrawn once, without the animation, now that the
