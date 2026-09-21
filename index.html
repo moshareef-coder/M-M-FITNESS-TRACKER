@@ -25370,13 +25370,20 @@ function todaySessions() {
 
 /* The day, above whatever screen the workout tab is showing. It is not drawn on
    an empty day: with nothing done and nothing planned the choose screen IS the
-   list, and a heading over one empty row is furniture. */
+   list, and a heading over one empty row is furniture. The head, the rows and
+   the count note stay off at exactly one session, same as ever: the plan below
+   already IS that session and a list of one above it says nothing. Mo: "I
+   should be able to also add another activity as well ... always" -- the Add
+   button used to wait for a second row to justify a section, which meant the
+   one door onto today's second session was locked until a second session
+   already existed. It only needs a first one now. */
 function todaySessionsHTML() {
   const list = todaySessions();
   if (!list.length) return "";
   const stateWord = { done: "Done", running: "Live", open: "Ready" };
   return `
     <section class="tsl">
+      ${list.length > 1 ? `
       <div class="tsl-head">
         <h3>Today&rsquo;s sessions</h3>
         <span class="tsl-n">${list.length}</span>
@@ -25388,7 +25395,7 @@ function todaySessionsHTML() {
             <span class="tsl-txt"><b>${escapeHtml(sn.label)}</b><i>${escapeHtml(sn.detail)}</i></span>
             <span class="tsl-state">${sn.state === "done" ? icon("check", 14) : escapeHtml(stateWord[sn.state])}</span>
           </${sn.tap ? "button" : "div"}>`).join("")}
-      </div>
+      </div>` : ""}
       <button type="button" class="tsl-add" id="tslAddBtn">${icon("plus", 15)} Add another session</button>
       ${/* Two sessions is not two days, and somebody looking at two rows under
             one heading is entitled to wonder. gymDaysInWeek counts distinct
@@ -34875,6 +34882,71 @@ function openPlanKind(date, onWeights) {
   scrim.querySelector("#pkAct").onclick = () => { close(); openActivityInstead(date, planDayWord(date)); };
 }
 
+/* Whether a day already holds one of each kind a plan can be (a lift and a
+   non-lifting activity), the two slots nextPlanSlot knows how to hand out.
+   Past that point a new plan of either kind REPLACES the one already there
+   rather than adding to it -- nextPlanSlot's own rule, unchanged here -- so
+   the add door below can say so instead of letting a tap quietly overwrite a
+   session nobody asked to lose. Same boolean nextPlanSlot itself tests, so a
+   lifting day emptied by hand (emptiness alone is not "this is an activity
+   day", see the comment on cardioSessionOf) reads the same way in both
+   places. */
+function dayIsFull(date) {
+  const rows = plansOnDate(date);
+  return rows.some((w) => (w.exercises || []).length > 0) && rows.some((w) => !(w.exercises || []).length);
+}
+
+/* Mo: "I should be able to also add another activity as well... You can
+   always add that on. You can always generate that or whatever." Same three
+   doors openDayPlanner shows an empty day (generateWorkout, the manual
+   builder, openActivityInstead), offered again for a day that already holds
+   something, because all three already place what they write by
+   nextPlanSlot rather than at slot 0 -- see saveManualWorkout and
+   planActivityOnDay. Nothing here is a second way to write a plan, only a
+   second place this ask can be made from. */
+function openAddActivitySheet(date) {
+  if (dayIsFull(date)) {
+    toast(`${planDayWord(date)} already has a lift and an activity on it, the most a day can hold right now. Remove one first to swap it for something else.`);
+    return;
+  }
+  const dayWord = planDayWord(date);
+  const close = () => $("popScrim").classList.add("hidden");
+  $("popCard").innerHTML = `
+    <div class="pop-body">
+      <div class="ds-top">
+        <div><div class="pop-who" style="color:var(--muted)">${escapeHtml(dayWord.toUpperCase())}</div>
+          <div class="sv-name">Add another activity</div></div>
+        <button type="button" class="ds-x" id="dpX" aria-label="Close">&times;</button>
+      </div>
+      <div class="dp-ways">
+        ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="dpGen">
+          <span class="dp-way-ico">${icon("wand", 18)}</span>
+          <span class="dp-way-txt"><b>Generate one</b><i>Built around your goals and history.</i></span>
+        </button>`}
+        <button type="button" class="dp-way" id="dpOwn">
+          <span class="dp-way-ico">${icon("pencil", 18)}</span>
+          <span class="dp-way-txt"><b>Plan my own</b><i>Pick the exercises yourself.</i></span>
+        </button>
+        <button type="button" class="dp-way" id="dpAct">
+          <span class="dp-way-ico">${icon("run", 18)}</span>
+          <span class="dp-way-txt"><b>Add an activity</b><i>A run, a ride, yoga, Pilates.</i></span>
+        </button>
+      </div>
+    </div>`;
+  $("popScrim").classList.remove("hidden");
+  $("popScrim").onclick = (e) => { if (e.target === $("popScrim")) close(); };
+  $("dpX").onclick = close;
+  if ($("dpGen")) $("dpGen").onclick = () => { close(); generateWorkout(date); };
+  if ($("dpOwn")) $("dpOwn").onclick = () => {
+    close();
+    PLAN_FOR_DATE = date;
+    MANUAL_DRAFT = [];
+    saveDraft();
+    goWorkoutScreen("manual");
+  };
+  if ($("dpAct")) $("dpAct").onclick = () => { close(); openActivityInstead(date, dayWord); };
+}
+
 /* Putting something on an empty day: generate one, build one, or do an
    activity. Mo, 2026-09-18: a day that already holds a plan should open the
    plan itself, full size, with the same rows and the same swaps as the screen
@@ -36843,11 +36915,19 @@ function showPlanScreen(date) {
    done and there is no clock to report on, so a state word on every row would
    be "Planned" seven times. What it owes the reader is which session they are
    looking at and one tap to the other. */
+/* Mo: "when I plan my week or whatever, and then I go into my week, and I
+   click on it, I should be able to also add another activity as well." This
+   used to answer "" below two sessions, which hid the add door along with a
+   list that had nothing to say yet, the same trap todaySessionsHTML had:
+   review a day with only one thing on it, or nothing at all, and there was no
+   way from here to put a second thing on it. The list of what is already
+   there still waits for a second row to earn its place; the door to add one
+   does not. */
 function plannedDayListHTML(date, showing) {
   const rows = plansOnDate(date);
-  if (rows.length < 2) return "";
   return `
     <section class="tsl">
+      ${rows.length > 1 ? `
       <div class="tsl-head">
         ${/* Not the day's name: the card title two lines above already says
               which Saturday this is, and printing it twice is the screen
@@ -36867,12 +36947,13 @@ function plannedDayListHTML(date, showing) {
             <span class="tsl-state">${on ? "Showing" : "Open"}</span>
           </button>`;
         }).join("")}
-      </div>
+      </div>` : ""}
+      <button type="button" class="tsl-add" id="tslPlanAddBtn" data-add-date="${escapeHtml(date)}">${icon("plus", 15)} Add another activity</button>
       ${/* The same sentence today's list makes, for the same reason: somebody
             looking at two rows under one date is entitled to wonder whether
             the week is about to count them twice. gymDaysInWeek counts
             distinct dates, so it cannot. */ ""}
-      <p class="tsl-note">${rows.length} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>
+      ${rows.length > 1 ? `<p class="tsl-note">${rows.length} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
     </section>`;
 }
 
@@ -37039,17 +37120,15 @@ function renderPlanPreview(opts) {
     </div>`;
   }).join("");
 
-  /* Only once the day holds more than this plan. On an ordinary one-session day
-     the plan IS the day and a list of one above it says nothing. Never while
-     reviewing another day: those sessions are today's. */
-  /* The day above the session, whenever the day holds more than one. Today
-     reads it off todaySessions, which knows about the clock and what is already
-     logged; a day that has not arrived has none of that and is only its rows,
-     so it gets the plain version. Both are the same list under the same
-     heading, because two sessions on a Thursday is one Thursday either way. */
-  const dayList = review
-    ? plannedDayListHTML(date, plan)
-    : todaySessions().length > 1 ? todaySessionsHTML() : "";
+  /* The day above the session. Today reads it off todaySessions, which knows
+     about the clock and what is already logged; a day that has not arrived has
+     none of that and is only its rows, so it gets the plain version. Both are
+     the same list under the same heading, because two sessions on a Thursday
+     is one Thursday either way. Each function decides on its own whether the
+     list of rows is worth drawing (never at one session, the plan below IS
+     that one); the Add door is not gated the same way any more, see the
+     comment on todaySessionsHTML. */
+  const dayList = review ? plannedDayListHTML(date, plan) : todaySessionsHTML();
 
   /* "Maybe by accident I didn't do it." The way out, at the bottom of the
      screen that is about today, under everything that offers to do today: it
@@ -37221,6 +37300,11 @@ function renderPlanPreview(opts) {
       renderPlanPreview({ date, review: true, slot: Number(b.dataset.planSlot) || 0 });
     };
   });
+  /* The review screen's own door onto a second session, wherever this day
+     falls. Not on today: today's plan screen (dayList = todaySessionsHTML)
+     wires its own tslAddBtn to the live clock instead, through
+     wireTodaySessions above. */
+  if ($("tslPlanAddBtn")) $("tslPlanAddBtn").onclick = (e) => openAddActivitySheet(e.currentTarget.dataset.addDate);
   mountMotionFigures($("workoutContent"));
 
   makeReorderable($("planRows"), async (order) => {
