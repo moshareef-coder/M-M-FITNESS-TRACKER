@@ -6471,13 +6471,17 @@
      into a clipped label, which is what Mo saw. Each chip is its own width now
      and the row scrolls sideways under the thumb, bleeding to the screen edges
      so it reads as more-to-the-right rather than as a cut off word. Scoped to
-     the strip, so the page itself never scrolls. */
-  .lift-chips {
+     the strip, so the page itself never scrolls.
+
+     The pose picker's category tabs (.csn-pick-tabs/.csn-pick-tab) wear this
+     same strip: a category name is as variable in length as a lift name, and
+     the same argument against a segmented control applies. */
+  .lift-chips, .csn-pick-tabs {
     display: flex; gap: 8px; margin: 0 -16px 12px; padding: 0 16px 2px;
     overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
   }
-  .lift-chips::-webkit-scrollbar { display: none; }
-  .lift-chip {
+  .lift-chips::-webkit-scrollbar, .csn-pick-tabs::-webkit-scrollbar { display: none; }
+  .lift-chip, .csn-pick-tab {
     flex: 0 0 auto; white-space: nowrap; min-height: 36px; padding: 8px 15px;
     border-radius: 100px; cursor: pointer;
     display: inline-flex; align-items: center; gap: 5px;
@@ -6489,8 +6493,8 @@
      starring happens under See all lifts. */
   .lift-star { display: flex; color: var(--accent); }
   .lift-star svg { fill: currentColor; }
-  .lift-chip.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
-  .lift-chip:active { transform: scale(.97); }
+  .lift-chip.on, .csn-pick-tab.on { background: var(--panel); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-card); }
+  .lift-chip:active, .csn-pick-tab:active { transform: scale(.97); }
   .lift-records { margin-bottom: 12px; }
 
   /* ---- A cardio or class session ----
@@ -6680,14 +6684,35 @@
   /* ---- Picking the class yourself ----
      The swap sheet's row with the order written into its icon slot, so
      choosing a pose and seeing where it landed in the class are one thing to
-     look at rather than a list and a second list underneath it. */
-  .csn-pick-cat {
-    margin: 20px 0 8px; font-size: 12.5px; font-weight: 800; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--muted);
-  }
+     look at rather than a list and a second list underneath it.
+
+     The stacked category headers this used to be (one long scroll, a label
+     every few rows) are gone: Mo asked for tabs, so the categories moved into
+     the same scrolling chip strip the lift picker already wears (.lift-chips,
+     above) rather than inventing a second filter row that looks different for
+     no reason; .csn-pick-tabs shares its geometry rather than redeclaring it.
+
+     One thing it cannot share: .csn-stage (unlike the Progress tab .lift-chips
+     sits in) is itself a column flexbox, and setting overflow-x without
+     overflow-y makes the browser compute overflow-y: auto too, which zeroes a
+     flex item's automatic minimum size. Undeclared, the tab strip shrank to
+     2px between the guided line and the rows the moment there was more
+     content than the sheet's height, taking the whole strip down to a
+     hairline. flex: none opts it out of that shrink instead. */
+  .csn-pick-tabs { flex: none; }
   .csn-pick.on { border-color: var(--accent); }
   .csn-pick.on .sv-row-ico { background: var(--accent); color: var(--on-accent); }
   .csn-pick .sv-row-ico b { font-size: 14px; font-weight: 800; }
+  /* The move IS the pose, and a numbered badge does not say what a Warrior II
+     looks like. Same rail figure as Up Next (.upnext-fig), sized down for a
+     list row instead of a horizontal card: 46px was built for a card with
+     nothing else on it, this row already carries a badge and two lines of
+     text, so it comes in a shade smaller. Always data-fig-static (see
+     mountMotionFigures): a picker of up to forty of these is forty thumbnails
+     to glance at, not forty things to watch move. */
+  .csn-pick-fig { flex: 0 0 44px; width: 44px; height: 44px; display: block; }
+  .csn-pick-fig canvas { display: block; width: 44px; height: 44px; }
+  .csn-pick-fig.fig-none { display: none; }
   /* Wraps, unlike the meta line above it, because it is a sentence and the
      nowrap rule up there would cut it to "Loads what you told me". */
   .csn-pick-warn {
@@ -22772,6 +22797,12 @@ async function csnGenerate() {
 let CSN_PICK_POOL = null;
 let CSN_PICK_FOR = null;
 let CSN_PICK_OUT = new Set();
+/* Which category tab is showing. null is All. Lives outside CARDIO_SES
+   because it is not part of the class being built, just where the picker
+   happens to be scrolled to; reset in csnOpenPicker so a fresh open (or a
+   re-open on the reveal's Edit) always starts on All rather than wherever a
+   previous visit left off. */
+let CSN_PICK_TAB = null;
 /* The engine module itself, once it has landed, because csnPlanFromPicks is
    synchronous and an edited class is filled to its minutes by the engine's own
    fillRounds rather than a copy of it. */
@@ -22848,6 +22879,7 @@ async function csnOpenPicker(from = "setup") {
   }
   CARDIO_SES.pickBack = from;
   CARDIO_SES.state = "pick";
+  CSN_PICK_TAB = null;
   csnSave();
   renderCardioStage();
 }
@@ -23553,7 +23585,30 @@ function renderCardioStage() {
       if (!c) cats.push(c = { key, moves: [] });
       c.moves.push(m);
     }
+    /* A stale tab (the library reloaded with a different category set, which
+       does not happen today but would otherwise render an empty screen with
+       no way back to All) falls back to All rather than showing nothing. */
+    if (CSN_PICK_TAB && !cats.some((c) => c.key === CSN_PICK_TAB)) CSN_PICK_TAB = null;
+    const shown = CSN_PICK_TAB ? (cats.find((c) => c.key === CSN_PICK_TAB)?.moves || []) : pool;
     const word = actMoveWord(a, true);
+    /* One row, badge plus figure plus text. The badge still carries the order
+       (see the block comment above this state): a number says where in the
+       class a pose landed and nothing else does, so it stays even though the
+       figure now also tells you which pose this is. */
+    const pickRow = (m) => {
+      const n = order.get(m.name) || 0;
+      return `<button type="button" class="sv-row csn-pick${n ? " on" : ""}" data-pick="${escapeHtml(m.name)}" aria-pressed="${n ? "true" : "false"}">
+              <span class="sv-row-ico">${n ? `<b>${n}</b>` : icon("plus", 18)}</span>
+              <span class="csn-pick-fig" data-fig="${escapeHtml(m.name)}" data-fig-static></span>
+              <span class="sv-row-txt">
+                <span class="sv-row-name">${escapeHtml(m.name)}</span>
+                <span class="sv-row-meta">${escapeHtml(`${m.seconds}s${m.perSide ? " a side" : ""} \u00b7 ${m.level}`)}</span>
+                ${/* Not hidden and not removed: see csnOpenPicker. A pose
+                      somebody chose with this under it is their call. */ ""}
+                ${CSN_PICK_OUT.has(m.name) ? `<span class="csn-pick-warn">Loads what you told me hurts</span>` : ""}
+              </span>
+            </button>`;
+    };
     stage.innerHTML = `
       <div class="csn-head">
         <h2>${editing ? "Edit the" : "Pick your"} ${escapeHtml(word)}</h2>
@@ -23564,23 +23619,12 @@ function renderCardioStage() {
           ? `, into the ${CARDIO_SES.pickBudget} minutes you asked for.`
           : ", and it is as long as what is in it."}`
         : "Tap to add. The class runs in the order you tap them, and it is as long as what you put in it."}</span></p>
-      ${pool.length ? cats.map((c) => `
-        <h3 class="csn-pick-cat">${escapeHtml(c.key)}</h3>
-        <div class="sv-rows">
-          ${c.moves.map((m) => {
-            const n = order.get(m.name) || 0;
-            return `<button type="button" class="sv-row csn-pick${n ? " on" : ""}" data-pick="${escapeHtml(m.name)}" aria-pressed="${n ? "true" : "false"}">
-              <span class="sv-row-ico">${n ? `<b>${n}</b>` : icon("plus", 18)}</span>
-              <span class="sv-row-txt">
-                <span class="sv-row-name">${escapeHtml(m.name)}</span>
-                <span class="sv-row-meta">${escapeHtml(`${m.seconds}s${m.perSide ? " a side" : ""} \u00b7 ${m.level}`)}</span>
-                ${/* Not hidden and not removed: see csnOpenPicker. A pose
-                      somebody chose with this under it is their call. */ ""}
-                ${CSN_PICK_OUT.has(m.name) ? `<span class="csn-pick-warn">Loads what you told me hurts</span>` : ""}
-              </span>
-            </button>`;
-          }).join("")}
-        </div>`).join("")
+      ${pool.length && cats.length > 1 ? `<div class="csn-pick-tabs" id="csnPickTabs">
+        <button type="button" class="csn-pick-tab${CSN_PICK_TAB ? "" : " on"}" data-cat="">All</button>
+        ${cats.map((c) => `<button type="button" class="csn-pick-tab${CSN_PICK_TAB === c.key ? " on" : ""}" data-cat="${escapeHtml(c.key)}">${escapeHtml(c.key)}</button>`).join("")}
+      </div>` : ""}
+      ${pool.length
+        ? `<div class="sv-rows">${shown.map(pickRow).join("")}</div>`
         : `<p class="muted-note">The move library has not landed yet. Close this and open it again in a moment.</p>`}
       <div class="csn-pick-bar">
         <b>${picks.length ? `${picks.length} ${escapeHtml(actMoveWord(a, picks.length !== 1))} \u00b7 ${rounds > 1 ? `${rounds} rounds \u00b7 ` : ""}${mins} min` : `Nothing picked yet`}</b>
@@ -23589,6 +23633,16 @@ function renderCardioStage() {
     /* Back is back to where this was opened from, with the class behind it as
        it was: an edit that was not sent is not an edit. */
     $("csnX").onclick = () => { CARDIO_SES.state = editing ? "reveal" : "setup"; csnSave(); renderCardioStage(); };
+    if ($("csnPickTabs")) $("csnPickTabs").querySelectorAll("[data-cat]").forEach((b) => {
+      b.onclick = () => {
+        /* Not csnSave()'d: which tab is showing is not part of the class, so
+           it does not belong on CARDIO_SES and a reload does not need to
+           remember it. The picks underneath are untouched either way, which
+           is the whole point of keeping this off the session. */
+        CSN_PICK_TAB = b.dataset.cat || null;
+        renderCardioStage();
+      };
+    });
     stage.querySelectorAll("[data-pick]").forEach((b) => {
       b.onclick = () => {
         const name = b.dataset.pick;
@@ -23606,6 +23660,10 @@ function renderCardioStage() {
       };
     });
     $("csnPickGo").onclick = () => { if (csnApplyPicks()) sfx.play("set"); };
+    /* The reveal and the live screen both mount their figures at the bottom
+       of renderCardioStage; this state returns before that call, same as
+       reveal does, so it mounts its own. */
+    mountMotionFigures(stage);
     return;
   }
 
