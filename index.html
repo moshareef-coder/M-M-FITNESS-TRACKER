@@ -3510,6 +3510,32 @@
      to be out of the way or every frame fights it. */
   .sess-sheet.dragging .upnext { transition: none; }
   .sess-sheet .upnext-label { margin: 0 20px 10px; }
+
+  /* The stretch screen folds EVERYTHING under the clock, not just the rail.
+     Same mechanism, bigger bite: the cue, the Back/Restart/Skip row, the one
+     big button and the rail all live in here, and a running hold shows none of
+     them until the sheet is pulled up. A cap rather than a height, for the
+     same reason the rail has one. */
+  .sess-sheet .stretch-more {
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height .3s cubic-bezier(.22,1,.36,1), opacity .2s ease, margin-top .3s cubic-bezier(.22,1,.36,1);
+  }
+  .sess-sheet.open .stretch-more { max-height: 560px; opacity: 1; margin-top: 14px; }
+  .sess-sheet.dragging .stretch-more { transition: none; }
+  /* The rail inside it does NOT fold on its own any more: the block above is
+     what folds, and a rail collapsed inside a collapsing parent measures its
+     own height as zero mid-drag, which is what makes the pull jump. */
+  .sess-sheet .stretch-more .upnext {
+    max-height: 220px; opacity: 1; margin-top: 18px; transition: none;
+  }
+  /* The word under the handle, on the stretch sheet only, and only while it is
+     shut: once the buttons are on screen they say what they are themselves. */
+  .sess-grab-hint {
+    display: block; margin-top: 6px; font-size: 12.5px; font-weight: 600;
+    letter-spacing: .01em; color: color-mix(in srgb, var(--sess-ink) 52%, transparent);
+    transition: opacity .2s ease;
+  }
+  .sess-sheet.open .sess-grab-hint { opacity: 0; }
   /* The whole sheet is the grip. pan-x leaves the rail free to scroll sideways
      and hands every vertical gesture to the drag below instead of the browser. */
   .sess-sheet { touch-action: pan-x; }
@@ -30776,6 +30802,13 @@ function paintStretchHead(list, at) {
    painter to know when the head has to be redrawn rather than patched. */
 let STRETCH_LIVE_AT = null;
 
+/* Which block the sheet was last shut for. The sheet starts down on the way
+   INTO a warm-up, a cool-down or a stretch of its own, and then stays however
+   you left it for the rest of that block: shutting it again on every hold
+   would mean re-pulling it for every Skip, which is the one thing somebody
+   using Skip is going to do repeatedly. */
+let STRETCH_SHEET_FOR = null;
+
 /* The last three seconds of the get ready, out loud, the same three ticks the
    class counts in with: the phone is on the floor and the person is looking at
    the ceiling, so the countdown that matters is the one you can hear. Keyed on
@@ -31025,6 +31058,11 @@ function renderStretchPhase() {
   const total = at.hold;
   const secondSide = !!move.perSide && SESSION.stretchSide === 2;
   STRETCH_LIVE_AT = `${i}-${SESSION.stretchSide}-${at.phase}`;   // what the painter compares against
+  /* Down on the way in, and only on the way in. `solo` is in the key so a
+     standalone stretch started straight after a workout's cool-down still
+     gets its own fresh start rather than inheriting that one's sheet. */
+  const block = `${SESSION.phase}-${solo ? "solo" : "plan"}`;
+  if (STRETCH_SHEET_FOR !== block) { STRETCH_SHEET_FOR = block; SESSION_SHEET_OPEN = false; }
   SESSION_LAST_EX = null;   // the first lift after the warm-up slides in like a new exercise
   const card = $("sessionCard");
   /* Same skeleton as the lift (the stage and the sheet, one screen that does
@@ -31081,13 +31119,22 @@ function renderStretchPhase() {
       </div>
       </div>
 
-      <div class="sess-sheet${SESSION_SHEET_OPEN ? " open" : ""}" id="sessSheet">
+      <div class="sess-sheet stretch-sheet${SESSION_SHEET_OPEN ? " open" : ""}" id="sessSheet">
+        <!-- The handle says what is under it. A pull that nothing announces is
+             a feature nobody finds, and this one is now the only way to reach
+             Skip and Back, so it cannot be left to a bare bar. -->
         <button type="button" class="sess-grab" id="sessGrab" aria-expanded="${SESSION_SHEET_OPEN ? "true" : "false"}"
-          aria-label="${SESSION_SHEET_OPEN ? "Hide what is up next" : "Show what is up next"}"><i></i></button>
+          aria-label="${SESSION_SHEET_OPEN ? "Hide the controls" : "Show the controls"}"><i></i><span class="sess-grab-hint">Skip, back and restart</span></button>
 
         <!-- The hold, where the lift keeps its set chips: the one number this
              screen is about, with the side and what follows above it. -->
         <div class="stretch-hold${prep ? " prep" : ""}" id="stretchTimer">${stretchHeadHTML(list, at)}</div>
+
+        <!-- Everything from here down is folded away until the sheet is pulled
+             up. The clock above is the whole of what a running hold needs to
+             say, and the room this gives back goes to the figure, which is the
+             point: it was the smallest thing on its own screen. -->
+        <div class="stretch-more" id="stretchMore">
         ${move.cue ? `<p class="stretch-cue">${escapeHtml(move.cue)}</p>` : ""}
 
         <!-- The class's three ways out of a mistimed hold, in the class's own
@@ -31129,6 +31176,7 @@ function renderStretchPhase() {
             </button>`).join("")}
           </div>
         </div>` : ""}
+        </div>
       </div>
     </div>`;
 
@@ -31141,7 +31189,7 @@ function renderStretchPhase() {
   $("sessionBody").querySelectorAll("[data-jump-stretch]").forEach((b) => {
     b.onclick = () => jumpToStretch(parseInt(b.dataset.jumpStretch, 10));
   });
-  wireSessionSheet();
+  wireSessionSheet(null, null, ".stretch-more");
   /* A line per hold, from the same slot the lift screen uses. Fired after the
      render so the slot exists, and keyed on the move so moving between holds
      is what prompts him rather than every repaint of the countdown. */
@@ -31658,10 +31706,18 @@ function renderSession() {
 /* The nodes are arguments now rather than two ids read in here: the activity
    session builds this same sheet, and a paused lifting session can still be
    holding its own #sessSheet in the document while it does. */
-function wireSessionSheet(sheetEl, grabEl) {
+/* `foldSel` is what the pull actually folds away. The lift screen folds its Up
+   next rail and keeps its own controls on screen, because the set in front of
+   you is that screen's whole job. The stretch screen hands in ".stretch-more"
+   instead and folds everything below the clock, which is Mo's call on it:
+   "everything starts off down, you have to swipe up for it, and it just starts
+   off with the time." A hold asks nothing of you while it runs, so the figure
+   gets the room until you ask for the buttons back. */
+function wireSessionSheet(sheetEl, grabEl, foldSel = ".upnext") {
   const sheet = sheetEl || $("sessSheet");
   const grab = grabEl || $("sessGrab");
   if (!sheet || !grab) return;
+  const words = foldSel === ".upnext" ? "what is up next" : "the controls";
   const set = (open) => {
     // One short tick when it actually snaps, so the sheet answers the thumb
     // even before the eye catches up. Nothing on a no-op.
@@ -31669,11 +31725,11 @@ function wireSessionSheet(sheetEl, grabEl) {
     SESSION_SHEET_OPEN = open;
     sheet.classList.toggle("open", open);
     grab.setAttribute("aria-expanded", open ? "true" : "false");
-    grab.setAttribute("aria-label", open ? "Hide what is up next" : "Show what is up next");
+    grab.setAttribute("aria-label", `${open ? "Hide" : "Show"} ${words}`);
   };
   grab.onclick = () => set(!SESSION_SHEET_OPEN);
 
-  const rail = sheet.querySelector(".upnext");
+  const rail = sheet.querySelector(foldSel);
   if (!rail) return;   // last exercise: nothing to pull up
 
   /* The drag. The old one only listened on the handle, only looked at where
