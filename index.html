@@ -1643,6 +1643,9 @@
   /* Session length asks five questions' worth of answer in the same row, so the
      only thing that changes is how many columns it is cut into. */
   .rest-pref.five { grid-template-columns: repeat(5, 1fr); }
+  /* Seven, for the days of a week. The gap comes down with the column count
+     rather than the buttons, so a 44px tap target survives at 390px. */
+  .rest-pref.seven { grid-template-columns: repeat(7, 1fr); gap: 6px; }
   .rest-pref button:active { transform: scale(.96); }
   .rest-pref button.on { background: var(--accent); border-color: transparent; color: var(--on-accent); }
 
@@ -1657,6 +1660,42 @@
   .set-styles .ob-style.on { background: color-mix(in srgb, var(--accent) 14%, var(--panel-2)); }
   .set-styles .ob-other { margin: 12px 0 0; }
   .set-styles .ob-other > summary { background: var(--panel-2); }
+
+  /* Settings > Training, grouped.
+
+     The page used to be seven cards, one per control, each with its own border
+     and its own uppercase heading. Every setting therefore weighed the same:
+     the answer somebody gives once on the way in sat in the same box as the
+     number they change when their week changes, and two of the boxes existed
+     only to hold a single switch. Mo, twice: it contradicts itself, and it is
+     flat.
+
+     So a group gets the border and a row does not. A .pref-block is one
+     control inside a group, full bleed to the card's padding so its hairline
+     runs edge to edge the way the settings list's own dividers do. */
+  #page-training .pref-block { padding: 14px 15px; margin: 0 -15px; border-top: 1px solid var(--border); }
+  /* The group's first row, by position rather than :first-child (the heading
+     holds that) or :first-of-type (which is per element name, and these rows
+     are a div and three labels, so it would have stripped the divider off the
+     first label as well). */
+  #page-training h2 + .pref-block { padding-top: 0; border-top: none; }
+  #page-training .pref-block:last-child { padding-bottom: 0; }
+  .pref-name {
+    display: block; font-size: 15px; font-weight: 600;
+    font-family: var(--font-display); letter-spacing: -.01em;
+  }
+  /* One step under .pref-name and the same size as a settings row's subtitle,
+     so a control reads as a name with a reason rather than two sentences. */
+  .pref-why { display: block; font-size: 12.5px; color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
+  .rest-pref + .pref-why { margin-top: 10px; }
+  /* A switch row. The bordered pill it replaces is still right on the pages
+     that hold one switch alone; stacked four deep inside one card it read as
+     four buttons, and the accent fill on a checked one shouted louder than the
+     week above it. The box is the state now, and the row is the tap target. */
+  .pref-row { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; cursor: pointer; }
+  .pref-row .pref-txt { flex: 1; min-width: 0; }
+  .pref-row input { width: 20px; height: 20px; flex-shrink: 0; margin: 1px 0 0; accent-color: var(--accent); }
+  #page-training .pref-row:active { background: var(--panel-2); }
 
   /* Grid, not space-between: "Weight (lb)" is a wider label than "Reps", so
      with flex the two control groups started at different places and the minus
@@ -8096,71 +8135,90 @@
         <div class="scr-title">Training</div>
         <div class="spacer"></div>
       </div>
-    <!-- Asked on the way in and then never again: somebody who joined a gym,
+    <!-- Three groups, not seven cards, ordered by how often somebody comes here
+         to change the thing. What their week is, then what happens inside a
+         session, then the one answer they give once. Mo said this page
+         contradicts itself and that it is flat; the flatness was every control
+         carrying an identical border and an identical heading, which is how the
+         number he changes when his week changes ended up below two boxes that
+         held nothing but a switch. -->
+    <div class="card">
+      <h2>Your week</h2>
+      <!-- This was "Weekly goal": a bare 1 to 7 number box, the one control on
+           the page that never said what it moved, under a heading that collides
+           with the Goal row one screen up (lose weight, build muscle).
+
+           It was also only half of the answer. The app keeps TWO weekly day
+           counts: profiles.challenge_target, which Home's ring, the streak and
+           the badges read, and user_goals.days_per_week, which the week builder
+           reads and which onboarding set once with no screen able to change it
+           after. This box wrote the first and not the second, so setting 3 here
+           left Home saying "0 of 3" while a generated week laid down five. That
+           is the "doesn't make any sense". One control, one answer, both
+           columns: see saveTrainingDays. -->
+      <div class="pref-block">
+        <span class="pref-name">Training days</span>
+        <div class="rest-pref seven" id="setupTrainingDays"></div>
+        <p class="pref-why" id="setupTrainingDaysNote"></p>
+      </div>
+      <div class="pref-block">
+        <span class="pref-name">Session length</span>
+        <div class="rest-pref five" id="setupSessionLen"></div>
+        <p class="pref-why" id="setupSessionLenNote"></p>
+      </div>
+    </div>
+    <div class="card">
+      <h2>In a session</h2>
+      <!-- The robot's switch lives here now. It had a card of its own headed
+           "Your training partner", which is a heading about a person holding
+           one session preference; Mo asked for the card gone and the switch
+           kept, so the switch sits with the rest of the session preferences,
+           word for word as it was. The kit card went the same way: its heading
+           said "Equipment" and its switch says what it does, so the heading was
+           the only part doing no work. -->
+      <div class="pref-block">
+        <span class="pref-name">Rest between sets</span>
+        <div class="rest-pref" id="setupRestChoices"></div>
+        <p class="pref-why">Seconds, give or take. Used for workouts you build yourself. A generated plan budgets its own rest per exercise, because a heavy squat and a lateral raise do not want the same wait.</p>
+      </div>
+      <label class="pref-block pref-row" id="quipsWrap">
+        <span class="pref-txt">
+          <span class="pref-name">Let him talk during a workout</span>
+          <span class="pref-why">The figure on the session screen says something now and then: after a record, when a rest is running long, between lifts. He is quiet most sets. Off here means never, on this phone.</span>
+        </span>
+        <input type="checkbox" id="quipsToggle" />
+      </label>
+      <label class="pref-block pref-row" id="kitPeekWrap">
+        <span class="pref-txt">
+          <span class="pref-name">Show what you need before each exercise</span>
+          <span class="pref-why">When a workout moves to the next lift, a card shows the kit it needs for three seconds and then goes. The equipment is always there to tap on the plan and on the session screen, whether this is on or off.</span>
+        </span>
+        <input type="checkbox" id="kitPeekToggle" />
+      </label>
+      <label class="pref-block pref-row" id="skipStretchWrap">
+        <span class="pref-txt">
+          <span class="pref-name">Skip the warm-up and cool-down</span>
+          <span class="pref-why">Every generated workout opens with a few minutes of timed dynamic moves and closes with a few holds for what you worked. Off here means never; you can also skip either one on the day.</span>
+        </span>
+        <input type="checkbox" id="skipStretchToggle" />
+      </label>
+    </div>
+    <!-- Last, because it is the only answer on this page that is given once.
+         Asked on the way in and then never again: somebody who joined a gym,
          stopped going, or took up running was planned for the answer they gave
          on the day they signed up, forever. Same seven cards as onboarding,
-         same column, and it saves with the button at the bottom of this page
-         because nothing here writes until Save. -->
+         same column. -->
     <div class="card">
       <h2>How you train</h2>
       <div class="set-styles" id="setupStyleGrid"></div>
       <p class="muted-note" id="setupStyleNote"></p>
+      <!-- The one control here that cannot save on the tap: going from lifting
+           to running is an untick and a tick, and the untick in between would
+           write the empty list, which is the one value this column must never
+           hold. So it keeps its button, sitting under the grid it saves rather
+           than at the bottom of a page full of controls it no longer owns. -->
+      <button class="btn-primary" id="saveSetupBtn" style="margin-top:12px;">Save how you train</button>
     </div>
-    <div class="card">
-      <h2>Weekly goal</h2>
-      <!-- Hidden with nobody to share with. Save has always skipped it in that
-           case, so on a solo account it was a switch that said "both of us" and
-           then did nothing. -->
-      <label class="gym-toggle hidden" id="sharedGoalToggleWrap">
-        <span>Use one shared goal</span>
-        <input type="checkbox" id="sharedGoalToggle" />
-      </label>
-      <div id="sharedGoalFields" class="hidden" style="margin-top:12px;">
-        <label>Workout days per week</label>
-        <input type="number" id="setupSharedGoal" min="1" max="7" value="4" />
-        <p class="muted-note">Either of you can change it, and it applies to you both.</p>
-      </div>
-      <div id="ownGoalFields" style="margin-top:12px;">
-        <label>Workout days per week</label>
-        <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
-      </div>
-    </div>
-    <div class="card">
-      <h2>Session length</h2>
-      <p class="muted-note" style="margin-top:-6px;">Minutes, give or take. The plan is built to fit it: fewer sets when the time is short, more when there is room.</p>
-      <div class="rest-pref five" id="setupSessionLen"></div>
-      <p class="muted-note" id="setupSessionLenNote"></p>
-    </div>
-    <div class="card">
-      <h2>Rest between sets</h2>
-      <p class="muted-note" style="margin-top:-6px;">Seconds, give or take. Used for workouts you build yourself. A generated plan budgets its own rest per exercise, because a heavy squat and a lateral raise do not want the same wait.</p>
-      <div class="rest-pref" id="setupRestChoices"></div>
-    </div>
-    <div class="card">
-      <h2>Your training partner</h2>
-      <label class="gym-toggle" id="quipsWrap">
-        <span>Let him talk during a workout</span>
-        <input type="checkbox" id="quipsToggle" />
-      </label>
-      <p class="muted-note">The figure on the session screen says something now and then: after a record, when a rest is running long, between lifts. He is quiet most sets. Off here means never, on this phone.</p>
-    </div>
-    <div class="card">
-      <h2>Equipment</h2>
-      <label class="gym-toggle" id="kitPeekWrap">
-        <span>Show what you need before each exercise</span>
-        <input type="checkbox" id="kitPeekToggle" />
-      </label>
-      <p class="muted-note">When a workout moves to the next lift, a card shows the kit it needs for three seconds and then goes. The equipment is always there to tap on the plan and on the session screen, whether this is on or off.</p>
-    </div>
-    <div class="card">
-      <h2>Stretching</h2>
-      <label class="gym-toggle" id="skipStretchWrap">
-        <span>Skip the warm-up and cool-down</span>
-        <input type="checkbox" id="skipStretchToggle" />
-      </label>
-      <p class="muted-note">Every generated workout opens with a few minutes of timed dynamic moves and closes with a few holds for what you worked. Off here means never; you can also skip either one on the day.</p>
-    </div>
-    <button class="btn-primary" id="saveSetupBtn">Save preferences</button>
     </div>
     <div class="settings-page hidden" id="page-milestones">
       <div class="scr-head">
@@ -14036,14 +14094,6 @@ function showApp() {
   $("app").classList.remove("hidden");
   renderAvatarPair();
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
-  $("sharedGoalToggleWrap").onclick = () => {
-    setTimeout(() => {
-      const on = $("sharedGoalToggle").checked;
-      $("sharedGoalToggleWrap").classList.toggle("checked", on);
-      $("sharedGoalFields").classList.toggle("hidden", !on);
-      $("ownGoalFields").classList.toggle("hidden", on);
-    }, 0);
-  };
   $("proofInput").addEventListener("change", (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -41299,9 +41349,18 @@ function gymDaysThisWeek(name) {
   return gymDaysInWeek(name, weekStartStr());
 }
 
-/* A shared couple goal overrides each person's individual target when set. */
+/* One person's week, always their own.
+
+   A partnership used to be able to carry one shared number that overrode both
+   people's, set by a "Use one shared goal" switch on Setup > Training. Mo asked
+   for the switch gone, and a read with no writer left is worse than no feature:
+   a couple who had turned it on could never turn it off again. So the override
+   goes too, and partnerships.shared_weekly_goal is now written by nothing and
+   read by nothing. Rows that still hold a number fall back to each person's own
+   challenge_target, which is what the two of them last chose for themselves.
+   The column is left in place: dropping one is the owner's call and not
+   reversible. */
 function weeklyGoalFor(email) {
-  if (MY_PARTNERSHIP?.shared_weekly_goal) return MY_PARTNERSHIP.shared_weekly_goal;
   /* Looked up by email rather than assuming anyone who is not me is my
      partner: in a coach group PARTNER_PROFILE is null, so every client was
      silently given the default 4. */
@@ -41890,6 +41949,7 @@ function openSettingsPage(key) {
     // What the goal suggests moves when the goal does, so this re-reads the
     // profile every time the page is opened.
     renderSessionLengthPage();
+    renderTrainingDays();
     // And the same again: this one paints the stored answer, so an edit that
     // was abandoned by leaving the page must not still be sitting here.
     renderTrainStylesPage();
@@ -41941,6 +42001,33 @@ function renderRestChoices() {
   });
 }
 
+/* Seven buttons, one of them on, in place of a 1 to 7 number box.
+
+   The box was the only control on this page you had to type into, it gave no
+   hint that 7 was the top, and it said nothing about what the number moved.
+   Seven chips are the same geometry as the rest length and the session length
+   under them, they read as a week at a glance, and the line below states the
+   answer back in words along with what it changes. */
+const TRAINING_DAY_CHOICES = [1, 2, 3, 4, 5, 6, 7];
+
+function trainingDaysNote(days) {
+  return `${days} ${days === 1 ? "day" : "days"} a week. The ring on Home fills against this, `
+    + "and a week you generate aims for this many sessions.";
+}
+
+function renderTrainingDays() {
+  const el = $("setupTrainingDays");
+  if (!el) return;
+  const current = weeklyGoalFor(MY_EMAIL);
+  el.innerHTML = TRAINING_DAY_CHOICES.map((d) =>
+    `<button type="button" class="${d === current ? "on" : ""}" data-days="${d}"
+      aria-pressed="${d === current}" aria-label="${d} ${d === 1 ? "day" : "days"} a week">${d}</button>`).join("");
+  $("setupTrainingDaysNote").textContent = trainingDaysNote(current);
+  el.querySelectorAll("[data-days]").forEach((b) => {
+    b.onclick = () => saveTrainingDays(Number(b.dataset.days));
+  });
+}
+
 /* ---------- The answers, shown on the rows themselves ----------
    Every row on the settings root states what it is currently set to, so the
    list can be read instead of opened one page at a time. Goal, Focus and
@@ -41967,8 +42054,7 @@ function bodyStatsSummary() {
 }
 
 function trainingSummary() {
-  const shared = MY_PARTNERSHIP?.shared_weekly_goal;
-  const days = shared || MY_PROFILE?.challenge_target;
+  const days = MY_PROFILE?.challenge_target;
   const mine = Number(MY_PROFILE?.rest_sec);
   const rest = Number.isFinite(mine) && mine > 0 ? mine : DEFAULT_REST_SEC;
   const bits = [];
@@ -42097,10 +42183,13 @@ function renderSessionLengths(el, { chosen, suggested, onPick }) {
   });
 }
 
+/* One line, where the card used to carry a static paragraph above the buttons
+   and this one below them, each saying half of the same thing. */
 function sessionLengthNote(chosen, suggested) {
+  const how = "fewer sets when the time is short, more when there is room";
   return Number.isFinite(chosen)
-    ? `Every plan is built to fit about ${chosen} minutes. Tap it again to let your goal decide instead.`
-    : `Not set, so your goal picks the length and that comes to about ${suggested} minutes. Tap one to say otherwise.`;
+    ? `Every plan is built to fit about ${chosen} minutes: ${how}. Tap it again to let your goal decide instead.`
+    : `Not set, so your goal picks the length and that comes to about ${suggested} minutes: ${how}. Tap one to say otherwise.`;
 }
 
 /* Setup > Training. Saved on the tap, like the rest length above it, because a
@@ -42372,34 +42461,25 @@ function renderSetupTab() {
   if (MY_EMAIL === ADMIN_EMAIL) renderAdminPanel();
 
   if (MY_PROFILE) {
-    $("setupChallengeTarget").value = MY_PROFILE.challenge_target || 4;
     /* Device preference, not an account one, so it is read off localStorage
        here rather than off the profile with the rest of this page. */
     $("quipsToggle").checked = !quipsMuted();
-    $("quipsWrap").classList.toggle("checked", !quipsMuted());
     $("quipsToggle").onchange = (e) => {
       setQuipsMuted(!e.target.checked);
-      $("quipsWrap").classList.toggle("checked", e.target.checked);
       if (!e.target.checked) hideQuip();
     };
     // Same deal: a device preference, so localStorage rather than the profile.
     $("kitPeekToggle").checked = !kitPeekMuted();
-    $("kitPeekWrap").classList.toggle("checked", !kitPeekMuted());
     $("kitPeekToggle").onchange = (e) => {
       setKitPeekMuted(!e.target.checked);
-      $("kitPeekWrap").classList.toggle("checked", e.target.checked);
       if (!e.target.checked) hideKitPeek();
     };
+    /* Saves on the tap now, like the two switches above it and the two chip
+       rows above those. It was the one control in the group that waited for a
+       button at the bottom of the page, so flipping it and walking away lost
+       the change while its neighbours kept theirs. */
     $("skipStretchToggle").checked = MY_PROFILE.skip_stretching === true;
-    $("skipStretchWrap").classList.toggle("checked", MY_PROFILE.skip_stretching === true);
-    $("skipStretchToggle").onchange = (e) => $("skipStretchWrap").classList.toggle("checked", e.target.checked);
-    const shared = MY_PARTNERSHIP?.shared_weekly_goal;
-    $("sharedGoalToggleWrap").classList.toggle("hidden", !MY_PARTNERSHIP);
-    $("sharedGoalToggle").checked = !!shared;
-    $("setupSharedGoal").value = shared || 4;
-    $("sharedGoalToggleWrap").classList.toggle("checked", !!shared);
-    $("sharedGoalFields").classList.toggle("hidden", !shared || !MY_PARTNERSHIP);
-    $("ownGoalFields").classList.toggle("hidden", !!shared && !!MY_PARTNERSHIP);
+    $("skipStretchToggle").onchange = (e) => saveSkipStretching(e.target.checked);
     $("setupSex").value = MY_PROFILE.sex || "";
     $("setupAge").value = MY_PROFILE.age || "";
     $("setupActivity").value = MY_PROFILE.activity_level || "";
@@ -42678,33 +42758,81 @@ async function commitProfile(payload, { toastText }) {
   return true;
 }
 
-/* Setup > Training. Owns the goal note, the weekly target and stretching.
-   Rest length, session length and the coach's voice all save on the tap and
-   are not read here. */
+/* Setup > Training's one remaining button, and it owns one control.
+
+   It used to own three: the weekly target, stretching, and how you train. The
+   first two now save on the tap, which is what the rest of the page already
+   did, so the page no longer has some controls that stick and some that need a
+   button nobody can tell applies to which. How you train cannot save on the
+   tap for a reason written above saveTrainStyles, so the button follows it up
+   the page and says what it saves. */
 async function saveTrainingPrefs() {
-  const ok = await commitProfile({
-    /* The goal itself is not here. It is one tap away on the goal page, which
-       writes goal, goal_bubble and goal_child together. Saving preferences
-       must never touch it: the old dropdown held five strings the tiles do not
-       all produce, so a profile set to "Stay consistent" opened Training
-       reading "Lose weight" and one Save wrote that over it. */
-    challenge_target: clampNum($("setupChallengeTarget").value, 1, 7, 4),
-    skip_stretching: $("skipStretchToggle").checked,
-  }, { toastText: "Training saved" });
-  if (!ok) return;
+  const btn = $("saveSetupBtn");
+  if (btn) btn.disabled = true;
+  try {
+    /* "Nothing to save" rather than silence: a Save button that answers a tap
+       with nothing on screen reads as broken, and the commonest reason to get
+       here is opening the page, reading it, and tapping Save out of habit. */
+    if (await saveTrainStyles() === false) toast("Nothing to save");
+  } finally { if (btn) btn.disabled = false; }
+}
 
-  await saveTrainStyles();
+/* Setup > Training. Saved on the tap, like the rest length and the session
+   length it sits with.
 
-  if (MY_PARTNERSHIP) {
-    const sharedOn = $("sharedGoalToggle").checked;
-    const sharedVal = sharedOn ? clampNum($("setupSharedGoal").value, 1, 7, 4) : null;
-    const { error: pErr } = await sb.from("partnerships")
-      .update({ shared_weekly_goal: sharedVal })
-      .eq("id", MY_PARTNERSHIP.id);
-    if (pErr) { toast("Could not save the shared goal"); console.error(pErr); }
-    else MY_PARTNERSHIP.shared_weekly_goal = sharedVal;
+   It writes TWO columns, and that is the whole reason this control was
+   rewritten. The app keeps a person's week in two places: challenge_target on
+   the profile, which Home's ring, the streak and the badges count against, and
+   days_per_week on their active user_goals row, which is what the week builder
+   lays down and what defaultActivityPref reads the intensity tier back out of.
+   Onboarding wrote both; this screen wrote only the first, and nothing anywhere
+   could change the second. So a person who came here and said three was shown
+   "0 of 3" on Home while a generated week still put down five, on the same
+   evening, in the same app. One control, one answer, both columns. */
+async function saveTrainingDays(days) {
+  const before = MY_PROFILE?.challenge_target;
+  // Painted first: a chip that waits for the network to light up feels stuck.
+  if (MY_PROFILE) MY_PROFILE.challenge_target = days;
+  renderTrainingDays();
+  const { error } = await sb.from("profiles").update({ challenge_target: days }).eq("email", MY_EMAIL);
+  if (error) {
+    if (MY_PROFILE) MY_PROFILE.challenge_target = before;
+    renderTrainingDays();
+    console.error("could not save the training days", error);
+    toast("Could not save that");
+    return;
   }
+  /* Said out loud rather than swallowed. The two numbers disagreeing is the bug
+     this control exists to end, so a half-written change must not report itself
+     as saved. There is no active goal row on an account from before user_goals
+     existed, in which case there is nothing to keep in step. */
+  if (MY_GOAL) {
+    const { error: gErr } = await sb.from("user_goals")
+      .update({ days_per_week: days }).eq("email", MY_EMAIL).eq("status", "active");
+    if (gErr) {
+      console.error("could not save the plan's week", gErr);
+      toast("Saved, but your plan is still on the old week");
+      renderHome();
+      return;
+    }
+    MY_GOAL.days_per_week = days;
+  }
+  toast(`${days} ${days === 1 ? "day" : "days"} a week`);
   renderHome();
+}
+
+/* Setup > Training. A profile column with no migration pending, so it goes
+   straight out on the tap the way the theme and the rest length do. */
+async function saveSkipStretching(skip) {
+  const { error } = await sb.from("profiles").update({ skip_stretching: skip }).eq("email", MY_EMAIL);
+  if (error) {
+    console.error("could not save stretching", error);
+    toast("Could not save that");
+    $("skipStretchToggle").checked = MY_PROFILE?.skip_stretching === true;
+    return;
+  }
+  if (MY_PROFILE) MY_PROFILE.skip_stretching = skip;
+  toast(skip ? "Warm-up and cool-down off" : "Warm-up and cool-down back on");
 }
 
 /* How you train, saved with the rest of the page but in its own write.
@@ -42717,26 +42845,31 @@ async function saveTrainingPrefs() {
    Only written when the answer actually changed, so a Save that was about the
    weekly target does not restamp this and does not say anything about the plan
    when nothing about the plan moved. */
+/* Returns false when there was nothing to write, so the button can say so
+   rather than answering a tap with an empty screen. */
 async function saveTrainStyles() {
-  if (!Array.isArray(SETUP_STYLES)) return;          // the page was never opened
+  if (!Array.isArray(SETUP_STYLES)) return false;    // the page was never opened
   const next = trainStylesToSave();
   const before = Array.isArray(MY_PROFILE?.train_styles) ? MY_PROFILE.train_styles : null;
   const same = before && before.length === next.length && next.every((id) => before.includes(id));
   /* Empty is never written. See the refusal in renderTrainStylesPage: the
-     engine reads it as never asked, which is the opposite of what it means. */
-  if (same || !next.length) return;
+     engine reads it as never asked, which is the opposite of what it means.
+     It says so now: an untick that leaves nothing ticked used to be answered
+     with silence by a button labelled Save. */
+  if (!next.length) { toast("Pick at least one, or your plans have nothing to build from"); return true; }
+  if (same) return false;
 
   const { error, droppedStyles } = await upsertGoalFields({
     email: MY_EMAIL, user_name: ME, train_styles: next,
     updated_at: new Date().toISOString(),
   });
-  if (error) { toast("Could not save how you train"); console.error(error); return; }
+  if (error) { toast("Could not save how you train"); console.error(error); return true; }
   if (droppedStyles) {
     /* Not saved, so nothing here pretends it was, and the grid goes back to
        what the database actually holds. */
     $("setupStyleNote").textContent = "How you train is not being stored yet, so this part has not been saved.";
     renderTrainStylesPage();
-    return;
+    return true;
   }
   if (MY_PROFILE) MY_PROFILE.train_styles = next;
 
@@ -42754,6 +42887,7 @@ async function saveTrainStyles() {
   $("setupStyleNote").textContent = TODAY_WORKOUT && !TODAY_WORKOUT.archived
     ? "Saved. Today's workout was built on your old answer and is left exactly as it is. Regenerate it on the Workout tab to use this, or it lands with your next plan."
     : "Saved. The next plan you generate is built on this.";
+  return true;
 }
 
 /* Setup > Your body. Owns the four numbers the calorie and load maths reads,
