@@ -174,7 +174,7 @@ function tick(now) {
 
 function paint(m) {
   const cycle = ((m.time / m.move.dur) % 1 + 1) % 1;
-  render(m.canvas, m.move, m.colors, cycle, m.time, { lit: m.lit, view: m.view, mood: m.mood });
+  render(m.canvas, m.move, m.colors, cycle, m.time, { lit: m.lit, view: m.view, mood: m.mood, face: m.face });
 }
 
 /**
@@ -194,6 +194,10 @@ export function mountMove(canvas, name, opts = {}) {
     // The face's mood: neutral, happy, focused, surprised, sleepy. The app
     // sets it from what just happened (a logged set, a beaten record).
     mood: opts.mood || undefined,
+    // "buddy" (the rig's own default, set in STYLE) unless the caller asks
+    // for something else. undefined rather than a hardcoded fallback here,
+    // so STYLE stays the one place that default lives.
+    face: opts.face,
     // "male" (default) or "female". Same skeleton and the same moves, a second
     // proportion table; see BODY_FEMALE in rig.mjs.
     bodyKind: opts.body || "male",

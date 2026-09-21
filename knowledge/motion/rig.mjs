@@ -1003,6 +1003,48 @@ function drawHead(ctx, S, C, fill) {
   ctx.restore();
   // ear: a small shape at the hairline, the only feature on the head
   const ears = [];  // the sheet's head has no ear
+  // The mark, in its own artwork's units (brand/vector/unio-bar.svg), rects
+  // read straight off that file and re-centred on the bar's own middle so
+  // they drop onto `vis` with no further alignment. 655.58 is that file's
+  // own outer width, end plate to end plate; it is the number `drawMarkFace`
+  // divides by, so a change to that artwork means re-measuring this list,
+  // not tuning it by eye. Mo approved this exact shape in the announcement
+  // film (scripts/make-brand-film.py, unio_face()); this is the same seven
+  // rects, not a redraw of them.
+  const MARK_DARK = [
+    [-270.785, 0, 114.01, 255.34, 38],
+    [270.785, 0, 114.01, 255.34, 38],
+    [0, 0, 330.17, 134.20, 26.13],
+    [-165.085, 0, 147.27, 375.30, 47.51],
+    [165.085, 0, 147.27, 375.30, 47.51],
+  ];
+  const MARK_PAD_X = [-165.085, 165.085];  // both 62.95 x 186.46, r 31.47
+  // Drawn in the visor's own local frame (translate to `vis`, rotate to
+  // `along`) with the same axis-aligned roundRect boxTube already uses for a
+  // tilted tube, rather than reasoning about "up" for seven separate boxes:
+  // every one of the mark's rects is centred on y = 0 in its own artwork, so
+  // the rotation alone is enough to keep it in registration at any head tilt.
+  // squash pinches the pads toward their shared centre line rather than
+  // shrinking from one edge, the same thing blink_bar() does to these same
+  // two pads in the film, so a blink looks like the same eye closing.
+  function drawMarkFace(ctx, vis, along, halfW, squash, dark, lime) {
+    const scale = (halfW * 2) / 655.58;
+    ctx.save();
+    ctx.translate(vis.x, vis.y);
+    ctx.rotate(Math.atan2(along.y, along.x));
+    ctx.fillStyle = dark;
+    for (const [cx, cy, w, h, r] of MARK_DARK) {
+      roundRect(ctx, (cx - w / 2) * scale, (cy - h / 2) * scale, w * scale, h * scale, r * scale);
+      ctx.fill();
+    }
+    ctx.fillStyle = lime;
+    const pw = 62.95 * scale, ph = 186.46 * scale * (squash ? 0.12 : 1), pr = 31.47 * scale;
+    for (const cx of MARK_PAD_X) {
+      roundRect(ctx, cx * scale - pw / 2, -ph / 2, pw, ph, pr);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   // The face. Placed from the head's PROJECTED axes so it lands right in any
   // view: forward along the anterior axis (which foreshortens to nothing face
   // on and to full length side on), spread along the lateral axis (the other
@@ -1021,13 +1063,23 @@ function drawHead(ctx, S, C, fill) {
       ctx.save();
       hull(ctx, C, skull, { clip: true });
       ctx.fillStyle = C.seam;
-      if (FACE === "buddy") {
+      if (FACE === "buddy" || FACE === "mark") {
         // The face Mo approved (reference/face-buddy.png): a dark visor with
         // two lime pill eyes and grille marks, a tiny nose tick, a small
         // mouth, a lime chin light, an ear disc seen from the side. Moods
         // change only the eyes and the mouth: neutral, happy, focused,
         // surprised, sleepy. Everything is a few flat shapes so it survives
         // card size; the grille and the nose drop out below 200px.
+        //
+        // "mark" is the same face with one part swapped: where the visor and
+        // its two eyes went, the actual dumbbell mark goes instead (see
+        // drawMarkFace above). Everything else below, mouth, grille, chin
+        // light, ear disc, the tiny-size fallback, is shared and unchanged,
+        // because Mo's approved design in the film keeps buddy's mouth and
+        // only replaces the eyes. It only takes over face on: the mark does
+        // not foreshorten sensibly in profile the way a pair of eyes does, so
+        // side on (latLen < 0.28, the same test buddy already uses to wrap
+        // its own visor to the front of the head) this still draws buddy.
         const up = norm2(ax.y);
         const px = (ctx.getTransform ? ctx.getTransform().a : 2) * R;   // head radius in device pixels
         const big = px > 14;
@@ -1043,8 +1095,12 @@ function drawHead(ctx, S, C, fill) {
         const along = latLen < 0.28 ? scl(F, 0.9) : Lt;     // visor runs across the face, or along it side on
         const alongLen = latLen < 0.28 ? 0.9 : latLen;
         const a = add(vis, scl(along, halfW)), b = add(vis, scl(along, -halfW));
+        const useMark = FACE === "mark" && !sideOn;
         ctx.fillStyle = C.seam;
-        capsulePath(ctx, a, halfH, b, halfH); ctx.fill();
+        // The mark has no visor plate behind it, the same way the real
+        // artwork has open air between its own bar and end plates, so this
+        // fill is skipped rather than drawn and then covered.
+        if (!useMark) { capsulePath(ctx, a, halfH, b, halfH); ctx.fill(); }
         const lime = C.accent;
         if (tiny) {
           // two soft lime marks inside the band so it still reads as a face
@@ -1058,6 +1114,13 @@ function drawHead(ctx, S, C, fill) {
         const eyeAt = [add(vis, scl(along, eyeSpread)), add(vis, scl(along, -eyeSpread))];
         const eyeH = R * 0.26, eyeW = R * 0.105;
         const mood = MOOD || "neutral";
+        if (useMark) {
+          // Only blink ports: happy/focused/surprised have no equivalent on
+          // a fixed rounded-rect pad the way they do on a drawn eye, and
+          // faking one would be guessing at a design Mo has not seen. Sleepy
+          // reuses the same squash as a blink, which is what buddy does too.
+          drawMarkFace(ctx, vis, along, halfW, blink || mood === "sleepy", C.seam, lime);
+        } else {
         ctx.strokeStyle = lime; ctx.lineCap = "round"; ctx.lineWidth = eyeW * 1.6;
         for (let i = 0; i < eyeAt.length; i++) {
           const e = eyeAt[i], sign = i === 0 ? 1 : -1;
@@ -1082,6 +1145,7 @@ function drawHead(ctx, S, C, fill) {
             ctx.fillStyle = lime;
             capsulePath(ctx, add(e, scl(up, eyeH * tall)), eyeW, add(e, scl(up, -eyeH * tall)), eyeW); ctx.fill();
           }
+        }
         }
         if (big && latLen >= 0.28) {
           // grille: three short dashes just outside each eye
