@@ -2,13 +2,15 @@
 
 Mo approved the dumbbell-as-face design in the announcement film and asked
 for it on every robot in the app. **Shipped**, both halves: `robotFaceSVG()`
-(5219faa) and the rig's exercise figure (4708f66, profile handling in
-5d93daf). What follows was the handoff plan written before any of that
-existed; kept as a record of what the design actually is and the one call
-that is still genuinely open, not as a to-do list any more.
+(5219faa) and the rig's exercise figure (4708f66), front on only after a
+profile version (5d93daf onward) was tried and reverted (5796214). What
+follows was the handoff plan written before any of that existed; kept as a
+record of what the design actually is and the one call that is still
+genuinely open, not as a to-do list any more.
 
 Written 2026-09-20 from the film's own implementation, not from memory.
-Updated the same day once both halves shipped.
+Updated twice the same day: once when both halves shipped, again when the
+profile half was reverted.
 
 ## What the approved design actually is
 
@@ -75,21 +77,23 @@ are replaced, mouth, grille, chin light, ear disc and the tiny-size
 fallback are shared and untouched. Two drawing functions, both in rig.mjs
 right above the face block:
 
-- `drawMarkFace(ctx, vis, along, halfW, squash, dark, lime)` -- face on. The
-  mark's real seven rects (`brand/vector/unio-bar.svg`, re-measured not
+- `drawMarkFace(ctx, vis, along, halfW, squash, dark, lime)` -- face on only.
+  The mark's real seven rects (`brand/vector/unio-bar.svg`, re-measured not
   re-drawn), rotated onto `along` and scaled so the mark's own outer width
-  matches the visor capsule's width, `halfW * 2`.
-- `drawMarkEye(ctx, center, scale, squash, dark, lime)` -- profile. One
-  housing plate and its pad, upright rather than rotated. The full mark does
-  not have a rotation that looks right in profile, since its width assumes a
-  face-on view; a single plate is what a dumbbell actually looks like turned
-  edge on, and a plate-plus-centred-pad is left-right symmetric so it needs
-  no "along" at all.
+  matches the visor capsule's width, `halfW * 2`. `squash` is
+  `blink || mood === "sleepy"`, reusing buddy's own blink clock.
 
-Which one draws is `latLen < 0.28`, the exact test buddy already uses to
-decide whether its own visor wraps to the front of the head. `squash` is
-`blink || mood === "sleepy"` in both, reusing buddy's own blink clock, so a
-blink looks like the same eye closing whichever one is on screen.
+`useMark` is `FACE === "mark" && !sideOn`, `sideOn` being `latLen < 0.28`,
+the exact test buddy already uses to decide whether its own visor wraps to
+the front of the head. Side on always draws buddy's own eye, unchanged.
+
+A profile version existed for a while, `drawMarkEye`, one plate standing in
+for one end of the dumbbell rather than the full shape rotated sideways
+(which put half of it outside the head). It went through three straight
+fixes on three different poses, corner radius, then scale, then position,
+and Mo called that pattern out directly rather than let a fourth one land:
+"it's getting really inconsistent." Removed. The lesson worth keeping is in
+the code comment above `drawMarkFace`, not repeated here.
 
 `mountMove()` forwards `opts.face` through to `render()` and exposes a live
 `ctl.setFace()` alongside its other live setters (setTheme, setMood, ...),
@@ -114,7 +118,9 @@ a drawn eye, so they quietly draw the neutral mark rather than a guessed
 shape. This is a real design gap, not a bug: **decide** whether the mark
 gets mood variants, or the robot's moods stop showing once the mark is on.
 
-**3. Side on: shipped, `drawMarkEye`, see above.** Was "mark front on and
-buddy in profile, or a squashed mark in profile" in the original plan; ended
-up being neither guess. Mo saw the gallery, said the side-on figures still
-looked like the old face, and asked for it fixed rather than left open.
+**3. Side on: settled, the other way round from how it shipped for a while.**
+The original plan offered "mark front on and buddy in profile" as one of two
+options. A squashed-mark-in-profile version was tried instead, needed
+re-tuning on every new pose it hit, and was reverted once that pattern was
+three fixes deep. Side on is buddy's own eye, permanently, unless somebody
+designs a profile mark that does not need pose-by-pose tuning to look right.
