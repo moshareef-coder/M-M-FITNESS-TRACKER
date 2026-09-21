@@ -261,6 +261,17 @@
     overflow-x: hidden;
     overscroll-behavior: none;
   }
+  /* An overlay is up: the page behind it must not move at all. overflow:hidden
+     alone does not stop a finger in an iOS web view, and this ships as one, so
+     the page is taken out of flow and parked at the offset it was on. That is
+     the only lock WebKit honours, and it is also why the offset has to be put
+     back by hand on the way out (syncPageLock): position:fixed forgets where
+     the page was and reopens it at the top, which reads as the app losing its
+     place. Deliberately NO overscroll-behavior here: "none" on body is what
+     killed every finger and wheel scroll in the app once already. */
+  body.page-locked {
+    position: fixed; left: 0; right: 0; width: 100%;
+  }
   html, body {
     margin: 0; padding: 0;
     background: var(--bg);
@@ -4686,14 +4697,21 @@
 
   /* The partner popup */
   .pop-scrim {
-    position: fixed; inset: 0; z-index: 70; padding: 20px;
+    position: fixed; inset: 0; z-index: 70;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
     display: flex; align-items: center; justify-content: center;
     background: rgba(12,14,19,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     animation: fadeIn .2s ease;
   }
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
   .pop {
-    width: 100%; max-width: 400px; background: var(--panel); border-radius: 22px; overflow: hidden;
+    width: 100%; max-width: 400px; background: var(--panel); border-radius: 22px;
+    /* Hidden across, auto down. It was hidden both ways with no height to stop
+       at, so a pop with a long question in it ran off the bottom of the phone
+       and took its own buttons with it: nothing to scroll, and no way to
+       answer. 100% is the scrim's padded box, which already clears the notch
+       and the home indicator. */
+    max-height: 100%; overflow: hidden auto; -webkit-overflow-scrolling: touch;
     border: 1px solid var(--border); box-shadow: var(--shadow-lift);
     animation: popIn .3s cubic-bezier(.22,1,.36,1);
   }
@@ -4833,12 +4851,12 @@
   /* Keyboard up: pinSheets() has sized the scrim to what is actually visible,
      so the sheet fills that and keeps its own scroll instead of running on
      underneath the keys. */
-  .sheet-scrim.kb > * {
+  .sheet-scrim.kb > *, .pop-scrim.kb > * {
     max-height: 100%; animation: none;
     padding-bottom: 16px;
   }
   .day-sheet {
-    width: 100%; max-height: 86dvh; overflow-y: auto; background: var(--panel);
+    width: 100%; max-height: 86dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--panel);
     border-radius: 22px 22px 0 0; border: 1px solid var(--border); border-bottom: none;
     padding: 10px 18px calc(26px + env(safe-area-inset-bottom, 0px));
     animation: sheetUp .28s cubic-bezier(.22,1,.36,1);
@@ -4847,7 +4865,7 @@
   /* Partner sheet. Coral throughout, because coral already means "them"
      everywhere else in the app: the ring, the week strip, the chart line. */
   .partner-sheet {
-    width: 100%; max-height: 92dvh; overflow-y: auto; background: var(--panel);
+    width: 100%; max-height: 92dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--panel);
     border-radius: 22px 22px 0 0; border: 1px solid var(--border); border-bottom: none;
     padding: 10px 18px calc(26px + env(safe-area-inset-bottom, 0px));
     animation: sheetUp .28s cubic-bezier(.22,1,.36,1);
@@ -14138,6 +14156,7 @@ function showApp() {
     btn.onclick = () => switchTab(btn.dataset.tab);
   });
   pinTabBar();
+  wirePageLock();
 
   $("fabStart").onclick = () => {
     switchTab("workout");
@@ -14355,7 +14374,10 @@ function pinSheets() {
   if (!vv) return;
   const hidden = Math.round(window.innerHeight - vv.height);
   const kb = hidden > 90;   // small deltas are the URL bar, not a keyboard
-  for (const scrim of document.querySelectorAll(".sheet-scrim")) {
+  /* The pop scrim gets the same treatment: some of the cards it floats ask for
+     a number, and a card centred on the layout viewport sits behind the keys
+     exactly the way a bottom sheet did. */
+  for (const scrim of document.querySelectorAll(".sheet-scrim, .pop-scrim")) {
     if (scrim.classList.contains("hidden")) {
       scrim.style.top = scrim.style.height = "";
       scrim.classList.remove("kb");
@@ -14365,6 +14387,78 @@ function pinSheets() {
     scrim.style.top = kb ? `${Math.round(vv.offsetTop)}px` : "";
     scrim.style.height = kb ? `${Math.round(vv.height)}px` : "";
   }
+}
+
+/* ---- The page behind an overlay does not move ----
+   Every overlay in the app is position: fixed over a page that is still a
+   perfectly good scroller, so a finger on the backdrop scrolled what was
+   underneath instead of doing nothing, on all twenty of them. overflow:
+   hidden on body does not stop that in a WebKit web view, and this ships as
+   one, so the page is taken out of flow instead and parked at the offset it
+   was on (see body.page-locked).
+
+   One list, one observer, rather than a lock call bolted onto forty open and
+   close paths that would then have to stay in step: the overlays are the
+   thing that is visible or not, so ask them.
+
+   Refcounting is deliberately avoided for the same reason. A count gets out
+   of step the moment one path closes a sheet twice or a render re-hides a
+   scrim that was already hidden, and a count stuck above zero is an app you
+   cannot scroll at all. Reading the DOM cannot drift. */
+const PAGE_LOCK_SEL = ".sheet-scrim, .pop-scrim, .gen-scrim, .csn-scrim, .clip-scrim, .paywall-scrim";
+let pageLockY = 0;
+let pageLocked = false;
+
+function anyOverlayUp() {
+  for (const el of document.querySelectorAll(PAGE_LOCK_SEL)) {
+    /* getClientRects rather than the class alone: five of these scrims live
+       inside a tab panel, and a panel that is hidden takes its scrim down with
+       it without touching the scrim's own class. A lock taken for an overlay
+       nobody can see is an app that will not scroll and no way to work out
+       why. */
+    if (!el.classList.contains("hidden") && el.getClientRects().length) return true;
+  }
+  // The lift session is a class on body rather than a scrim of its own.
+  return document.body.classList.contains("session-open");
+}
+
+function syncPageLock() {
+  const want = anyOverlayUp();
+  if (want === pageLocked) return;
+  const se = document.scrollingElement || document.documentElement;
+  if (want) {
+    pageLockY = Math.round(se.scrollTop);
+    document.body.style.top = `-${pageLockY}px`;
+    document.body.classList.add("page-locked");
+    pageLocked = true;
+    return;
+  }
+  document.body.classList.remove("page-locked");
+  document.body.style.top = "";
+  pageLocked = false;
+  se.scrollTop = pageLockY;
+  /* Again next frame, but only if something threw it back to the top: several
+     sheets re-render the tab behind them as they close, and a fresh innerHTML
+     resets the scroll after this has already put it back. Guarded so it can
+     never fight a close that scrolls somewhere on purpose. */
+  requestAnimationFrame(() => {
+    if (!pageLocked && pageLockY > 0 && se.scrollTop === 0) se.scrollTop = pageLockY;
+  });
+}
+
+let pageLockWired = false;
+function wirePageLock() {
+  // showApp() has four callers and any of them can be the one that runs.
+  if (pageLockWired) return;
+  pageLockWired = true;
+  const obs = new MutationObserver(syncPageLock);
+  /* body's own class list carries session-open, and its children are where
+     every scrim that is built on the fly gets appended. */
+  obs.observe(document.body, { childList: true, attributes: true, attributeFilter: ["class"] });
+  for (const el of document.querySelectorAll(PAGE_LOCK_SEL)) {
+    obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+  }
+  syncPageLock();
 }
 
 function switchTab(tab) {
@@ -42549,6 +42643,14 @@ const A11Y_SHEETS = {
   cropScrim: "Move and scale",
   swapScrim: "Swap exercise",
   measureScrim: "Log measurements",
+  /* These five were built on .sheet-scrim like the rest but never listed here,
+     so they alone had no Escape, no focus trap and no label: the shared layer
+     only knows about a sheet that is named in this map. */
+  swapDayScrim: "Swap workout",
+  trackScrim: "What Progress shows",
+  cardioScrim: "Log cardio",
+  reportScrim: "Strength report",
+  liftsScrim: "Lifts",
 };
 const A11Y_TITLE_SEL = ".scr-title, .pop-who, .ps-label, .cb-sheet-title, .ds-date, h1, h2, h3";
 const A11Y_FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -42620,11 +42722,16 @@ function dismissSheet(scrim) {
      touchmove keeps arriving, and preventDefault on it while we hold the
      gesture is what stops the browser scrolling underneath us. The mouse
      still comes through pointer events, for the desktop build. */
+  /* EVERY vertical scroller between the finger and the scrim has to be at its
+     top, not just the innermost one. A sheet whose panel is scrolled halfway
+     down can still have a short list inside it sitting at zero, and stopping
+     at that list handed the sheet a dismiss while what the thumb was actually
+     on was the middle of a page of reading. */
   const scrolledToTop = (from) => {
     for (let el = from; el && el !== scrim; el = el.parentElement) {
       if (el.scrollHeight > el.clientHeight + 1) {
         const oy = getComputedStyle(el).overflowY;
-        if (oy === "auto" || oy === "scroll") return el.scrollTop <= 1;
+        if ((oy === "auto" || oy === "scroll") && el.scrollTop > 1) return false;
       }
     }
     return true;
