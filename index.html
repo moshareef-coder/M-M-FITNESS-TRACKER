@@ -6224,6 +6224,37 @@
   #cardWeight.wt-hero .wt-pill { border-radius: 100px; min-height: 36px; padding: 8px 0; }
   #cardWeight.wt-hero .wt-log { margin-top: 14px; padding-top: 14px; }
 
+  /* ---- The weight trend (weightTrendHTML) ----
+     One block, five goal screens, the same argument as the graph block they
+     already share: the arrow, the words, the window and the colour rule live
+     in one function, and a screen decides only where to put it.
+
+     Bare text inside the weight hero, where it sits under the number it is
+     about; a card of its own on the other four, where the scale is a second
+     reading and the screen leads with something else.
+
+     Colour is never the only carrier. The arrow and the word beside it say
+     which way the scale went on their own, so the block reads the same to
+     anybody who cannot separate the two hues, and --up and --down are already
+     tuned per theme. */
+  .wtr-slot { margin-top: 14px; }
+  .goal-screen > .wtr-slot { margin-top: 12px; }
+  .wtr-card {
+    background: var(--card-fill); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 15px; box-shadow: var(--shadow-card);
+  }
+  .wtr-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+  .wtr-line {
+    display: flex; align-items: center; gap: 7px; margin-top: 6px;
+    font-size: 17px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+  }
+  .wtr-line svg { flex-shrink: 0; }
+  /* The level case is grey on purpose. A goal can call up good or down good;
+     neither of them calls standing still either, so it gets the muted ink
+     rather than being forced into one of the two colours. */
+  .wtr-line.wtr-level { color: var(--muted); }
+  .wtr-sub { font-size: 12.5px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+
   /* ---- The tone hero (renderToneHero) ----
      The recomp goal's screen, the same shape as the weight hero above but led
      by the tape rather than the scale: a title, the four measurement chips,
@@ -7481,6 +7512,7 @@
         <p class="tone-empty hidden" id="toneEmpty">Log a measurement to start the line.</p>
         <div class="wt-range" id="toneRange"></div>
       </div>
+      <div class="wtr-slot hidden" id="toneTrend"></div>
       <div class="tone-actions" id="toneActions">
         <button type="button" class="btn-primary" id="toneLogBtn"></button>
       </div>
@@ -7503,6 +7535,7 @@
         <p class="end-empty hidden" id="endEmpty">Log a run to start the line.</p>
         <div class="wt-range" id="endRange"></div>
       </div>
+      <div class="wtr-slot hidden" id="endTrend"></div>
       <div class="card end-recent hidden" id="endRecent"></div>
       <div class="prog-tiles end-tiles" id="endTiles">
         <button type="button" class="prog-tile" id="endMinutes" disabled></button>
@@ -7531,6 +7564,7 @@
         <p class="end-empty hidden" id="bulkEmpty"></p>
         <div class="wt-range" id="bulkRange"></div>
       </div>
+      <div class="wtr-slot hidden" id="bulkTrend"></div>
       <div class="tone-photos" id="bulkPhotos"></div>
       <div class="end-actions" id="bulkActions">
         <button type="button" class="btn-primary" id="bulkLogBtn"></button>
@@ -7553,6 +7587,7 @@
         <p class="end-empty hidden" id="liftEmpty"></p>
         <div class="wt-range" id="liftRange"></div>
       </div>
+      <div class="wtr-slot hidden" id="liftTrend"></div>
       <div class="card lift-records hidden" id="liftRecords"></div>
       <div class="prog-tiles end-tiles" id="liftTiles">
         <button type="button" class="prog-tile" id="liftVolume" disabled></button>
@@ -7590,6 +7625,7 @@
         <div class="wth-head hidden" id="wtHeroHead"></div>
         <p class="muted-note idx-lead" style="margin-top:-6px" id="weightLead"></p>
         <div class="wth-stats hidden" id="wtHeroStats"></div>
+        <div class="wtr-slot hidden" id="wtHeroTrend"></div>
         <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
         <!-- The goal weight, asked here rather than during setup. It left
              onboarding because it was being asked before somebody had weighed
@@ -15597,15 +15633,6 @@ function statsWindow(name, days = 7) {
   return { volume, minutes, sets, workouts, fromStr };
 }
 
-function weightTrend(name, days = 30) {
-  const from = new Date(todayStr() + "T00:00:00");
-  from.setDate(from.getDate() - (days - 1));
-  const fromStr = isoDate(from);
-  const w = entriesFor(name).filter((e) => e.weight != null && e.entry_date >= fromStr);
-  if (w.length < 2) return null;
-  return { change: +(w[w.length - 1].weight - w[0].weight).toFixed(1), latest: w[w.length - 1].weight, n: w.length };
-}
-
 function fmtVolume(lb) {
   // Show the real number, as in "12,450 lbs". Only abbreviate once it stops
   // fitting, which for a week of lifting is rare.
@@ -15613,34 +15640,6 @@ function fmtVolume(lb) {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
   return n.toLocaleString();
 }
-
-/* Up to three tiles, only the ones that mean something for this person. */
-function headlineStats(name, email) {
-  const s = statsWindow(name, 7);
-  const goal = (email === MY_EMAIL ? MY_PROFILE : PARTNER_PROFILE)?.goal || "";
-  const out = [];
-
-  if (s.volume > 0) {
-    out.push({ label: "Volume lifted, 7 days", value: fmtVolume(s.volume), unit: "lb" });
-  }
-  if (s.minutes > 0) {
-    out.push({ label: "Active time, 7 days", value: String(s.minutes), unit: "min" });
-  }
-  // Weight matters when it is the stated goal, or when nothing else qualifies.
-  const wantsWeight = /lose|gain|recomp|weight/i.test(goal);
-  const t = weightTrend(name, 30);
-  if (t && (wantsWeight || out.length < 2)) {
-    const sign = t.change > 0 ? "+" : "";
-    out.push({ label: "Body weight, 30 days", value: `${sign}${t.change}`, unit: "lb",
-               tone: t.change === 0 ? "" : (/lose|recomp|fat/i.test(goal) ? (t.change < 0 ? "good" : "warn")
-                                                                          : (t.change > 0 ? "good" : "warn")) });
-  }
-  if (!out.length && s.workouts > 0) {
-    out.push({ label: "Workouts, 7 days", value: String(s.workouts), unit: s.workouts === 1 ? "session" : "sessions" });
-  }
-  return out.slice(0, 3);
-}
-
 
 /* ---------- Hero: how the two of you are doing, and the one thing to do ---------- */
 
@@ -20314,6 +20313,7 @@ function renderWeightHero(on, profile, isPartner) {
   card.querySelector(".wt-logcard")?.classList.toggle("hidden", isPartner);
   if (!on) {
     stats.classList.add("hidden");
+    $("wtHeroTrend")?.classList.add("hidden");
     row.classList.add("hidden");
     log.classList.toggle("hidden", isPartner);
     return;
@@ -20336,17 +20336,15 @@ function renderWeightHero(on, profile, isPartner) {
       <path class="snow" d="M30 20l5 10-3-2-2 3-2-3-3 2Z"/>
     </svg>`;
 
-  /* Where they are is the latest weigh-in on file; the change is the
-     headline's thirty day window, so a stale last reading still shows a
-     number, just without a month it can honestly compare against. */
+  /* Where they are is the latest weigh-in on file. Which way it has been
+     going is the trend block under this one: it used to be a line here
+     reading "2.1 lb down this month", off the first and last weigh-in of a
+     fixed month, which is exactly the reading Mo says flips about. One
+     number, one place, and the smoothed one wins. */
   const all = entriesFor(name).filter((e) => e.weight != null);
   const now = all.length ? all[all.length - 1].weight : null;
   stats.classList.toggle("hidden", now == null);
   if (now != null) {
-    const rows = headlineWeighIns(name);
-    const d = rows.length >= 2 ? rows[rows.length - 1].weight - rows[0].weight : 0;
-    const delta = rows.length >= 2 && Math.abs(d) >= 0.05
-      ? `${Math.abs(d).toFixed(1)} lb ${d < 0 ? "down" : "up"} this month` : "";
     const lb = (v) => Number.isInteger(v) ? String(v) : v.toFixed(1);
     /* No target on file, no target column. Inventing one would be worse than
        the empty space. Percent is the distance covered from the start toward
@@ -20374,9 +20372,9 @@ function renderWeightHero(on, profile, isPartner) {
     stats.innerHTML = `
       <div class="wth-now">
         <div class="wth-now-fig"><b>${now.toFixed(1)}</b><i>lb</i></div>
-        ${delta ? `<div class="wth-now-delta">${delta}</div>` : ""}
       </div>${target}`;
   }
+  renderWeightTrend("wtHeroTrend", name, profile, isPartner, true);
 
   /* The log row. Yours only: a partner's screen keeps the chart and loses the
      stepper, same as before. The plus opens the stepper that was always here
@@ -20521,6 +20519,14 @@ function renderToneHero(on, profile, isPartner) {
   $("toneRange").querySelectorAll("[data-range]").forEach((b) => {
     b.onclick = () => { TONE_RANGE = b.dataset.range; again(); };
   });
+
+  /* Mo: "we can also do the lose fat, build muscle ... it doesn't have a
+     weight trend." It did not, and the omission was deliberate: the tape is
+     what this goal is judged on and the chips above filter the scale out.
+     That is still true, and it is not a reason to refuse to show somebody
+     what their weight has been doing. It sits under the line rather than over
+     it, and this goal claims the scale holds, so it never colours. */
+  renderWeightTrend("toneTrend", name, profile, isPartner, true);
 
   /* Photos are never shared, so a partner's screen has no photos card rather
      than an empty one. */
@@ -20920,6 +20926,10 @@ function renderLiftHero(on, profile, isPartner) {
     <span class="prog-tile-body"><span class="prog-tile-title">Recent PRs</span><span class="prog-tile-val">${prs}</span><span class="prog-tile-sub">${
       prs ? "in the last 30 days" : "beat a weight to set one"}</span></span>`;
 
+  /* Same as Build endurance: a lift goal makes no claim about body weight, so
+     the trend is here without a colour and only once there is one to draw. */
+  renderWeightTrend("liftTrend", name, profile, isPartner, false);
+
   /* What Mo asked for by name: every lift, and what each one is doing. The
      browser already exists, it was just only reachable from a card this screen
      replaces. */
@@ -21014,8 +21024,15 @@ function renderBulkHero(on, profile, isPartner) {
       const weeksWord = `${span} week${span === 1 ? "" : "s"}`;
       /* Gaining is the point here, so up is the good colour. The same column
          read on Tone Up gets the opposite treatment, which is correct: a
-         growing arm and a growing waist are different news. */
-      delta = flat
+         growing arm and a growing waist are different news.
+
+         Not for weight. That is the one metric on this row with a smoothed
+         trend of its own directly below, and this line is the raw first
+         against last over the range pill, which is precisely the reading that
+         flips sign on a heavy Sunday. Two numbers about the same column
+         disagreeing is worse than one of them being missing. */
+      if (m.key === "weight") delta = "";
+      else delta = flat
         ? `<div class="wth-now-delta">Level over ${weeksWord}</div>`
         : `<div class="wth-now-delta ${d > 0 ? "idx-good" : "idx-bad"}">${d > 0 ? "+" : "-"}${num(Math.abs(d))} ${escapeHtml(m.unit)} in ${weeksWord}</div>`;
     }
@@ -21078,6 +21095,11 @@ function renderBulkHero(on, profile, isPartner) {
   $("bulkRange").querySelectorAll("[data-range]").forEach((b) => {
     b.onclick = () => { BULK_RANGE = b.dataset.range; again(); };
   });
+
+  /* Under the line whichever chip is up, so the scale's direction does not
+     depend on having tapped Weight first. On this goal up is the good news,
+     which is the same movement Lose weight paints red. */
+  renderWeightTrend("bulkTrend", name, profile, isPartner, true);
 
   /* The same pair Tone Up shows, same rules: yours only, no See all. */
   const photos = $("bulkPhotos");
@@ -22886,6 +22908,12 @@ function renderEnduranceHero(on, profile, isPartner) {
   const days = gymDaysThisWeek(name), goal = weeklyGoalFor(email);
   $("endConsistency").innerHTML = `<span class="prog-tile-ico">${icon("calendar", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Workout Consistency</span><span class="prog-tile-val">${days} of ${goal}</span><span class="prog-tile-sub">this week</span></span>`;
+
+  /* Body weight says nothing about this goal, so the trend carries no colour
+     here and stays away entirely until there is something to read. Somebody
+     running four times a week still gets to see which way the scale is
+     going. */
+  renderWeightTrend("endTrend", name, profile, isPartner, false);
 
   /* One call to action, the same rule the other goal screens follow. */
   const acts = $("endActions");
@@ -38859,6 +38887,191 @@ function lbsPerWeek(rows) {
   return den ? (num / den) * 7 : null;
 }
 
+/* ---- The weight trend ----
+
+   Mo: "we need to add a red and green trend for when you go up in weight or
+   when you go down in weight." Two facts have to be kept apart to do that
+   honestly, and they are: which way the number moved (here) and whether that
+   is good news (weightAim below). One arrow has to be able to carry both,
+   because a pound on is a win on Bulk up and a loss on Lose weight.
+
+   The movement is smoothed. Day to day body weight is water, salt and what
+   time somebody stood on the scale, so last minus previous flips sign most
+   weeks, and a trend that changes colour every Tuesday is a trend nobody
+   believes. It is the least squares slope through every weigh-in in the
+   window (lbsPerWeek, the same smoother renderProgressHeadline already reads,
+   so the sentence and the block cannot disagree), reported as a rate and as
+   the change across the days actually spanned.
+
+   The window WIDENS rather than refusing. Somebody who weighs in every other
+   Sunday has three readings in eight weeks and a month-long window would tell
+   them their trend is unknowable when it plainly is not. Whatever it lands on
+   is printed, because a number whose window is hidden is a number that can be
+   argued with.
+
+   Three readings across a fortnight is the floor, and it is the same floor
+   the headline already holds: a line through two points is a line through two
+   bad mornings. */
+const WEIGHT_TREND_WINDOWS = [30, 60, 120];
+const WEIGHT_TREND_MIN_READS = 3;
+const WEIGHT_TREND_MIN_DAYS = 14;
+/* Under half a pound across the whole window is the scale's own noise rather
+   than a direction, and painting that green or red is colouring a coin toss. */
+const WEIGHT_TREND_FLAT_LB = 0.5;
+
+function weightTrend(name) {
+  const all = entriesFor(name).filter((e) => e.weight != null);
+  if (!all.length) return { state: "none" };
+  const last = all[all.length - 1];
+  const since = daysBetween(last.entry_date, todayStr());
+  if (all.length === 1) return { state: "one", now: last.weight, date: last.entry_date, since };
+
+  for (const days of WEIGHT_TREND_WINDOWS) {
+    const rows = headlineWeighIns(name, days);
+    if (rows.length < WEIGHT_TREND_MIN_READS) continue;
+    const span = daysBetween(rows[0].entry_date, rows[rows.length - 1].entry_date);
+    if (span < WEIGHT_TREND_MIN_DAYS) continue;
+    const rate = lbsPerWeek(rows);
+    if (rate == null) continue;
+    const change = (rate / 7) * span;
+    return {
+      state: "ok", now: last.weight, span, reads: rows.length, rate, change, since,
+      /* -1 down, +1 up, 0 level. Which way it went, and nothing about whether
+         that is what this person wanted. */
+      moved: Math.abs(change) < WEIGHT_TREND_FLAT_LB ? 0 : change < 0 ? -1 : 1,
+    };
+  }
+  /* Weigh-ins on file, just not enough of them close enough together. Said
+     out loud rather than drawn as a flat line, which is the lie this whole
+     function exists to avoid. */
+  return { state: "thin", now: last.weight, date: last.entry_date, reads: all.length, since };
+}
+
+/* resolveGoal's training emphasis for a goal pick, cached, and null until the
+   import lands. Same shape as goalDayRange, except this one is read from a
+   render path rather than awaited, so it repaints Progress the once, and only
+   when the answer actually changes what is on screen. */
+const GOAL_EMPHASIS = new Map();
+function goalEmphasis(pick) {
+  if (!pick?.bubble) return null;
+  const key = `${pick.bubble}/${pick.child || ""}`;
+  if (GOAL_EMPHASIS.has(key)) return GOAL_EMPHASIS.get(key);
+  GOAL_EMPHASIS.set(key, null);
+  ensureGoalEngine().then((mod) => {
+    let emphasis = null;
+    try { emphasis = mod?.resolveGoal({ bubble: pick.bubble, child: pick.child })?.params?.emphasis || null; }
+    catch (e) { console.warn("goal emphasis", e); }
+    GOAL_EMPHASIS.set(key, emphasis);
+    if (emphasis === "recomp" && !$("tab-progress")?.classList.contains("hidden")) renderProgressTab();
+  }).catch((e) => console.warn("goal emphasis", e));
+  return null;
+}
+
+/* Which way the scale is supposed to move for this person. -1 when down is
+   the good direction, +1 when up is, 0 when the goal makes no claim about
+   body weight at all.
+
+   0 means NO COLOUR, and that is the point of it. Get stronger, Build
+   endurance and Move better say nothing about what the scale should do, so
+   painting a pound green or red on those screens would be inventing an
+   opinion the goal does not hold.
+
+   The claim on the goal tile is the source, because it is already the field
+   that decides which progress card leads and which two goals refuse each
+   other; reading it here is what stops the colour on the trend disagreeing
+   with the card underneath it. A retired bubble is routed the way the picker
+   routes it, so an account still sitting on "Train for an event" is read as
+   the goal it became rather than as nothing.
+
+   The child can then take the claim back off the bubble, and resolveGoal is
+   the only thing that knows that: "lose the last 10" and "skinny fat" resolve
+   to recomp parameters, where fat leaving and muscle arriving cancel on the
+   scale. Tone Up already says so in as many words, and colouring those would
+   be judging somebody on the one number their own plan says will not move. */
+function weightAim(profile) {
+  const pick = profile?.goal_bubble
+    ? migrateGoalPick(profile.goal_bubble, profile.goal_child || null) : null;
+  const claim = pick ? goalTileFor(pick.bubble)?.claim || null : null;
+  const dir = claim === "down" ? -1 : claim === "up" ? 1 : 0;
+  if (dir && goalEmphasis(pick) === "recomp") return 0;
+  return dir;
+}
+
+/* The block itself, written once for all five goal screens.
+
+   `card` is the only thing that differs between them: inside the weight hero
+   it is bare text under the number it describes, and everywhere else it wears
+   its own card because the scale is not what that screen leads with. */
+function weightTrendHTML(name, profile, opts = {}) {
+  const t = weightTrend(name);
+  const lb = (v) => (Math.round(Math.abs(v) * 10) / 10).toFixed(1);
+  const weeks = (n) => `${n} week${n === 1 ? "" : "s"}`;
+  const days = (n) => `${n} day${n === 1 ? "" : "s"}`;
+
+  let ico = "minus", cls = "wtr-level", line = "", sub = "";
+  if (t.state === "none") {
+    ico = "scale";
+    line = "No weigh-ins yet";
+    sub = "Step on the scale once and this starts. A few readings and it can say which way you are going.";
+  } else if (t.state === "one") {
+    ico = "scale";
+    line = `${lb(t.now)} lb, once`;
+    sub = `One weigh-in is a number, not a direction. ${WEIGHT_TREND_MIN_READS} of them across a fortnight is the least this can read a trend from.`;
+  } else if (t.state === "thin") {
+    ico = "scale";
+    line = t.since > WEIGHT_TREND_WINDOWS[WEIGHT_TREND_WINDOWS.length - 1]
+      ? `Last weighed ${days(t.since)} ago` : "Not a trend yet";
+    sub = `${t.reads} weigh-ins on file, the last at ${lb(t.now)} lb. `
+      + `${WEIGHT_TREND_MIN_READS} across a fortnight is the least this can read a trend from.`;
+  } else {
+    const spanWeeks = Math.max(1, Math.round(t.span / 7));
+    const from = `over the last ${weeks(spanWeeks)}, from ${t.reads} weigh-ins`;
+    if (!t.moved) {
+      line = "Holding steady";
+      sub = `Inside half a pound ${from}.`;
+    } else {
+      /* The aim decides the colour and nothing else does. Same movement, two
+         goals, two verdicts, which is the whole of what Mo asked for. */
+      const aim = weightAim(profile);
+      ico = t.moved < 0 ? "arrowDown" : "arrowUp";
+      cls = !aim ? "wtr-level" : t.moved === aim ? "idx-good" : "idx-bad";
+      line = `${lb(t.change)} lb ${t.moved < 0 ? "down" : "up"}`;
+      sub = `About ${lb(t.rate)} lb a week ${from}.`;
+    }
+    /* A trend drawn from a month that ended weeks ago is still true, and
+       saying when it stopped is the difference between a stale reading and a
+       wrong one. */
+    if (t.since >= 14) sub += ` Last weigh-in was ${days(t.since)} ago.`;
+  }
+
+  return `<div class="wtr${opts.card ? " wtr-card" : ""}">
+    <div class="wtr-eyebrow">Weight trend</div>
+    <div class="wtr-line ${cls}">${icon(ico, 17)}<span>${escapeHtml(line)}</span></div>
+    <div class="wtr-sub">${escapeHtml(sub)}</div>
+  </div>`;
+}
+
+/* Into whichever screen asked for it. `always` is the three screens where body
+   weight IS the measure, or half of it: they show the block with nothing
+   logged, because there the empty state is the invitation. On Get stronger
+   and Build endurance the scale is a side reading, so it waits until there is
+   something to read rather than nagging about a number that goal never asked
+   for. Somebody who untracked the scale is never shown it at all.
+
+   hired() for the same reason the charts read it: this is a reading, and
+   readings are the half of this tab somebody pays for. On the weight hero
+   .hire-locked would have hidden it anyway, because the slot is inside the
+   card it stands down; on the other four the slot is a sibling of that card
+   and would have sailed straight past the pitch. */
+function renderWeightTrend(id, name, profile, isPartner, always) {
+  const el = $(id);
+  if (!el) return;
+  const wanted = hired() && (isPartner || isTracked("weight"))
+    && (always || entriesFor(name).some((e) => e.weight != null));
+  el.classList.toggle("hidden", !wanted);
+  el.innerHTML = wanted ? weightTrendHTML(name, profile, { card: id !== "wtHeroTrend" }) : "";
+}
+
 /* Epley, capped at twelve reps. Past that the formula drifts into fantasy and
    a set of twenty light reps reads as a bigger single than a heavy triple. */
 function e1rm(weight, reps) {
@@ -39539,8 +39752,13 @@ function progressHeadline(kind, name, email, profile, third) {
     const rows = headlineWeighIns(name);
     const goal = weightGoalFor(email);
     const first = rows[0]?.weight ?? null;
-    const up = goal ? goal.target_value > (goal.start_value ?? first ?? 0)
-      : profile?.goal_bubble === "build-muscle" || /muscle|gain/.test((profile?.goal || "").toLowerCase());
+    /* Which way is forward, from the one place that decides it. This used to
+       be a regex over the goal's TITLE ("muscle|gain"), which called Lose fat
+       and build muscle a gaining goal off the word in its name, and disagreed
+       with the tile claim the recovery card and the trend block both read. A
+       real target still wins: a number somebody typed is more specific than
+       the tile they tapped. */
+    const up = goal ? goal.target_value > (goal.start_value ?? first ?? 0) : weightAim(profile) > 0;
     if (!rows.length) {
       return { value: "Not yet", line: `${Subj} ${have} not logged a weigh-in yet.`,
         note: "One number on the scale starts this. Two weeks of them and it can tell you the rate you are moving at." };
