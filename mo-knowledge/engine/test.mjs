@@ -37,7 +37,7 @@ import { JOINTS, JOINT_LOAD, defaultJointLoad, jointLoadFor } from "./joint-load
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
-import { STYLE_KEYS, readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, refusalNote, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX } from "./styles.mjs";
+import { STYLE_KEYS, readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, refusalNote, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX, FREQUENCY_LEVELS, FREQUENCY_DAYS, frequencyForDays, normalizeFrequency, composeWeek } from "./styles.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -5593,4 +5593,151 @@ test("the adapter carries the rotation into the saved plan and into meta, and no
   /* A day with no stand-in on it has no such key at all. */
   for (const e of stored) if (!e.rotatedFor) assert.ok(!("rotatedFor" in e) && !("rotatedAt" in e));
   assert.ok(out.notes.some((n) => n.startsWith(`Swapped in ${standIn.to}: your Lat Pulldown`)));
+});
+
+/* ---- how often: the frequency dial and the week it composes ----------------
+   Mo, 2026-09-21: "every day / most days / sometimes / rarely", and a day may
+   hold a lift, a run and a class together because none of them contradicts
+   the others. What it may not hold is two of a kind. */
+
+const WEEK7 = () => Array.from({ length: 7 }, (_, i) => ({ key: `d${i}` }));
+const kindsOn = (out) => out.days.map((d) => d.sessions.map((x) => x.kind).sort().join("+"));
+
+test("a style with no frequency recorded gets the week it already had", () => {
+  /* Never asked is not "sometimes". The old builder gave every second style
+     one day a week, so that is what the default has to be, or every profile
+     that predates the dial gets a busier week nobody chose. */
+  const st = readStyles(["lifting", "running", "yoga"]);
+  assert.deepEqual(st.frequency, { lifting: "most", running: "rare", yoga: "rare" });
+  assert.equal(st.frequencyAsked, false, "a default is not an answer");
+  /* With no resistance the FIRST pick is the one the old count was spent on. */
+  assert.deepEqual(readStyles(["running", "yoga"]).frequency, { running: "most", yoga: "rare" });
+  /* Both resistance styles are the same session, so both read as the lift. */
+  assert.deepEqual(readStyles(["walking", "lifting", "home"]).frequency, { walking: "rare", lifting: "most", home: "most" });
+  /* Nonsense is dropped like a typo in the list, and never asked stays empty. */
+  const typo = readStyles(["lifting", "running"], { running: "weekly", lifting: 5 });
+  assert.equal(typo.frequencyAsked, false);
+  assert.deepEqual(typo.frequency, { lifting: "most", running: "rare" });
+  assert.deepEqual(readStyles(null, { lifting: "daily" }).frequency, {});
+  /* A real answer is kept as given and only the unanswered styles default. */
+  const asked = readStyles(["lifting", "running", "yoga"], { running: "some" });
+  assert.equal(asked.frequencyAsked, true);
+  assert.deepEqual(asked.frequency, { lifting: "most", running: "some", yoga: "rare" });
+  assert.deepEqual(normalizeFrequency({ yoga: " Daily " }, ["yoga"]), { frequency: { yoga: "daily" }, asked: true });
+  /* The words and their numbers, and the way back from a count. */
+  assert.deepEqual([...FREQUENCY_LEVELS], ["rare", "some", "most", "daily"]);
+  assert.deepEqual(FREQUENCY_DAYS, { daily: 7, most: 5, some: 3, rare: 1 });
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(frequencyForDays), ["rare", "some", "some", "most", "most", "most", "daily"]);
+  assert.equal(frequencyForDays("x"), null);
+});
+
+test("lifting, running and yoga every day is three sessions on every day", () => {
+  const st = readStyles(["lifting", "running", "yoga"], { lifting: "daily", running: "daily", yoga: "daily" });
+  const out = composeWeek(st, WEEK7(), { liftCount: 7, seed: 20260921 });
+  assert.deepEqual(kindsOn(out), Array(7).fill("cardio+flow+resistance"));
+  assert.deepEqual(out.dropped, []);
+  /* And the sessions say which style they are, so the builder can name the run. */
+  assert.deepEqual(out.days[0].sessions.map((x) => x.style), ["lifting", "running", "yoga"]);
+  assert.equal(out.days[0].sessions[1].mode, "running");
+  assert.equal(out.days[0].sessions[2].training, "yoga");
+});
+
+test("a day never holds two of a kind, whatever the dials say", () => {
+  /* Every combination of the four words across lifting AND home, two cardio
+     modes and both flow trainings, on a full week and on a three day rest of
+     one. The ceiling is three because the categories are three. */
+  const styles = ["lifting", "home", "running", "cycling", "yoga", "pilates"];
+  let weeks = 0;
+  for (const lift of FREQUENCY_LEVELS) for (const home of FREQUENCY_LEVELS)
+    for (const run of FREQUENCY_LEVELS) for (const cyc of FREQUENCY_LEVELS)
+      for (const yoga of FREQUENCY_LEVELS) for (const pil of FREQUENCY_LEVELS) {
+        const st = readStyles(styles, { lifting: lift, home, running: run, cycling: cyc, yoga, pilates: pil });
+        for (const n of [7, 3]) {
+          const days = WEEK7().slice(0, n);
+          const out = composeWeek(st, days, { seed: weeks++ });
+          for (const d of out.days) {
+            const kinds = d.sessions.map((x) => x.kind);
+            assert.ok(kinds.length <= 3, `${kinds} on one day`);
+            assert.equal(new Set(kinds).size, kinds.length, `two of a kind on one day: ${kinds}`);
+            assert.ok(kinds.filter((k) => k === "resistance").length <= 1);
+          }
+          /* Whatever could not fit is said, never silently dropped. */
+          const placed = out.days.flatMap((d) => d.sessions).length;
+          const owed = styles.reduce((sum, s) => sum + Math.min(n, FREQUENCY_DAYS[st.frequency[s]]), 0)
+            - Math.min(n, FREQUENCY_DAYS[st.frequency.home]);  /* home shares the lift's days */
+          const said = out.dropped.reduce((sum, x) => sum + x.count, 0);
+          assert.ok(placed + said >= Math.min(owed, 3 * n) - (n < 7 ? 6 : 0), "a session went missing without a word");
+        }
+      }
+  assert.equal(weeks, 4 ** 6 * 2);
+  /* Lifting and home together are one session a day, and it lands once. */
+  const both = composeWeek(readStyles(["lifting", "home"], { lifting: "daily", home: "daily" }), WEEK7());
+  assert.deepEqual(kindsOn(both), Array(7).fill("resistance"));
+});
+
+test("days_per_week is the lifting count and the dial does not round it", () => {
+  const st = readStyles(["lifting", "running"], { lifting: "most", running: "rare" });
+  const four = composeWeek(st, WEEK7(), { liftCount: 4 });
+  assert.equal(four.days.filter((d) => d.sessions.some((x) => x.kind === "resistance")).length, 4);
+  /* Without the count the word is what there is. */
+  const five = composeWeek(st, WEEK7());
+  assert.equal(five.days.filter((d) => d.sessions.some((x) => x.kind === "resistance")).length, 5);
+  /* Lifts the builder has already placed are pinned and counted. */
+  const pinned = composeWeek(st, WEEK7().map((d, i) => ({ ...d, lift: i < 3 })), { liftCount: 5 });
+  assert.deepEqual(pinned.days.map((d) => d.sessions.some((x) => x.kind === "resistance")), [true, true, true, false, false, false, false],
+    "a day the caller said holds no lift gets none, however many are owed");
+  /* Four days open of a seven day week owes a share, never nothing. */
+  const rest = composeWeek(readStyles(["lifting", "running", "yoga"], { lifting: "most", running: "most", yoga: "rare" }),
+    WEEK7().slice(0, 4), { liftCount: 2 });
+  assert.equal(rest.days.filter((d) => d.sessions.some((x) => x.kind === "cardio")).length, 3, "5 of 7 over 4 days is 3");
+  assert.equal(rest.days.filter((d) => d.sessions.some((x) => x.kind === "flow")).length, 1, "rarely is still once");
+});
+
+test("where the extras land: quiet days, off the leg day, after the heavy lift", () => {
+  /* Three lifts, legs in the middle and marked heavy. */
+  const days = WEEK7().map((d, i) => ({ ...d, lift: [0, 2, 4].includes(i), legs: i === 2, heavy: i === 2 }));
+  const st = readStyles(["lifting", "running", "yoga"], { lifting: "some", running: "rare", yoga: "rare" });
+  for (let seed = 0; seed < 14; seed++) {
+    const out = composeWeek(st, days, { liftCount: 3, seed });
+    const kinds = kindsOn(out);
+    /* A rare style lands where nothing else is. */
+    assert.ok(!kinds.some((k) => k.includes("cardio") && k.includes("resistance")), `the run stacked on a lift: ${kinds}`);
+    /* Flow wants the day after the heavy lift and that day is free, so it
+       takes it whatever the seed says. */
+    assert.equal(kinds[3].includes("flow"), true, `yoga not on the day after legs: ${kinds}`);
+  }
+  /* Cardio most days, over a week with a leg day: the leg day is the one it
+     skips when it has to skip one. */
+  const run5 = composeWeek(readStyles(["lifting", "running"], { lifting: "some", running: "most" }), days, { liftCount: 3 });
+  const runOn = run5.days.map((d) => d.sessions.some((x) => x.kind === "cardio"));
+  assert.equal(runOn.filter(Boolean).length, 5);
+  assert.equal(runOn[2], false, "the leg day is the one without a run");
+  /* Deterministic: the same seed is the same week. */
+  assert.deepEqual(composeWeek(st, days, { liftCount: 3, seed: 5 }), composeWeek(st, days, { liftCount: 3, seed: 5 }));
+  /* A kept plan on a day counts as that kind, so a second is not stacked on it. */
+  const kept = composeWeek(readStyles(["running"], { running: "rare" }),
+    WEEK7().slice(0, 2).map((d, i) => ({ ...d, taken: i === 0 ? ["cardio"] : [] })));
+  assert.deepEqual(kindsOn(kept), ["", "cardio"]);
+  /* Never asked composes nothing, which is the legacy path's job. */
+  assert.deepEqual(composeWeek(readStyles(null), WEEK7()).days.map((d) => d.sessions.length), Array(7).fill(0));
+});
+
+test("the single generated day prefers the style due more often, once the dial was set", async () => {
+  /* Run most days, yoga rarely: over a fortnight most days are runs. Not
+     every day, because a class was asked for and one arrives. */
+  const dates = Array.from({ length: 12 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`);
+  const st = readStyles(["running", "yoga"], { running: "most", yoga: "rare" });
+  const kinds = dates.map((d) => (styleDayFor(st, { today: new Date(d + "T09:00:00") })?.flow ? "flow" : "cardio"));
+  assert.ok(kinds.filter((k) => k === "cardio").length >= 8, `runs: ${kinds}`);
+  assert.ok(kinds.includes("flow"), "the rare class still comes round");
+  /* The plain alternation for a profile that never saw the dial, and it is
+     the payload path that matters, because that is the one existing accounts
+     go through. */
+  const legacy = readStyles(["running", "yoga"]);
+  const alt = dates.slice(0, 4).map((d) => (styleDayFor(legacy, { today: new Date(d + "T09:00:00") })?.flow ? "flow" : "cardio"));
+  assert.deepEqual([...new Set(alt)].sort(), ["cardio", "flow"]);
+  const out = await generateFromPayload(stylePayload(["running", "yoga"], { style_frequency: { running: "most", yoga: "rare" } }),
+    { today: new Date("2026-10-03T09:00:00") });
+  assert.equal(out.meta.styles.honoured, true);
+  assert.deepEqual(out.meta.styles.frequency, { running: "most", yoga: "rare" }, "the answer is reported back, so a screen can say it");
 });

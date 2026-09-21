@@ -337,6 +337,24 @@
   .obs-ico { display: block; color: var(--accent); margin-bottom: 3px; }
   .obs-label { font-size: 15px; font-weight: 650; }
   .obs-sub { font-size: 12.5px; color: var(--muted); line-height: 1.3; }
+  /* The card and its dial share one grid cell, so the dial appears under the
+     card it belongs to rather than in the next slot along. */
+  .ob-style-cell { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .ob-style-cell > .ob-style { flex: 1; }
+  /* How often: four bars, fill rising left to right, one colour. Lit bars are
+     the level and everything under it; the rest are the same shape in the
+     border colour so the eye reads a level, not a set of buttons. */
+  .obs-freq { display: flex; flex-direction: column; gap: 3px; align-items: center; padding: 0 2px; }
+  .obs-freq-bars { display: flex; gap: 5px; align-items: flex-end; height: 26px; width: 100%; }
+  .obs-freq-bar {
+    flex: 1; height: 100%; display: flex; align-items: flex-end; padding: 0; margin: 0;
+    background: none; border: 0; cursor: pointer; min-width: 0; border-radius: 4px;
+  }
+  .obs-freq-bar i { display: block; width: 100%; border-radius: 3px; background: var(--border); transition: background .15s ease; }
+  .obs-freq-bar.lit i { background: color-mix(in srgb, var(--accent) 55%, var(--panel)); }
+  .obs-freq-bar.on i { background: var(--accent); }
+  .obs-freq-bar:active i { transform: scaleY(.94); transform-origin: bottom; }
+  .obs-freq-word { font-size: 11.5px; font-weight: 650; color: var(--muted); letter-spacing: .01em; }
   /* Reserves its own height so the grid does not jump when the sentence about
      resistance training appears and disappears under it. */
   /* Progress and the robot ride at the top of every step. The bar is thin and
@@ -11393,7 +11411,7 @@ function renderGoalPage() {
 
    It reports what it dropped rather than swallowing it, because "saved" when
    half of it was not saved is the kind of quiet lie this app does not tell. */
-const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal"];
+const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency"];
 
 async function upsertGoalFields(patch) {
   const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
@@ -11411,6 +11429,10 @@ async function upsertGoalFields(patch) {
        without the column, so the caller has to say so rather than report a
        save that did not happen. */
     droppedStyles: dropped("train_styles"),
+    /* And the dial beside it, 20260921_style_frequency.sql. Written and not
+       applied, like every migration here, so until the owner runs it this is
+       the one column on the Training page a save can lose. */
+    droppedFrequency: dropped("style_frequency"),
   };
 }
 
@@ -12945,6 +12967,102 @@ function recommendedStyles(data) {
   return kept.length ? kept : ["walking", "home"];
 }
 
+/* ---- How often. The dial under each ticked style ----------------------------
+   Mo, 2026-09-21: "every day / most days / sometimes / rarely". Four words,
+   left to right in rising order because the control is drawn as a fill level
+   and a fill that falls to the right reads backwards. One accent colour and
+   NEVER a hue ramp: red already means "focus hard" on the body map, so a dial
+   that ran red to green would read as bad to good, and there is no bad answer
+   to "how often".
+
+   The numbers are the engine's (FREQUENCY_DAYS in styles.mjs), repeated here
+   because this file cannot import synchronously and the picker paints before
+   any module is loaded. Change them there first; this copy says so. */
+const STYLE_FREQ = [
+  { id: "rare", label: "Rarely", days: 1, phrase: "rarely" },
+  { id: "some", label: "Sometimes", days: 3, phrase: "sometimes" },
+  { id: "most", label: "Most days", days: 5, phrase: "most days" },
+  { id: "daily", label: "Every day", days: 7, phrase: "every day" },
+];
+const STYLE_FREQ_IDS = STYLE_FREQ.map((f) => f.id);
+const freqDays = (id) => STYLE_FREQ.find((f) => f.id === id)?.days || 0;
+
+/* The nearest word for a count of days, the direction days_per_week is read
+   back into the resistance dial. Same table as frequencyForDays in styles.mjs
+   and not its inverse: four days is "most days", because that is what a
+   person would call it. */
+function freqForDays(n) {
+  const d = Number(n);
+  if (!Number.isFinite(d) || d <= 0) return null;
+  return d >= 7 ? "daily" : d >= 4 ? "most" : d >= 2 ? "some" : "rare";
+}
+
+/* Which styles share one dial. Lifting and home are the same session with a
+   shorter list of implements (styles.mjs folds home into an equipment limit),
+   and the week holds one resistance session a day, so two dials for them
+   would be one number asked twice. They move together. */
+const isResistanceStyle = (id) => TRAIN_STYLES.find((t) => t.id === id)?.mod === "weight-training";
+
+/* One word per ticked style, defaults filled in, and the defaults are the
+   week the app was already building before the dial existed. Mirrors
+   normalizeFrequency in styles.mjs with one thing the engine cannot know
+   here: days_per_week, which is the lifting count and the exact version of
+   the resistance dial, so the dial opens on that number's word. With no
+   resistance ticked the first pick is the one the old builder spent the
+   count on, so it takes that word instead. Everything else opens on "rarely",
+   one day a week, which is what the week builder gave every second style
+   until 2026-09-21. Not "sometimes": that would hand every account from before the
+   dial a week three times busier than the one they had, chosen by nobody.
+   Onboarding writes "some" for a NEW account's second styles on purpose, as
+   a recorded answer rather than a guess made here. */
+function styleFrequencyFor(picked, raw, daysPerWeek) {
+  const given = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const resistance = picked.some(isResistanceStyle);
+  const fromDays = freqForDays(daysPerWeek);
+  const out = {};
+  picked.forEach((id, i) => {
+    const word = typeof given[id] === "string" ? given[id].trim().toLowerCase() : null;
+    if (word && STYLE_FREQ_IDS.includes(word)) { out[id] = word; return; }
+    const main = resistance ? isResistanceStyle(id) : i === 0;
+    out[id] = main ? (fromDays || "most") : "rare";
+  });
+  /* Whatever the map said, the two resistance styles agree, on the heavier
+     word, because that is the one the week has to hold. */
+  const res = picked.filter(isResistanceStyle);
+  if (res.length > 1) {
+    const top = res.map((id) => out[id]).sort((a, b) => freqDays(b) - freqDays(a))[0];
+    for (const id of res) out[id] = top;
+  }
+  return out;
+}
+
+/* The dial itself: four bars rising left to right, the chosen one and every
+   bar below it filled, the word for it underneath. Four bars rather than four
+   labelled segments because the card is half the screen wide and "Sometimes"
+   next to "Most days" does not fit in it at a size anybody can read. */
+function styleDialHTML(id, level, shown) {
+  const t = TRAIN_STYLES.find((x) => x.id === id);
+  const at = STYLE_FREQ_IDS.indexOf(level);
+  return `<div class="obs-freq${shown ? "" : " hidden"}" data-style-dial="${id}" role="radiogroup" aria-label="How often: ${escapeHtml(t?.label || id)}">
+      <div class="obs-freq-bars">
+        ${STYLE_FREQ.map((f, i) => `<button type="button" class="obs-freq-bar${i <= at ? " lit" : ""}${f.id === level ? " on" : ""}" data-freq="${f.id}" role="radio" aria-checked="${f.id === level}" aria-label="${f.label}"><i style="height:${25 * (i + 1)}%"></i></button>`).join("")}
+      </div>
+      <span class="obs-freq-word">${escapeHtml(STYLE_FREQ[at]?.label || "")}</span>
+    </div>`;
+}
+
+function paintStyleDial(root, id, level) {
+  const dial = root.querySelector(`[data-style-dial="${id}"]`);
+  if (!dial) return;
+  const at = STYLE_FREQ_IDS.indexOf(level);
+  dial.querySelectorAll("[data-freq]").forEach((b, i) => {
+    b.classList.toggle("lit", i <= at);
+    b.classList.toggle("on", b.dataset.freq === level);
+    b.setAttribute("aria-checked", String(b.dataset.freq === level));
+  });
+  dial.querySelector(".obs-freq-word").textContent = STYLE_FREQ[at]?.label || "";
+}
+
 /* ---- The styles picker. ONE picker, two screens -----------------------------
    Onboarding asks this on the way in and Setup > Training asks it forever
    after, and it is the same seven options with the same copy going into the
@@ -12957,14 +13075,22 @@ function recommendedStyles(data) {
    `recs` only decorates. Nothing in here ticks anything on its own: what is
    ticked is what the caller passed, because Setup must never paint a
    suggestion as if it were the stored answer. */
-function trainStylePickerHTML(picked, recs = []) {
+/* `freq` is the word under each ticked card, from styleFrequencyFor. The
+   dial is drawn for every card and hidden on the unticked ones, so a tick
+   reveals it in place rather than reflowing the grid to make room. The card
+   and its dial share a cell: a dial inside the card would be a button in a
+   button, which the browser flattens, and the tap would land on both. */
+function trainStylePickerHTML(picked, recs = [], freq = {}) {
   const on = new Set(picked);
-  const card = (t) => `<button type="button" class="ob-style${on.has(t.id) ? " on" : ""}" data-style="${t.id}" aria-pressed="${on.has(t.id)}">
+  const card = (t) => `<div class="ob-style-cell">
+    <button type="button" class="ob-style${on.has(t.id) ? " on" : ""}" data-style="${t.id}" aria-pressed="${on.has(t.id)}">
       ${recs.includes(t.id) ? `<span class="obs-rec">Recommended</span>` : ""}
       <span class="obs-ico">${icon(t.ico, 20)}</span>
       <span class="obs-label">${escapeHtml(t.label)}</span>
       <span class="obs-sub">${escapeHtml(t.sub)}</span>
-    </button>`;
+    </button>
+    ${styleDialHTML(t.id, freq[t.id] || styleFrequencyFor([...picked, t.id], freq)[t.id], on.has(t.id))}
+    </div>`;
   const others = TRAIN_STYLES.filter((t) => t.other);
   /* Other is closed by default and opens itself when something inside it is
      already ticked, so reopening this never hides a choice. It is not drawn at
@@ -12980,7 +13106,11 @@ function trainStylePickerHTML(picked, recs = []) {
 /* `onChange` is handed the new list and a veto: return false and the tap is
    taken back, tick and all. Setup uses it to hold the line at one ticked, and
    onboarding never vetoes anything. */
-function wireTrainStylePicker(root, picked, onChange) {
+/* `freq` is the live map the dials edit in place, and `onFreq` is told after
+   every turn of a dial with the style and the whole map. A tick shows the
+   style's dial and an untick hides it; the word behind a hidden dial is kept,
+   so unticking running and ticking it back does not forget "most days". */
+function wireTrainStylePicker(root, picked, onChange, { freq = null, onFreq = null } = {}) {
   const on = new Set(picked);
   root.querySelectorAll("[data-style]").forEach((b) => b.onclick = () => {
     const id = b.dataset.style;
@@ -12989,30 +13119,66 @@ function wireTrainStylePicker(root, picked, onChange) {
     if (onChange([...on], id) === false) { was ? on.add(id) : on.delete(id); return; }
     b.classList.toggle("on", on.has(id));
     b.setAttribute("aria-pressed", String(on.has(id)));
+    const dial = root.querySelector(`[data-style-dial="${id}"]`);
+    if (dial) dial.classList.toggle("hidden", !on.has(id));
+    /* A style ticked for the first time gets its default word, in the map
+       and on the dial, so what is saved is what is on screen. */
+    if (freq && on.has(id) && !freq[id]) {
+      freq[id] = styleFrequencyFor([...on], freq)[id];
+      paintStyleDial(root, id, freq[id]);
+    }
+  });
+  root.querySelectorAll("[data-style-dial]").forEach((dial) => {
+    const id = dial.dataset.styleDial;
+    dial.querySelectorAll("[data-freq]").forEach((b) => b.onclick = () => {
+      const level = b.dataset.freq;
+      if (!freq) return;
+      /* Both resistance styles at once: one session a day, one dial. */
+      const ids = isResistanceStyle(id) ? TRAIN_STYLES.filter((t) => t.mod === "weight-training").map((t) => t.id) : [id];
+      for (const x of ids) { freq[x] = level; paintStyleDial(root, x, level); }
+      if (onFreq) onFreq(id, level, { ...freq });
+    });
   });
 }
 
 /* The sentence under the grid. Says nothing when there is nothing true to say,
    the way quips.mjs does it, so the line is worth reading when it appears. */
-function trainStyleNote(picked) {
+function trainStyleNote(picked, freq = null) {
   if (!picked.length) return "Pick at least one.";
   const of = (k) => picked.map((id) => TRAIN_STYLES.find((t) => t.id === id)).filter((t) => t?.mod === k);
+  const shape = weekShapeSentence(picked, freq || styleFrequencyFor(picked, null));
   if (!of("weight-training").length) {
-    return "No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle.";
+    return `${shape} No resistance training. That is your call, and worth knowing: two sessions a week is what keeps weight loss taking fat rather than muscle.`;
   }
-  /* What a second style next to lifting actually buys, said here because the
-     cards cannot: a single generated session is the lifting day whatever
-     else is ticked (measured byte-identical on 2026-09-19), and the run or
-     the class arrives only through the week builder, which gives cardio one
-     day and a class one day (weekGenKinds). Two cardio styles still share
-     the one day, so they are listed with "or". */
-  const names = (list) => list.map((t) => t.label.toLowerCase()).join(" or ");
-  const parts = [];
-  if (of("cardio").length) parts.push(`one day of ${names(of("cardio"))}`);
-  if (of("flow").length) parts.push(`one day of ${names(of("flow"))}`);
-  return parts.length
-    ? `Lifting is the backbone. Generate the week and it gets ${parts.join(" and ")}. A single session on its own is still a lifting day.`
-    : "";
+  /* What the dials add up to, said here because the cards cannot. A day
+     holds up to three sessions when they do not clash (a lift, a run, a
+     class), and never two of a kind, which is composeWeek's rule and the
+     week builder's. A single generated session on its own is still the
+     lifting day; the runs and the classes arrive through the week. */
+  const total = picked.filter((id) => !isResistanceStyle(id)).reduce((n, id) => n + freqDays((freq || {})[id]), 0)
+    + Math.max(0, ...picked.filter(isResistanceStyle).map((id) => freqDays((freq || {})[id])));
+  return total > 7
+    ? `${shape} That is more than seven, so some days hold two or three sessions: a lift, a run and a class can share a day, two of a kind cannot.`
+    : `${shape} Generate the week and that is what it lays down. A single session on its own is still a lifting day.`;
+}
+
+/* "Lifting most days, running sometimes, yoga rarely." The resistance pair
+   first, since the week is built around it, then the rest in the order they
+   were ticked; both resistance styles share one word so they share one
+   clause. Reads the dial's own words, so the sentence and the control never
+   disagree. */
+const STYLE_WORD = {
+  lifting: "lifting", home: "bodyweight work", running: "running", cycling: "cycling",
+  walking: "walking", pilates: "Pilates", yoga: "yoga",
+};
+function weekShapeSentence(picked, freq) {
+  const phrase = (id) => STYLE_FREQ.find((f) => f.id === freq[id])?.phrase || "rarely";
+  const clauses = [];
+  const res = picked.filter(isResistanceStyle);
+  if (res.length) clauses.push(`${res.map((id) => STYLE_WORD[id]).join(" and ")} ${phrase(res[0])}`);
+  for (const id of picked) if (!isResistanceStyle(id)) clauses.push(`${STYLE_WORD[id] || id} ${phrase(id)}`);
+  const line = clauses.join(", ");
+  return line.charAt(0).toUpperCase() + line.slice(1) + ".";
 }
 
 /* How many training days each step is worth on the bar. Not evenly spaced,
@@ -13519,23 +13685,47 @@ function renderOnboardStep(step, data = {}) {
        screen in the run where somebody is choosing rather than answering.
        The grid itself is trainStylePickerHTML, shared with Setup > Training. */
     let picked = [...new Set(data.train_styles || recs)];
+    /* How often, one word per ticked style. A NEW account opens its second
+       styles on "sometimes" rather than the "rarely" an old profile defaults
+       to, and it is written out in full, so the difference between "never
+       asked" and "asked, said sometimes" is a recorded answer. The resistance
+       dial opens on the day count if the draft already has one (Back from
+       the days step) and on "most days" otherwise. */
+    const freq = data.style_frequency && typeof data.style_frequency === "object" ? { ...data.style_frequency } : {};
+    const seed = styleFrequencyFor(picked, freq, data.days_per_week);
+    for (const id of picked) if (!freq[id]) freq[id] = isResistanceStyle(id) || (!picked.some(isResistanceStyle) && id === picked[0]) ? seed[id] : "some";
     ob.innerHTML = `
       <div class="ob-step">
         ${obChrome("styles", data)}
         <h1>Pick your workouts</h1>
-        <p class="sub">We have ticked what suits your goals. Change any of it. We only ever plan what is ticked here.</p>
-        ${trainStylePickerHTML(picked, recs)}
+        <p class="sub">We have ticked what suits your goals. Change any of it, and say how often. We only ever plan what is ticked here.</p>
+        ${trainStylePickerHTML(picked, recs, freq)}
         <p class="ob-style-note" id="styleNote"></p>
         <button type="button" class="btn-primary" id="styleNext">On to the fun stuff</button>
         <button type="button" class="btn-ghost" id="styleBack">Back</button>
       </div>`;
     const note = () => {
-      $("styleNote").textContent = trainStyleNote(picked);
+      $("styleNote").textContent = trainStyleNote(picked, freq);
       $("styleNext").disabled = !picked.length;
     };
-    wireTrainStylePicker(ob, picked, (ids) => { picked = ids; note(); });
+    wireTrainStylePicker(ob, picked, (ids) => { picked = ids; note(); }, { freq, onFreq: () => note() });
     note();
-    $("styleNext").onclick = () => renderOnboardStep("days", { ...data, train_styles: picked });
+    /* Only the ticked styles' words travel, and the resistance word becomes
+       the day count the next step opens on: the dial and days_per_week are
+       one number said two ways (see saveTrainingDays), so a person who says
+       "most days" here finds the five day tier already lit on the next screen
+       rather than being asked the same thing again as if they had not. */
+    $("styleNext").onclick = () => {
+      const kept = {};
+      for (const id of picked) kept[id] = freq[id] || "some";
+      const res = picked.find(isResistanceStyle);
+      const next = { ...data, train_styles: picked, style_frequency: kept };
+      if (res && freqForDays(data.days_per_week) !== kept[res]) {
+        next.days_per_week = freqDays(kept[res]);
+        next.intensity = null;
+      }
+      renderOnboardStep("days", next);
+    };
     $("styleBack").onclick = () => {
       const q = tuneQueue(data);
       if (q.length) renderOnboardStep("tune", { ...data, tuneIdx: q.length - 1 });
@@ -13695,12 +13885,25 @@ function renderOnboardStep(step, data = {}) {
       /* A draft's pick survives only if the rung still exists for this goal,
          and its number is re-read off the rung rather than trusted from the
          draft, because the draft may have been saved by the fixed tiers. */
-      const kept = TIERS.find((t) => t.id === data.intensity) || null;
+      /* Or the rung whose count the resistance dial on the previous step
+         set, which is how "most days" there arrives here as the five day
+         tier already lit. A count no rung holds (seven, on a goal that tops
+         out at five) lights nothing and the person picks; the dial is read
+         back off whatever they pick. */
+      const kept = TIERS.find((t) => t.id === data.intensity)
+        || (data.intensity == null && data.days_per_week ? TIERS.find((t) => t.days === data.days_per_week) : null) || null;
       const apply = (t) => {
         data.intensity = t.id;
         data.days_per_week = t.days;
         data.days_range = [t.days, t.days];
         if (!data.session_minutes_manual) data.session_minutes = t.mins;
+        /* The other direction of the same number: a tier is a lifting count,
+           so the resistance dial takes its word. Both resistance styles,
+           since they share the dial. */
+        const word = freqForDays(t.days);
+        if (word && data.style_frequency) {
+          for (const id of Object.keys(data.style_frequency)) if (isResistanceStyle(id)) data.style_frequency[id] = word;
+        }
       };
       if (kept) apply(kept); else { data.intensity = null; data.days_per_week = null; data.days_range = null; }
       const chosen = data.intensity;
@@ -13965,6 +14168,9 @@ function finishOnboardingFromDraft(data) {
        setup still lands. A plan built before these existed is untouched,
        because the engine reads null as never asked. */
     train_styles: Array.isArray(data.train_styles) ? data.train_styles : null,
+    /* The dial's words, only for the styles ticked. Null when the styles step
+       never ran, for the same reason train_styles is. */
+    style_frequency: data.style_frequency && typeof data.style_frequency === "object" ? data.style_frequency : null,
     committed_at: data.committed_at || null,
     goal_tuning: goalTuningPatch(data),
     /* A list only when the hurts page was passed, empty list included.
@@ -13991,7 +14197,7 @@ async function finishOnboarding(data) {
   /* Through upsertGoalFields, not straight at the table: goal_secondary is
      behind an unapplied migration, and a first-run setup must not fail on a
      column that does not exist yet. */
-  const { data: saved, error, droppedSecondary, droppedSession } = await upsertGoalFields({
+  const { data: saved, error, droppedSecondary, droppedSession, droppedFrequency } = await upsertGoalFields({
     email: MY_EMAIL,
     user_name: ME,
     focus: data.focus,
@@ -14007,6 +14213,7 @@ async function finishOnboarding(data) {
        null here would put every account through the missing-column retry for a
        value that means exactly what the column's default already means. */
     ...(Array.isArray(data.train_styles) && data.train_styles.length ? { train_styles: data.train_styles } : {}),
+    ...(data.style_frequency && Object.keys(data.style_frequency).length ? { style_frequency: data.style_frequency } : {}),
     ...(data.goal_tuning ? { goal_tuning: data.goal_tuning } : {}),
     ...(Array.isArray(data.tracked_metrics) ? { tracked_metrics: data.tracked_metrics } : {}),
     ...(data.tracked_by_goal ? { tracked_by_goal: data.tracked_by_goal } : {}),
@@ -14024,6 +14231,7 @@ async function finishOnboarding(data) {
   if (error) { toast("Setup failed, try again"); console.error(error); return false; }
   if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
   if (droppedSession) toast("Your session length is not being stored yet.");
+  if (droppedFrequency) toast("How often you train is not being stored yet.");
   /* No paywall on the way out, and this is where one used to open: half a
      second after the write, for anybody who had just committed. That was the
      only place onboarding ever said a price. The hire step says it now, two
@@ -21837,7 +22045,11 @@ function ensureCardioLibrary() {
    of Generate week does not hand back the same run seven times. That is the
    same YYYYMMDD seed `cardioSessionFor` uses, so a week built here and a week
    built by the generator agree. */
-async function cardioDayForStyles(st, forDate) {
+/* `mode` narrows the pick to the one cardio style composeWeek put on the day,
+   so a week with running and cycling on different days is built as one. The
+   limits pass below still gets the last word, because a bad knee outranks
+   the dial. */
+async function cardioDayForStyles(st, forDate, mode = null) {
   /* `ensureStylesModule` is defined down with the week generator, which is the
      only caller of this function; it was written and then never used, and this
      is what it was for. */
@@ -21848,7 +22060,8 @@ async function cardioDayForStyles(st, forDate) {
      seed is built out of getDate(). */
   const day = new Date(`${forDate || todayStr()}T00:00:00`);
   const minutes = Number(MY_PROFILE?.session_minutes) || null;
-  const gentle = cardioForLimits(st);
+  const narrowed = mode && (st?.cardioModes || []).includes(mode) ? { ...st, cardioModes: [mode] } : st;
+  const gentle = cardioForLimits(narrowed);
   const built = mod.cardioSessionFor(gentle.styles, { today: day, minutes }) || null;
   /* The sentence rides on the session, where the day card prints `note`
      under the pacing line, so the person reads why the day is a walk before
@@ -25933,8 +26146,25 @@ function plansOnDate(date, email = MY_EMAIL) {
    one goes on overwriting this morning's card, exactly as it does today and as
    the sheet already warns, because slotsAvailable says the database cannot hold
    the second row yet. */
-function nextPlanSlot(date, { lifting = true } = {}) {
-  const same = plansOnDate(date).find((w) => !!(w.exercises || []).length === lifting);
+/* Which of the three kinds a plan row is, in composeWeek's words. A day may
+   hold one of each and never two of one, so this is the test every slot
+   decision reads. A class the library had no moves for is still a class: it
+   is told apart by the activity it names rather than by the moves it carries. */
+function planKind(plan) {
+  if ((plan?.exercises || []).length) return "resistance";
+  const s = planActivitySession(plan);
+  if (!s) return "resistance";
+  if (s.kind === "flow" || cardioActFor(s.card)?.training) return "flow";
+  return "cardio";
+}
+
+/* `kind` is the row's kind; `lifting` is the older spelling of the same
+   question kept for the callers that only ever write lifts. Until 2026-09-21
+   every non-lifting row counted as one kind, so a class planned onto a day
+   that held a run took the run's slot and the run with it. */
+function nextPlanSlot(date, { lifting = true, kind = null } = {}) {
+  const want = kind || (lifting ? "resistance" : "cardio");
+  const same = plansOnDate(date).find((w) => planKind(w) === want);
   if (same) return planSlot(same);
   if (slotsAvailable() === false) return 0;
   /* Archived rows count. The unique key does not care whether a plan was
@@ -26026,7 +26256,7 @@ function todaySessions() {
     const name = (l.exercise_name || "").trim();
     const act = actForExerciseName(name);
     out.push({
-      key: `log:${l.id}`, ico: act?.ico || "run", state: "done",
+      key: `log:${l.id}`, ico: act?.ico || "run", state: "done", act: act || null,
       label: name,
       detail: `${l.duration_min} min${l.distance_mi ? ` \u00b7 ${l.distance_mi} mi` : ""}`,
       at: l.created_at || "",
@@ -26040,7 +26270,7 @@ function todaySessions() {
   if (csnRunning() && (!CARDIO_SES.date || CARDIO_SES.date === date)) {
     const a = csnAct();
     out.push({
-      key: "activity:live", ico: a.ico, state: "running", label: a.label,
+      key: "activity:live", ico: a.ico, state: "running", label: a.label, act: a,
       /* Not "Running for": this clock times a yoga class and a rowing machine
          as often as a run, and a day planned by hand as Yoga now arrives here
          by the front door. The elapsed time says the same thing without
@@ -26069,6 +26299,7 @@ function todaySessions() {
     const mins = w.duration_sec ? Math.max(1, Math.round(w.duration_sec / 60)) : 0;
     out.push({
       key: `plan:${w.id}`, ico: run ? (cardioActFor(run)?.ico || "run") : "dumbbell",
+      act: run ? cardioActFor(run) : null,
       state: live ? "running" : over ? "done" : "open",
       label: displayFocus(w.focus, w.exercises),
       detail: live ? "In progress"
@@ -26091,6 +26322,27 @@ function todaySessions() {
    button used to wait for a second row to justify a section, which meant the
    one door onto today's second session was locked until a second session
    already existed. It only needs a first one now. */
+/* "3 sessions today: lifting, a run and yoga." Mo, 2026-09-21: "we can have
+   that mentioned as well: hey, you're going to be doing 3 different sessions
+   on this day". One sentence for the day you are in and the day you are
+   reviewing, off the same rows, so the two screens cannot count differently.
+   Each entry is described the way the activity table names it, and a lift is
+   "lifting" whatever its focus is called, because the sentence is about
+   kinds and the rows above it already say which lift. */
+function sessionsSentence(entries, when) {
+  if (entries.length < 2) return "";
+  const words = entries.map((e) => {
+    if (e.kind === "resistance") return "lifting";
+    const act = e.act;
+    if (!act) return "a session";
+    if (act.training) return act.key === "pilates" ? "Pilates" : act.key;
+    const noun = actNoun(act);
+    return /^[aeiou]/i.test(noun) ? `an ${noun}` : `a ${noun}`;
+  });
+  const list = words.length === 2 ? words.join(" and ") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+  return `${entries.length} sessions ${when}: ${list}.`;
+}
+
 function todaySessionsHTML() {
   const list = todaySessions();
   if (!list.length) return "";
@@ -26120,7 +26372,7 @@ function todaySessionsHTML() {
             one heading is entitled to wonder. gymDaysInWeek counts distinct
             dates, so the ring cannot move twice for one Tuesday, and this is
             the app saying that rather than the reader having to trust it. */ ""}
-      <p class="tsl-note">${list.length} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
+      <p class="tsl-note">${escapeHtml(sessionsSentence(list.map((sn) => ({ kind: sn.ico === "dumbbell" ? "resistance" : "activity", act: sn.act })), "today"))} One training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
     </section>`;
 }
 
@@ -26137,6 +26389,15 @@ function addSessionFootHTML(date, review) {
         : `<button type="button" class="tsl-add" id="tslAddBtn">${icon("plus", 15)} Add another session</button>`}
       ${count > 1 ? `<p class="tsl-note">${count} sessions, one training day toward your week of ${weeklyGoalFor(MY_EMAIL)}.</p>` : ""}
     </section>`;
+}
+
+/* The same sentence for a day being reviewed, off its plan rows. */
+function plannedDaySentence(date, rows) {
+  const when = date === todayStr() ? "today" : `on ${planDayWord(date)}`;
+  return sessionsSentence(rows.map((w) => {
+    const act = cardioSessionOf(w);
+    return { kind: act ? "activity" : "resistance", act: act ? cardioActFor(act) : null };
+  }), when);
 }
 
 function wireTodaySessions(root) {
@@ -27877,6 +28138,9 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
        asked and builds exactly the plan it built before this column existed,
        which is what every account made before onboarding asked gets. */
     train_styles: MY_PROFILE?.train_styles ?? null,
+    /* And how often, the dial beside the list. Same null promise: a profile
+       without it gets the day it always got. */
+    style_frequency: MY_PROFILE?.style_frequency ?? null,
     /* Which day this plan is FOR, which is not always today. The engine seeds
        the run or the class it builds for a no-lifting week off a date, and
        without this it seeds off the moment of the call: planning Thursday and
@@ -35082,7 +35346,8 @@ function weekGenDays() {
    days and not four. Next week owes the whole number.
 
    Five means five since 2026-09-20: the yoga and the cardio do not come out of
-   this number any more, they are placed around it. See weekGenExtras. */
+   this number any more, they are placed around it, by composeWeek, as often
+   as the dial under each of them says. See weekGenDescriptors. */
 /* The number they chose, held inside the days the engine builds for their
    goal. This used to read the raw profile number, so a profile saying 6 laid
    down six sessions while the engine built a three day rotation and the
@@ -35116,7 +35381,7 @@ function spreadOver(list, n) {
   return out;
 }
 
-/* What a week owes that is NOT lifting.
+/* What a week owes that is NOT lifting, and where it goes.
 
    THE NUMBER HE PICKED IS A NUMBER OF LIFTING DAYS. Mo, 2026-09-20: "I put 5
    days to work out. What I mean by 5 days to work out is 5 days to lift. I want
@@ -35124,84 +35389,108 @@ function spreadOver(list, n) {
    do it on your days off, or you can do it as a different session. It's 2
    sessions in 1 day."
 
-   So yoga and cardio no longer spend one of his days. They are extra sessions
-   the week owes on top of the number, one per ticked style, and where they go
-   is answered below rather than by taking a lift off the board.
+   And on 2026-09-21 the rest of it: how often each of the others, from the
+   dial under every ticked style (profiles.style_frequency), and up to THREE
+   sessions on a day when they do not contradict. "Running and working out,
+   like lifting, is not contradicting each other. If they even want to
+   weightlift, run, and do yoga every single day, they can. Those are 3
+   separate sessions." What contradicts is two of a kind: two lifts, two
+   cardio modes, yoga and Pilates together.
 
-   This replaces two answers in two days, and it is worth saying why both of the
-   earlier ones were wrong. The first handed the yoga day and the cardio day out
-   of the number, so five days with yoga ticked came back as three lifting days
-   while the plan screen went on saying five. The second gave lifting a floor of
-   two thirds of the week and fitted the others into the surplus, so five became
-   four lifts and one yoga: better, and still not what he said. Five means five.
+   The placing is composeWeek in styles.mjs, pure and under the gate, and this
+   file's job is to hand it the truth about the week: which days are open,
+   which of them hold a lift (built first, so the composer knows which day is
+   legs and which is the heaviest), and which kinds a kept day already holds.
+   Three earlier answers lived here and each was wrong in its own way (the
+   extras came out of the lifting count; then lifting got a floor; then one
+   day per extra style, stacked on the last lifts when the week was full),
+   and the fourth is not another rule of thumb but the dial, honoured. */
 
-   One session per ticked style per week, and the flow list takes its first
-   entry: somebody who ticked Yoga and Pilates gets a mat session, not two. */
-function weekGenExtras(st) {
-  if (!st || !st.asked) return [];
-  const out = [];
-  if (st.cardio && (st.cardioModes || []).length) out.push({ kind: "cardio" });
-  const flows = st.flowTrainings || [];
-  if (flows.length) out.push({ kind: "flow", training: flows[0] });
-  return out;
-}
-
-/* With no resistance ticked there is no backbone to protect and no lifting days
-   to count, so the number is a number of sessions again and the week alternates
-   through whatever they did tick. A week of running and yoga is not four runs
-   and a yoga day tacked on the end. */
-function weekGenRing(count, extras) {
-  const out = [];
-  for (let i = 0; i < count && extras.length; i++) out.push({ ...extras[i % extras.length] });
-  return out;
-}
-
-/* Where the extra sessions go.
-
-   HIS TWO ANSWERS, IN HIS ORDER. "You either can do it on your days off, or you
-   can do it as a different session." A rest day first, because somebody who has
-   a free day would rather use it than stack two sessions onto a day that is
-   already working, and the rest day is also the honest one: it is a session on
-   its own, at its own length, not a class squeezed in after an hour of lifting.
-   Only when the week has no free day left does one ride on top of a lifting
-   day as its second session.
-
-   The rest days are taken evenly spaced rather than off the front, so a single
-   extra on a five lift week lands in the middle of the gaps instead of on
-   Monday. The stacked ones go on the LAST lifting days of the week, and that is
-   a real choice rather than the array's end: a week with no rest day in it is
-   already at its limit, and the day to put more on is the one with the least
-   ahead of it.
-
-   A seven lifting day week has neither a rest day nor anywhere quiet, so every
-   extra stacks, and if the database cannot hold a second plan yet the caller
-   says that out loud instead of dropping the class in silence. */
-function weekGenPlace(liftDays, restDays, extras) {
-  const out = [];
-  const free = spreadOver(restDays, Math.min(extras.length, restDays.length));
-  extras.forEach((ex, i) => {
-    if (i < free.length) { out.push({ day: free[i], kind: { ...ex }, stack: false }); return; }
-    /* Backwards from the end of the week, so two extras on a week with no room
-       are the last two days rather than the same day twice. */
-    const host = liftDays[liftDays.length - 1 - (i - free.length)];
-    if (host) out.push({ day: host, kind: { ...ex }, stack: true });
-  });
-  return out;
-}
-
-/* Where the extras ended up, in words, because a week that quietly contains
-   less than somebody asked for is the failure this whole change is about. */
-function weekGenPlacedSay(placed, failed) {
-  const word = (k) => (k.kind === "flow" ? (FLOW_LABEL[k.training] || "Mobility") : "Cardio");
-  const say = [];
-  for (const p of placed) {
-    const when = planDayWord(p.day.date);
-    say.push(p.stack
-      ? `${word(p.kind)} is a second session on ${when}, next to the lift: your week had no free day left for it.`
-      : `${word(p.kind)} is on ${when}, which was a rest day.`);
+/* The days as composeWeek wants them. `lift` is decided for every day, so
+   the composer places nothing of that kind: the lifts are already built and
+   the count is days_per_week's, which is not the composer's to round. */
+function weekGenDescriptors(candidates, liftRows) {
+  const byDate = new Map(liftRows.map((r) => [r.date, r]));
+  /* The heaviest lift is the leg day when there is one, and otherwise the
+     one with the most sets; a tie is the first. It is a fact about what
+     was built, measured off the rows, not a guess about what would be. */
+  let heavy = null;
+  for (const r of liftRows) {
+    if (r.state !== "done") continue;
+    if (!heavy || (r.legs && !heavy.legs) || (r.legs === heavy.legs && r.load > heavy.load)) heavy = r;
   }
-  for (const f of failed) {
-    say.push(`${word(f.kind)} has nowhere to go: this app can still only hold one plan a day, which is the migration the owner has not run yet.`);
+  return candidates.map((d) => {
+    const r = byDate.get(d.date);
+    return {
+      key: d.date,
+      lift: !!(r && r.state === "done"),
+      legs: !!(r && r.state === "done" && r.legs),
+      heavy: !!(r && r === heavy),
+      /* A day being built over holds nothing yet as far as the composer is
+         concerned; a same-kind row on it is replaced by the write. */
+      taken: d.keep ? d.plans.map(planKind) : [],
+    };
+  });
+}
+
+/* A day the person said to build over is emptied first. Until a day could
+   hold three rows this was free: the lift wrote slot 0 and slot 0 was the
+   day. Now "build over them" on a Tuesday holding a lift, a run and a class
+   would rewrite whichever kinds the new week puts there and leave the rest
+   standing, so a week that dropped yoga would still show last week's yoga
+   on it. Open rows only: a finished session is a record of what happened
+   and stays, the way weekGenDays already keeps a trained day off the list. */
+async function weekGenClearDay(date) {
+  const rows = plansOnDate(date).filter((w) => w.id && !w.completed_at);
+  for (const w of rows) {
+    const { error } = await sb.from("ai_workouts").delete().eq("id", w.id);
+    if (error) { console.error("could not clear a day before building over it", error); return false; }
+  }
+  ALL_PLANS = (ALL_PLANS || []).filter((w) => !rows.includes(w));
+  return true;
+}
+
+/* The week's start as one number, the same date arithmetic styles.mjs seeds
+   its own pickers with, so the composer's tie-breaks turn over once a week
+   and not once a press. */
+function weekGenSeed() {
+  const start = planWeekStart(weekGenNext() ? 1 : 0);
+  return Number(isoDate(start).replace(/-/g, "")) || 0;
+}
+
+/* Where everything ended up, in words, because a week that quietly contains
+   less than somebody asked for is the failure this whole change is about.
+   One clause per style, then any day that holds three, then whatever could
+   not be placed and why. */
+function weekGenPlacedSay(rows, dropped, noRoom, dayCount) {
+  const word = (k) => (k.kind === "flow" ? (FLOW_LABEL[k.training] || "Mobility") : k.style ? (STYLE_WORD[k.style] || "Cardio") : "Cardio");
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const list = (names) => (names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
+  const say = [];
+  const built = rows.filter((r) => r.state === "done" && r.kind.kind !== "lift");
+  const byStyle = new Map();
+  for (const r of built) {
+    const k = r.kind.style || r.kind.training || r.kind.kind;
+    if (!byStyle.has(k)) byStyle.set(k, { kind: r.kind, days: [] });
+    byStyle.get(k).days.push(planDayWord(r.date));
+  }
+  /* "Running every day" rather than seven day names, when it is every day
+     the button was building. */
+  for (const { kind, days } of byStyle.values()) {
+    say.push(dayCount && days.length >= dayCount ? `${cap(word(kind))} every day.` : `${cap(word(kind))} on ${list(days)}.`);
+  }
+  /* The days that hold three, by name, which is Mo's own ask: "we can have
+     that mentioned as well: hey, you're going to be doing 3 different
+     sessions on this day". */
+  const perDay = new Map();
+  for (const r of rows) if (r.state === "done") perDay.set(r.date, (perDay.get(r.date) || 0) + 1);
+  const three = [...perDay.entries()].filter(([, n]) => n >= 3).map(([d]) => cap(planDayWord(d)));
+  if (three.length) say.push(`${list(three)} ${three.length === 1 ? "holds" : "hold"} three sessions.`);
+  for (const d of dropped) {
+    say.push(`${cap(STYLE_WORD[d.style] || d.style)} is short ${d.count === 1 ? "a day" : `${d.count} days`}: ${d.why}.`);
+  }
+  for (const r of noRoom) {
+    say.push(`${cap(word(r.kind))} on ${planDayWord(r.date)} has nowhere to go: this app can still only hold one plan a day, which is the migration the owner has not run yet.`);
   }
   return say.join(" ");
 }
@@ -35231,13 +35520,13 @@ const FLOW_LABEL = { yoga: "Yoga", pilates: "Pilates" };
    nextPlanSlot answers 0 on a database that has not had
    20260917_ai_workouts_slot.sql run yet, and that answer is a refusal here
    rather than a placement. */
-function weekGenSlot(date, stack) {
+function weekGenSlot(date, stack, kind) {
   if (!stack) return 0;
-  return nextPlanSlot(date, { lifting: false }) || null;
+  return nextPlanSlot(date, { kind: kind?.kind === "flow" ? "flow" : "cardio" }) || null;
 }
 
 async function weekGenBuildDay(date, kind, st, opts = {}) {
-  const at = weekGenSlot(date, opts.stack);
+  const at = weekGenSlot(date, opts.stack, kind);
   if (at === null) return { ok: false, why: "slot" };
   if (kind.kind === "lift") {
     const ok = await generateWorkout(date, { quiet: true, slot: at, keepFocus: opts.keepFocus || null, avoidNames: opts.avoidNames || [] });
@@ -35256,7 +35545,7 @@ async function weekGenBuildDay(date, kind, st, opts = {}) {
   /* Cardio, from the library, by the same call the generator makes when the
      styles leave it nothing to lift: one named session rather than "do some
      cardio", seeded off the day so the week is not the same run five times. */
-  const day = await cardioDayForStyles(st, date);
+  const day = await cardioDayForStyles(st, date, kind.mode || null);
   const name = day?.focus || "Cardio";
   /* The session itself, not just its name. The minutes, the effort and the cue
      are the difference between a day that says "Easy Run" and one somebody can
@@ -35331,42 +35620,36 @@ async function generateTheWeek() {
 
   const open = weekGenDays();
   if (!open.length) { toast("Nothing left in this week to fill"); return; }
+  const mod = await ensureStylesModule();
+  const st = mod?.readStyles ? mod.readStyles(MY_PROFILE?.train_styles, MY_PROFILE?.style_frequency) : null;
+  const lifting = !st || !st.asked || st.resistance;
+  const composing = !!(st && st.asked && mod?.composeWeek);
   const perWeek = await weekGenPerWeek();
-  let want = weekGenTarget(open, perWeek);
-  if (!want) { toast(`Your ${perWeek} days are already in this week`); return; }
+  let want = lifting ? weekGenTarget(open, perWeek) : 0;
+  if (lifting && !want && !composing) { toast(`Your ${perWeek} days are already in this week`); return; }
+  if (!lifting && !composing) { toast("Nothing ticked in your workouts, so there is nothing to build"); return; }
 
   /* A day somebody planned by hand is theirs, so it is not written over
      without being asked about. Leaving them alone means they still count: the
      week owes N sessions, and one already sitting there is one of them. */
-  let candidates = open;
+  let candidates = open.map((d) => ({ ...d, keep: false }));
   const taken = open.filter((d) => d.plan);
   if (taken.length) {
     const names = taken.map((d) => (d.isToday ? "Today" : d.label)).join(taken.length === 2 ? " and " : ", ");
     const answer = await askAboutPlannedDays(names);
     if (!answer) return;
     if (answer === "keep") {
-      candidates = open.filter((d) => !d.plan);
-      want = Math.max(0, want - taken.length);
-      if (!want) { toast("Your week is already full"); return; }
+      /* Kept days stay in the list, marked, so the composer counts what is on
+         them and puts nothing of that kind beside it; the lifts go on the
+         others. A kept lift is one of the N. */
+      candidates = candidates.map((d) => ({ ...d, keep: !!d.plan }));
+      want = Math.max(0, want - taken.filter((d) => d.plans.some((w) => planKind(w) === "resistance")).length);
     }
   }
 
-  const days = spreadOver(candidates, want);
-  if (!days.length) { toast("No empty days left this week"); return; }
-
-  const st = await ensureStylesModule().then((mod) => (mod?.readStyles ? mod.readStyles(MY_PROFILE?.train_styles) : null));
-  const lifting = !st || !st.asked || st.resistance;
-  const extras = weekGenExtras(st);
-  if (!lifting && !extras.length) { toast("Nothing ticked in your workouts, so there is nothing to build"); return; }
-
-  /* The number he picked is a number of LIFTING days, so every chosen day is a
-     lift and the ticked extras are placed around them. With no resistance
-     ticked there is nothing to build a week around and the number goes back to
-     being a number of sessions, alternating through what is there. */
-  const ring = lifting ? [] : weekGenRing(days.length, extras);
-  const placed = lifting
-    ? weekGenPlace(days, candidates.filter((d) => !days.includes(d) && !d.plan), extras)
-    : [];
+  const liftable = candidates.filter((d) => !d.keep);
+  const days = lifting ? spreadOver(liftable, want) : [];
+  if (lifting && !days.length && !composing) { toast("No empty days left this week"); return; }
 
   WEEK_GEN_RUNNING = true;
   const dayName = (d) => (d.isToday ? "Today" : d.date === shiftDate(todayStr(), 1) ? "Tomorrow" : d.label);
@@ -35378,43 +35661,81 @@ async function generateTheWeek() {
     state: "waiting",
     what: "",
   });
-  /* Day order, with a stacked session listed straight under the lift it sits
-     on: the card is a picture of the week, and a second session floating at
-     the bottom of it would not read as the same Friday. It also has to be
-     BUILT in that order, because the lift has to own slot 0 before anything
-     asks the day for a free one. */
-  const rows = [];
-  days.forEach((d, i) => {
-    rows.push(rowFor(d, lifting ? { kind: "lift" } : ring[i] || { kind: "lift" }));
-    for (const p of placed) if (p.stack && p.day === d) rows.push(rowFor(d, p.kind, true));
-  });
-  for (const p of placed) if (!p.stack) rows.push(rowFor(p.day, p.kind, false));
-  rows.sort((a, b) => (a.date === b.date ? (a.stack ? 1 : 0) - (b.stack ? 1 : 0) : a.date.localeCompare(b.date)));
+  /* The lifts first, in day order, and BUILT first: the composer wants to
+     know which day came out as legs before it decides where a run is not
+     welcome, and the lift has to own slot 0 before anything asks the day
+     for a free one. The runs and the classes join the card as they are
+     placed, listed under the day they share. */
+  const rows = days.map((d) => rowFor(d, { kind: "lift" }));
   const ui = openWeekGenCard(rows);
   /* What this run has already built: the day types, so the next ask is for a
      different one, and the movements, so two days of the same type are not the
      same workout twice. */
   const builtFocus = [];
   const seenNames = [];
+  let dropped = [];
   try {
+    /* Build over them means exactly that: what was on those days goes
+       before anything new lands, so the composer's view of them as empty is
+       the truth and not a hope. */
+    for (const d of candidates) if (d.plan && !d.keep) await weekGenClearDay(d.date);
     for (const row of rows) {
       row.state = "at";
       ui.paint(`Building ${row.long}...`);
       const out = await weekGenBuildDay(row.date, row.kind, st, {
         keepFocus: builtFocus.length ? weekGenNextFocus(builtFocus) : null,
         avoidNames: seenNames,
-        stack: row.stack,
       });
       row.state = out.ok ? "done" : "failed";
       row.why = out.why || "";
-      row.what = out.ok ? out.what : out.why === "slot" ? "No room" : "Didn't build";
-      if (out.ok && row.kind.kind === "lift" && LAST_GEN_WORKOUT) {
+      row.what = out.ok ? out.what : "Didn't build";
+      if (out.ok && LAST_GEN_WORKOUT) {
         builtFocus.push(LAST_GEN_WORKOUT.focus);
+        /* What the composer reads off this day: whether it is legs, and how
+           much of it there is, in sets. */
+        row.legs = engineDayFor(LAST_GEN_WORKOUT.focus) === "Lower body";
+        row.load = (LAST_GEN_WORKOUT.exercises || []).reduce((n, ex) => n + (Number(ex?.sets) || 3), 0);
         for (const ex of LAST_GEN_WORKOUT.exercises || []) {
           if (ex?.name && !seenNames.includes(ex.name)) seenNames.push(ex.name);
         }
       }
       ui.paint(`Building ${row.long}...`);
+    }
+
+    /* Then everything else, placed around what was just built. With no
+       resistance ticked every day is open to the composer and the dials are
+       the whole answer; the old ring that alternated days_per_week sessions
+       through the ticks is gone with the number it counted, since that number
+       is a lifting count and there is no lifting. */
+    if (composing) {
+      const composed = mod.composeWeek(st, weekGenDescriptors(candidates, rows), { seed: weekGenSeed() });
+      dropped = composed.dropped || [];
+      const extras = [];
+      for (const day of composed.days) {
+        const d = candidates.find((x) => x.date === day.key);
+        if (!d) continue;
+        for (const sn of day.sessions) {
+          if (sn.kind === "resistance") continue;
+          const kind = sn.kind === "flow"
+            ? { kind: "flow", training: sn.training, style: sn.style }
+            : { kind: "cardio", mode: sn.mode, style: sn.style };
+          /* Stacked when the day already holds something, kept or just
+             built, because that is what decides whether slot 0 is free. */
+          const stack = rows.some((r) => r.date === d.date && r.state === "done") || (d.keep && d.plans.length > 0);
+          extras.push(rowFor(d, kind, stack));
+        }
+      }
+      rows.push(...extras);
+      rows.sort((a, b) => (a.date === b.date ? (a.kind.kind === "lift" ? -1 : b.kind.kind === "lift" ? 1 : 0) : a.date.localeCompare(b.date)));
+      for (const row of extras) {
+        row.state = "at";
+        ui.paint(`Building ${row.long}...`);
+        const out = await weekGenBuildDay(row.date, row.kind, st, { stack: row.stack });
+        row.state = out.ok ? "done" : "failed";
+        row.why = out.why || "";
+        row.what = out.ok ? out.what : out.why === "slot" ? "No room" : "Didn't build";
+        ui.paint(`Building ${row.long}...`);
+      }
     }
   } finally {
     WEEK_GEN_RUNNING = false;
@@ -35447,16 +35768,13 @@ async function generateTheWeek() {
   const lifts = built.filter((r) => r.kind.kind === "lift").length;
   ui.finish(
     built.length
-      ? `${lifting ? `${lifts} lifting day${lifts === 1 ? "" : "s"}` : `${builtDays} day${builtDays === 1 ? "" : "s"}`} on your week.`
+      ? `${lifting && lifts ? `${lifts} lifting day${lifts === 1 ? "" : "s"}` : `${builtDays} day${builtDays === 1 ? "" : "s"}`} on your week.`
       : "Nothing landed.",
     /* Three things can be worth saying and all three are the same kind of
        honesty: a day that would not build, where each extra session ended up,
        and one this app cannot place until a migration is run. */
     [failed.length ? `${failed.map((r) => r.long).join(", ")} wouldn't build. Try ${failed.length === 1 ? "that one" : "those"} from the day itself.` : "",
-      weekGenPlacedSay(
-        placed.filter((p) => built.some((r) => r.date === p.day.date && r.stack === p.stack && r.kind.kind === p.kind.kind)),
-        placed.filter((p) => noRoom.some((r) => r.date === p.day.date && r.kind.kind === p.kind.kind)),
-      )].filter(Boolean).join(" "),
+      weekGenPlacedSay(rows, dropped, noRoom, candidates.length)].filter(Boolean).join(" "),
   );
 }
 
@@ -35482,12 +35800,20 @@ function openWeekGenCard(rows) {
   const paint = (say) => {
     const el = scrim.querySelector("#wgSay");
     if (el && say) el.textContent = say;
-    scrim.querySelector("#wgRows").innerHTML = rows.map((r) => `
+    /* "Friday, 2nd" and "Friday, 3rd": which session on the day, counted
+       down the card, because three rows all called Friday read as a mistake. */
+    const nth = ["", "2nd", "3rd", "4th"];
+    const seen = new Map();
+    scrim.querySelector("#wgRows").innerHTML = rows.map((r) => {
+      const at = seen.get(r.date) || 0;
+      seen.set(r.date, at + 1);
+      return `
       <div class="wg-row ${r.state}">
-        <span class="wg-day">${escapeHtml(r.stack ? `${r.name}, 2nd` : r.name)}</span>
+        <span class="wg-day">${escapeHtml(at ? `${r.name}, ${nth[at] || at + 1}` : r.name)}</span>
         <span class="wg-what">${escapeHtml(r.what || weekGenKindWord(r.kind))}</span>
         <span class="wg-state">${r.state === "done" ? icon("check", 14) : escapeHtml(state[r.state] || "")}</span>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   };
   paint("Building...");
   return {
@@ -35512,7 +35838,10 @@ function openWeekGenCard(rows) {
 function weekGenKindWord(kind) {
   if (!kind) return "";
   if (kind.kind === "flow") return FLOW_LABEL[kind.training] || "Mobility";
-  if (kind.kind === "cardio") return "Cardio";
+  if (kind.kind === "cardio") {
+    const w = kind.style ? STYLE_WORD[kind.style] : null;
+    return w ? w.charAt(0).toUpperCase() + w.slice(1) : "Cardio";
+  }
   return "Workout";
 }
 
@@ -36438,10 +36767,13 @@ async function saveActivityFlow(plan) {
    the same day four times. Measured in the sandbox, which built Lower body
    three days running until this existed. The real rows are reloaded once at
    the end of the run, and they overwrite these. */
-function rememberPlannedDay(date, focus, exercises, slot = 0) {
+function rememberPlannedDay(date, focus, exercises, slot = 0, cardio = null) {
+  /* `cardio` rides along so planKind can tell the run the builder wrote a
+     moment ago from the class it is about to write next to it. */
   const row = {
     user_name: ME, email: MY_EMAIL, entry_date: date,
     focus, exercises: exercises || [], archived: false, completed_at: null, slot,
+    ...(cardio ? { cardio } : {}),
   };
   /* Keyed on the slot as well as the day, or the yoga the week builder just
      stacked on Tuesday would drop Tuesday's lift out of the list the builder
@@ -36474,14 +36806,18 @@ async function planActivityOnDay(date, name, { quiet = false, session = null, ac
      replaces whatever activity is already there; the week builder hands one in
      when it is deliberately putting a class on top of a lifting day, which is
      the second half of what Mo asked for. */
-  const at = slot != null ? slot : nextPlanSlot(date, { lifting: false });
+  /* A class and a run are different kinds and may share the day; a second
+     class replaces the first. */
+  const kind = flow || act?.training ? "flow" : "cardio";
+  const at = slot != null ? slot : nextPlanSlot(date, { kind });
+  /* A class rides under `flow` beside the name, the same key the generator
+     writes it under, because planActivitySession reads that one first and a
+     yoga day with its moves on it is a class rather than a word. */
+  const cardioRow = { session: own, ...(flow ? { flow } : {}) };
   const { error } = await upsertPlanRow({
     user_name: ME, email: MY_EMAIL, entry_date: date,
     focus: name, exercises: [], mobility: null,
-    /* A class rides under `flow` beside the name, the same key the generator
-       writes it under, because planActivitySession reads that one first and a
-       yoga day with its moves on it is a class rather than a word. */
-    cardio: { session: own, ...(flow ? { flow } : {}) },
+    cardio: cardioRow,
     archived: false, completed_at: null, duration_sec: null,
   }, at);
   /* supabase-js resolves rather than throws, so this is the only place the
@@ -36498,7 +36834,7 @@ async function planActivityOnDay(date, name, { quiet = false, session = null, ac
   }
   /* The week builder writes several of these in a row and reloads once at the
      end, so a quiet call stops at the row it saved. */
-  if (quiet) { rememberPlannedDay(date, name, [], at); return true; }
+  if (quiet) { rememberPlannedDay(date, name, [], at, cardioRow); return true; }
   await planChangedOn(date);
   toast(`${name} is on ${datedLabel(date)}`);
   return true;
@@ -37715,7 +38051,8 @@ function plannedDayListHTML(date, showing) {
             <span class="tsl-state">${on ? "Showing" : "Open"}</span>
           </button>`;
         }).join("")}
-      </div>` : ""}
+      </div>
+      <p class="tsl-note">${escapeHtml(plannedDaySentence(date, rows))}</p>` : ""}
     </section>`;
 }
 
@@ -43915,6 +44252,8 @@ async function renderSessionLengthPage() {
 /* What the picker on Setup > Training is holding, which until Save is not what
    the profile holds. Null while the page has never been opened. */
 let SETUP_STYLES = null;
+/* The dial's words, edited in place by the picker and saved with the styles. */
+let SETUP_FREQ = null;
 
 /* Setup > Training, the same seven cards onboarding asks on the way in.
 
@@ -43938,8 +44277,14 @@ function renderTrainStylesPage() {
      on them because it is asking for a first answer; this page is showing an
      answer that already exists, and pre-ticking a suggestion here would paint a
      plan the engine is not building. */
-  el.innerHTML = trainStylePickerHTML(SETUP_STYLES, recommendedStyles(MY_PROFILE || {}));
-  const note = () => { $("setupStyleNote").textContent = trainStyleSetupNote(SETUP_STYLES, stored); };
+  /* The words on file, defaults filled in off days_per_week for the styles
+     with none: an account from before the dial sees "most days" under its
+     lift and "rarely" under its run, which is the week it has been getting.
+     Painting a default is not saving one; the save below writes only when
+     something on this card changed. */
+  SETUP_FREQ = styleFrequencyFor(SETUP_STYLES, MY_PROFILE?.style_frequency, MY_GOAL?.days_per_week ?? MY_PROFILE?.challenge_target);
+  el.innerHTML = trainStylePickerHTML(SETUP_STYLES, recommendedStyles(MY_PROFILE || {}), SETUP_FREQ);
+  const note = () => { $("setupStyleNote").textContent = trainStyleSetupNote(SETUP_STYLES, stored, SETUP_FREQ); };
   wireTrainStylePicker(el, SETUP_STYLES, (ids) => {
     /* Nothing ticked is refused rather than saved, and this is not tidiness.
        styles.mjs reads an empty list the same way it reads null, which is
@@ -43953,19 +44298,50 @@ function renderTrainStylesPage() {
     }
     SETUP_STYLES = ids;
     note();
-  });
+  }, { freq: SETUP_FREQ, onFreq: () => note() });
   note();
 }
 
 /* Said before anything is written, the way the goal page says what a goal
    change is worth before Save rather than after. */
-function trainStyleSetupNote(picked, stored) {
+function trainStyleSetupNote(picked, stored, freq = null) {
   if (!picked.length) {
     return stored === null
       ? "You have never answered this, so your plans are built on what your goal suggests. Tick what you train and the next one is built on that."
       : "Pick at least one.";
   }
-  return trainStyleNote(picked) || "The next plan you generate is built on this.";
+  return trainStyleNote(picked, freq) || "The next plan you generate is built on this.";
+}
+
+/* What goes in the column: a word for every ticked style and nothing for
+   the rest, so unticking a style forgets its word the way it forgets the
+   tick. */
+function styleFrequencyToSave() {
+  const out = {};
+  for (const id of SETUP_STYLES || []) out[id] = SETUP_FREQ?.[id] || styleFrequencyFor(SETUP_STYLES, SETUP_FREQ)[id];
+  return out;
+}
+
+/* The dial's word for the lift, written alongside days_per_week when the
+   count moves. Through upsertGoalFields, because the column is behind an
+   unapplied migration and a PGRST204 on it must not take the row with it.
+   Quiet on failure: the count itself was saved by the caller and said so,
+   and the dial repaints off the count anyway. */
+async function syncStyleFrequencyToDays(days) {
+  const word = freqForDays(days);
+  const stored = MY_PROFILE?.style_frequency && typeof MY_PROFILE.style_frequency === "object" ? MY_PROFILE.style_frequency : null;
+  if (!word || !stored) return;
+  const ids = Object.keys(stored).filter(isResistanceStyle);
+  if (!ids.length || ids.every((id) => stored[id] === word)) return;
+  const next = { ...stored };
+  for (const id of ids) next[id] = word;
+  const { error, droppedFrequency } = await upsertGoalFields({
+    email: MY_EMAIL, user_name: ME, style_frequency: next, updated_at: new Date().toISOString(),
+  });
+  if (error || droppedFrequency) { console.warn("the lifting dial is out of step with the day count", error || "column missing"); return; }
+  MY_PROFILE.style_frequency = next;
+  if (SETUP_FREQ) for (const id of ids) SETUP_FREQ[id] = word;
+  if ($("setupStyleGrid")?.innerHTML) for (const id of ids) paintStyleDial($("setupStyleGrid"), id, word);
 }
 
 /* What actually goes in the column: exactly what is ticked on the grid.
@@ -44549,6 +44925,12 @@ async function saveTrainingDays(days) {
   }
   toast(`${days} ${days === 1 ? "day" : "days"} a week`);
   renderHome();
+  /* And the resistance dial on the card below, which is this same number as
+     a word. Mo's days_per_week is the lifting count, so a dial that said
+     "sometimes" over a week set to five would be the page disagreeing with
+     itself two cards apart. Not awaited: it is a follow-up write and the
+     count has already been reported saved. */
+  syncStyleFrequencyToDays(days);
 }
 
 /* Setup > Training. A profile column with no migration pending, so it goes
@@ -44587,10 +44969,17 @@ async function saveTrainStyles() {
      It says so now: an untick that leaves nothing ticked used to be answered
      with silence by a button labelled Save. */
   if (!next.length) { toast("Pick at least one, or your plans have nothing to build from"); return true; }
-  if (same) return false;
+  /* The dial is its own change. A turn of it with no tick touched is still
+     a Save worth making, and the map is compared as a whole because unticking
+     a style drops its word as well. */
+  const freqNext = styleFrequencyToSave();
+  const freqBefore = MY_PROFILE?.style_frequency && typeof MY_PROFILE.style_frequency === "object" ? MY_PROFILE.style_frequency : null;
+  const freqSame = !!freqBefore && Object.keys(freqNext).length === Object.keys(freqBefore).length
+    && Object.keys(freqNext).every((id) => freqBefore[id] === freqNext[id]);
+  if (same && freqSame) return false;
 
-  const { error, droppedStyles } = await upsertGoalFields({
-    email: MY_EMAIL, user_name: ME, train_styles: next,
+  const { error, droppedStyles, droppedFrequency } = await upsertGoalFields({
+    email: MY_EMAIL, user_name: ME, train_styles: next, style_frequency: freqNext,
     updated_at: new Date().toISOString(),
   });
   if (error) { toast("Could not save how you train"); console.error(error); return true; }
@@ -44602,6 +44991,21 @@ async function saveTrainStyles() {
     return true;
   }
   if (MY_PROFILE) MY_PROFILE.train_styles = next;
+  if (droppedFrequency) {
+    /* The ticks landed and the dial did not: 20260921_style_frequency.sql
+       has not been run. Said, rather than reported as one save. */
+    if (MY_PROFILE) MY_PROFILE.style_frequency = null;
+    toast("How often is not being stored yet");
+  } else if (MY_PROFILE) {
+    MY_PROFILE.style_frequency = freqNext;
+    /* The resistance dial is days_per_week as a word, so a turn of it moves
+       the count on the card above, the same way a tap on that card moves
+       this dial. Only when the word actually changed the number: four days
+       reads as "most days" and must not become five for being read back. */
+    const res = next.find(isResistanceStyle);
+    const days = res ? freqDays(freqNext[res]) : 0;
+    if (days && freqForDays(MY_GOAL?.days_per_week ?? MY_PROFILE.challenge_target) !== freqNext[res]) await saveTrainingDays(days);
+  }
 
   /* Nothing is regenerated here, and that is the decision rather than an
      omission. A plan built on the old answer may be one somebody is part way

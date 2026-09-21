@@ -535,7 +535,7 @@ const META_SUBKEYS = {
   progression: ["rule", "detail"],
   volume: ["byGroup", "under", "frequencyCapped"],
   rotation: ["block", "anchors", "held", "accessories"],
-  styles: ["asked", "picked", "resistance", "honoured", "equipmentMissing", "equipmentDeclared", "cardioModes", "flowTrainings", "note"],
+  styles: ["asked", "picked", "frequency", "resistance", "honoured", "equipmentMissing", "equipmentDeclared", "cardioModes", "flowTrainings", "note"],
 };
 const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets", "cardio", "flow"]);
 const CARDIO_KEYS = new Set(["name", "mode", "minutes", "effort", "cue", "structure"]);
