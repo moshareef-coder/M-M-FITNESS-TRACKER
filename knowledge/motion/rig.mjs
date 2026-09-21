@@ -1151,10 +1151,13 @@ function drawHead(ctx, S, C, fill) {
           // One plate rather than the full mark rotated sideways: rotating
           // the whole shape toward "along" put half of it past the head's
           // silhouette, because the mark's own width assumes a face-on view.
-          // Scaled so its height matches what a single buddy eye occupies
-          // here (eyeH is the sideOn eye's own half-height), so the mark does
-          // not suddenly change size crossing the front/profile line.
-          drawMarkEye(ctx, vis, (eyeH * 2) / 375.30, blink || mood === "sleepy", C.seam, lime);
+          // Scaled off the PAD's own native height (186.46), not the
+          // housing's (375.30), so the green part -- the part that actually
+          // reads as an eye -- matches the length buddy's own eye was, per
+          // Mo: "give him those long green eyes like the old one." Scaling
+          // off the housing instead made the pad about half that length,
+          // which was the actual "his eyes are too small."
+          drawMarkEye(ctx, vis, (eyeH * 2) / 186.46, blink || mood === "sleepy", C.seam, lime);
         } else if (useMark) {
           // Only blink ports: happy/focused/surprised have no equivalent on
           // a fixed rounded-rect pad the way they do on a drawn eye, and
