@@ -34194,22 +34194,33 @@ function weekGenPlacedSay(placed, failed) {
    heat map. */
 const FLOW_LABEL = { yoga: "Yoga", pilates: "Pilates" };
 
+/* Which session on the day this run is writing.
+
+   A day the builder CHOSE is a day it owns: somebody who answered "build over
+   them" said so, and a day it was not allowed to touch never reached this
+   function at all. So a chosen day is written at slot 0 and whatever was there
+   is replaced, rather than the write finding a free slot beside it and leaving
+   a planned run under a planned Pull Day. Measured in the sandbox, which did
+   exactly that until this was explicit.
+
+   A STACKED session is the other placement, the second of Mo's two: it sits on
+   top of the lift this run built a moment ago. It needs a slot above 0 and it
+   must never settle for slot 0, because that is the lift, and writing over it
+   would cost him one of the five days this whole change exists to give him.
+   nextPlanSlot answers 0 on a database that has not had
+   20260917_ai_workouts_slot.sql run yet, and that answer is a refusal here
+   rather than a placement. */
+function weekGenSlot(date, stack) {
+  if (!stack) return 0;
+  return nextPlanSlot(date, { lifting: false }) || null;
+}
+
 async function weekGenBuildDay(date, kind, st, opts = {}) {
+  const at = weekGenSlot(date, opts.stack);
+  if (at === null) return { ok: false, why: "slot" };
   if (kind.kind === "lift") {
-    const ok = await generateWorkout(date, { quiet: true, keepFocus: opts.keepFocus || null, avoidNames: opts.avoidNames || [] });
+    const ok = await generateWorkout(date, { quiet: true, slot: at, keepFocus: opts.keepFocus || null, avoidNames: opts.avoidNames || [] });
     return ok ? { ok: true, what: displayFocus(LAST_GEN_WORKOUT?.focus, LAST_GEN_WORKOUT?.exercises) || "Workout" } : { ok: false };
-  }
-  /* A session stacked onto a day that already holds this run's lift, which is
-     the second of Mo's two placements. It needs a slot above 0 and it must
-     never settle for slot 0, because slot 0 on that day is the lift that was
-     built a moment ago: writing over it would cost him one of the five days
-     this whole change exists to give him. nextPlanSlot answers 0 on a database
-     that has not had 20260917_ai_workouts_slot.sql run yet, and that answer is
-     a refusal here rather than a placement. */
-  let at = null;
-  if (opts.stack) {
-    at = nextPlanSlot(date, { lifting: false });
-    if (!at) return { ok: false, why: "slot" };
   }
   if (kind.kind === "flow") {
     const name = FLOW_LABEL[kind.training] || "Mobility";
