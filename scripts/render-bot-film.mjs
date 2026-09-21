@@ -39,9 +39,13 @@ const OUT = arg("out", join(ROOT, "brand/film/frames"));
 const SIZE = Number(arg("size", 1080));
 const MOVE = arg("move", "Mountain Pose");
 const THEME = arg("theme", "light");
-// A whole run wears one face; there is no need for this to vary shot to shot,
-// so it is a flag rather than a field threaded through every shot object.
+// A whole run wears one face, one body and one skin: each cast member gets its
+// own invocation of this script, so these are flags rather than fields on every
+// shot object.
 const FACE = arg("face", null);
+const BODY_OPT = arg("body", null);
+const SKIN = arg("skin", null);
+const LINES = arg("lines", null);
 
 /* Fresh port and profile per run: a fixed profile leaves a SingletonLock behind
    when a run is killed, and the next Chrome waits on a browser that is never
@@ -131,7 +135,10 @@ try {
     const s = SHOTS[f];
     await ev(`window.__draw(${JSON.stringify(MOVE)}, ${s.cycle}, ${s.face}, `
       + `{theme: ${JSON.stringify(THEME)}, mood: ${JSON.stringify(s.mood || "neutral")}`
-      + (FACE ? `, faceStyle: ${JSON.stringify(FACE)}` : "") + `})`, `draw ${f}`);
+      + (FACE ? `, faceStyle: ${JSON.stringify(FACE)}` : "")
+      + (BODY_OPT ? `, body: ${JSON.stringify(BODY_OPT)}` : "")
+      + (SKIN ? `, skin: ${JSON.stringify(SKIN)}` : "")
+      + (LINES !== null ? `, lines: ${LINES === "true"}` : "") + `})`, `draw ${f}`);
     const len = await ev("window.__b = window.__png(), window.__b.length", `size ${f}`);
     let b64 = "";
     for (let o = 0; o < len; o += CH) b64 += await ev(`window.__b.slice(${o}, ${o + CH})`, `chunk ${f}`);

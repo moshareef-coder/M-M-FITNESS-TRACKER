@@ -23,9 +23,39 @@
 <canvas id="stage" width="1080" height="1080"></canvas>
 
 <script type="module">
-  import { moveFor, palette, render } from "/knowledge/motion/index.mjs";
+  import { moveFor, palette, render, BODIES, BODY } from "/knowledge/motion/index.mjs";
 
   const canvas = document.getElementById("stage");
+
+  /* Two more bodies for the two humans, pushed further apart than the rig's own
+     male/female so they read as distinct people at film size instead of the
+     same figure twice. Numbers are the library's own, moved, not invented: he
+     gets a V, she gets an hourglass. Registered here, not in knowledge/, which
+     is read only and not ours. */
+  if (BODIES && BODY && BODIES.female && !BODIES["film-man"]) {
+    BODIES["film-man"] = {
+      ...BODY, hairStyle: "cap",
+      shoulderW: 13.8, rShoulder: 6.4, rDelt: 6.7, rChest: 10.6,
+      rWaist: 7.0, rPelvis: 6.9, hipW: 5.0, rHip: 5.9,
+      rUpperArmMid: 5.0, rForearmMid: 4.0, rThighMid: 6.1, rCalf: 4.9,
+    };
+    /* Her hips came in from an earlier pass that reached her hanging arms and
+       merged the two silhouettes into one shape, which is worse than not being
+       distinctive. The hourglass now comes mostly from the waist against the
+       shoulders rather than from absolute hip width. */
+    BODIES["film-woman"] = {
+      ...BODIES.female, hairStyle: "bun",
+      shoulderW: 10.6, rShoulder: 4.9, rDelt: 5.1, rChest: 8.8,
+      rWaist: 5.2, rPelvis: 8.0, hipW: 7.2, rHip: 6.6,
+      rThighMid: 6.1, bust: 2.4,
+    };
+  }
+
+  /* One warm mid tan, as a lit / shade / far ramp so the figure keeps the same
+     three-tone shading it already had, just recoloured. */
+  const SKIN = {
+    tan: { lit: "#e8c49f", shade: "#dcb188", far: "#cda175", farShade: "#bf9268" },
+  };
 
   /* A wave, authored here rather than in knowledge/, which is read only and not
      ours. It is Mountain Pose with different arm angles: cloning the pose keeps
@@ -71,10 +101,32 @@
     };
   }
 
+  /* A stand with the arms carried clear of the body.
+
+     In Mountain Pose the arms hang against the hips, and from the front the two
+     silhouettes touch: measured down a body, the arm and the hip are ONE run of
+     pixels for a stretch in the middle. That matters once clothing is cut out
+     of the silhouette (see clothe() in make-brand-film.py): a merged arm and
+     hip get dressed as one shape and the forearm comes out black. No threshold
+     fixes that; the shapes have to actually be apart. Six degrees of extra
+     abduction does it and reads as standing ready rather than at attention. */
+  function buildStand(base, deg) {
+    if (!base || !base.keys) return null;
+    return {
+      ...base,
+      keys: base.keys.map((k) => ({
+        ...k,
+        joints: { ...k.joints, shoulderR: deg, shoulderL: deg },
+      })),
+    };
+  }
+
   const EXTRA = {};
   const mp = moveFor("Mountain Pose");
   const wv = buildWave(mp);
   if (wv) EXTRA["UNIO Wave"] = wv;
+  const st = buildStand(mp, 18);
+  if (st) EXTRA["UNIO Stand"] = st;
 
   window.__size = (w, h) => { canvas.width = w; canvas.height = h; return [w, h]; };
 
@@ -83,12 +135,24 @@
   window.__draw = (name, cycle, face, opts = {}) => {
     const move = EXTRA[name] || moveFor(name);
     if (!move) throw new Error(`no move called ${name}`);
-    const C = palette(opts.theme || "light", opts.accent || "action", "mannequin", "male");
+    const C = palette(opts.theme || "light", opts.accent || "action", "mannequin", opts.body || "male");
+    // Skin. The palette's body ramp is five plain fields, so a tone is applied
+    // by replacing them and leaving the dark outline alone: the outline is what
+    // holds the drawing together and a tinted outline turns it to mush.
+    if (opts.skin) {
+      const T = SKIN[opts.skin];
+      if (T) {
+        C.ink = T.lit; C.inkHi = T.lit;
+        C.shade = T.shade; C.shadeSoft = T.shade;
+        C.far = T.far; C.farShade = T.farShade;
+      }
+    }
     // faceStyle: the rig's own face option ("none", "buddy", ...), not to be
     // confused with `face` above, which is the blink clock in seconds.
     render(canvas, move, C, cycle, face, {
       mood: opts.mood || undefined, view: opts.view || undefined,
       face: opts.faceStyle || undefined,
+      lines: opts.lines === undefined ? undefined : !!opts.lines,
     });
     return true;
   };

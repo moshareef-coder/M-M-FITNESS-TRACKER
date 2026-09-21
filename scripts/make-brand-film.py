@@ -35,11 +35,35 @@ WHITE = (255, 255, 255, 255)
 INK = (17, 19, 24, 255)
 MUTED = (110, 116, 128, 255)
 
-# He stands. The wave is authored and working in brand/film-harness.html as
-# "UNIO Wave" if it is ever wanted, but Mo looked at both and preferred him
-# still: the film is calm and a wave was the one thing in it asking for
-# attention.
-MOVE = "Mountain Pose"
+# Two people either side of him. Mo: "bring in the guy and the woman, the same
+# exact thing we had before." The rig has one character design and one face, so
+# a coach plus two trainees would be three identical figures; instead the pair
+# on screen IS the couple and UNIO is the voice in the bubble AND the only face
+# in the shot. "none" (no face at all) is what makes them read as people rather
+# than as two more robots.
+#
+# Position and scale are measured, not guessed: at chest height carrying the
+# arms clear makes a figure wider, and the three of them side by side were
+# overlapping at the old spacing.
+CAST = [
+    {"key": "man", "body": "film-man", "face": "none", "dx": -0.300,
+     "t0": 1.00, "t1": 1.80, "how": "fade", "skin": "tan", "lines": True, "kit": True},
+    {"key": "woman", "body": "film-woman", "face": "none", "dx": 0.300,
+     "t0": 3.60, "t1": 4.20, "how": "pop", "skin": "tan", "lines": True, "kit": True},
+    # Last in the list is drawn last, so he sits in FRONT of both of them and
+    # her arm passes behind his rather than over it.
+    {"key": "unio", "body": "male", "face": "none", "overlay": "buddy", "dx": 0.0,
+     "t0": 0.00, "t1": 0.80, "how": "fade", "skin": None, "lines": False, "kit": False},
+]
+UNIO = 2
+
+# UNIO Stand is Mountain Pose with the arms carried six degrees clear of the
+# hips (built in brand/film-harness.html). Clothing is cut from each figure's
+# own silhouette, and in Mountain Pose the arm and the hip are one unbroken run
+# of pixels at that height: no threshold separates them, so a clothed forearm
+# came out black. The clearance is not needed for UNIO, who wears no kit, but
+# one move for the whole cast is simpler than two.
+MOVE = "UNIO Stand"
 MOVE_DUR = 6.4
 # The blink is drawn here, not asked of the rig.
 #
@@ -53,7 +77,10 @@ MOVE_DUR = 6.4
 # over in a quarter of a second with almost none of it spent shut.
 # Two, not four. Mo: "he's blinking too much, just a couple blinks in the
 # beginning." One as he arrives and one as the wave comes down.
-BLINKS = [(0.85, 0.09, 0.17), (3.55, 0.09, 0.17)]
+BLINKS = [(1.10, 0.09, 0.17), (4.15, 0.09, 0.17)]
+# A last blink right before the cut, so the bloom that hides the swap comes out
+# of a blink rather than arriving from nowhere.
+BLINK_OUT = (6.20, 0.10, 0.20)
 EYES_OPEN_AT = 1.0           # a face clock nowhere near the rig's own blink
 # He keeps one face for the whole film. The rig's happy eyes are an upward arc
 # and the neutral ones are vertical bars, and there is no shape in between, so
@@ -64,7 +91,16 @@ MOOD = "neutral"
 # Higgsfield pass and wanted in the source rather than bolted on afterwards.
 GLOW_LEN = 0.55
 
-FIG_UNTIL = 6.4              # the figure is on screen until here
+FIG_UNTIL = 6.90             # the figures are on screen until here
+# The push into his face, and the cut where it becomes the mark.
+#
+# This is the whole reason the mark went onto his face in the first place. Mo:
+# "we have the dumbbell as the head, so now we can zoom in." His eyes ARE the
+# artwork, at a smaller size, so the camera does not cut between two drawings
+# that resemble each other: it pushes in on one drawing and stops pushing.
+ZOOM_ON = UNIO
+ZOOM_FROM, ZOOM_TO = 5.70, 6.90
+ZOOM_MAX = 3.7
 FIG_MOUTH = ROOT / "brand/film/figure-mouth"
 # How much wider his face wears the mark than the bare pad-to-pad span, so it
 # reads as features on a face rather than a sticker cut flush to its own edges.
@@ -75,10 +111,12 @@ FACE_MARK_PAD = 1.0
 # itself is a zoom on one drawing.
 EYE_NARROW = 0.86
 EYE_RAISE = 0.22
-# Full body, not a portrait. Mo: "in the beginning we should just show his whole
-# body." A 9:16 frame is the right shape for a standing figure anyway.
-FIG_SCALE = 0.62             # of the frame height, head to feet
-FIG_TOP = 0.10               # where his head starts, as a fraction of the frame
+# Full body, not a portrait. Measured, not guessed: at chest height with the
+# arms held clear, the man is wider than UNIO, who is wider than the woman, and
+# three of them at the old single-figure scale ran to 881px of a 1080 frame with
+# no gap between them.
+FIG_SCALE = 0.41             # of the frame height, head to feet
+FIG_TOP = 0.15               # where the head starts, as a fraction of the frame
 
 # He speaks, in the app's own bubble. Not a caption: the same white bubble with
 # the notch on the corner nearest him, the same small COACH label, and the same
@@ -91,7 +129,7 @@ BOT_NAME = "UNIO"
 # (text, arrives, last character lands, starts leaving)
 SAYS = [
     ("Who will be joining us today?", 1.00, 2.60, 3.50),
-    ("Let's begin.",                  3.85, 4.35, 5.60),
+    ("Let's begin.",                  3.85, 4.35, 5.30),
 ]
 # No copy. Mo is adding his own, so the film is picture only and every second
 # has to be carried by movement instead of by a sentence.
@@ -101,15 +139,16 @@ LINES = []
 # the top and race round to meet at the bottom. That is the same gesture as the
 # progress rings on the dashboard filling up, which makes the logo assemble the
 # way the product works rather than the way a logo usually appears.
-DRAW_FROM, DRAW_TO = 6.20, 7.75
-BAR_FROM, BAR_TO = 7.68, 8.24
-SWEEP_FROM, SWEEP_TO = 8.55, 9.45     # a specular band crossing the finished mark
+DRAW_FROM, DRAW_TO = 7.60, 8.70
+# The mark arrives out of his eyes, so it is first and the arcs follow it.
+BAR_FROM, BAR_TO = 6.85, 7.55
+SWEEP_FROM, SWEEP_TO = 8.85, 9.65     # a specular band crossing the finished mark
 
 # The end card. Set under the mark once it has finished assembling, in the app's
 # own face, with the space above it left clear for anything Mo lays over the top.
 END_NAME = "UNIO"
 END_LINE = "Train together."
-END_FROM = 8.85
+END_FROM = 8.90
 
 SFPRO = "/System/Library/Fonts/SFNS.ttf"
 
@@ -123,7 +162,7 @@ SFPRO = "/System/Library/Fonts/SFNS.ttf"
 PAD_BLEED = 8
 BAR_PX = 853
 # When the mark blinks, and which pads. (start, length, left, right)
-MARK_BLINKS = [(8.42, 0.20, 1, 1), (9.20, 0.26, 0, 1)]
+MARK_BLINKS = [(8.80, 0.20, 1, 1), (9.45, 0.24, 0, 1)]
 # The figure is rendered far larger than it is shown, because the shot is a
 # portrait and the rig draws a whole standing body: at 1080 his head is about a
 # hundred pixels tall, and cropping to it means upscaling the one part of the
@@ -318,16 +357,17 @@ def neutral_floor(im, y0, body):
     grey.putalpha(a)
     lit = Image.composite(grey, strip, mask)
 
-    # The shadow is wider than the frame, so its soft ends are cropped off and
-    # what is left is a straight rule under his feet. Fading it toward the edges
-    # gives it back an end, inside the frame, where it can be seen.
+    # The rig's shadow is nearly as wide as its whole canvas. With one figure a
+    # gentle fade is enough; with three side by side, each shadow reaches past
+    # the other two and they join into one hard rule across the frame. Each now
+    # falls off steeply into its own pool under its own feet.
     w = strip.width
-    ramp_px = w * 0.22
+    ramp_px = w * 0.42
     fall = Image.new("L", (w, 1), 0)
     fp = fall.load()
     for x in range(w):
         e = min(x, w - 1 - x)
-        fp[x, 0] = 255 if e > ramp_px else int(255 * (e / ramp_px) ** 1.4)
+        fp[x, 0] = 255 if e > ramp_px else int(255 * (e / ramp_px) ** 2.6)
     fall = fall.resize(strip.size)
     # Only the shadow fades; his feet keep their own alpha.
     faded = ImageChops.multiply(lit.getchannel("A"), fall)
@@ -335,6 +375,55 @@ def neutral_floor(im, y0, body):
 
     out = im.copy()
     out.paste(lit, box)
+    return out
+
+
+# Black kit, cut out of each figure's own silhouette. The rig has no clothing
+# layer at all: it draws one bare mannequin. But the alpha channel IS the body,
+# so a vest and shorts can be taken from it directly, which means they fit the
+# pose exactly and move with it rather than being a shape pasted over the top.
+KIT = (24, 26, 30, 255)
+VEST = (0.165, 0.430)        # as fractions of the figure's height
+SHORTS = (0.425, 0.605)
+KIT_REACH = 0.105            # how far from the centre line a run may sit, of figure width
+KIT_SS = 4                   # the run-finding pass runs at 1/4 size; see clothe()
+
+
+def clothe(im, y0, body, x0, x1):
+    """Finding the runs a pixel at a time over a full-size row, for two
+    figures, on hundreds of frames, is millions of reads and was the whole
+    reason an early build of this took eighteen minutes. Run finding happens on
+    a quarter-size copy here, and the resulting shape is intersected with the
+    FULL size alpha afterward, so the garment's edges are the figure's own and
+    nothing is softened by the detour.
+    """
+    W_, H_ = im.size
+    sw, sh = W_ // KIT_SS, H_ // KIT_SS
+    small = im.getchannel("A").resize((sw, sh), Image.BILINEAR)
+    px = small.load()
+    cx = (x0 + x1) / 2 / KIT_SS
+    reach = (x1 - x0) * KIT_REACH / KIT_SS
+    rough = Image.new("L", (sw, sh), 0)
+    d = ImageDraw.Draw(rough)
+    for lo, hi in (VEST, SHORTS):
+        for y in range(max(0, int((y0 + body * lo) / KIT_SS)), min(sh, int((y0 + body * hi) / KIT_SS))):
+            run = None
+            for x in range(sw):
+                on = px[x, y] > 150
+                if on and run is None:
+                    run = x
+                elif not on and run is not None:
+                    if abs((run + x - 1) / 2 - cx) < reach:
+                        d.line([(run, y), (x - 1, y)], fill=255)
+                    run = None
+            if run is not None and abs((run + sw - 1) / 2 - cx) < reach:
+                d.line([(run, y), (sw - 1, y)], fill=255)
+    mask = ImageChops.multiply(rough.resize((W_, H_), Image.BILINEAR).point(lambda v: 255 if v > 140 else 0),
+                               im.getchannel("A").point(lambda v: 255 if v > 150 else 0))
+    kit = Image.new("RGBA", (W_, H_), KIT)
+    kit.putalpha(mask)
+    out = im.copy()
+    out.alpha_composite(kit)
     return out
 
 
@@ -395,6 +484,21 @@ def blink_bar(base, closes, boxes):
     return im
 
 
+def cam(t):
+    """The camera: how far zoomed in, and how far the centre has travelled.
+
+    One formula for the whole film, deliberately. An earlier version used plain
+    placement below a threshold and a camera transform above it, and the two do
+    not agree: the transform centres on his EYES, which are nowhere near the
+    middle of the frame, so on the first frame of the push everything jumped by
+    the distance between the two. The centre travels from mid-frame to his eyes
+    on the same eased curve as the zoom, so at rest this IS the plain wide shot
+    and there is nothing to switch between.
+    """
+    k = 0.0 if t <= ZOOM_FROM else smooth((t - ZOOM_FROM) / (ZOOM_TO - ZOOM_FROM))
+    return 1.0 + (ZOOM_MAX - 1.0) * k, k
+
+
 def clamp01(x):
     return 0.0 if x < 0 else 1.0 if x > 1 else x
 
@@ -408,7 +512,7 @@ def ramp(t, a, b):
 
 def eye_close(t):
     """How shut his eyes are at film time t, 0 open and 1 closed."""
-    for at, dn, up in BLINKS:
+    for at, dn, up in BLINKS + [BLINK_OUT]:
         if at <= t < at + dn:
             return ease_out((t - at) / dn)
         if at + dn <= t < at + dn + up:
@@ -419,6 +523,17 @@ def eye_close(t):
 def eye_flare(t):
     """How lit his eyes are, 0 to 1. Rises as the lids open and decays after."""
     out = 0.0
+    # The last one does not decay: it keeps climbing into the cut, so the bloom
+    # is at its brightest exactly where his eyes become the mark.
+    #
+    # clamp01 BEFORE the exponent. The guard is `a + dn <= t`, but this computes
+    # (t - a) - dn, and the two associate differently in floating point: on the
+    # exact frame where they meet the result is about -9e-16, and a negative
+    # base with a fractional exponent is a complex number in Python. That blew
+    # up a render 183 frames in.
+    a, dn, up = BLINK_OUT
+    if a + dn <= t <= ZOOM_TO:
+        out = max(out, clamp01((t - a - dn) / max(0.01, ZOOM_TO - a - dn)) ** 0.8)
     for at, dn, up in BLINKS:
         start = at + dn
         if start <= t < start + GLOW_LEN:
@@ -604,22 +719,31 @@ def shot_list():
 
 
 def render_figure(shots):
+    """One pass per cast member, plus a second pass for whoever has an
+    "overlay" face (UNIO: a bare head to build his face on, and an ordinary
+    render of him to lift the mouth off).
+    """
     tmp = Path("/tmp/unio-shots.json")
     tmp.write_text(json.dumps(shots))
-    if not FIG.exists() or len(list(FIG.glob("f*.png"))) < len(shots):
-        print(f"rendering {len(shots)} bare-head frames")
-        subprocess.run([
+    jobs = []
+    for c in CAST:
+        jobs.append((c["key"], c["body"], c["face"], c["lines"], c["skin"]))
+        if c.get("overlay"):
+            jobs.append((c["key"] + "-face", c["body"], c["overlay"], c["lines"], c["skin"]))
+    for key, body, face, lines, skin in jobs:
+        out = FIG / key
+        if out.exists() and len(list(out.glob("f*.png"))) >= len(shots):
+            continue
+        print(f"rendering {len(shots)} frames for {key}")
+        cmd = [
             "node", str(ROOT / "scripts/render-bot-film.mjs"),
-            "--shots", str(tmp), "--out", str(FIG), "--size", str(RENDER),
-            "--move", MOVE, "--theme", "light", "--face", "none",
-        ], check=True)
-    if not FIG_MOUTH.exists() or len(list(FIG_MOUTH.glob("f*.png"))) < len(shots):
-        print(f"rendering {len(shots)} ordinary-face frames, for the mouth")
-        subprocess.run([
-            "node", str(ROOT / "scripts/render-bot-film.mjs"),
-            "--shots", str(tmp), "--out", str(FIG_MOUTH), "--size", str(RENDER),
+            "--shots", str(tmp), "--out", str(out), "--size", str(RENDER),
             "--move", MOVE, "--theme", "light",
-        ], check=True)
+            "--face", face, "--body", body, "--lines", "true" if lines else "false",
+        ]
+        if skin:
+            cmd += ["--skin", skin]
+        subprocess.run(cmd, check=True)
 
 
 def font(size, weight="Regular"):
@@ -660,24 +784,52 @@ def fade(im, a):
 def main():
     shots = shot_list()
     render_figure(shots)
-    figs = sorted(FIG.glob("f*.png"))
-    mouths = sorted(FIG_MOUTH.glob("f*.png"))
-    if not figs or len(mouths) < len(figs):
+    cast_frames = {c["key"]: sorted((FIG / c["key"]).glob("f*.png")) for c in CAST}
+    faces = {c["key"]: sorted((FIG / (c["key"] + "-face")).glob("f*.png"))
+             for c in CAST if c.get("overlay")}
+    figs = cast_frames[CAST[0]["key"]]
+    if not figs or any(len(v) < len(figs) for v in cast_frames.values()):
         sys.exit("no figure frames")
 
-    # Whole body, placed rather than cropped. The bounding box includes the soft
-    # floor shadow, which is far wider than he is, so the scale is taken from his
-    # HEIGHT and the horizontal centre from his torso: sizing off the box would
-    # shrink him to fit a shadow.
-    probe = Image.open(figs[0]).convert("RGBA")
-    x0, y0, x1, y1 = probe.getbbox()
-    body = y1 - y0
-    fscale = (H * FIG_SCALE) / body
-    fw = int(probe.width * fscale)
-    fh = int(probe.height * fscale)
-    # Where the whole scaled canvas has to sit for his head to land on FIG_TOP.
-    f_left = (W - fw) // 2
-    f_top = int(H * FIG_TOP) - int(y0 * fscale)
+    # One shared scale, taken off UNIO's own height rather than any of theirs,
+    # since he is the reference character regardless of which two people stand
+    # beside him. Each cast member's own width then follows from their own body
+    # proportions at that same scale, which is why the three of them come out
+    # different widths despite standing at the same "distance".
+    ref = Image.open(cast_frames[CAST[UNIO]["key"]][0]).convert("RGBA")
+    rx0, ry0, rx1, ry1 = ref.getbbox()
+    fscale = (H * FIG_SCALE) / (ry1 - ry0)
+
+    # Per cast member: their own bbox, in their own frame's coordinates, and
+    # where their scaled canvas has to sit for their head to land on FIG_TOP.
+    layout = {}
+    for c in CAST:
+        p0 = Image.open(cast_frames[c["key"]][0]).convert("RGBA")
+        bx0, by0, bx1, by1 = p0.getbbox()
+        fw_c, fh_c = int(p0.width * fscale), int(p0.height * fscale)
+        layout[c["key"]] = {
+            "x0": bx0, "y0": by0, "x1": bx1, "body": by1 - by0,
+            "fw": fw_c, "fh": fh_c,
+            "left": (W - fw_c) // 2 + int(c["dx"] * W),
+            "top": int(H * FIG_TOP) - int(by0 * fscale),
+        }
+
+    # His eyes, measured once in his own canvas coordinates. They only exist
+    # once the face has been assembled, so the probe has to be assembled too or
+    # there is nothing to aim at. Measured once rather than per frame so the
+    # camera is steady: he sways inside a still camera, which is what a real one
+    # does, instead of the camera chasing his breathing.
+    u_key = CAST[ZOOM_ON]["key"]
+    eprobe = Image.open(cast_frames[u_key][0]).convert("RGBA")
+    _bar_probe = Image.open(ROOT / "brand/unio-bar.png").convert("RGBA")
+    eprobe = unio_face(eprobe, Image.open(faces[u_key][0]).convert("RGBA"),
+                       0.0, _bar_probe, pad_boxes(_bar_probe))
+    ebox = eye_boxes(eprobe)
+    if not ebox:
+        sys.exit("could not find the eyes to push in on")
+    eye_cx_c = (ebox[0][0] + ebox[1][2]) / 2
+    eye_cy_c = (ebox[0][1] + ebox[0][3]) / 2
+    eye_h_c = ebox[0][3] - ebox[0][1]
 
     arcL = Image.open(ROOT / "brand/unio-left.png").convert("RGBA")
     arcR = Image.open(ROOT / "brand/unio-right.png").convert("RGBA")
@@ -687,6 +839,15 @@ def main():
     bar_src = Image.open(ROOT / "brand/unio-bar.png").convert("RGBA")
     bar_pads = pad_boxes(bar_src)
     mark = 730
+    # What the mark has to measure for its pads to be exactly as tall as his
+    # eyes were on the last frame before the cut. Both are centred, so matching
+    # the height puts them in the same place, and since his eyes are drawn FROM
+    # this artwork it is the same picture at the same size: nothing swaps.
+    _sc_cut = (1.030 - 0.030) * (1.0 + 0.030 * clamp01(ZOOM_TO / FIG_UNTIL))
+    pad_h_native = (pad_boxes(_bar_probe)[0][3] - pad_boxes(_bar_probe)[0][1]) or 155
+    mark_at_cut = (eye_h_c * fscale * _sc_cut * ZOOM_MAX) * _bar_probe.height / pad_h_native
+    print(f"  his eyes are {eye_h_c * fscale * _sc_cut * ZOOM_MAX:.0f}px tall at the cut, "
+          f"so the mark arrives at {mark_at_cut:.0f}px and settles to {mark}px")
     arcL = arcL.resize((mark, mark), Image.LANCZOS)
     arcR = arcR.resize((mark, mark), Image.LANCZOS)
     mx, my = (W - mark) // 2, (H - mark) // 2
@@ -711,31 +872,68 @@ def main():
         t = i / FPS
         frame = Image.new("RGBA", (W, H), WHITE)
 
-        # ---- the figure ----
-        if i < len(figs):
-            a_in = ramp(t, 0.0, 0.70)
-            a_out = 1 - ramp(t, FIG_UNTIL - 0.5, FIG_UNTIL)
-            a = a_in * a_out
-            if a > 0.01:
-                # He arrives rather than appears, then creeps very slightly
-                # closer for the rest of the shot. The push is small enough that
-                # nobody sees it happening and the shot still refuses to sit
-                # still, which is the difference between calm and dead.
-                settle = 1.030 - 0.030 * ease_out(clamp01(t / 0.70))
-                push = 1.0 + 0.030 * clamp01(t / FIG_UNTIL)
-                sc = settle * push
-                w2, h2 = int(fw * sc), int(fh * sc)
-                src = Image.open(figs[i]).convert("RGBA")
-                src = neutral_floor(src, y0, body)
-                src = unio_face(src, Image.open(mouths[i]).convert("RGBA"),
-                                eye_close(t), bar_src, bar_pads)
-                boxes = eye_boxes(src)
-                src = glow_eyes(src, boxes, eye_flare(t))
-                im = src.resize((w2, h2), Image.LANCZOS)
-                # Scaling about the centre of where he already sits, so the push
-                # does not walk him across the frame.
-                frame.alpha_composite(fade(im, a),
-                                      (f_left - (w2 - fw) // 2, f_top - (h2 - fh) // 2))
+        # ---- the three of them ----
+        # He holds full strength right up to the cut; the bloom does the hiding,
+        # not a fade.
+        a_out = 1 - ramp(t, FIG_UNTIL - 0.07, FIG_UNTIL)
+        if a_out > 0.01 and i < len(figs):
+            # Everyone drifts very slightly closer for the whole shot. The move
+            # is small enough that nobody sees it happening and the frame still
+            # refuses to sit dead still, which is the difference between calm
+            # and inert.
+            settle = 1.030 - 0.030 * ease_out(clamp01(t / 0.70))
+            push = 1.0 + 0.030 * clamp01(t / FIG_UNTIL)
+            sc = settle * push
+            z, ck = cam(t)
+            # Where his eyes actually are this frame, at this scale, so the push
+            # lands on them and not three per cent to one side of them.
+            u_lay = layout[u_key]
+            eye_wx = u_lay["left"] - (u_lay["fw"] * sc - u_lay["fw"]) / 2 + eye_cx_c * fscale * sc
+            eye_wy = u_lay["top"] - (u_lay["fh"] * sc - u_lay["fh"]) / 2 + eye_cy_c * fscale * sc
+            ccx = W / 2 + (eye_wx - W / 2) * ck
+            ccy = H / 2 + (eye_wy - H / 2) * ck
+            for c in CAST:
+                lay = layout[c["key"]]
+                # Each of them arrives on their own beat. UNIO fades up alone
+                # first so the frame is his; the man fades in while the
+                # question is still forming; she pops in after it is asked,
+                # which makes her the answer to it rather than scenery.
+                p = clamp01((t - c["t0"]) / max(0.01, c["t1"] - c["t0"]))
+                if p <= 0.001:
+                    continue
+                if c["how"] == "pop":
+                    ea, es, rise = p, 0.88 + 0.12 * ease_out_back(p), int(70 * (1 - ease_out(p)))
+                else:
+                    ea, es, rise = ease_out(p), 1.0, 0
+                a = a_out * ea
+                if a <= 0.01:
+                    continue
+                fw_c, fh_c = lay["fw"], lay["fh"]
+                w2, h2 = int(fw_c * sc * es), int(fh_c * sc * es)
+                w3, h3 = int(w2 * z), int(h2 * z)
+                if w3 < 4 or h3 < 4 or w3 > 26000 or h3 > 26000:
+                    continue
+                src = Image.open(cast_frames[c["key"]][i]).convert("RGBA")
+                k = w3 / src.width
+                im = src.resize((w3, h3), Image.LANCZOS)
+                im = neutral_floor(im, lay["y0"] * k, lay["body"] * k)
+                if c["kit"]:
+                    im = clothe(im, lay["y0"] * k, lay["body"] * k, lay["x0"] * k, lay["x1"] * k)
+                if c.get("overlay"):
+                    ov = Image.open(faces[c["key"]][i]).convert("RGBA").resize((w3, h3), Image.LANCZOS)
+                    im = unio_face(im, ov, eye_close(t), bar_src, bar_pads)
+                    boxes = eye_boxes(im)
+                    im = glow_eyes(im, boxes, eye_flare(t))
+                # Where they stand in the wide shot, then the camera applied.
+                # Everything scales about the point being pushed in on, so
+                # nobody walks across the frame as it moves.
+                wx = lay["left"] - (w2 - fw_c) / 2
+                wy = lay["top"] - (h2 - fh_c) / 2 + rise
+                sx = (wx - ccx) * z + W / 2
+                sy = (wy - ccy) * z + H / 2
+                # Drawn in CAST order, so UNIO, listed last, paints over both of
+                # them: her arm passes behind his rather than over it.
+                frame.alpha_composite(fade(im, a), (int(sx), int(sy)))
 
         # ---- he speaks ----
         for text, s_from, s_typed, s_until in SAYS:
@@ -763,19 +961,22 @@ def main():
 
         # ---- the mark assembling ----
         draw_p = smooth((t - DRAW_FROM) / (DRAW_TO - DRAW_FROM))
-        if draw_p > 0.001:
+        # The mark arrives out of his eyes BEFORE the arcs start drawing, so
+        # this cannot be gated on the arc reveal alone: that left half a second
+        # of pure white between his last frame and the ring's first.
+        if draw_p > 0.001 or t >= BAR_FROM:
             layer = Image.new("RGBA", (mark, mark), (0, 0, 0, 0))
             for img, side in ((arcL, "left"), (arcR, "right")):
                 piece = arc_reveal(img, side, draw_p)
                 if piece is not None:
                     layer.alpha_composite(piece)
 
-            bo = clamp01((t - BAR_FROM) / (BAR_TO - BAR_FROM))
-            if bo > 0.01:
-                sc = 0.5 + 0.5 * ease_out_back(bo)
-                bw = max(2, int(mark * sc))
-                b = blink_bar(bar_src, pad_close(t), bar_pads).resize((bw, bw), Image.LANCZOS)
-                layer.alpha_composite(fade(b, min(1.0, bo * 2.0)), ((mark - bw) // 2, (mark - bw) // 2))
+            # The dumbbell does not drop in any more: it is already there, full
+            # size, because it IS his eyes. What moves is the camera coming off
+            # it.
+            if t >= BAR_FROM:
+                layer.alpha_composite(
+                    blink_bar(bar_src, pad_close(t), bar_pads).resize((mark, mark), Image.LANCZOS))
 
             sp = clamp01((t - SWEEP_FROM) / (SWEEP_TO - SWEEP_FROM))
             if 0.001 < sp < 0.999:
@@ -788,14 +989,34 @@ def main():
                     Image.new("L", (mark, mark), 120)))
                 layer.alpha_composite(shine)
 
-            # The whole mark takes the knock when the dumbbell lands, which is
-            # what sells it as one object rather than a picture being built.
-            knock = 0.0
-            if BAR_TO - 0.12 <= t < BAR_TO + 0.34:
-                knock = math.sin(math.pi * (t - (BAR_TO - 0.12)) / 0.46) * 0.022
-            ms = int(mark * (1 + knock))
-            frame.alpha_composite(layer.resize((ms, ms), Image.LANCZOS),
-                                  (mx - (ms - mark) // 2, my - (ms - mark) // 2))
+            # ---- the pull back ----
+            # The mark starts at exactly the size his eyes just were and settles
+            # to its own. That is the whole illusion: nothing dissolves, the
+            # camera simply stops pushing and comes off it.
+            pull = ease_out(clamp01((t - BAR_FROM) / (BAR_TO - BAR_FROM)))
+            ms = int(mark_at_cut + (mark - mark_at_cut) * pull) if t >= BAR_FROM else mark
+            ms = max(8, min(ms, 4200))
+            shown = layer.resize((ms, ms), Image.LANCZOS)
+
+            # The bloom off his eyes carries across the cut and decays on the
+            # pads, so there is no frame where the swap is visible.
+            bl = 1 - clamp01((t - BAR_FROM) / 0.42)
+            if bl > 0.02 and bar_pads:
+                kk = ms / bar_src.height
+                lay_g = Image.new("L", (ms, ms), 0)
+                dg = ImageDraw.Draw(lay_g)
+                for px0, py0, px1, py1 in bar_pads:
+                    pd = (py1 - py0) * 0.18
+                    dg.rounded_rectangle([(px0 - pd) * kk, (py0 - pd) * kk,
+                                          (px1 + pd) * kk, (py1 + pd) * kk],
+                                         radius=((px1 - px0) / 2 + pd) * kk, fill=255)
+                lay_g = lay_g.filter(ImageFilter.GaussianBlur(
+                    max(2.0, (bar_pads[0][3] - bar_pads[0][1]) * 0.42 * kk)))
+                glow = Image.new("RGBA", (ms, ms), (168, 255, 0, 0))
+                glow.putalpha(lay_g.point(lambda v: int(v * 0.9 * bl)))
+                shown.alpha_composite(glow)
+
+            frame.alpha_composite(shown, ((W - ms) // 2, (H - ms) // 2))
 
             ea = ramp(t, END_FROM, END_FROM + 0.55)
             if ea > 0.01:
