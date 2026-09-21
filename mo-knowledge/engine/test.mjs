@@ -3623,159 +3623,90 @@ test("asking for a focus still never costs that group its work, however tight th
  * What a longer session buys when it cannot buy sets
  * ---------------------------------------------------------------- */
 
-test("every heavy main lift is ramped, with no clock involved", () => {
+test("ramp is off for now: no main lift is ramped, heavy or not, clocked or not", () => {
+  /* Owner's call, 2026-09-20: "get rid of the ramp feature for now completely."
+     This replaces the old positive test (every heavy main lift used to earn
+     warm-up rungs) with its mirror, so this is a real regression test against
+     the feature ever coming back half-on: plan.mjs's `rampsForDay` returns none
+     at the single point a day's ramp sets are built, and every day of every
+     plan, clocked or not, must carry that through to `rampSets: []`. */
   const goal = { bubble: "get-stronger" };
   const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male" };
   const logs = longHistory(78);
   const base = buildPlan({ goal, person, logs });
   const long = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
-
-  /* The bug this closes: an advanced lifter on a strength goal is already over
-     the session length they asked for, so a surplus-gated ramp gave the person
-     research/13 is describing exactly nothing. */
-  assert.ok(base.week.every((d) => d.rampSets.length),
-    "an advanced strength week ramps every day, with no session length sent at all");
-  const ramps = long.week.flatMap((d) => d.rampSets || []);
-  assert.ok(ramps.length, "and a stated clock does not take it away either");
-
-  for (const r of ramps) {
-    const day = long.week.find((d) => (d.rampSets || []).includes(r));
-    const lift = day.exercises.find((e) => e.name === r.exercise);
-    assert.ok(lift, `${r.exercise} is a lift on the day it ramps`);
-    assert.ok(r.sets.length >= 1 && r.sets.length <= 4, "one to four rungs, research/13");
-    for (const s of r.sets) {
-      assert.ok(s.weight < lift.weight, `${r.exercise} ramps at ${s.weight} under a working ${lift.weight}`);
-      assert.ok(s.restSec >= 45 && s.restSec <= 60, "the research's own rests");
-    }
+  for (const d of [...base.week, ...long.week]) {
+    assert.deepEqual(d.rampSets, [], `${d.name}: no ramp, on a plan an advanced heavy lift used to always earn one on`);
+    assert.equal(d.rampMinutes, 0, `${d.name}: nothing to cost`);
   }
 
-  /* The whole point: zero volume. Not one hard set moved, not one weekly total,
-     so nothing reaches recovery.mjs or the MRV ceiling through this door. */
+  /* The whole point: zero volume either way, so nothing reaches recovery.mjs or
+     the MRV ceiling through the door a ramp used to leave open. */
   const sets = (p) => p.week.map((d) => d.exercises.map((e) => `${e.name}:${e.sets}`).join("|")).join("//");
   const longNoExtras = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
   assert.equal(sets(long), sets(longNoExtras), "the same input gives the same sets");
   for (const [group, row] of Object.entries(long.weeklyVolume)) {
     assert.ok(row.sets <= row.target + 2 + 0.001, `${group} past its weekly target plus the slack`);
   }
-  /* And the ramp is not hiding in the day's own count of what it is doing. */
-  for (const d of long.week) {
-    for (const r of d.rampSets || []) {
-      assert.ok(!d.exercises.some((e) => e.name === `${r.exercise} ramp`), "no ramp masquerading as a lift");
-    }
-  }
   assert.equal(base.volumeNotes.timeBought, undefined, "a plan with no stated clock has no ledger of what it spent");
+  assert.deepEqual(base.volumeNotes.ramped, [], "the week-level ramp ledger is always empty now");
 });
 
-test("what counts as heavy: mains yes, accessories never, bodyweight never", () => {
-  const plan = buildPlan({
-    goal: { bubble: "get-stronger" },
-    person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
-    logs: longHistory(78),
-  });
-  /* How many leading slots of each day type are mains, mirrored from plan.mjs
-     SLOTS on purpose rather than imported: a check that borrows the thing it is
-     checking agrees with it by construction. Same reason sweep.mjs writes out
-     the volume ceiling. A full body day has four mains, an upper day three. */
-  const MAIN_SLOTS = { fullBody: 4, push: 2, pull: 2, legs: 2, upper: 3, lower: 2 };
-  for (const d of plan.week) {
-    const ramped = new Set((d.rampSets || []).map((r) => r.exercise));
-    assert.ok(ramped.size <= 2, `${d.name} ramps ${ramped.size} lifts; research/13 caps it at two`);
-    /* research/13: "none for accessories and isolation". Mains lead the day, so
-       anything past the day type's main slots must never carry a ramp. */
-    const mains = MAIN_SLOTS[d.focus];
-    assert.ok(mains, `${d.focus} is not in the mirrored slot table`);
-    for (const e of d.exercises.slice(mains)) {
-      assert.ok(!ramped.has(e.name), `${e.name} is an accessory on ${d.focus} and must not be ramped`);
-    }
-    for (const r of d.rampSets || []) {
-      const lift = d.exercises.find((e) => e.name === r.exercise);
-      assert.ok(lift.weight > 0, `${r.exercise} has no load to ramp and must not have one`);
-    }
-  }
-  /* A bodyweight-only week has nothing loaded to ramp, and says nothing rather
-     than inventing a regression ladder the library does not carry. */
-  const bw = buildPlan({
-    goal: { bubble: "get-stronger" },
-    person: { daysAsked: 3, bodyWeightLb: 180, sex: "Male" },
-    limits: { missing: ["none"] },
-  });
-  for (const d of bw.week) {
-    for (const r of d.rampSets || []) {
-      const lift = d.exercises.find((e) => e.name === r.exercise);
-      assert.ok(lift && lift.weight > 0, `${r.exercise} was ramped with no weight on it`);
-    }
-  }
-});
+/* "what counts as heavy: mains yes, accessories never, bodyweight never" is
+   deleted rather than rewritten: every assertion in it existed to check WHICH
+   lifts `rampsForDay` picked (mains over accessories, loaded over bodyweight),
+   and with ramp generation off at the source there is no picking left to
+   check. The test above is the honest replacement: nothing is ramped, full
+   stop, so there is nothing here left to be heavy or light. */
 
-test("a ramp is inside the session estimate, never bolted on after it", () => {
+test("the session estimate reserves no ramp, now that ramp is off", () => {
+  /* Was "a ramp is inside the session estimate, never bolted on after it":
+     with `rampsForDay` always returning none, `d.rampSets` is always empty and
+     `prepMinutesFor` always takes its WARMUP_MIN branch, so this is now a
+     regression check that the zero really is a zero and not a leftover ramp
+     reserve nobody is charging for (which would silently overcharge the
+     estimate) or a ramp cost nobody is showing (which would silently undercharge
+     it, the exact "the app promised 45 and gave you 52" bug from 2026-09-19). */
   const plan = buildPlan({
     goal: { bubble: "get-stronger" },
     person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
     logs: longHistory(78),
   });
   for (const d of plan.week) {
-    /* The bug the WARMUP_MIN comment was written about: minutes the person
-       spends that the number on the screen does not know about. A ramped day
-       reserves the shorter general block plus the ramp, and the sum is what the
-       estimate carries. */
-    const rampSec = d.rampSets.reduce((t, r) => t + r.seconds, 0);
-    const expected = rampSec
-      ? Math.round((RAMPED_WARMUP_SECONDS + rampSec) / 60)
-      : Math.round(WARMUP_SECONDS / 60);
-    assert.equal(d.prepMinutes, expected, `${d.name} reserves what it spends`);
-    /* What the built block runs over its budget is reserved against a stated
-       clock beside the cool-down (plan.mjs `costBlocks`), never lost. */
-    assert.ok(d.mobility.warmupSeconds >= (rampSec ? RAMPED_WARMUP_SECONDS : WARMUP_SECONDS), `${d.name}: the block is under its budget`);
-    /* The exported costing rather than a copy of it, so a change to what a set
-       costs is made in one place; the worked example on REP_SECONDS in plan.mjs
-       is where a reader checks the arithmetic itself. */
+    assert.deepEqual(d.rampSets, [], `${d.name}: no ramp`);
+    assert.equal(d.prepMinutes, Math.round(WARMUP_SECONDS / 60), `${d.name}: reserves the plain warm-up and nothing more`);
+    assert.ok(d.mobility.warmupSeconds >= WARMUP_SECONDS, `${d.name}: the block is under its budget`);
     assert.equal(d.estimatedMinutes, Math.round(d.prepMinutes + sessionSeconds(d.exercises) / 60),
       `${d.name}: the estimate is the prep plus the work and nothing else`);
     assert.equal(d.estimatedMinutes, estimateMinutes(d.exercises, d.prepMinutes));
-    /* totalMinutes adds the cool-down and must not add the ramp twice. */
     assert.equal(d.totalMinutes, d.estimatedMinutes + Math.round(d.mobility.cooldownSeconds / 60),
-      `${d.name}: the ramp is counted once`);
+      `${d.name}: no ramp counted, once or twice`);
   }
 });
 
-test("a ramped day gets the shorter general warm-up, and only a ramped day", () => {
-  const plan = buildPlan({
-    goal: { bubble: "get-stronger" },
-    person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
-    logs: longHistory(78),
-  });
-  for (const d of plan.week) {
-    if (!d.rampSets.length) continue;
-    /* Four minutes of general work plus about four of ramp is more preparation
-       than the six it replaces, and more of it is specific, which is the whole
-       argument. It must never come back longer than the unramped block. */
-    assert.ok(d.mobility.warmupSeconds <= WARMUP_SECONDS,
-      `${d.name} ramps and still got the full block`);
-  }
-});
+/* "a ramped day gets the shorter general warm-up, and only a ramped day" is
+   deleted rather than rewritten: its whole body sat behind
+   `if (!d.rampSets.length) continue`, so with ramp off it can never run a
+   single assertion again. The test above already covers the warm-up length
+   it was guarding. */
 
-test("ramp-up sets never reach what calibration counts as prescribed", () => {
+test("no workout carries rampSets for calibration to join against, now that ramp is off", () => {
+  /* Was "ramp-up sets never reach what calibration counts as prescribed",
+     which asserted a ramp set could never masquerade as a working set in
+     `ai_workouts.exercises`. With generation off there is no ramp set to
+     masquerade, so the sharper and still-real claim is that `rampSets` never
+     even reaches the workout shape calibration reads: a stray truthy value
+     here is exactly how this could come back half-on undetected. */
   const goal = { bubble: "get-stronger" };
   const person = { daysAsked: 4, bodyWeightLb: 180, sex: "Male" };
   const logs = longHistory(78);
   const long = buildPlan({ goal, person: { ...person, sessionMinutes: 90 }, logs });
-  let sawRamp = false;
   for (let i = 0; i < long.week.length; i++) {
     const w = toWorkout(long, i);
-    if (w.rampSets) sawRamp = true;
-    /* `exercises` is the array the app copies into `ai_workouts.exercises`, and
-       that row is the only thing calibrate.mjs joins a log against. A ramp set
-       in it would be read as work the person did not do. */
+    assert.equal(w.rampSets, undefined, `day ${i}: no rampSets on the workout calibration reads`);
     const names = w.exercises.map((e) => e.name);
     assert.equal(new Set(names).size, names.length, "no duplicated rows");
-    for (const r of w.rampSets || []) {
-      const rows = w.exercises.filter((e) => e.name === r.exercise);
-      assert.equal(rows.length, 1, `${r.exercise} appears once, as the working lift`);
-      assert.equal(rows[0].sets, long.week[i].exercises.find((e) => e.name === r.exercise).sets,
-        "the prescribed set count is the working count and nothing else");
-    }
   }
-  assert.ok(sawRamp, "the workout carries the ramp for the app to render separately");
 });
 
 test("extra time grows the cool-down and never the warm-up", () => {
@@ -3845,27 +3776,22 @@ test("a stated session length that buys something says what it bought", () => {
   const say = plan.dayNotes.find((n) => /It bought a ten minute/.test(n));
   assert.ok(say, "and the plan says what it was");
   assert.ok(/it is not logged/.test(say), "and that it does not count as a set");
-  /* The ramp is no longer something spare minutes bought, so the sentence that
-     describes it must not claim otherwise. */
-  const rampSay = plan.dayNotes.find((n) => /ramp-up sets/.test(n));
-  assert.ok(rampSay, "the ramp is explained");
-  assert.ok(!/asked for/.test(rampSay), "and not as something the clock paid for");
+  /* Was also asserting the ramp got its own explaining sentence here. With
+     ramp generation off, `ramped` (plan.mjs) never has anything in it, so the
+     dayNotes.push that used to write that sentence never fires; there being no
+     rampSay to find IS the correct behaviour now, not a gap to re-assert. */
   /* The refusal, when it still fires, must no longer recommend the thing the
      research says costs performance. */
   for (const n of plan.dayNotes) assert.ok(!/longer warm-up/.test(n), "no engine advice to warm up for longer");
 });
 
-test("each goal's session length covers the ramp it actually prescribes", () => {
-  /* The staleness this closes: `sessionMin` was set for a session that opened
-     cold, so the day the ramp shipped it was short by the ramp's cost and 517
-     sweep days read as over budget with nothing a person would feel having
-     changed. The fix has to stay DERIVED rather than drift into a magic number,
-     so this asserts the derivation rather than the numbers: how many rungs a
-     main earns comes off `repRange[0]` on the goal's own row, and what a day
-     reserves for preparation must be the six minutes it always reserved plus
-     exactly what those rungs cost. If somebody tunes a rep range and forgets the
-     session length, this is what says so. */
-  const extraFor = (reps) => (reps <= 5 ? 3 : reps <= 9 ? 1 : 0);
+test("every goal's session reserves the plain warm-up now, with no ramp left to derive from", () => {
+  /* Was "each goal's session length covers the ramp it actually prescribes",
+     which asserted `sessionMin` was derived to cover a ramp's cost per goal.
+     There is no ramp cost left to derive: `rampsForDay` returns none for
+     every goal, so the honest and still-worth-checking claim across the whole
+     tree is that `prepMinutes` never drifts off the plain six minutes it
+     reserved before ramps ever existed, for any goal or child. */
   for (const bubble of Object.keys(GOAL_PARAMS)) {
     for (const child of Object.keys(GOAL_PARAMS[bubble])) {
       const params = GOAL_PARAMS[bubble][child];
@@ -3875,19 +3801,9 @@ test("each goal's session length covers the ramp it actually prescribes", () => 
         person: { daysAsked: 4, bodyWeightLb: 180, sex: "Male" },
         logs: [],
       });
-      const want = extraFor(params.repRange[0]);
       for (const d of plan.week) {
-        /* A day with nothing loaded to ramp reserves the plain six and that is
-           correct; the claim is only that a day WITH a ramp reserves what the
-           goal's rep range predicts. */
-        if (!d.rampSets.length) { assert.equal(d.prepMinutes, 6, `${bubble}/${child} ${d.name}`); continue; }
-        /* The FIRST main's ramp only, which is the mandatory part and the part
-           `sessionMin` was derived from. The second main's rung is added later
-           and only where the day already has room, so budgeting for it would be
-           budgeting for something optional. */
-        const mandatory = Math.round((240 + d.rampSets[0].seconds) / 60) - 6;
-        assert.equal(mandatory, want,
-          `${bubble}/${child} ${d.name}: reps ${params.repRange[0]} should cost ${want} extra minutes`);
+        assert.deepEqual(d.rampSets, [], `${bubble}/${child} ${d.name}: no ramp`);
+        assert.equal(d.prepMinutes, 6, `${bubble}/${child} ${d.name}`);
       }
     }
   }
