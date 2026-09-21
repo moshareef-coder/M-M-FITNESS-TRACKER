@@ -3119,11 +3119,11 @@
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     color: #8f959d; opacity: .28; pointer-events: none;
   }
+  /* The stand-in and the figure are both in the markup and the mount decides
+     between them: a drawable name leaves `fig-live` on the canvas and takes the
+     stage off the icon. See stageFigure for why the icon is what a mode with
+     nothing authored shows. */
   .sess-stage:has(.fig-live) .sess-stage-none { display: none; }
-  /* Same rule, the other stand-in: the running robot is what a cardio stage
-     shows while its mode has no authored gait, so a mounted figure takes the
-     stage off him. */
-  .sess-stage:has(.fig-live) .csn-figure { display: none; }
   .sess-fig.sess-fig-stage canvas {
     width: auto; height: min(360px, 88vw, 100%); max-width: 88vw; aspect-ratio: 1 / 1;
   }
@@ -6552,8 +6552,6 @@
   /* Him running is the cardio stage's whole figure, so it takes the room a
      mounted move would take rather than the 200px it had under a clock. Its
      label sits on the light stage in both themes, so it cannot keep --muted. */
-  .sess-stage-main .csn-figure { width: min(300px, 74vw); margin: 0; }
-  .sess-stage-main .rbr-label { color: rgba(17,19,24,.55); }
   /* The lifting card is a kind, not an activity, so it takes its own line
      rather than sitting half width beside Other. */
   .csn-act-wide { grid-column: 1 / -1; }
@@ -6653,72 +6651,38 @@
      read standing on a mat with the clock about to start. The plan screen no
      longer uses it. */
   .act-move-more { margin: 2px 0 0 35px; font-size: 12.5px; color: var(--muted); }
+  /* ---- Picking the class yourself ----
+     The swap sheet's row with the order written into its icon slot, so
+     choosing a pose and seeing where it landed in the class are one thing to
+     look at rather than a list and a second list underneath it. */
+  .csn-pick-cat {
+    margin: 20px 0 8px; font-size: 12.5px; font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .csn-pick.on { border-color: var(--accent); }
+  .csn-pick.on .sv-row-ico { background: var(--accent); color: var(--on-accent); }
+  .csn-pick .sv-row-ico b { font-size: 14px; font-weight: 800; }
+  /* Wraps, unlike the meta line above it, because it is a sentence and the
+     nowrap rule up there would cut it to "Loads what you told me". */
+  .csn-pick-warn {
+    margin-top: 3px; font-size: 12px; line-height: 1.35; color: var(--warn); white-space: normal;
+  }
+  /* Rides on the bottom of the sheet while the list scrolls under it. The count
+     and the minutes are the reason to stop scrolling, so they cannot be sitting
+     at the end of thirty seven poses. */
+  .csn-pick-bar {
+    position: sticky; bottom: 0; z-index: 2; margin-top: 18px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0 calc(6px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg); border-top: 1px solid var(--border);
+  }
+  .csn-pick-bar b { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 700; }
+  .csn-pick-bar .btn-primary { flex: none; width: auto; padding: 13px 18px; }
   /* What the list IS, said above it: a sequence of thirteen under a class that
      runs forty minutes is only honest with the repeat next to it. */
   .act-seq-note { margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
   .act-seq-note b { color: var(--fg); font-weight: 700; }
 
-  /* ---- Him, running ----
-     Sized under the clock rather than at the lifting stage's 360px: that screen
-     is the figure and a rep counter, this one is the figure and a 68px clock, a
-     progress bar and two buttons, and 360px here pushes the End button off a
-     small phone. */
-  .csn-figure { width: min(200px, 54vw); margin: 2px 0 4px; }
-  .rbr { position: relative; }
-  .rbr-svg { display: block; width: 100%; height: auto; }
-  .rbr-label {
-    display: block; margin-top: 2px; text-align: center;
-    font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
-  }
-  /* A limb is a white bone with a dark outline, the same way the body is drawn,
-     so it is two strokes of the same path rather than one. */
-  .rbr-out, .rbr-in { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-  .rbr-out { stroke: var(--rb-line); stroke-width: 7.5; }
-  .rbr-in { stroke: var(--rb-body); stroke-width: 4.6; }
-  .rbr-ground { stroke: var(--rb-line); stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 14 11; opacity: .5; }
-  .rbr-speed line { stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; opacity: 0; }
-  .rbr-face { overflow: visible; }
-  /* The base transform IS the stride, so with every animation switched off he
-     is still a picture of somebody running. transform-box is stated rather than
-     left to the initial value, because the origin has to be read in viewBox
-     units and an implementation that defaults the other way puts his legs on
-     backwards. */
-  .rbr-leg, .rbr-arm { transform-box: view-box; }
-  .rbr-leg { transform-origin: 85px 79px; }
-  .rbr-arm-a { transform-origin: 72px 64px; }
-  .rbr-arm-b { transform-origin: 98px 64px; }
-  .rbr-leg-a { transform: rotate(24deg); }
-  .rbr-leg-b { transform: rotate(-24deg); }
-  .rbr-arm-a { transform: rotate(-26deg); }
-  .rbr-arm-b { transform: rotate(26deg); }
-  .rbr-bob { transform-box: view-box; transform-origin: 85px 72px; }
-  @keyframes rbrLegA { 0%, 100% { transform: rotate(24deg); } 50% { transform: rotate(-24deg); } }
-  @keyframes rbrLegB { 0%, 100% { transform: rotate(-24deg); } 50% { transform: rotate(24deg); } }
-  @keyframes rbrArmA { 0%, 100% { transform: rotate(-26deg); } 50% { transform: rotate(26deg); } }
-  @keyframes rbrArmB { 0%, 100% { transform: rotate(26deg); } 50% { transform: rotate(-26deg); } }
-  @keyframes rbrBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-  @keyframes rbrGround { to { stroke-dashoffset: -28px; } }
-  @keyframes rbrSpeed {
-    0% { opacity: 0; transform: translateX(16px); }
-    35% { opacity: .5; }
-    100% { opacity: 0; transform: translateX(-12px); }
-  }
-  .rbr-leg-a { animation: rbrLegA .62s ease-in-out infinite; }
-  .rbr-leg-b { animation: rbrLegB .62s ease-in-out infinite; }
-  .rbr-arm-a { animation: rbrArmA .62s ease-in-out infinite; }
-  .rbr-arm-b { animation: rbrArmB .62s ease-in-out infinite; }
-  .rbr-bob { animation: rbrBob .31s ease-in-out infinite; }
-  .rbr-ground { animation: rbrGround .4s linear infinite; }
-  .rbr-speed line { transform-box: view-box; animation: rbrSpeed .62s linear infinite; }
-  .rbr-s2 { animation-delay: .2s; }
-  .rbr-s3 { animation-delay: .4s; }
-  /* Paused means he stops, not that he keeps running over a stopped clock. */
-  .csn-figure.paused .rbr * { animation-play-state: paused; }
-  .csn-figure.paused .rbr-speed line { opacity: 0; }
-  @media (prefers-reduced-motion: reduce) {
-    .rbr-leg, .rbr-arm, .rbr-bob, .rbr-ground, .rbr-speed line { animation: none; }
-    .rbr-speed line { opacity: .4; }
-  }
   /* ---- The day's sessions ----
      A day that holds two is the point, so the list is a list and not a badge
      on one card: each session says what it is, how much of it there is, and
@@ -21730,13 +21694,18 @@ function csnAct() {
   return CARDIO_ACTS.find((a) => a.key === CARDIO_SES?.act) || CARDIO_ACTS[0];
 }
 
-/* Is there a clock on it. Setup and reveal are both a person deciding, and
-   neither is a session: offering to "resume" something nobody has started, or
-   drawing it on Home as a live row, is the app telling them they are running
-   when they are still choosing. Asked through here rather than compared to a
-   state name at four call sites, which is how reveal would have been missed. */
+/* The screens where somebody is deciding rather than training: choosing the
+   activity, picking the class by hand, and reading back what was built before
+   the clock starts. Three places have to agree about which those are, so they
+   ask this list rather than each naming the states, which is how `reveal` was
+   nearly missed when it arrived and how `pick` would have been missed today. */
+const CSN_CHOOSING = new Set(["setup", "pick", "reveal"]);
+
+/* Is there a clock on it. None of the above is a session: offering to "resume"
+   something nobody has started, or drawing it on Home as a live row, is the app
+   telling them they are running when they are still choosing. */
 function csnRunning() {
-  return !!CARDIO_SES && CARDIO_SES.state !== "setup" && CARDIO_SES.state !== "reveal";
+  return !!CARDIO_SES && !CSN_CHOOSING.has(CARDIO_SES.state);
 }
 
 /* Is anything open. Mo: "if I pause, I pause and it's still gonna have me do
@@ -22159,49 +22128,34 @@ function activityWhy(act, profile, isRec) {
   return lines[goal] || lines.consistent;
 }
 
-/* ---- Him, running ----
+/* ---- What a bare clock draws ----
 
-   The rig in knowledge/motion draws every exercise in this app and it has no
-   run cycle. It belongs to a collaborator and is read only, so there is nothing
-   there to pose. Rather than stand a still figure on the one screen whose whole
-   subject is movement, this is him drawn here: the bust robotFaceSVG already
-   returns, nested rather than copied so there stays exactly one drawing of his
-   face in this file, with legs and arms under it and the ground going past. A
-   request for a real run cycle is in mo-knowledge/LIBRARY-REQUESTS.md.
+   "Just start the clock" is the door that plans nothing, so there is no session
+   name for the stage to mount a figure by, and for months that meant a robot
+   drawn here running: on a yoga clock, on the stair master, on an elliptical.
+   This is one half of the answer to that. The other is stageFigure, which draws
+   the activity's own icon where there is nothing honest to draw; this is for
+   where the library DOES hold something that is simply what the activity is,
+   and the clock borrows it.
 
-   The animation is CSS on classes and not a timer, so it costs nothing while
-   the clock beside it is being repainted twice a second. Pausing freezes it
-   where it stands, which is what pausing looks like. prefers-reduced-motion
-   turns every keyframe off and leaves the base transform, and the base
-   transform IS a stride: the still pose is a picture of somebody running, not
-   a picture of somebody standing. */
-function robotRunningSVG(label = "") {
-  /* Twice, because a limb here is a white bone with a dark outline, the same
-     way the body is drawn, and one stroke cannot be both. */
-  const limb = (d) => `<path class="rbr-out" d="${d}"/><path class="rbr-in" d="${d}"/>`;
-  /* The bust is 64 by 78 in its own viewBox and it is nested, not copied, so the
-     translate is what puts its hips at 85,79 and every limb coordinate below is
-     measured off that one point. Move the translate and the legs come off. */
-  return `<div class="rbr" aria-hidden="true">
-    <svg class="rbr-svg" viewBox="0 0 170 150" preserveAspectRatio="xMidYMax meet">
-      <g class="rbr-speed">
-        <line class="rbr-s1" x1="4" y1="30" x2="38" y2="30"/>
-        <line class="rbr-s2" x1="10" y1="50" x2="36" y2="50"/>
-        <line class="rbr-s3" x1="2" y1="70" x2="32" y2="70"/>
-      </g>
-      <g class="rbr-bob">
-        ${/* The far side of him first, so the near arm and leg draw on top. */ ""}
-        <g class="rbr-arm rbr-arm-b">${limb("M98 64 110 79 101 91")}</g>
-        <g class="rbr-leg rbr-leg-b">${limb("M85 79 98 105 94 129")}${limb("M94 129 105 131")}</g>
-        <g class="rbr-torso" transform="translate(53 8)">${robotFaceSVG(64, "rbr-face", { bust: true })}</g>
-        <g class="rbr-leg rbr-leg-a">${limb("M85 79 72 105 78 129")}${limb("M78 129 89 131")}</g>
-        <g class="rbr-arm rbr-arm-a">${limb("M72 64 60 79 69 91")}</g>
-      </g>
-      <line class="rbr-ground" x1="-30" y1="139" x2="230" y2="139"/>
-    </svg>
-    ${label ? `<span class="rbr-label">${escapeHtml(label)}</span>` : ""}
-  </div>`;
-}
+   A gait for the modes with one, the stepmill for the stairs, and a standing
+   pose for a mat. The pose is deliberately the most boring one in the library:
+   nothing was planned and nobody is being instructed, and a figure breathing in
+   Mountain Pose says exactly that, where a sequence of poses would be
+   pretending we had built somebody a class. It stands in for Pilates too, which
+   has no standing pose of its own. A body standing still is not a yoga claim,
+   it is a body standing still.
+
+   A name nothing can draw is handled rather than forbidden: mountMotionFigures
+   marks it `fig-none` and the activity's icon takes the stage, which is what
+   every mode left out of this list already gets. */
+const CSN_CLOCK_FIG = {
+  run: "Easy Run", treadmill: "Easy Run",
+  walk: "Brisk Walk",
+  cycle: "Easy Ride", bikemachine: "Easy Ride",
+  stairs: "Stair Intervals",
+  yoga: "Mountain Pose", pilates: "Mountain Pose",
+};
 
 /* Effort is a 1 to 10 rating of perceived exertion, which is the scale the
    library prescribes on. Printed as it is written rather than converted into a
@@ -22454,11 +22408,12 @@ function closeCardioSession() {
   pinSheets();
 }
 
-/* Leaving setup throws the session away; leaving a running one only hides it,
-   because the clock is still the truth and the person is still running. A
-   reveal is setup with a session drawn on it, so it goes the same way. */
+/* Leaving a screen where nothing has started throws the session away; leaving a
+   running one only hides it, because the clock is still the truth and the
+   person is still running. A reveal and a half picked class are both setup with
+   more written on them, so they go the same way. */
 function csnDismiss() {
-  if (CARDIO_SES?.state === "setup" || CARDIO_SES?.state === "reveal") { CARDIO_SES = null; csnSave(); }
+  if (CSN_CHOOSING.has(CARDIO_SES?.state)) { CARDIO_SES = null; csnSave(); }
   closeCardioSession();
 }
 
@@ -22518,6 +22473,171 @@ async function csnGenerate() {
   renderCardioStage();
 }
 
+/* ---- Picking the class yourself ----
+
+   Mo, 2026-09-21: "when I go to yoga, I also want to be able to select my yoga
+   workouts, not just generate. Instead of saying 'Run the clock,' we can have
+   another one that says 'Pick your yoga workouts,' and then from there, it
+   gives you the dropdown, just like how a normal workout would give you."
+
+   WHAT "PICK" MEANS, because there were two readings of that and the library
+   settles it rather than taste. Picking a ready made CLASS would mean picking a
+   style, and the engine's styles are a sentence and nothing else: buildActivity
+   Session reads styleKey into the seed and into a note, and Vinyasa, Hatha,
+   Power and Yin select the same poses for the same lengths out of the same
+   pool. Four doors onto one class is a menu that lies. Picking the POSES is the
+   other reading and it is the one the library can keep: 37 yoga poses in six
+   categories and 22 Pilates moves in four, every one of them drawn by
+   knowledge/motion, which is a list somebody can build a class out of. It is
+   also the flow he compared it to, since a lifting workout is a list you add
+   to, swap and remove.
+
+   THE POOL IS THE WHOLE LIBRARY, not what their level has earned. The level cap
+   is a rule about what this app PRESCRIBES unasked, and that is a different act
+   from what somebody chooses for themselves with the word on the row in front
+   of them, which is the argument openFlowSwapSheet already settled for the
+   harder half of its list.
+
+   WHAT THIS DOES NOT DO is order the class. The engine spreads a generated
+   sequence across categories and runs easiest to hardest, for reasons written
+   at the top of activity-session.mjs; a class somebody picked is theirs in the
+   order they picked it, and quietly resorting it would be the app overruling
+   the thing it just offered. The number on the row is that order, so it is
+   visible while they build it. */
+
+/* The pool and the order, kept out of CARDIO_SES because they are two
+   different kinds of fact: the picks are the person's and ride on the session
+   so a reload comes back on them, the pool is library data that would be dead
+   weight in localStorage. `FOR` is which activity it was built for, since
+   yoga and Pilates share this screen. */
+let CSN_PICK_POOL = null;
+let CSN_PICK_FOR = null;
+let CSN_PICK_OUT = new Set();
+
+/* The library's own word for one thing in a class. A Pilates class holds moves
+   and a yoga class holds poses; calling a pose a move is the app talking about
+   its data rather than about yoga. */
+function actMoveWord(a, plural = false) {
+  const pose = a?.training === "yoga";
+  return plural ? (pose ? "poses" : "moves") : (pose ? "pose" : "move");
+}
+
+/* Gated where csnGenerate is gated and for the same reason: the library is
+   what he is hired for, and a second door onto the same 37 poses that skipped
+   the paywall would make the first one arbitrary. Picking is a different act
+   from generating, not a cheaper one. */
+async function csnOpenPicker() {
+  const a = csnAct();
+  if (!a.training) return;
+  if (!await requirePremium()) return;
+  /* Re-read after the await, the same trap csnGenerate documents: the paywall
+     is a whole screen and this sheet can be closed behind it. */
+  if (!CARDIO_SES || CARDIO_SES.state !== "setup" || CARDIO_SES.act !== a.key) return;
+  const engine = await ensureSessionEngine();
+  const training = (EXERCISE_TRAININGS || []).find((t) => t.id === a.training);
+  if (!engine?.movesAtOrBelow || !training) {
+    /* Said rather than swallowed: both arrive by dynamic import after first
+       paint, and a button that does nothing is worse than one that explains. */
+    toast("Still loading the move library. Try again in a moment.");
+    return;
+  }
+  CSN_PICK_POOL = engine.movesAtOrBelow(training, "advanced");
+  CSN_PICK_FOR = a.key;
+  /* What the generator would have refused over what they said hurts. Asked of
+     the engine rather than worked out again here, because a second opinion
+     about which poses load a knee is exactly the thing that goes stale: this
+     is the same `excluded` list buildActivitySession puts on a class, asked
+     for the whole library at the top of its ladder. Nothing is removed. A
+     pose somebody chose with the warning on the row is their call, and one
+     quietly missing from their own picker is not. */
+  const probe = engine.buildActivitySession(training, {
+    minutes: 30, level: "advanced", limits: MY_PROFILE?.limits ?? null,
+  });
+  CSN_PICK_OUT = new Set((probe?.excluded || []).map((e) => e.name));
+  if (!Array.isArray(CARDIO_SES.picks)) CARDIO_SES.picks = [];
+  CARDIO_SES.state = "pick";
+  csnSave();
+  renderCardioStage();
+}
+
+/* The moves they have picked, in their order, as library entries. Names are
+   what the session carries, so a pool that came back for a different activity
+   or not at all leaves this empty rather than half built. */
+function csnPickedMoves() {
+  const a = csnAct();
+  if (CSN_PICK_FOR !== a.key || !CSN_PICK_POOL) return [];
+  return (CARDIO_SES?.picks || []).map((n) => CSN_PICK_POOL.find((m) => m.name === n)).filter(Boolean);
+}
+
+/* The class they built, in the shape buildGuidedPlan hands back, field for
+   field, because the reveal, the live player, the Up next rail and the saved
+   row all read that shape and a second one would have to be taught to four
+   screens. Three fields mean something different from a generated class and
+   all three are said out loud on the screen:
+
+     `rounds` is 1. A sequence somebody chose is the sequence; running it twice
+     would be the app adding work nobody picked.
+     `minutes` is what the picks add up to WITH the ten second preps, because
+     that is what the clock is actually going to run, not what the stepper on
+     the screen behind said.
+     `level` is the hardest thing in the class rather than a level the person
+     has earned, which is the only true thing that word can mean here. */
+function csnPlanFromPicks() {
+  const a = csnAct();
+  const picks = csnPickedMoves();
+  if (!picks.length) return null;
+  const training = (EXERCISE_TRAININGS || []).find((t) => t.id === a.training);
+  const seconds = picks.reduce((n, m) => n + m.seconds * (m.perSide ? CSN_PER_SIDE : 1), 0);
+  const withPrep = picks.reduce((n, m) => n + csnMoveCost(m), 0);
+  const rank = ["beginner", "intermediate", "advanced"];
+  const level = picks.reduce((top, m) => (rank.indexOf(m.level) > rank.indexOf(top) ? m.level : top), "beginner");
+  const warned = picks.filter((m) => CSN_PICK_OUT.has(m.name));
+  const word = actMoveWord(a, picks.length !== 1);
+  const notes = [];
+  /* First, because the reveal prints notes[0] as his line and this is the one
+     that should change somebody's mind. */
+  if (warned.length) {
+    notes.push(`${warned.map((m) => m.name).join(", ")} load${warned.length === 1 ? "s" : ""} what you told me hurts, so I would have left `
+      + `${warned.length === 1 ? "it" : "them"} out of a class I built. You picked ${warned.length === 1 ? "it" : "them"}, so ${warned.length === 1 ? "it is" : "they are"} in. Go carefully.`);
+  }
+  /* Short on purpose: this is the line his bubble carries into the live screen,
+     where two lines is all there is and a third sentence would be cut off
+     mid-word. Both facts a picked class has to state are in it, that the order
+     is theirs and that it runs once. */
+  notes.push(`Your own ${picks.length} ${word}, in the order you picked them, once through.`);
+  return {
+    ok: true,
+    training: a.training,
+    label: training?.label || actTitle(a),
+    /* Not a library style: this is what the reveal calls the class, and "Yoga,
+       your pick" is the honest name for one nobody generated. */
+    style: { key: "picked", label: "your pick" },
+    level,
+    minutes: Math.max(1, Math.round(withPrep / 60)),
+    seconds,
+    rounds: 1,
+    uniqueSeconds: seconds,
+    /* Written in the shape a flow move is written in everywhere else, and no
+       wider: the library entry also carries `primary` and `secondary` muscle
+       lists that a session row deliberately does not, for the reason
+       applyFlowSwap gives. `categoryLabel` is what the live screen prints
+       under the pose name and `category` is what a saved row carries, so both
+       are set rather than leaving one screen guessing. */
+    moves: picks.map((m) => ({
+      name: m.name,
+      seconds: m.seconds,
+      perSide: !!m.perSide,
+      round: 1,
+      category: m.categoryLabel || m.category || null,
+      categoryLabel: m.categoryLabel || null,
+      cue: m.cue || null,
+    })),
+    excluded: [],
+    notes,
+  };
+}
+
+
 /* ---- The live session: the lift screen, with an activity in it ----
 
    Mo, on the Pilates and running screens: "all of our UI should follow the
@@ -22530,18 +22650,18 @@ async function csnGenerate() {
 
    Three things come through it:
 
-   A generated class (yoga, Pilates) has moves, and every one of them is drawn:
-   knowledge/motion covers all 37 yoga poses and all 22 Pilates moves, so the
-   stage mounts the pose by name exactly as the stretch screen does.
+   A class (yoga, Pilates), generated or picked, has moves and every one of them
+   is drawn: knowledge/motion covers all 37 yoga poses and all 22 Pilates moves,
+   so the stage mounts the pose by name exactly as the stretch screen does.
 
-   A cardio session (a run, a ride, the machines) has no moves and no drawn
-   animation anywhere in this app, so the stage holds him running instead. It
-   is the honest stand-in rather than a lifting figure borrowed for a run: see
-   robotRunningSVG, and mo-knowledge/LIBRARY-REQUESTS.md for the real run cycle
-   that will replace it. THE SLOT IS `stageFigure` BELOW: the day the library
-   has a run, that branch becomes the same data-fig mount the class uses.
+   A cardio session names the library's own session and the gaits are keyed by
+   that name, so a run, a walk, a ride and the stepmill draw themselves the same
+   way a pose does.
 
-   A bare clock is cardio with nothing written on it, and takes the same shape.
+   A bare clock has no session on it at all, so it draws the activity instead of
+   a session: see CSN_CLOCK_FIG. What is left after that is the modes nothing
+   has been authored for, and those draw the activity's own icon rather than a
+   figure doing something else. See stageFigure below.
 
    What replaces the weight and rep dials is the hold block the stretch screen
    already uses: a timed move has nothing to log, it has a number counting
@@ -22591,25 +22711,35 @@ function renderActivityLive(a, stage) {
       : (plan?.notes || [])[0] || card?.cue || "");
   const remaining = plan && !done ? plan.moves.map((m, n) => ({ m, n })).filter(({ n }) => n > at.i) : [];
 
-  const stageFigure = plan
-    ? `<div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(move?.name || (done ? "Rest: Towel" : ""))}" data-theme="light" ${paused || done ? "data-fig-static" : ""}></div>
-       <div class="sess-stage-none" aria-hidden="true">${icon(a.ico || "heart", 72)}</div>`
-    /* A cardio session is drawn the same way a pose is, now that there is
-       something to draw: knowledge/motion/moves/cardio.mjs carries a run, a
-       walk, a ride and the stepmill, keyed by the library's own session names,
-       so `data-fig="Easy Run"` mounts the gait exactly as `data-fig="Tree
-       Pose"` mounts the pose.
+  /* WHAT THE STAGE DRAWS, and one mount for all three of them, because the
+     only thing that differs is the name.
 
-       Twenty of the twenty seven sessions have one. The other seven (rowing,
-       swimming, the elliptical, HIIT, the rope) still have nothing honest to
-       draw, so he keeps running for those, and which of the two shows is
-       decided by the mount rather than by a list kept here: mountMotionFigures
-       marks a name it cannot draw with `fig-none` and leaves `fig-live` on one
-       it can, so the CSS beside .sess-stage-none hides whichever is wrong.
-       Nothing in this file has to know which modes are covered, which is what
-       stops this going stale the day a rower is authored. */
-    : `<div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(card?.name || "")}" data-theme="light" ${paused ? "data-fig-static" : ""}></div>
-       <div class="csn-figure${paused ? " paused" : ""}">${robotRunningSVG(a.short || a.label || "")}</div>`;
+     A class names the pose it is holding. A built cardio session names the
+     library row it came from, and knowledge/motion/moves/cardio.mjs keys the
+     gaits by exactly those names, so `data-fig="Easy Run"` mounts the run the
+     way `data-fig="Tree Pose"` mounts the pose. A bare clock names nothing, so
+     it falls back to what this activity IS.
+
+     AND WHERE THERE IS NOTHING TO DRAW, NOTHING IS DRAWN. Nineteen of the
+     library's twenty seven cardio sessions have a gait; the eight that do not
+     are rowing, swimming, the elliptical, HIIT and the rope, and until today
+     every one of them got a robot RUNNING, as did a yoga clock, because the
+     fallback beside this mount was a running figure rather than an absence. A
+     run cycle on an elliptical is the app asserting something false about what
+     the person is doing, and it is worse than an empty stage. So the stand-in
+     is now the activity's own icon, and which of the two shows is decided by
+     the mount rather than by a list kept here: mountMotionFigures marks a name
+     it cannot draw with `fig-none` and leaves `fig-live` on one it can, so the
+     CSS beside .sess-stage-none hides whichever is wrong. Nothing in this file
+     has to know which modes are covered, which is what stops this going stale
+     the day a rower is authored. The rower is asked for in
+     mo-knowledge/LIBRARY-REQUESTS.md. */
+  const figName = plan
+    ? (move?.name || (done ? "Rest: Towel" : ""))
+    : (card?.name || CSN_CLOCK_FIG[a.key] || "");
+  const stageFigure = `
+    <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(figName)}" data-theme="light" ${paused || done ? "data-fig-static" : ""}></div>
+    <div class="sess-stage-none" aria-hidden="true">${icon(a.ico || "heart", 72)}</div>`;
 
   stage.innerHTML = `
     <div class="session-bar">
@@ -22887,6 +23017,12 @@ function renderCardioStage() {
         </div>
         <div class="act-hero-acts">
           ${canGenerate ? `<button type="button" class="btn-primary" id="csnGen">${icon("wand", 17)} Build my ${escapeHtml(actNoun(a))}</button>` : ""}
+          ${/* The third door, and only where there is a library of moves to open
+                it on: a cardio library row is a whole session rather than a
+                thing you do eight of, so there is nothing to assemble. See
+                csnOpenPicker for why this picks moves and not ready made
+                classes. */ ""}
+          ${a.training ? `<button type="button" class="btn-secondary" id="csnPick">${icon("checklist", 17)} Pick the ${escapeHtml(actMoveWord(a, true))} myself</button>` : ""}
           <button type="button" class="btn-secondary" id="csnGo">${icon("play", 17)} Just start the clock</button>
         </div>
       </section>
@@ -23004,6 +23140,7 @@ function renderCardioStage() {
       b.onclick = () => { CARDIO_SES.minutes = Number(b.dataset.preset); csnSave(); renderCardioStage(); };
     });
     if ($("csnGen")) $("csnGen").onclick = csnGenerate;
+    if ($("csnPick")) $("csnPick").onclick = csnOpenPicker;
     /* The free door. A clock and nothing else, which is what it says, and the
        reason it does not quietly build a session first: the generated one is
        what he is hired for. */
@@ -23020,6 +23157,89 @@ function renderCardioStage() {
     return;
   }
 
+  /* The class as a list you build rather than one you are handed. The rows are
+     the swap sheet's rows, because adding a pose to a class and swapping one out
+     of a class are the same act seen twice and should not look like two
+     features. What the row carries that the swap sheet's does not is WHERE in
+     the class it landed: the number in the icon slot is the order, which is why
+     there is no second list of what you have chosen underneath. */
+  if (CARDIO_SES.state === "pick") {
+    const pool = CSN_PICK_FOR === a.key && CSN_PICK_POOL ? CSN_PICK_POOL : [];
+    const picks = csnPickedMoves();
+    const order = new Map(picks.map((m, i) => [m.name, i + 1]));
+    /* The preps are in it because the clock will run them. A class of eight
+       poses is eighty seconds of getting into them, and a number that left
+       that out would be eighty seconds wrong by the time they finished. */
+    const mins = Math.max(1, Math.round(picks.reduce((n, m) => n + csnMoveCost(m), 0) / 60));
+    const cats = [];
+    for (const m of pool) {
+      const key = m.categoryLabel || m.category || "";
+      let c = cats.find((x) => x.key === key);
+      if (!c) cats.push(c = { key, moves: [] });
+      c.moves.push(m);
+    }
+    const word = actMoveWord(a, true);
+    stage.innerHTML = `
+      <div class="csn-head">
+        <h2>Pick your ${escapeHtml(word)}</h2>
+        <button type="button" class="csn-x" id="csnX" aria-label="Back">${icon("chevronLeft", 18)}</button>
+      </div>
+      <p class="csn-guided">${icon("info", 15)} <span>Tap to add. The class runs in the order you tap them, and it is as long as what you put in it.</span></p>
+      ${pool.length ? cats.map((c) => `
+        <h3 class="csn-pick-cat">${escapeHtml(c.key)}</h3>
+        <div class="sv-rows">
+          ${c.moves.map((m) => {
+            const n = order.get(m.name) || 0;
+            return `<button type="button" class="sv-row csn-pick${n ? " on" : ""}" data-pick="${escapeHtml(m.name)}" aria-pressed="${n ? "true" : "false"}">
+              <span class="sv-row-ico">${n ? `<b>${n}</b>` : icon("plus", 18)}</span>
+              <span class="sv-row-txt">
+                <span class="sv-row-name">${escapeHtml(m.name)}</span>
+                <span class="sv-row-meta">${escapeHtml(`${m.seconds}s${m.perSide ? " a side" : ""} \u00b7 ${m.level}`)}</span>
+                ${/* Not hidden and not removed: see csnOpenPicker. A pose
+                      somebody chose with this under it is their call. */ ""}
+                ${CSN_PICK_OUT.has(m.name) ? `<span class="csn-pick-warn">Loads what you told me hurts</span>` : ""}
+              </span>
+            </button>`;
+          }).join("")}
+        </div>`).join("")
+        : `<p class="muted-note">The move library has not landed yet. Close this and open it again in a moment.</p>`}
+      <div class="csn-pick-bar">
+        <b>${picks.length ? `${picks.length} ${escapeHtml(actMoveWord(a, picks.length !== 1))} \u00b7 ${mins} min` : `Nothing picked yet`}</b>
+        <button type="button" class="btn-primary" id="csnPickGo"${picks.length ? "" : " disabled"}>See the class</button>
+      </div>`;
+    $("csnX").onclick = () => { CARDIO_SES.state = "setup"; csnSave(); renderCardioStage(); };
+    stage.querySelectorAll("[data-pick]").forEach((b) => {
+      b.onclick = () => {
+        const name = b.dataset.pick;
+        const had = (CARDIO_SES.picks || []).includes(name);
+        /* Tapping a picked one takes it out, and the rest renumber. Removing
+           and adding again is also how a class is reordered, which is worth
+           saying out loud: there is no drag here, and there does not need to
+           be one for a list this length. */
+        CARDIO_SES.picks = had
+          ? CARDIO_SES.picks.filter((x) => x !== name)
+          : [...(CARDIO_SES.picks || []), name];
+        buzz(10);
+        csnSave();
+        renderCardioStage();
+      };
+    });
+    $("csnPickGo").onclick = () => {
+      const plan = csnPlanFromPicks();
+      if (!plan) return;
+      sfx.play("set");
+      CARDIO_SES.plan = plan;
+      CARDIO_SES.card = null;
+      /* The class's own length wins over the stepper, exactly as it does for a
+         generated one: what is on the clock has to be what is on the mat. */
+      CARDIO_SES.minutes = plan.minutes;
+      CARDIO_SES.state = "reveal";
+      csnSave();
+      renderCardioStage();
+    };
+    return;
+  }
+
   /* The session, before the clock. Same card as the picker, because it is the
      same card: an eyebrow, what it is, the line about it, and the buttons. What
      changes is that the title is now the library's own name for the session
@@ -23032,7 +23252,7 @@ function renderCardioStage() {
     const structure = card
       ? (card.structure || `${card.minutes} min, held at one effort`)
       : plan
-        ? `${plan.moves.length} moves${plan.rounds > 1 ? `, ${plan.rounds} rounds` : ""}`
+        ? `${plan.moves.length} ${actMoveWord(a, plan.moves.length !== 1)}${plan.rounds > 1 ? `, ${plan.rounds} rounds` : ""}`
         : "";
     const cue = card?.cue || (plan?.notes || [])[0] || "";
     const named = (v) => { const t = String(v || ""); return t ? t[0].toUpperCase() + t.slice(1) : ""; };
@@ -23242,7 +23462,7 @@ function restoreCardioSession() {
   if (CARDIO_SES) return;
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(CSN_KEY) || "null"); } catch { return; }
-  if (!saved || saved.state === "setup" || saved.state === "reveal") return;
+  if (!saved || CSN_CHOOSING.has(saved.state)) return;
   /* Yesterday's forgotten session is not today's workout. */
   if (saved.date && saved.date !== todayStr()) { try { localStorage.removeItem(CSN_KEY); } catch {} return; }
   CARDIO_SES = saved;

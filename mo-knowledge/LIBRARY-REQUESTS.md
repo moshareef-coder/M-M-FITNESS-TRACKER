@@ -202,8 +202,11 @@ twenty seven poses. That is the shape the cardio library says it wants, and it
 is the piece that would let the running screen use the real rig like every other
 session screen in the app does.
 
-Until then the hand drawn robot stands, and it is marked in the code as the
-honest stand-in that it is.
+**Partly delivered.** `knowledge/motion/moves/cardio.mjs` now carries a run, a
+walk, an indoor ride and the stepmill, keyed by the cardio library's own session
+names, so nineteen of the twenty seven sessions draw themselves on the real rig.
+The hand drawn robot was deleted from `index.html` on 2026-09-21. What is still
+missing is item 12 below.
 
 ---
 
@@ -385,3 +388,76 @@ relax itself and print an apology for somebody skipping in a garden.
 **Why we did not work around it:** the only workarounds available are inventing
 sessions the library does not have, or handing somebody a different mode from
 the one they ticked. The second is exactly the bug this change removes.
+
+---
+
+## 12. Five cardio modes still have no figure, and the app now draws nothing for them (2026-09-21)
+
+Item 7 asked for five looping gaits and four of them exist. This is the rest of
+that list, re-measured against the libraries as they ship today, because the
+app's behaviour changed underneath it.
+
+Every one of the 27 rows in `knowledge/exercise-library/cardio.mjs` checked
+against `knowledge/motion/index.mjs` `hasMove()`:
+
+| mode | sessions | drawn |
+|---|---|---|
+| running | 7 | 7 |
+| cycling | 6 | 6 |
+| walking | 4 | 4 |
+| stairs | 1 | 1 |
+| hiking | 1 | 1 |
+| **rowing** | **3** | **0** |
+| **elliptical** | **2** | **0** |
+| **swimming** | **1** | **0** |
+| **hiit** | **1** | **0** |
+| **jump rope** | **1** | **0** |
+
+Nineteen drawn, eight not. The eight are Easy Row, Row Intervals, Threshold Row,
+Easy Elliptical, Elliptical Steady, Easy Swim, HIIT Circuit and Jump Rope
+Intervals.
+
+**What changed on our side.** Until 2026-09-21 every one of those eight, and
+every bare clock including a yoga one, got a robot drawn RUNNING, because the
+fallback beside the figure mount on the session stage was a running figure
+rather than an absence. A run cycle on an elliptical is the app asserting
+something false about what the person is doing. The fallback is now the
+activity's own icon, the robot is deleted, and a mode with no gait shows a quiet
+mark and the clock instead of a figure doing the wrong exercise.
+
+So this is no longer "the stand-in is crude". It is "there is nothing on the
+stage", on the one screen whose whole subject is movement, for anybody who rows,
+swims, uses the elliptical, does a HIIT circuit or skips.
+
+**Asked for, in the order they would earn their keep:**
+
+1. **A row.** Three sessions ride on it, it is the commonest gym machine after
+   the treadmill and the bike, and the catch-drive-finish-recovery cycle is a
+   real loop rather than a pose. It is also the one where a wrong picture is
+   most likely to teach a bad habit, so an authored one is worth more here than
+   anywhere else on this list.
+2. **A glide, for the elliptical.** Two sessions. Closest to what already exists:
+   it is the ride's leg cycle standing up with the arms travelling, and it is the
+   mode that looked most absurd under a run cycle.
+3. **A skip, for jump rope.** One session, and the only one of these that is
+   cheap: it is a small bounce with the wrists turning, and it needs no machine
+   drawn behind it.
+4. **A swim.** One session, and the hardest, because the figure is horizontal and
+   the rig stands on a ground line. Worth saying out loud rather than leaving on
+   a list: if the rig cannot lie down, the honest answer is that swimming never
+   gets a figure and keeps the icon, and we would rather be told that than wait.
+5. **HIIT is not a gait and we are not asking for one.** A HIIT Circuit is a
+   sequence of whole exercises, so what would actually serve it is the library
+   naming those exercises, at which point it becomes a class and draws itself
+   pose by pose the way a yoga class already does. That is a request for
+   `knowledge/exercise-library/cardio.mjs`, not for the rig.
+
+One loop each, shared by every session in the mode, exactly as item 7 proposed.
+The mount needs no change: `mountMotionFigures` keys on the library's session
+name, marks anything it cannot draw `fig-none`, and the icon steps aside by
+itself the day a name starts resolving. Nothing in `index.html` has to know
+which modes are covered.
+
+**Why we did not work around it:** authoring gaits in `index.html` is how the
+running robot happened, and the robot then outlived its own honesty by being the
+fallback for everything that had nothing. We are not drawing a second one.
