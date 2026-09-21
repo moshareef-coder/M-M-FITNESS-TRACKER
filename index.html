@@ -2061,6 +2061,12 @@
   .av:active { transform: scale(.93); }
   .av.me { border-color: var(--me); color: var(--me-ink); box-shadow: var(--glow-me); }
   .av.them { border-color: var(--partner); color: var(--partner-ink); margin-left: -10px; z-index: 1; box-shadow: var(--glow-partner); }
+  /* Which half of Progress is on screen, the only mark left of it once the
+     switch became the faces themselves. An outline rather than more shadow:
+     --glow-me/--glow-partner are "none" in dark mode by the house rule against
+     shadows for depth there, so a glow alone would only ever show in light. */
+  .av.showing { transform: scale(1.08); outline: 2px solid var(--text); outline-offset: 2px; }
+  .av.showing:active { transform: scale(1.02); }
   .setup-photo { display: flex; align-items: flex-start; gap: 14px; margin-top: 14px; }
   .setup-photo .av { width: 64px; height: 64px; font-size: 17px; border-width: 3px; cursor: pointer; flex-shrink: 0; }
   .setup-photo .av:active { transform: scale(.97); }
@@ -5688,29 +5694,13 @@
   .goal-chip.on { color: var(--text); border-bottom-color: var(--accent); }
   .goal-chip:active { color: var(--text); }
 
-  /* Whose progress you are reading. Mo asked for "one singular tick... maybe
-     on the right side of the title, maybe like 'Me and Me'", and the two of
-     you already have initials and a colour each at the top of every screen, so
-     the tick IS that pair, shrunk. It rides inside the title row rather than
-     above it: the pair of pills that used to sit over the goal strip was cut
-     for turning one screen into two rows of tabs, and this has to cost no row.
-
-     A ring rather than a fill, because that is the language the header pair
-     already speaks for these same two people, and because a filled orange
-     circle with white on it does not clear contrast in either theme. */
-  /* Positioning only: the pill's own look is cal-scope's, shared with the
-     Week/Month switch. A name can run longer than "Week" or "Month", so the
-     row is allowed to shrink the pill rather than push the title off screen. */
-  .prog-who { margin-left: auto; flex: none; max-width: 52%; }
-  .prog-who ~ .track-kebab { margin-left: 2px; }
-  .prog-who button {
-    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    padding: 8px 11px; min-height: 32px;
-  }
-  .prog-who button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  /* Their view has no goal tabs, because their goals are theirs. Their name
-     stands where the title was and reads like the tab it replaces, minus the
-     tap, so the row never collapses to a switch floating on a rule. */
+  /* Whose progress you are reading, and the switch for it, is the header
+     avatar pair now (see .av.showing below): tried as a tick next to the
+     title, then as a pill matching Week/Month, and Mo asked for neither in
+     the end, on 2026-09-20: "we already have our avatars... click on their
+     avatar and it'll take me directly to theirs." Their view has no goal
+     tabs, because their goals are theirs. Their name stands where the title
+     was and reads like the tab it replaces, minus the tap. */
   .prog-title-static {
     padding: 0 0 9px; border-bottom: 2px solid var(--partner);
     font-size: 14px; font-weight: 700; letter-spacing: -.01em; color: var(--text);
@@ -8717,7 +8707,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.20.6";
+const APP_VERSION = "2026.09.20.7";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -14570,6 +14560,10 @@ function switchTab(tab) {
     renderWorkoutTab();
   }
   if (tab === "setup") renderSetupTab();
+  /* Progress re-syncs its own ring on every internal view change; every other
+     tab needs this once, on the way in, or the ring stays lit on an avatar
+     that no longer means anything on the screen underneath it. */
+  syncAvatarPairView();
 }
 
 /* ---------- Offline write queue ----------
@@ -15973,9 +15967,37 @@ async function renderAvatarPair() {
   const theirs = partner ? await avatarHTML(PARTNER_EMAIL, partner, "them") : "";
   wrap.innerHTML = mine + theirs;
 
+  /* Mo, 2026-09-20: "at the top right I can already see our avatars... I can
+     click on their avatar and it'll take me directly to theirs and be able to
+     see what they're doing, what their progress is." The faces already sit
+     where he is asking for a door, on every tab, so they ARE the door rather
+     than a second control drawn to look like one: elsewhere they still go
+     where they always did (yours to Setup, theirs to the quick summary
+     sheet), and on the Progress tab itself they switch which half of it is on
+     screen, in place, which is also how you get back from hers to your own. */
   const [meBtn, themBtn] = wrap.querySelectorAll(".av");
-  if (meBtn) meBtn.onclick = () => switchTab("setup");
-  if (themBtn) themBtn.onclick = openPartnerSheet;
+  const onProgress = () => document.querySelector(".tab-btn.active")?.dataset.tab === "progress";
+  if (meBtn) meBtn.onclick = () => {
+    if (onProgress()) {
+      if (PROGRESS_VIEW === "me") return;
+      PROGRESS_VIEW = "me";
+      PROGRESS_GOAL_LENS = null;
+      renderProgressTab();
+      return;
+    }
+    switchTab("setup");
+  };
+  if (themBtn) themBtn.onclick = () => {
+    if (onProgress()) {
+      if (PROGRESS_VIEW === "partner") return;
+      PROGRESS_VIEW = "partner";
+      PROGRESS_GOAL_LENS = null;
+      renderProgressTab();
+      return;
+    }
+    PROGRESS_VIEW = "partner";
+    switchTab("progress");
+  };
 }
 
 /* ---------- The photo editor ----------
@@ -40904,44 +40926,19 @@ function legacyGoalBubble(goalText) {
            recomp: "tone-lean-abs", consistent: "consistent" }[key] || null;
 }
 
-/* The switch itself: two rings, the initials and colours this app already
-   gives the two of you, and the lit one is the one you are reading. Appended
-   into the title row so it costs no row of its own, and to the LEFT of the
-   three dots, which govern your own goal and stay hard right where they were.
-
-   Never drawn at all without a partner. A two state control whose other state
-   does not exist is furniture, and somebody training alone must not be shown a
-   door to a person they do not have. */
-function paintProgWho(host) {
-  if (!PARTNER_EMAIL || !PARTNER_PROFILE) return;
-  const mine = PROGRESS_VIEW !== "partner";
-  const them = partnerName();
-  /* Mo, 2026-09-20: he didn't like the two initials in rings and asked for
-     "another ticker" instead, the same word he used for the Week/Month
-     switch. It is the same control: cal-scope is already the app's one pill
-     for "which of two readings is this screen showing", so this reuses it
-     rather than drawing a second switch that happens to look similar. */
-  const wrap = document.createElement("div");
-  wrap.className = "cal-scope prog-who";
-  wrap.id = "progWho";
-  wrap.setAttribute("role", "group");
-  wrap.setAttribute("aria-label", "Whose progress");
-  wrap.innerHTML = `
-    <button type="button" data-who="me" class="${mine ? "on" : ""}" aria-pressed="${mine}">Me</button>
-    <button type="button" data-who="partner" class="${!mine ? "on" : ""}" aria-pressed="${!mine}">${escapeHtml(them)}</button>`;
-  const keb = host.querySelector("#trackOpen");
-  keb ? host.insertBefore(wrap, keb) : host.appendChild(wrap);
-  wrap.querySelectorAll("[data-who]").forEach((b) => {
-    b.onclick = () => {
-      if (b.dataset.who === PROGRESS_VIEW) return;
-      PROGRESS_VIEW = b.dataset.who;
-      /* A goal lens is something you did to YOUR tab. Carried across it would
-         read her data through a goal neither of you picked, which is the one
-         thing the lens comment above already says nobody asked for. */
-      PROGRESS_GOAL_LENS = null;
-      renderProgressTab();
-    };
-  });
+/* Rings the currently-viewed person's avatar in the global header, the only
+   mark left of whose progress this tab is showing. Mo, 2026-09-20, twice in
+   one day: first that the pill did not belong next to the goal title, then
+   that the avatars already sitting top right should just be the switch
+   themselves, tapped directly rather than read through a second control. See
+   renderAvatarPair for the click side of it. */
+function syncAvatarPairView() {
+  const wrap = $("avatarPair");
+  if (!wrap) return;
+  const onProgress = document.querySelector(".tab-btn.active")?.dataset.tab === "progress";
+  const showingPartner = onProgress && PROGRESS_VIEW === "partner";
+  wrap.querySelector(".av.me")?.classList.toggle("showing", onProgress && !showingPartner);
+  wrap.querySelector(".av.them")?.classList.toggle("showing", showingPartner);
 }
 
 function renderGoalChips(profile) {
@@ -40949,12 +40946,12 @@ function renderGoalChips(profile) {
   if (!host) return;
   host.classList.remove("hidden");
   /* Their goals are theirs, so the strip has nothing to offer on their view.
-     The row stays, because the switch lives in it and because a screen about
-     somebody else should say whose it is: their name takes the title's place,
-     underlined in their colour. */
+     The row stays because a screen about somebody else should still say whose
+     it is: their name takes the title's place, underlined in their colour.
+     The way back to your own is the header avatar now, not a control here. */
   if (PROGRESS_VIEW === "partner") {
     host.innerHTML = `<span class="prog-title-static">${escapeHtml(partnerName())}</span>`;
-    paintProgWho(host);
+    syncAvatarPairView();
     return;
   }
 
@@ -41012,7 +41009,7 @@ function renderGoalChips(profile) {
       renderProgressTab();
     };
   });
-  paintProgWho(host);
+  syncAvatarPairView();
   /* No More chip. Mo: you have one, two or three goals and the strip shows
      them; a fourth thing shaped exactly like a goal that is really a link to
      Setup was the tab teaching people to tap a goal to go somewhere else.
