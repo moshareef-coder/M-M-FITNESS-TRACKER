@@ -26581,7 +26581,7 @@ let PLAN_NOTES_OPEN = null;
    render if present and say nothing if absent. `progression` prints only when
    the rule is not the linear default, since "add weight when every rep lands"
    is the plan's normal state and a line on every plan is not a line. */
-const PLAN_NOTE_KINDS = ["injury", "days", "secondary", "frequency", "equipment", "bodymap", "missing", "deload", "progression"];
+const PLAN_NOTE_KINDS = ["injury", "days", "secondary", "frequency", "equipment", "bodymap", "missing", "deload", "progression", "rotation"];
 const PLAN_NOTES_SHOWN = 3;
 
 /* The first sentence of an engine note, which is where each of them puts the
@@ -26604,6 +26604,12 @@ function planWarnings(notes, meta = null) {
     else if (/^You said you have no /.test(n)) out.push({ kind: "equipment", text: n });
     else if (/^You marked .* on the body map/.test(n)) out.push({ kind: "bodymap", text: noteLead(n) });
     else if (/^You picked (your whole body|\d+ of the fourteen)/.test(n) || /marked red, which is the top tier/.test(n)) out.push({ kind: "bodymap", text: noteLead(n) });
+    /* The engine rotates a stalled lift out for a block and turns accessories
+       over between blocks (plan.mjs, ROTATION). Mo's rule was "if it ain't
+       broke, don't break it", so when something does change the person is
+       owed the reason on the plan itself, not a different week with no word
+       about why. Ranked last: it explains a choice, it never asks for one. */
+    else if (/^Swapped in |^Rotated accessories this block| is standing in for /.test(n)) out.push({ kind: "rotation", text: noteLead(n, 2) });
   }
   if (!meta || typeof meta !== "object") return out;
 
