@@ -5642,6 +5642,27 @@ test("lifting, running and yoga every day is three sessions on every day", () =>
   assert.equal(out.days[0].sessions[2].training, "yoga");
 });
 
+test("every day on a cardio style is capped at the lifting count, not a flat seven", () => {
+  /* Mo, 2026-09-21: "we're going to cap it at the training days... we're just
+     going based off of those days." Four lifting days and running ticked
+     every day means a run on those same four days, not seven. */
+  const st = readStyles(["lifting", "running"], { lifting: "most", running: "daily" });
+  const out = composeWeek(st, WEEK7(), { liftCount: 4, seed: 1 });
+  const runDays = out.days.filter((d) => d.sessions.some((x) => x.kind === "cardio")).length;
+  assert.equal(runDays, 4);
+  assert.deepEqual(out.dropped, []);   // said no, not silently short: four was owed and four was placed
+  /* With no `liftCount` passed, the same cap falls back to the resistance
+     style's own word rather than the flat seven the dial used to mean. */
+  const noCount = composeWeek(st, WEEK7(), { seed: 1 });
+  const runDaysNoCount = noCount.days.filter((d) => d.sessions.some((x) => x.kind === "cardio")).length;
+  assert.equal(runDaysNoCount, 5);   // "most" is 5, and that is what lifting is falling back to as well
+  /* No resistance ticked at all: there is no training-days number to cap
+     against, so daily keeps meaning all seven, same as before this fix. */
+  const cardioOnly = readStyles(["running"], { running: "daily" });
+  const week = composeWeek(cardioOnly, WEEK7(), { seed: 1 });
+  assert.equal(week.days.filter((d) => d.sessions.some((x) => x.kind === "cardio")).length, 7);
+});
+
 test("a day never holds two of a kind, whatever the dials say", () => {
   /* Every combination of the four words across lifting AND home, two cardio
      modes and both flow trainings, on a full week and on a three day rest of
@@ -5661,10 +5682,19 @@ test("a day never holds two of a kind, whatever the dials say", () => {
             assert.equal(new Set(kinds).size, kinds.length, `two of a kind on one day: ${kinds}`);
             assert.ok(kinds.filter((k) => k === "resistance").length <= 1);
           }
-          /* Whatever could not fit is said, never silently dropped. */
+          /* Whatever could not fit is said, never silently dropped.
+             "Daily" on a cardio or flow style is capped at the lifting count
+             since 2026-09-21 (composeWeek's `liftDays`), so the expected total
+             has to cap it the same way or this invariant would fail on the
+             cap doing its job rather than on a real regression. lifting and
+             home are resistance, uncapped, and the fallback cap used here is
+             the same one composeWeek falls back to with no `liftCount`
+             passed: the busier of the two resistance words. */
+          const liftDays = Math.max(FREQUENCY_DAYS[st.frequency.lifting], FREQUENCY_DAYS[st.frequency.home]);
+          const dueFor = (s) => (s !== "lifting" && s !== "home" && st.frequency[s] === "daily") ? liftDays : FREQUENCY_DAYS[st.frequency[s]];
           const placed = out.days.flatMap((d) => d.sessions).length;
-          const owed = styles.reduce((sum, s) => sum + Math.min(n, FREQUENCY_DAYS[st.frequency[s]]), 0)
-            - Math.min(n, FREQUENCY_DAYS[st.frequency.home]);  /* home shares the lift's days */
+          const owed = styles.reduce((sum, s) => sum + Math.min(n, dueFor(s)), 0)
+            - Math.min(n, dueFor("home"));  /* home shares the lift's days */
           const said = out.dropped.reduce((sum, x) => sum + x.count, 0);
           assert.ok(placed + said >= Math.min(owed, 3 * n) - (n < 7 ? 6 : 0), "a session went missing without a word");
         }
