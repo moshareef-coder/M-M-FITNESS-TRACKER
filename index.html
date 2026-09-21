@@ -4626,6 +4626,36 @@
   .dot.rest { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
   .dot.wt { color: var(--muted); font-size: 11px; font-weight: 700; }
 
+  /* ---- The week, folded (renderWeekStrips) ----
+     The row is the whole control when it is shut, so it is a proper 48px
+     target with the card's own sunken fill rather than a line of text with a
+     chevron after it. */
+  .wk-toggle {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px;
+    padding: 10px 12px; margin-top: 8px; border-radius: 12px; cursor: pointer;
+    font: inherit; text-align: left; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--border);
+  }
+  .wk-toggle:active { background: color-mix(in srgb, var(--text) 7%, var(--panel-2)); }
+  .wk-toggle-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .wk-toggle-text b { font-size: 14.5px; font-weight: 700; }
+  .wk-toggle-text i { font-style: normal; font-size: 12.5px; color: var(--muted); }
+  .wk-toggle-go { display: flex; color: var(--muted); flex-shrink: 0; transition: transform .3s cubic-bezier(.22,1,.36,1); }
+  .wk-toggle[aria-expanded="true"] .wk-toggle-go { transform: rotate(180deg); }
+  /* max-height rather than height, the same fold .cmp-today uses: the week's
+     real height is not known until the tiles are in it. It is measured on the
+     way open and released to none once it is there, so a proof photo that
+     lands a second later is not clipped by a cap taken before it arrived. */
+  .wk-open {
+    overflow: hidden; max-height: 0; opacity: 0;
+    transition: max-height .3s cubic-bezier(.22,1,.36,1), opacity .22s ease;
+  }
+  .wk-open.on { opacity: 1; }
+  .wk-open .wk-legend { margin-top: 10px; }
+  @media (prefers-reduced-motion: reduce) {
+    .wk-open, .wk-toggle-go { transition: none; }
+  }
+
   /* Together timeline: one card per session, the latest word on it below. */
   .card-link.ink { color: var(--text); display: inline-flex; align-items: center; gap: 2px; font-weight: 600; }
   .tl-item { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-top: 10px; background: var(--panel); }
@@ -7373,9 +7403,25 @@
         <h2 id="weekTogetherTitle">This week <button type="button" class="info-dot" data-info="weekStrip" aria-label="What the day tiles mean">i</button></h2>
         <button type="button" class="card-link ink" id="timelineAllBtn">See all <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
       </div>
-      <div class="wk-legend" id="weekLegend"></div>
-      <div class="wk" id="weekGrid"></div>
-      <div class="pact-foot" id="pactFoot"></div>
+      <!-- Mo: "For the calendar, I want it to be a dropdown first, and then
+           it always starts as a dropdown. I can click it, and then it will
+           just be your week." Collapsed on every open and never remembered: a
+           card that is sometimes shut and sometimes not, depending on what you
+           did last visit, is a card whose height nobody can predict, and Home
+           is the screen people land on most.
+
+           The row itself carries today and where the week stands, because a
+           row that only says the month is a tap you have to spend before you
+           find out whether it was worth spending. -->
+      <button type="button" class="wk-toggle" id="weekToggle" aria-expanded="false" aria-controls="weekOpen">
+        <span class="wk-toggle-text"><b id="weekToggleDay"></b><i id="weekToggleSub"></i></span>
+        <span class="wk-toggle-go" aria-hidden="true"></span>
+      </button>
+      <div class="wk-open" id="weekOpen">
+        <div class="wk-legend" id="weekLegend"></div>
+        <div class="wk" id="weekGrid"></div>
+        <div class="pact-foot" id="pactFoot"></div>
+      </div>
     </div>
 
     <div class="moments hidden" id="momentStrip"></div>
@@ -17681,6 +17727,76 @@ function renderMoments() {
   el.onclick = () => openTimelineSheet();
 }
 
+/* ---- The week, folded ----
+
+   Mo wants the strip shut on arrival and opened by a tap, every time, with
+   nothing remembered between visits. WEEK_STRIP_OPEN is therefore cleared on
+   the animated render, which is the one switchTab does when Home is opened;
+   an ordinary repaint (a heart sent, a set logged) leaves it exactly as the
+   person left it, because having it slam shut under a finger would be worse
+   than never folding it at all. */
+let WEEK_STRIP_OPEN = false;
+
+/* Sessions done against sessions meant, for the row you tap.
+
+   "Meant" is days_per_week, the week somebody actually committed to, not the
+   plan rows on file. Most weeks carry fewer rows than that, and a row reading
+   "2 of 2" to somebody who meant to train four times is a false all clear.
+   Where there is no answer on file it counts the plans instead, and where
+   there is neither it says nothing about planning at all rather than making a
+   denominator up. */
+function weekSessionCount() {
+  const dates = currentWeekDates();
+  const today = todayStr();
+  const done = dates.filter((d) => d <= today && !!entryOn(ME, d)?.gym).length;
+  const target = Number(MY_PROFILE?.days_per_week ?? MY_GOAL?.days_per_week);
+  /* Never fewer planned than done: "5 of 4" reads as a counting error where
+     it should read as a good week. The overshoot is said in words below. */
+  if (Number.isFinite(target) && target > 0) return { done, planned: Math.max(target, done) };
+  const rows = dates.filter((d) =>
+    (ALL_PLANS || []).some((w) => w.email === MY_EMAIL && w.entry_date === d && !w.archived)).length;
+  return { done, planned: rows ? Math.max(rows, done) : null };
+}
+
+/* Opened and shut on a measured height, so the cards below glide down with it
+   instead of jumping to a new place. Released to none once it is open: the
+   proof photos arrive later and the week has to be free to end up whatever
+   height it ends up. */
+function applyWeekStripOpen(animate = true) {
+  const body = $("weekOpen"), toggle = $("weekToggle");
+  if (!body || !toggle) return;
+  toggle.setAttribute("aria-expanded", String(WEEK_STRIP_OPEN));
+  body.classList.toggle("on", WEEK_STRIP_OPEN);
+  /* Nothing inside a shut fold may be tabbed into or read out. The fold is
+     still in the document, which is what lets it animate at all. */
+  body.inert = !WEEK_STRIP_OPEN;
+  if (!animate) {
+    /* A repaint is not a gesture. Suppressing the transition for one frame is
+       what stops an open strip replaying its own opening every time somebody
+       logs a set. */
+    body.style.transition = "none";
+    body.style.maxHeight = WEEK_STRIP_OPEN ? "none" : "0px";
+    void body.offsetHeight;
+    body.style.transition = "";
+    return;
+  }
+  if (WEEK_STRIP_OPEN) {
+    body.style.maxHeight = `${body.scrollHeight}px`;
+    const settle = (e) => {
+      if (e.target !== body || e.propertyName !== "max-height") return;
+      body.removeEventListener("transitionend", settle);
+      if (WEEK_STRIP_OPEN) body.style.maxHeight = "none";
+    };
+    body.addEventListener("transitionend", settle);
+    return;
+  }
+  /* From "none" there is nothing to animate away from, so the real height is
+     written first and read back before the zero lands. */
+  body.style.maxHeight = `${body.scrollHeight}px`;
+  void body.offsetHeight;
+  body.style.maxHeight = "0px";
+}
+
 function renderWeekStrips(animate = false) {
   const today = todayStr();
   const partner = PARTNER_EMAIL ? partnerName() : null;
@@ -17721,6 +17837,26 @@ function renderWeekStrips(animate = false) {
        own there is no between, so it opens your day directly. */
     b.onclick = () => (PARTNER_EMAIL ? openBothDaySheet(b.dataset.day) : openDaySheet(MY_EMAIL, b.dataset.day));
   });
+
+  /* The row you tap. The date is today's, and the line under it is the one
+     thing worth knowing about the week without opening it. */
+  const { done, planned } = weekSessionCount();
+  $("weekToggleDay").textContent = dateFmt({ weekday: "long", month: "short", day: "numeric" })
+    .format(new Date(today + "T00:00:00"));
+  $("weekToggleSub").textContent = planned == null
+    ? done ? `${done} session${done === 1 ? "" : "s"} done this week` : "Nothing logged this week yet"
+    : done > planned ? `${done} sessions done, ${planned} planned`
+    : done === planned ? `All ${planned} session${planned === 1 ? "" : "s"} done`
+    : `${done} of ${planned} sessions done`;
+  if (!$("weekToggleGoIco")) {
+    $("weekToggle").querySelector(".wk-toggle-go").innerHTML =
+      `<span id="weekToggleGoIco">${icon("chevronDown", 18)}</span>`;
+  }
+  $("weekToggle").onclick = () => { WEEK_STRIP_OPEN = !WEEK_STRIP_OPEN; applyWeekStripOpen(true); };
+  /* The animated render is switchTab opening Home, which is the moment the
+     fold has to be shut again. */
+  if (animate) WEEK_STRIP_OPEN = false;
+  applyWeekStripOpen(false);
 }
 
 /* The photos, once the grid is already on screen. Each tile is filled on its
