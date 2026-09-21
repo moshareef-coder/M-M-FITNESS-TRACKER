@@ -514,6 +514,8 @@ const META_KEYS = new Set([
   /* 2026-09-19: the talkative half of the plan, CONTRACT.md rows `deload`,
      `progression` and `volume`. */
   "deload", "progression", "volume",
+  /* 2026-09-21: what rotated this week and why, CONTRACT.md row `rotation`. */
+  "rotation",
 ]);
 /* Documented in the contract's prose and missing from its table. Warned, not
    failed: the key is deliberate and it is the TABLE that is behind, which is a
@@ -532,6 +534,7 @@ const META_SUBKEYS = {
      progression, and this table is walked as objects only. */
   progression: ["rule", "detail"],
   volume: ["byGroup", "under", "frequencyCapped"],
+  rotation: ["block", "anchors", "held", "accessories"],
   styles: ["asked", "picked", "resistance", "honoured", "equipmentMissing", "equipmentDeclared", "cardioModes", "flowTrainings", "note"],
 };
 const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets", "cardio", "flow"]);
@@ -544,7 +547,10 @@ const RAMP_SET_KEYS = new Set(["weight", "reps", "restSec", "pct", "cue"]);
    is the engine's memory of its own last answer: the app stores `exercises`
    verbatim and plateau-response.mjs reads it back off `plans`. CONTRACT.md
    documents it beside restSec. */
-const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "loadBasis", "note", "swap", "alternatives", "restSec", "volumeCut"]);
+/* `rotatedFor` and `rotatedAt` are the same kind of memory, for a rotation:
+   present only on a stand-in, read back by rotationsHeld so the swap is held
+   for its block rather than for one week. */
+const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "loadBasis", "note", "swap", "alternatives", "restSec", "volumeCut", "rotatedFor", "rotatedAt"]);
 /* What a `targetWeight` of 0 is allowed to mean. "your size" is deliberately not
    in here: it was the cold start basis and there is no cold start any more, so a
    row carrying it would be an old prescription path finding its way back. */

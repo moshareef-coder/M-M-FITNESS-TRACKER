@@ -21,7 +21,7 @@ import { dirname, join } from "node:path";
 import { deriveTrainingAge, observedCapacity, THRESHOLDS, detectPlateau, earnedMovements, EARNED_DAYS } from "./training-age.mjs";
 import { resolveGoal, GOAL_PARAMS, MAX_SECONDARY_GOALS, MOVEMENT_CLASSES, barredMovements, movementCautionNotes } from "./goal-engine.mjs";
 import { sizeCeiling1RM, prescribeLoad, patternFor, variantFactor, roundLoad } from "./load.mjs";
-import { buildPlan, estimateMinutes, sessionSeconds, noviceSessionCap, feelerSeconds, trainedWeeksBefore } from "./plan.mjs";
+import { buildPlan, estimateMinutes, sessionSeconds, noviceSessionCap, feelerSeconds, trainedWeeksBefore, ROTATION, accessoryBlock, eligibleMovements } from "./plan.mjs";
 import { conjunctiveWeek, chooseComparison, sharedSchedule, relativeScore, PRODUCTIVE_GAP } from "./pair.mjs";
 
 import { normalizeFocus, parseFocus, mergePriority, focusFreshness, MUSCLE_GROUPS, TIERS, TIER_COST, FOCUS_BUDGET } from "./focus.mjs";
@@ -31,7 +31,7 @@ import {
   learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn,
   SOFT_AT, HARD_AT, MAX_WEEK_SHARE, MIN_WEEK_MOVES,
 } from "./preferences.mjs";
-import { planPlateauResponse, applyRotateFallback, cutTakenRecently, PLATEAU_RESPONSE } from "./plateau-response.mjs";
+import { planPlateauResponse, applyRotateFallback, cutTakenRecently, rotationsHeld, sayRotation, PLATEAU_RESPONSE } from "./plateau-response.mjs";
 import { BODY_AREAS, EQUIPMENT_OPTIONS, normalizeLimits, applyLimits, limitsSummary } from "./limits.mjs";
 import { JOINTS, JOINT_LOAD, defaultJointLoad, jointLoadFor } from "./joint-load.mjs";
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
@@ -4991,7 +4991,10 @@ function replayLife({ payload, weeks, does = 4, log, start = new Date("2026-05-0
       const date = isoDay(new Date(today.getTime() + s * DAY_MS));
       plans.push({ entry_date: date, focus: d.name, completed_at: `${date}T18:00:00Z`,
         exercises: d.exercises.map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, targetWeight: e.weight ?? 0,
-          ...(e.volumeCut ? { volumeCut: true } : {}) })) });
+          ...(e.volumeCut ? { volumeCut: true } : {}),
+          /* The app stores toWorkout's output verbatim, so the rotation memory
+             rides in the saved row exactly as the cut does. */
+          ...(e.rotatedFor ? { rotatedFor: e.rotatedFor, rotatedAt: e.rotatedAt } : {}) })) });
       for (const e of d.exercises) for (const row of log(e)) logs.push({ entry_date: date, exercise_name: e.name, ...row });
     }
   }
@@ -5038,10 +5041,13 @@ test("fourteen weeks of perfect bodyweight and dumbbell training never gets a vo
 });
 
 test("a real stall on three loaded lifts cuts the week once and then lets the sets back up", () => {
-  /* The first three loaded lifts freeze at their first logged weight forever;
-     everything else lands. Before 2026-09-19 the cut fired every week from the
-     day it first fired, because it deferred the answers that would have
-     resolved the stall. */
+  /* The first three loaded MAIN lifts freeze at their first logged weight
+     forever; everything else lands. Before 2026-09-19 the cut fired every week
+     from the day it first fired, because it deferred the answers that would
+     have resolved the stall. Mains since 2026-09-21, because a stalled
+     accessory no longer stays on the card long enough to be one of the three:
+     the calendar turns it out for a fortnight and the stall resolves itself,
+     which is the accessory half of rotation doing its job. */
   const stuck = new Map();
   const weeks = replayLife({
     payload: { goal_bubble: "build-muscle", challenge_target: 4, current_weight: 190, sex: "Male" },
@@ -5049,7 +5055,7 @@ test("a real stall on three loaded lifts cuts the week once and then lets the se
     log: (e) => {
       const k = e.name.toLowerCase();
       const w = loadOf(e);
-      if (!stuck.has(k) && stuck.size < 3 && w > 0) stuck.set(k, w);
+      if (!stuck.has(k) && stuck.size < 3 && w > 0 && e.role === "main") stuck.set(k, w);
       if (!stuck.has(k)) return hitsEverything(e);
       const lb = stuck.get(k);
       return [{ sets: e.sets, reps: w > lb ? e.reps - 1 : e.reps, weight: lb }];
@@ -5376,4 +5382,215 @@ test("the response carries the deload, the progression and the ledger", () => {
   /* Nothing in `workout` or `notes` changed shape for it. */
   assert.ok(Array.isArray(first.notes));
   assert.ok(!("deload" in first.workout) && !("progression" in first.workout) && !("volume" in first.workout));
+});
+
+/* ---- rotation: anchors stay while they progress, stalled ones rotate and
+   are held, accessories take turns on the calendar (2026-09-21) ---- */
+
+/* A Monday, pinned, because accessory rotation reads the calendar and a test
+   that turned over on the real fortnight boundary would be the date-seeded
+   flake this suite already has one of. */
+const ROT_TODAY = new Date(2026, 5, 8, 12, 0, 0);
+const isoOf = (d) => new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const plusDays = (d, n) => new Date(d.getTime() + n * 86400000);
+
+/* Two sessions a week for `weeks` weeks, ending the day before `from`. Bench
+   and squat climb 5 lb a session; `flat` sits at 95 lb the whole time, which
+   is a lift that has stopped while loading still works elsewhere. */
+function rotLogs({ weeks = 10, flat = "Lat Pulldown", from = ROT_TODAY } = {}) {
+  const out = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    for (const back of [4, 1]) {
+      const s = (weeks - 1 - w) * 2 + (back === 1 ? 1 : 0);
+      const date = isoOf(plusDays(from, -(w * 7 + back)));
+      out.push({ entry_date: date, exercise_name: "Bench Press", sets: 3, reps: 8, weight: 135 + 5 * s });
+      out.push({ entry_date: date, exercise_name: "Barbell Back Squat", sets: 3, reps: 8, weight: 185 + 5 * s });
+      if (flat) out.push({ entry_date: date, exercise_name: flat, sets: 3, reps: 10, weight: 95 });
+    }
+  }
+  return out;
+}
+/* The week saved back the way the app saves it: toWorkout rows, one per day. */
+const savedRows = (plan, from, { completed = true } = {}) => plan.week.map((d, i) => {
+  const stamp = isoOf(plusDays(from, i));
+  return { entry_date: stamp, focus: d.name, exercises: toWorkout(plan, i).exercises, completed_at: completed ? `${stamp}T18:00:00Z` : null };
+});
+const rotMains = (plan) => plan.week.map((d) => d.exercises.filter((e) => e.role === "main").map((e) => e.name));
+/* The week trained as written: every prescribed movement logged at its
+   prescribed load, a modest starter where there was none yet. Left out of a
+   fixture, a completed plan whose movements were never logged reads to
+   preferences.mjs as movements the person abandoned, which is the right
+   reading and a different test. */
+const trainedRows = (plan, from) => plan.week.flatMap((d, i) => d.exercises.map((e) => ({
+  entry_date: isoOf(plusDays(from, i)), exercise_name: e.name, sets: e.sets, reps: e.reps,
+  weight: e.weight > 0 ? e.weight : (e.equipment !== "bodyweight" ? 45 : 0),
+})));
+const ROT_PERSON = { bodyWeightLb: 190, sex: "Male", daysAsked: 4 };
+
+test("a progressing anchor is kept, week after week", () => {
+  let logs = rotLogs({ flat: null });
+  let plans = [];
+  const seen = [];
+  for (let w = 0; w < 4; w++) {
+    const today = plusDays(ROT_TODAY, 7 * w);
+    const plan = buildPlan({ goal: { bubble: "build-muscle" }, person: ROT_PERSON, logs, plans, today });
+    assert.deepEqual(plan.rotation.anchors, [], `week ${w + 1} rotated an anchor`);
+    seen.push(rotMains(plan));
+    plans = [...plans, ...savedRows(plan, today)];
+    logs = [...logs, ...trainedRows(plan, today)];
+  }
+  for (let w = 1; w < seen.length; w++) assert.deepEqual(seen[w], seen[0], `week ${w + 1} mains moved`);
+  /* And the lift they are progressing is an anchor, not something else. */
+  assert.ok(seen[0].flat().includes("Barbell Back Squat"), seen[0].flat().join(", "));
+});
+
+test("a stalled anchor rotates once, the swap is named, and the stand-in is held for the block", () => {
+  const logs = rotLogs({ flat: "Lat Pulldown" });
+  const first = buildPlan({ goal: { bubble: "build-muscle" }, person: ROT_PERSON, logs, plans: [], today: ROT_TODAY });
+  /* The ladder reached rotate: ten weeks flat across nineteen sessions while
+     the other two lifts climbed, past every wait. */
+  const rotated = first.plateau.responses.find((r) => r.exercise === "Lat Pulldown");
+  assert.equal(rotated?.action, "rotate", JSON.stringify(first.plateau.responses));
+  const all = first.week.flatMap((d) => d.exercises);
+  assert.ok(!all.some((e) => e.name === "Lat Pulldown"), "the stalled lift is still on the card");
+  assert.equal(first.rotation.anchors.length, 1);
+  const { from, to } = first.rotation.anchors[0];
+  assert.equal(from, "Lat Pulldown");
+  const standIn = all.find((e) => e.name === to);
+  assert.ok(standIn && standIn.role === "main", `${to} is not a main`);
+  assert.equal(standIn.rotatedFor, "Lat Pulldown");
+  assert.equal(standIn.rotatedAt, isoOf(ROT_TODAY));
+  /* Exactly one stand-in: the other upper day's vertical pull was not stalled
+     and is not "standing in" for anything. */
+  assert.equal(all.filter((e) => e.rotatedFor).length, 1);
+  assert.ok(first.dayNotes.some((n) => new RegExp(`^Swapped in ${to}: your Lat Pulldown has not moved in \\d+ weeks`).test(n)), first.dayNotes.join(" | "));
+  /* The memory rides through the adapter into what the app saves. */
+  const rows = savedRows(first, ROT_TODAY);
+  const saved = rows.flatMap((r) => r.exercises).find((e) => e.rotatedFor);
+  assert.ok(saved && saved.name === to && saved.rotatedAt === isoOf(ROT_TODAY));
+
+  /* Week two: the same stand-in, in the same slot, and the hold says so. The
+     stalled lift is not back and no NEW rotation was made. */
+  const week2 = plusDays(ROT_TODAY, 7);
+  const second = buildPlan({ goal: { bubble: "build-muscle" }, person: ROT_PERSON, logs, plans: rows, today: week2 });
+  assert.deepEqual(rotMains(second), rotMains(first));
+  assert.deepEqual(second.rotation.anchors, []);
+  assert.equal(second.rotation.held.length, 1);
+  assert.deepEqual(second.rotation.held[0], { from: "Lat Pulldown", to, since: isoOf(ROT_TODAY), weeksLeft: 3 });
+  const kept = second.week.flatMap((d) => d.exercises).find((e) => e.name === to);
+  assert.equal(kept.rotatedAt, isoOf(ROT_TODAY), "the first date is carried forward, or the block restarts every week");
+  assert.ok(second.dayNotes.some((n) => n.startsWith(`${to} is standing in for Lat Pulldown for another 3 weeks`)), second.dayNotes.join(" | "));
+  /* Regenerated the same day: the same week, byte for byte. */
+  const again = buildPlan({ goal: { bubble: "build-muscle" }, person: ROT_PERSON, logs, plans: rows, today: week2 });
+  assert.equal(JSON.stringify(again.week), JSON.stringify(second.week));
+});
+
+test("rotationsHeld reads the swap back off saved plans, from its first date, and knows if the stand-in was trained", () => {
+  const rows = [
+    { entry_date: "2026-06-15", focus: "Upper body A", exercises: [{ name: "Negative Pull-Up", rotatedFor: "Lat Pulldown", rotatedAt: "2026-06-08" }] },
+    { entry_date: "2026-06-08", focus: "Upper body A", exercises: [{ name: "Negative Pull-Up", rotatedFor: "Lat Pulldown", rotatedAt: "2026-06-08" }, { name: "Bench Press" }] },
+    { entry_date: "2026-06-10", focus: "Lower body A", exercises: [{ name: "Hack Squat", rotatedFor: "Leg Press" }] },
+    null, { entry_date: "2026-06-11", exercises: 7 },
+  ];
+  const held = rotationsHeld({ plans: rows, logs: [{ entry_date: "2026-06-12", exercise_name: "Negative Pull-Up", weight: 0 }], today: new Date(2026, 5, 22, 12) });
+  const pull = held.find((h) => h.from === "Lat Pulldown");
+  assert.deepEqual(pull, { from: "Lat Pulldown", to: "Negative Pull-Up", rotatedAt: "2026-06-08", daysHeld: 14, loggedSince: true });
+  const squat = held.find((h) => h.from === "Leg Press");
+  assert.equal(squat.rotatedAt, "2026-06-10", "a row without rotatedAt dates the swap off its own entry_date");
+  assert.equal(squat.loggedSince, false);
+  assert.deepEqual(rotationsHeld({ plans: [], logs: [] }), []);
+});
+
+test("a held lift sits below rotate in the ladder: out for the block, then out only while the stand-in keeps going up", () => {
+  const inBlock = planPlateauResponse({ plateau: { lifts: [] }, held: [{ from: "Lat Pulldown", to: "Negative Pull-Up", rotatedAt: "2026-06-08", daysHeld: 10, loggedSince: false }] });
+  assert.equal(inBlock.responses.length, 1);
+  assert.equal(inBlock.responses[0].action, "rotate");
+  assert.equal(inBlock.responses[0].reason, "held");
+  assert.equal(inBlock.responses[0].weeksLeft, 3);
+  assert.ok(/standing in for Lat Pulldown for another 3 weeks/.test(inBlock.responses[0].say));
+  /* Not acting: three holds are memory, not fatigue, so no volume cut. */
+  const three = planPlateauResponse({ plateau: { lifts: [] }, held: ["A", "B", "C"].map((n) => ({ from: n, to: `${n}2`, rotatedAt: "2026-06-08", daysHeld: 3, loggedSince: false })) });
+  assert.equal(three.summary.action, "none");
+  assert.equal(three.responses.length, 3);
+  /* Past the block and never trained: the hold ends, the original may return. */
+  const lapsed = planPlateauResponse({ plateau: { lifts: [] }, held: [{ from: "Lat Pulldown", to: "Negative Pull-Up", rotatedAt: "2026-05-01", daysHeld: 35, loggedSince: false }] });
+  assert.equal(lapsed.responses.length, 0);
+  /* Past the block and still being done, not stalled: held, quietly. */
+  const going = planPlateauResponse({ plateau: { lifts: [] }, held: [{ from: "Lat Pulldown", to: "Negative Pull-Up", rotatedAt: "2026-05-01", daysHeld: 35, loggedSince: true }] });
+  assert.equal(going.responses.length, 1);
+  assert.equal(going.responses[0].say, null);
+  assert.equal(going.responses[0].weeksLeft, 0);
+  /* Past the block and the stand-in has stalled itself: its own rotate fires
+     and the hold on the original ends, so the two never chase each other. */
+  const standInStalled = { lifts: [{ name: "Negative Pull-Up", sessions: 10, sessionsFlat: 10, weeksFlat: PLATEAU_RESPONSE.rotateFromWeeks, weightLb: 40 }] };
+  const chased = planPlateauResponse({ plateau: standInStalled, stillLinear: false, confidence: "high", held: [{ from: "Lat Pulldown", to: "Negative Pull-Up", rotatedAt: "2026-05-01", daysHeld: 35, loggedSince: true }] });
+  assert.deepEqual(chased.responses.map((r) => [r.exercise, r.action, r.reason ?? null]), [["Negative Pull-Up", "rotate", null]]);
+  /* A held lift that detectPlateau still lists is not decided twice. */
+  const listed = planPlateauResponse({ plateau: { lifts: [{ name: "Lat Pulldown", sessions: 4, sessionsFlat: 9, weeksFlat: 9, weightLb: 95 }] }, stillLinear: false, confidence: "high", held: [{ from: "Lat Pulldown", to: "Negative Pull-Up", rotatedAt: "2026-06-08", daysHeld: 7, loggedSince: false }] });
+  assert.equal(listed.responses.filter((r) => r.exercise === "Lat Pulldown").length, 1);
+  assert.equal(listed.responses[0].reason, "held");
+  assert.ok(/^Swapped in Negative Pull-Up: your Lat Pulldown has not moved in 9 weeks/.test(sayRotation({ from: "Lat Pulldown", to: "Negative Pull-Up", weeksFlat: 9 })));
+});
+
+test("accessory rotation is deterministic for the same week, holds for a block, and turns on the next", () => {
+  const logs = rotLogs({ flat: null });
+  const build = (today) => buildPlan({ goal: { bubble: "build-muscle" }, person: ROT_PERSON, logs, plans: [], today });
+  const a = build(ROT_TODAY), again = build(ROT_TODAY);
+  assert.equal(JSON.stringify(a.week), JSON.stringify(again.week));
+  assert.ok(a.rotation.block > 0, "a person with logs is on the calendar");
+  /* The following week is the same fortnight, so the accessories hold. */
+  assert.equal(accessoryBlock(plusDays(ROT_TODAY, 7)), accessoryBlock(ROT_TODAY));
+  const b = build(plusDays(ROT_TODAY, 7));
+  assert.deepEqual(b.week.map((d) => d.exercises.map((e) => e.name)), a.week.map((d) => d.exercises.map((e) => e.name)));
+  /* Two weeks on is the next block: the mains stay, at least one accessory
+     turns, and the week says so. */
+  const c = build(plusDays(ROT_TODAY, 14));
+  assert.equal(c.rotation.block, a.rotation.block + 1);
+  assert.deepEqual(rotMains(c), rotMains(a));
+  const accA = a.week.flatMap((d) => d.exercises.filter((e) => e.role !== "main").map((e) => e.name));
+  const accC = c.week.flatMap((d) => d.exercises.filter((e) => e.role !== "main").map((e) => e.name));
+  assert.notDeepEqual(accC, accA);
+  assert.ok(c.rotation.accessories.length > 0);
+  assert.ok(c.dayNotes.some((n) => n.startsWith("Rotated accessories this block:")), c.dayNotes.join(" | "));
+  /* Every accessory that turned in was one the ranking already rated: within
+     the window, and eligible. */
+  const eligible = new Set(eligibleMovements({ days: 4 }));
+  for (const r of c.rotation.accessories) assert.ok(eligible.has(r.name), `${r.name} is not eligible`);
+  assert.ok(ROTATION.accessoryWindow >= 3 && ROTATION.accessoryWindow <= 4);
+});
+
+test("a new person's first three weeks hold the same anchors, on purpose", () => {
+  let plans = [];
+  const seen = [];
+  for (let w = 0; w < 3; w++) {
+    const today = plusDays(ROT_TODAY, 7 * w);
+    const plan = buildPlan({ goal: { bubble: "build-muscle" }, person: ROT_PERSON, logs: [], plans, today });
+    if (w === 0) assert.equal(plan.rotation.block, 0, "nothing on the record, so the ranked answer and no calendar");
+    assert.deepEqual(plan.rotation.anchors, []);
+    assert.deepEqual(plan.rotation.held, []);
+    seen.push(rotMains(plan));
+    /* Generated and never trained: rows with no completed_at and no logs. */
+    plans = [...plans, ...savedRows(plan, today, { completed: false })];
+  }
+  assert.deepEqual(seen[1], seen[0]);
+  assert.deepEqual(seen[2], seen[0]);
+  /* And a day one week prescribes nothing it could not: every movement on
+     the card is in the eligible set the coverage script measures against. */
+  const eligible = new Set(eligibleMovements({ days: 4 }));
+  const first = buildPlan({ goal: { bubble: "build-muscle" }, person: ROT_PERSON, logs: [], today: ROT_TODAY });
+  for (const e of first.week.flatMap((d) => d.exercises)) assert.ok(eligible.has(e.name), e.name);
+});
+
+test("the adapter carries the rotation into the saved plan and into meta, and nothing else moved", () => {
+  const logs = rotLogs({ flat: "Lat Pulldown" });
+  const out = generateFromPayload({ goal_bubble: "build-muscle", sex: "Male", current_weight: 190, challenge_target: 4, logs }, { today: ROT_TODAY, includePlan: true });
+  assert.ok(out.meta.rotation && Array.isArray(out.meta.rotation.anchors));
+  const standIn = out.plan.rotation.anchors[0];
+  assert.ok(standIn, "the stall reached the payload path");
+  const stored = out.plan.week.map((d, i) => toWorkout(out.plan, i)).flatMap((w) => w.exercises);
+  const carried = stored.find((e) => e.rotatedFor);
+  assert.ok(carried && carried.name === standIn.to && carried.rotatedAt === isoOf(ROT_TODAY));
+  /* A day with no stand-in on it has no such key at all. */
+  for (const e of stored) if (!e.rotatedFor) assert.ok(!("rotatedFor" in e) && !("rotatedAt" in e));
+  assert.ok(out.notes.some((n) => n.startsWith(`Swapped in ${standIn.to}: your Lat Pulldown`)));
 });

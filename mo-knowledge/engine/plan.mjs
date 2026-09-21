@@ -23,7 +23,7 @@ import { prescribeLoad, patternFor, roundLoad } from "./load.mjs";
 import { calibrate } from "./calibrate.mjs";
 import { learnPreferences, applyPreferences, avoidNote, openWeekBudget, heldBackNote, actedOn } from "./preferences.mjs";
 import { scoreAlternatives } from "./alternatives.mjs";
-import { planPlateauResponse, applyRotateFallback, repShiftFor, cutTakenRecently } from "./plateau-response.mjs";
+import { planPlateauResponse, applyRotateFallback, repShiftFor, cutTakenRecently, rotationsHeld, sayRotation } from "./plateau-response.mjs";
 import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary } from "./limits.mjs";
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
@@ -207,6 +207,12 @@ const mondayOf = (d) => {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
   return x;
+};
+/* Local calendar day as the app writes entry_date, so a date stamped here
+   compares with one the app stored. Same shape as `iso` in training-age.mjs. */
+const isoDate = (d) => {
+  const x = new Date(d);
+  return new Date(x - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 export function trainedWeeksBefore(plans = [], today = new Date()) {
   const thisMonday = mondayOf(new Date(today));
@@ -1292,6 +1298,120 @@ function candidates({ groups, pattern, equipment, role = "accessory", earned = n
   return applyPreferences(pool, preferences, prefBudget);
 }
 
+/* ---- rotation: what stays and what moves, 2026-09-21 ----
+ *
+ * Measured before this existed: across many generated weeks the engine
+ * reached 21 of the 158 movements a person was eligible for. Not the earning
+ * rule (deleting it moved one movement); it was `candidates` being a sort with
+ * no memory, so the same top scored movement won the same slot every week for
+ * everybody with the same profile. The owner's rule for fixing it, near
+ * verbatim: "if they're hitting their weights really well... if it ain't
+ * broken, don't break it. If they're at a plateau, then we can switch it up."
+ *
+ * So there are two kinds of slot and they rotate for two different reasons.
+ *
+ * ANCHORS, the main slots, are where a PR is being tracked. They never rotate
+ * for freshness. They rotate only when plateau-response.mjs says `rotate`,
+ * which is the last rung of a ladder that has already tried waiting, a lighter
+ * week and a rep range change, and once rotated the stand-in is held for a
+ * block: see PLATEAU_RESPONSE.rotateHoldDays and rotationsHeld. A person with
+ * no logs has no stall signal, so their first weeks hold the same anchors on
+ * purpose: they are learning the movement, and a lift you cannot yet do well
+ * is not one you are stuck on.
+ *
+ * ACCESSORIES rotate on a calendar, through the top few candidates the same
+ * ranking already produced. `accessoryWindow` is how many of them take turns
+ * and `accessoryEveryWeeks` how long each turn is. Four and two: a fortnight
+ * is long enough to progress an isolation movement and short enough that a
+ * twelve week block sees every candidate; a window of four keeps the slot
+ * among movements the ranking actually rated rather than reaching to the
+ * bottom of the pool for novelty, and four rather than three because it was
+ * measured (coverage.mjs: 47 of 79 movements reached at three, 54 at four)
+ * and because in an accessory pool every movement the person has not logged
+ * ties at the same rank, so the fourth is as good a pick as the second.
+ *
+ * The turn is taken off the CALENDAR and not off the person's own history,
+ * and that was not the first choice. The brief asked for (person, week index,
+ * slot). Two facts settled it. The edge function strips every identifying
+ * field before the payload reaches this engine (IDENTIFYING_FIELDS in
+ * index.ts, and the privacy policy the app makes on the same line), so there
+ * is no person to key on. And the payload's history is a sliding window,
+ * ninety days of logs and thirty of plans, so a "weeks since your first
+ * session" counter saturates after three months and then slides with the
+ * window: rotation would stop for exactly the people who have trained long
+ * enough to want it. Weeks since a fixed Monday is monotonic for everybody,
+ * gives the same answer on a regenerate the same day, and every fuzz and sweep
+ * run pins its clock, so it stays reproducible there. The cost is that block
+ * boundaries fall on the same fortnight for everybody, so somebody who joins
+ * in the second week of a block sees their first rotation after one week
+ * rather than two. Said here rather than hidden.
+ *
+ * It applies only once there is anything on the record at all. A person with
+ * no logs and no saved plans gets the ranked answer, byte for byte the week
+ * this engine handed out before rotation existed, which is a property the
+ * tests can hold and the reason a day one plan does not depend on the date. */
+export const ROTATION = Object.freeze({
+  accessoryEveryWeeks: 2,
+  accessoryWindow: 4,
+  /* A Monday. Which Monday is arbitrary; that it never changes is not. */
+  epoch: "2026-01-05",
+});
+
+/* Which fortnight the calendar is in, counted from the epoch. */
+export function accessoryBlock(today = new Date(), { epoch = ROTATION.epoch, everyWeeks = ROTATION.accessoryEveryWeeks } = {}) {
+  const [y, m, d] = epoch.split("-").map(Number);
+  const weeks = Math.round((mondayOf(new Date(today)) - mondayOf(new Date(y, m - 1, d))) / WEEK_MS);
+  return Math.max(0, Math.floor(weeks / everyWeeks));
+}
+
+/* The pool with its first few entries turned, so the slot's pick this block is
+   the next in line rather than always the first. Only the window turns; the
+   rest of the pool keeps its order and is still there for the unused-this-week
+   and dedupe fallbacks the selection loop already runs. `phase` spreads the
+   turns so two accessory slots on one day do not all shift at the same
+   moment: day and slot position, both fixed by the split. Nothing here can
+   promote a movement the ranking had not already put in its top few. */
+function turnWindow(pool, { block, phase, window = ROTATION.accessoryWindow }) {
+  const n = Math.min(window, pool.length);
+  if (n < 2 || block <= 0) return pool;
+  const k = (block + phase) % n;
+  if (k === 0) return pool;
+  return [...pool.slice(k, n), ...pool.slice(0, k), ...pool.slice(n)];
+}
+
+/* Whether a movement is one this slot could have held. A stalled lift is
+   excluded from every pool at once, and the note has to say which lift took
+   its place, which means knowing which slot it left. Primary muscle in the
+   slot's groups, and on a patterned slot the same pattern. */
+const EXERCISE_BY_NAME = new Map();
+for (const lib of [WEIGHTS, CALIS]) {
+  for (const cat of lib.categories) for (const ex of cat.exercises) if (!EXERCISE_BY_NAME.has(ex.name.toLowerCase())) EXERCISE_BY_NAME.set(ex.name.toLowerCase(), ex);
+}
+function belongsToSlot(name, slot) {
+  const ex = EXERCISE_BY_NAME.get(String(name || "").toLowerCase());
+  if (!ex) return false;
+  if (!(ex.primary || []).some((g) => slot.groups.includes(g))) return false;
+  return slot.pattern === "isolation" || patternFor(ex) === slot.pattern;
+}
+
+/* Every movement a week could hand this person, across every slot of the
+   split they would get. The denominator coverage.mjs measures reach against,
+   built from the same `candidates` the week is built from so the two cannot
+   drift. Preferences and exclusions are left out on purpose: they reorder or
+   subtract, and the question here is what the library allows. */
+export function eligibleMovements({ days = 3, equipment = null, earned = null, limits = null, lowerBack = false, ankle = false } = {}) {
+  const limitsUsed = normalizeLimits(limits);
+  const kitAllowed = allowedEquipment(limitsUsed);
+  const kit = kitAllowed ? (equipment ? equipment.filter((e) => kitAllowed.includes(e)) : kitAllowed) : equipment;
+  const out = new Set();
+  for (const [, key] of splitFor(days).slice(0, days)) {
+    for (const slot of slotsForDay(key, false, { lowerBack, ankle })) {
+      for (const ex of candidates({ ...slot, earned, equipment: kit, role: slot.role })) out.add(ex.name);
+    }
+  }
+  return [...out];
+}
+
 export function buildPlan({
   goal, person = {}, logs: rawLogs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
   limits = null, avoid = [], declaredEquipment = null,
@@ -1495,10 +1615,29 @@ export function buildPlan({
     /* A lighter week handed out inside the last block is spent: the sets go
        back up and the per lift answers run. See cutTakenRecently. */
     cutTaken: cutTakenRecently({ plans, today }),
+    /* And the rotations already made, so a swap is a block and not a week.
+       See rotationsHeld and the ROTATION comment above. */
+    held: rotationsHeld({ plans, logs, today }),
   });
   const rotateOut = new Set(
     plateauPlan.responses.filter((r) => r.action === "rotate").map((r) => r.exercise.toLowerCase()),
   );
+  /* The stand-ins a live hold wants kept, by the lift they replaced. A held
+     lift is excluded above like any rotation; this is the other half, that
+     the SAME stand-in wins the slot again rather than whichever candidate the
+     ranking happens to put first this week. */
+  const pinnedFor = new Map(
+    plateauPlan.responses.filter((r) => r.reason === "held" && r.replacement)
+      .map((r) => [r.exercise.toLowerCase(), { to: r.replacement, rotatedAt: r.rotatedAt }]),
+  );
+  const pinnedNames = new Set([...pinnedFor.values()].map((p) => p.to.toLowerCase()));
+  /* Which fortnight the accessories are on, and whether rotation applies at
+     all: not to a person with nothing on the record. See ROTATION. */
+  const block = (logs.length || (Array.isArray(plans) && plans.length)) ? accessoryBlock(today) : 0;
+  const rotatedAccessories = [];
+  const rotatedAnchors = [];
+  /* Stalled lifts already given a stand-in this week, for the no-card case. */
+  const stampedFrom = new Set();
   /* Rotations the library could not afford. Filled during selection. */
   const rotateBlocked = new Set();
 
@@ -1699,20 +1838,97 @@ export function buildPlan({
   );
   const prefBudget = openWeekBudget(preferences, { slots: prefSlots });
 
-  const selected = split.map(([name, key], dayIndex) => {
-    const isShort = shortFrom != null && dayIndex >= shortFrom;
-    const usedToday = new Set();
-    const slots = slotsForDay(key, isShort, slotOpts);
+  /* Every main slot in the week is filled before any accessory, since
+     2026-09-21. Until then the week was filled a day at a time, top to bottom,
+     and `usedThisWeek` let a Monday accessory take the movement a Wednesday
+     main wanted: the upper day's horizontal pull accessory reached Inverted
+     Row first and the pull day's MAIN horizontal pull got the second choice.
+     Harmless while nothing ever changed, and then accessory rotation changed
+     the Monday pick and moved the Wednesday anchor with it, which is the one
+     thing rotation is not allowed to do (measured: 6 of 121 anchor weeks on a
+     five day split). The main slot is the day's reason to exist and the lift
+     the person is tracking, so it chooses first across the whole week; the
+     accessories fill in around what the anchors took. The order within a day
+     is unchanged, and the short day floor counts the same way it did, because
+     every main is in before the first accessory is counted. */
+  /* Last week's card, by day name, so an anchor that is working can be put
+     back where it was before anything else is decided. The plans the app
+     sends are its own saved rows: `focus` is the day name toWorkout wrote and
+     `exercises` are in card order, mains first, so the main at slot i last
+     week is exercises[i]. Newest row per day wins. */
+  const lastCard = new Map();
+  for (const p of [...(Array.isArray(plans) ? plans : [])]
+    .filter((p) => p && typeof p === "object" && typeof p.focus === "string" && Array.isArray(p.exercises))
+    .sort((a, b) => String(b.entry_date || "").localeCompare(String(a.entry_date || "")))) {
+    if (!lastCard.has(p.focus)) lastCard.set(p.focus, p.exercises.map((e) => (e && typeof e.name === "string" ? e.name.toLowerCase() : null)));
+  }
+  const avoidedNames = new Set((preferences?.avoid || []).map((a) => String(a.name || "").toLowerCase()));
+  const preferNames = new Set((preferences?.prefer || []).map((a) => String(a.name || "").toLowerCase()));
+  /* Whether last week's anchor may simply stay, asked without building the
+     slot's pool: `candidates` spends the preference budget as a side effect
+     and asking it twice for one slot would charge the week twice. So the
+     eligibility rules of `match` are asked of one movement here, plus the two
+     things that would make keeping it wrong: this person has revealed they
+     avoid it, or they have revealed a preference for something this slot
+     could hold, in which case the ranking with preferences applied decides. */
+  const mayKeep = (n, slot) => {
+    const ex = EXERCISE_BY_NAME.get(n);
+    if (!ex || !belongsToSlot(n, slot)) return false;
+    if (!inDefaultPool(ex, slot.role) && !(earned && earned.has(n))) return false;
+    if (kit && !kit.includes(ex.equipment)) return false;
+    if (goalBarred.has(n) || excludeOut.has(n) || avoidedNames.has(n)) return false;
+    if ([...preferNames].some((pr) => pr !== n && belongsToSlot(pr, slot))) return false;
+    return (usedThisWeek.get(ex.name) || 0) === 0;
+  };
 
+  const dayCtx = split.map(([name, key], dayIndex) => ({
+    name, key, dayIndex,
+    isShort: shortFrom != null && dayIndex >= shortFrom,
+    usedToday: new Set(),
+    slots: slotsForDay(key, shortFrom != null && dayIndex >= shortFrom, slotOpts),
     /* The short day floor, counted on what was actually filled. Every main
        slot still runs; accessories are taken in order until the day has
        SHORT_DAY_MIN exercises, and a slot the library cannot fill does not
        spend one of those places. See slotsForDay. */
-    let taken = 0;
-    const picks = slots.map((slot) => {
-      if (isShort && slot.role !== "main" && taken >= SHORT_DAY_MIN) return null;
+    taken: 0,
+    picks: [],
+  }));
+  const pickFor = (ctx, slot, slotIndex, { keep = false } = {}) => {
+    const { name, dayIndex, isShort, usedToday } = ctx;
+    /* The keep pass: only a slot whose anchor from last week can stay is
+       filled here, and it is filled with that anchor. Everything else is left
+       for the fill pass, undefined rather than null so the two are told
+       apart. */
+    const kept = keep ? (lastCard.get(name) || [])[slotIndex] || null : null;
+    if (keep && !(kept && mayKeep(kept, slot))) return undefined;
+    {
+      if (isShort && slot.role !== "main" && ctx.taken >= SHORT_DAY_MIN) return null;
       const args = { ...slot, earned, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, hurtOut: limitOut, emphasis: P.emphasis, preferLoadable };
-      const pool = candidates({ ...args, barred: goalBarred });
+      const rankedPool = candidates({ ...args, barred: goalBarred });
+      /* A live hold pins its stand-in to the front of this slot. Only the
+         stand-in for a lift this slot could have held: the map is keyed on the
+         stalled lift, and belongsToSlot is the same question the note asks. */
+      const held = [...pinnedFor.entries()].find(([from, { to }]) => belongsToSlot(from, slot) && rankedPool.some((e) => e.name.toLowerCase() === to.toLowerCase()));
+      let pool = rankedPool;
+      if (held) {
+        const to = held[1].to.toLowerCase();
+        pool = [...rankedPool.filter((e) => e.name.toLowerCase() === to), ...rankedPool.filter((e) => e.name.toLowerCase() !== to)];
+      } else if (slot.role !== "main" && block > 0) {
+        /* Freshness, accessories only. A slot the person's own preferences
+           have already decided is left alone: `prefer` put their movement on
+           top and turning it under them is the tap doing nothing again, and
+           an avoided movement is never turned INTO the slot, because the
+           window is the ranking's top few and preferences.mjs sank it below
+           them. See ROTATION for the calendar and the window. */
+        const top = rankedPool[0] ? rankedPool[0].name.toLowerCase() : null;
+        const preferred = top && (preferences?.prefer || []).some((pr) => String(pr.name || "").toLowerCase() === top);
+        const avoided = new Set((preferences?.avoid || []).map((a) => String(a.name || "").toLowerCase()));
+        if (!preferred) {
+          const window = rankedPool.slice(0, ROTATION.accessoryWindow).filter((e) => !avoided.has(e.name.toLowerCase()) && !pinnedNames.has(e.name.toLowerCase()));
+          const rest = rankedPool.filter((e) => !window.includes(e));
+          pool = [...turnWindow(window, { block, phase: dayIndex * 7 + slotIndex * 3, window: window.length }), ...rest];
+        }
+      }
       if (!pool.length) {
         /* Empty for want of equipment is an old and quiet case, handled by
            dropping the slot. Empty because of the goal's own bar is new and it
@@ -1744,7 +1960,8 @@ export function buildPlan({
          rep counts, and no set count downstream can make sense of it. A slot
          with nothing left of its own is a slot the library cannot fill, which
          is a state this file already has an answer for. */
-      const pick = pool.find((e) => !usedToday.has(e.name) && (usedThisWeek.get(e.name) || 0) === 0)
+      const pick = (kept && pool.find((e) => e.name.toLowerCase() === kept && !usedToday.has(e.name)))
+        || pool.find((e) => !usedToday.has(e.name) && (usedThisWeek.get(e.name) || 0) === 0)
         || pool.find((e) => !usedToday.has(e.name))
         || null;
       if (!pick) { dedupeEmpty.push({ day: name, groups: slot.groups.join(" or ") }); return null; }
@@ -1753,8 +1970,43 @@ export function buildPlan({
       if (rotateOut.has(pick.name.toLowerCase())) rotateBlocked.add(pick.name);
       const offPattern = patternFor(pick) !== slot.pattern && slot.pattern !== "isolation";
       usedToday.add(pick.name);
-      taken++;
+      ctx.taken++;
       usedThisWeek.set(pick.name, (usedThisWeek.get(pick.name) || 0) + 1);
+      /* What this pick is standing in for, if anything, and since when. Carried
+         onto the exercise and through the adapter into the saved plan, which
+         is how next week's build knows the swap was made (rotationsHeld). A
+         first swap is dated today; a held one keeps its first date, or the
+         thirty day window on `plans` would restart the block every week. */
+      let rotatedFor = null, rotatedAt = null;
+      /* Which stalled lift this pick replaced, if any. A held one is the
+         stand-in the hold pinned; a fresh one is the lift that sat in THIS
+         slot last week, or, with no card to read, any rotated lift this slot
+         could have held. Not merely "belongs to the slot": two upper days
+         both hold a vertical pull, one of them stalled, and the other's kept
+         anchor is not standing in for anything. */
+      const prev = (lastCard.get(name) || [])[slotIndex] || null;
+      const standingIn = [...rotateOut].find((from) => {
+        if (from === pick.name.toLowerCase()) return false;
+        const pin = pinnedFor.get(from);
+        if (pin) return pin.to.toLowerCase() === pick.name.toLowerCase() && belongsToSlot(from, slot);
+        if (lastCard.has(name)) return prev === from;
+        /* No card to read, so where the stalled lift sat is inferred: it was
+           the familiar pick, familiar sorts first, and the first slot it
+           belongs to in week order is the one it would have won. Once. */
+        return belongsToSlot(from, slot) && !stampedFrom.has(from);
+      });
+      if (standingIn) stampedFrom.add(standingIn);
+      if (standingIn) {
+        const src = EXERCISE_BY_NAME.get(standingIn);
+        rotatedFor = src ? src.name : standingIn;
+        rotatedAt = pinnedFor.get(standingIn)?.rotatedAt || isoDate(today);
+        if (!pinnedFor.has(standingIn) && !rotatedAnchors.some((r) => r.from === rotatedFor && r.to === pick.name)) {
+          rotatedAnchors.push({ from: rotatedFor, to: pick.name, day: name });
+        }
+      }
+      if (slot.role !== "main" && !held && pool !== rankedPool && rankedPool[0] && pick.name !== rankedPool[0].name) {
+        rotatedAccessories.push({ day: name, name: pick.name, insteadOf: rankedPool[0].name });
+      }
 
       /* Every exercise needs a swap. The brief calls this a hard product
          requirement rather than a nice to have, and research/07 adds that the
@@ -1771,13 +2023,28 @@ export function buildPlan({
       if (swap) swapsThisWeek.add(swap.name);
 
       return {
-        slot, pick, swap, offPattern,
+        slot, pick, swap, offPattern, rotatedFor, rotatedAt,
         alternatives: ranked.slice(0, 3).map((a) => ({ name: a.name, why: a.why })),
       };
-    }).filter(Boolean);
-
-    return { name, key, isShort, picks };
-  });
+    }
+  };
+  /* Three passes over the week. First the anchors that are working go back
+     where they were (the owner's rule, "if it ain't broken, don't break it",
+     made a rule the selection cannot argue with); then the main slots that
+     came free, which is where a stalled lift's stand-in is chosen, and it is
+     chosen from what the kept anchors left, so a rotation never shuffles the
+     lifts beside it; then the accessories around all of that. */
+  for (const phase of ["keep", "mains", "accessories"]) {
+    for (const ctx of dayCtx) {
+      ctx.slots.forEach((slot, i) => {
+        if (ctx.picks[i] !== undefined) return;
+        if ((slot.role === "main") !== (phase !== "accessories")) return;
+        const got = pickFor(ctx, slot, i, { keep: phase === "keep" });
+        if (got !== undefined) ctx.picks[i] = got;
+      });
+    }
+  }
+  const selected = dayCtx.map(({ name, key, isShort, picks }) => ({ name, key, isShort, picks: picks.filter(Boolean) }));
 
   /* The slots the goal's bar emptied, said out loud. Nothing silently replaced
      them, because the replacement would have been the movement the goal pointed
@@ -1790,6 +2057,30 @@ export function buildPlan({
       + `everything the library offers for that slot is the kind of movement this goal points away from, so `
       + `the slot is left out rather than filled with one of those. The work that would fill it is planks `
       + `and side planks, or a Pallof Press if you have a cable machine.`);
+  }
+
+  /* The rotate note, now that selection knows what came in. The response was
+     decided before pass 2 and could only promise "another lift for the same
+     muscle"; the card names the lift, so the note does too, and the two can be
+     read against each other. A rotation that reached no slot (the stalled lift
+     was one the person logs but the week never prescribed) keeps its original
+     sentence, and one the pool could not afford is handled by rotateBlocked. */
+  for (const r of plateauPlan.responses) {
+    if (r.action !== "rotate" || r.reason === "held" || !r.say) continue;
+    const to = rotatedAnchors.find((a) => a.from.toLowerCase() === r.exercise.toLowerCase());
+    if (!to) continue;
+    const lift = (trainingAge.plateau?.lifts || []).find((l) => l.name.toLowerCase() === r.exercise.toLowerCase());
+    r.say = sayRotation({ from: to.from, to: to.to, weeksFlat: lift?.weeksFlat ?? null });
+  }
+  /* And the accessories that took a turn this block, one sentence for the
+     week. The main lifts are where the progress is and they did not move;
+     saying which smaller movements did keeps a changed week from reading as
+     a random one. */
+  if (rotatedAccessories.length) {
+    const names = [...new Set(rotatedAccessories.map((r) => r.name))];
+    dayNotes.push(`Rotated accessories this block: ${names.slice(0, 3).join(", ")}${names.length > 3 ? ` and ${names.length - 3} more` : ""}. `
+      + `Your main lifts stay where they are; the smaller movements take turns every `
+      + `${ROTATION.accessoryEveryWeeks} weeks so the week stays fresh.`);
   }
 
   /* And the slots that emptied because the only movements left were already on
@@ -1933,7 +2224,7 @@ export function buildPlan({
   };
 
   const week = selected.map(({ name, key, isShort, picks }) => {
-    const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern }) => {
+    const exercises = picks.map(({ slot, pick, swap, alternatives, offPattern, rotatedFor, rotatedAt }) => {
       const group = groupFor(slot, pick);
       /* The goal is not the only thing that can name a priority group. When the
          caller has merged the user's own body-map focus in (engine/focus.mjs),
@@ -1993,6 +2284,14 @@ export function buildPlan({
         /* Said out loud rather than hidden: this slot wanted a movement pattern
            the library could not supply at this level. */
         note: offPattern ? `Standing in for a ${slot.pattern} movement; the library has none you can use here.` : null,
+        /* Main or accessory, said on the exercise so a caller can tell an
+           anchor from the work around it without knowing SLOTS exists. */
+        role: slot.role,
+        /* Present only on a stand-in, absent otherwise rather than null, the
+           same shape as `volumeCut`: the adapter carries both into the saved
+           plan and a plan built before rotation existed is the object it
+           was. See rotationsHeld for what reads them back. */
+        ...(rotatedFor ? { rotatedFor, rotatedAt } : {}),
       };
       roleOf.set(exercise, slot.role);
       return exercise;
@@ -3084,6 +3383,17 @@ export function buildPlan({
        full reasoning stays in plateauPlan.why for an audit; the plan carries
        what was decided and what it means for the week. */
     plateau: { responses: plateauPlan.responses, summary: plateauPlan.summary },
+    /* What moved this week and why, so a screen can tell a rotation from a
+       regenerate. `anchors` are stalled lifts that left this week and what
+       took their place; `held` are the stand-ins still in their block; and
+       `accessories` are the freshness turns. `block` is the calendar
+       fortnight, 0 when rotation is not running for this person. */
+    rotation: {
+      block,
+      anchors: rotatedAnchors,
+      held: plateauPlan.responses.filter((r) => r.reason === "held").map((r) => ({ from: r.exercise, to: r.replacement, since: r.rotatedAt, weeksLeft: r.weeksLeft })),
+      accessories: rotatedAccessories,
+    },
     /* What we would have used and did not have, so a plan can say what would
        sharpen it rather than silently guessing. */
     missing: [

@@ -108,6 +108,17 @@ export const PLATEAU_RESPONSE = {
      a block after a lighter week AND their own answers, that is new evidence
      of fatigue rather than the same evidence read twice. */
   cutSpentDays: 28,
+  /* How long a rotated lift stays out once it has been swapped. The swap is
+     only worth making if the new lift gets a run of its own to be progressed,
+     and until 2026-09-21 it got one week: detectPlateau stops listing a lift
+     after a fortnight of not doing it (under four sessions in the window), the
+     exclusion lapsed with the listing, and the stalled lift walked straight
+     back in as the familiar pick. Four weeks, the same block everything else
+     here is measured in, read back off the saved plans the way the cut is.
+     Past the block the stand-in keeps the slot for exactly as long as it is
+     still going up, which is the owner's rule in one line: if it is not
+     broken, it is not changed. See rotationsHeld. */
+  rotateHoldDays: 28,
   /* How many lifts get a response out loud. A week that changes six things
      teaches nothing, and six notes on one plan is a wall of text nobody reads.
      Everything else stays visible in `trainingAge.plateau.lifts`. */
@@ -199,10 +210,32 @@ function sayFor({ action, lift, goal, reason = null, blocked = false }) {
       + `More reps at that weight is still more work, and it is usually what gets a `
       + `stuck lift moving again.`;
   }
+  if (action === "rotate" && reason === "held") {
+    /* The stand-in is in its block. Said every week of it, because the
+       person is looking at a lift where their usual one was and a plan that
+       explains that once and then goes quiet reads as having forgotten. */
+    const to = lift.replacement || "The stand-in";
+    const left = Number(lift.weeksLeft) || 0;
+    return `${to} is standing in for ${lift.name} for another ${left} week${left === 1 ? "" : "s"}, `
+      + `so it gets a proper run before anything else changes.`;
+  }
   /* rotate */
   return `${flat}, so it steps out this week and another lift for the same muscle `
     + `takes its place. Same muscle, new stimulus, and the ${lift.name.toLowerCase()} `
     + `comes back to a body that has been doing something else for a while.`;
+}
+
+/**
+ * The rotate sentence once selection knows what came in. planPlateauResponse
+ * decides before pass 2 runs and cannot name the replacement; plan.mjs finds
+ * it while filling the slot and rewrites the note through here, so the note
+ * and the card name the same lift. One plain sentence, then the hold, so the
+ * person knows the change is a block and not a whim.
+ */
+export function sayRotation({ from, to, weeksFlat = null, holdWeeks = Math.round(PLATEAU_RESPONSE.rotateHoldDays / 7) } = {}) {
+  const flat = typeof weeksFlat === "number" ? `has not moved in ${weeksFlat} weeks` : "has stopped moving";
+  return `Swapped in ${to}: your ${from} ${flat}. It stays in for the next ${holdWeeks} weeks `
+    + `so it can be progressed on its own before anything else changes.`;
 }
 
 function detailFor({ action, lift, goal, reason = null }) {
@@ -225,6 +258,11 @@ function detailFor({ action, lift, goal, reason = null }) {
     return `Keep ${lift.name}, work ${range(shift.to)}`
       + `${shift.from ? ` instead of ${range(shift.from)}` : ""} for a block, then return to the heavy range.`;
   }
+  if (action === "rotate" && reason === "held") {
+    return `${lift.replacement || "The stand-in"} took ${lift.name}'s slot on ${lift.rotatedAt || "an earlier week"}. `
+      + `Held for ${Math.round(PLATEAU_RESPONSE.rotateHoldDays / 7)} weeks from then, and past that for as `
+      + `long as the stand-in keeps going up.`;
+  }
   return `Leave ${lift.name} out of this week and fill the slot from the same primary muscle.`;
 }
 
@@ -242,7 +280,7 @@ function detailFor({ action, lift, goal, reason = null }) {
  *   why: string[],
  * }}
  */
-export function planPlateauResponse({ plateau, stillLinear = false, confidence = "none", calibration = null, goal = null, cutTaken = false } = {}) {
+export function planPlateauResponse({ plateau, stillLinear = false, confidence = "none", calibration = null, goal = null, cutTaken = false, held = [] } = {}) {
   /* This used to take `level` and branch on `level === "beginner"`. The sentence
      under that branch says what it was really asking: "a beginner is on linear
      progression by definition". That is a claim about the bar and it is
@@ -258,7 +296,19 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
   const lifts = (plateau && Array.isArray(plateau.lifts) ? plateau.lifts : []).filter((l) => l && l.name);
   const { byExercise, overall } = calibrationOf(calibration);
 
-  if (!lifts.length) {
+  /* Rotations already made, read back off the saved plans by rotationsHeld.
+     A held lift is not decided again: it is out, its stand-in is in, and the
+     only question is whether the hold is still live. That is answered after
+     the per lift decisions below, because past the block it turns on what
+     was decided about the stand-in. Keyed on the stalled lift. */
+  const holds = new Map();
+  for (const h of Array.isArray(held) ? held : []) {
+    if (!h || !h.from || !h.to) continue;
+    const k = lower(h.from);
+    if (!holds.has(k)) holds.set(k, h);
+  }
+
+  if (!lifts.length && !holds.size) {
     why.push("No lift is stalled, so there is nothing to answer. detectPlateau needs four "
       + "sessions of a movement inside the window before it will call anything stuck, which "
       + "is the right bar: a lift you did twice is not a lift that stopped.");
@@ -271,7 +321,7 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
 
   /* One decision per stalled lift, in the order detectPlateau gave them, which is
      longest stall first. */
-  const decided = lifts.map((lift) => {
+  const decided = lifts.filter((lift) => !holds.has(lower(lift.name))).map((lift) => {
     const verdict = byExercise[lower(lift.name)]?.verdict || null;
 
     if (lift.weeksFlat < PLATEAU_RESPONSE.minWeeksFlat) {
@@ -361,6 +411,43 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
     return { lift, action: "rotate" };
   });
 
+  /* ---- the holds, which sit BELOW rotate in the ladder ----
+     wait, deload-lift and rep-range are all ways of keeping the lift; rotate
+     is the rung where it goes, and a hold is what happens after that rung has
+     fired. Inside the block it is live unconditionally: a swap that can be
+     undone by next week's build is not a swap, it is noise, and the stand-in
+     has to be on the card long enough to be loaded and progressed. Past the
+     block it is live while the stand-in is being done and has not itself
+     stalled: the moment the stand-in earns a rotate of its own the hold ends
+     and the original, rested, is the familiar next pick. A stand-in nobody
+     has logged since the swap has nothing to defend the slot with, so the
+     original comes back at the block's end. Held lifts are never `acting`:
+     they were answered on the week they left, and three of them at once is
+     not fatigue, it is memory. */
+  const actionOf = new Map(decided.map((d) => [lower(d.lift.name), d.action]));
+  const holdWeeks = PLATEAU_RESPONSE.rotateHoldDays / 7;
+  const liveHolds = [];
+  for (const [, h] of holds) {
+    const days = Number(h.daysHeld) || 0;
+    const inBlock = days < PLATEAU_RESPONSE.rotateHoldDays;
+    const standInStalled = actionOf.get(lower(h.to)) === "rotate";
+    const live = inBlock || (h.loggedSince === true && !standInStalled);
+    if (!live) {
+      why.push(`${h.from}: ${h.to} stood in for it from ${h.rotatedAt}. The block is over and `
+        + (standInStalled ? `${h.to} has now stalled itself, so it rotates and ${h.from} is the rested, familiar next pick.`
+          : `${h.to} has not been logged since, so there is nothing to keep it in the slot with. ${h.from} may come back.`));
+      continue;
+    }
+    const weeksLeft = inBlock ? Math.max(1, Math.ceil((PLATEAU_RESPONSE.rotateHoldDays - days) / 7)) : 0;
+    why.push(`${h.from}: ${h.to} has stood in for it since ${h.rotatedAt}` + (inBlock
+      ? `, ${weeksLeft} of ${holdWeeks} weeks left. Held, because a swap undone the next week is noise, not a change.`
+      : `. Past the block and still going up, so it keeps the slot: if it is not broken it is not changed.`));
+    liveHolds.push({
+      lift: { name: h.from, replacement: h.to, weeksLeft, rotatedAt: h.rotatedAt },
+      action: "rotate", reason: "held", replacement: h.to, rotatedAt: h.rotatedAt, weeksLeft,
+    });
+  }
+
   const acting = decided.filter((d) => d.action !== "wait");
 
   /* ---- the systemic answer, which is never per exercise, and comes first
@@ -431,16 +518,26 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       + `week is the change, and a week that changes six things teaches nothing about any of `
       + `them. They come back next plan if the lifts are still flat.`);
     return {
-      responses: decided.map(({ lift, action, reason = null }) => ({
-        exercise: lift.name,
-        action: "wait",
-        detail: action === "wait"
-          ? detailFor({ action, lift, goal, reason })
-          : `Deferred: ${action}. Held a week behind the volume cut, which is the change this week.`,
-        /* The summary speaks for the whole week here. Four notes saying the same
-           thing in different words is the app apologising. */
-        say: null,
-      })),
+      responses: [
+        ...decided.map(({ lift, action, reason = null }) => ({
+          exercise: lift.name,
+          action: "wait",
+          detail: action === "wait"
+            ? detailFor({ action, lift, goal, reason })
+            : `Deferred: ${action}. Held a week behind the volume cut, which is the change this week.`,
+          /* The summary speaks for the whole week here. Four notes saying the same
+             thing in different words is the app apologising. */
+          say: null,
+        })),
+        /* A hold survives the cut. The lighter week is the SAME exercises with
+           fewer sets, and the stand-in is what is on the card; letting the
+           original back in for a week would be the very ping-pong the hold
+           exists to stop. Quiet, for the same reason the rest of the week is. */
+        ...liveHolds.map(({ lift, action, reason, replacement, rotatedAt, weeksLeft }) => ({
+          exercise: lift.name, action, reason, replacement, rotatedAt, weeksLeft,
+          detail: detailFor({ action, lift, goal, reason }), say: null,
+        })),
+      ],
       summary,
       why,
     };
@@ -459,14 +556,67 @@ export function planPlateauResponse({ plateau, stillLinear = false, confidence =
       + `rest are named in trainingAge.plateau.`);
   }
 
-  const responses = spoken.map(({ lift, action, reason = null }) => ({
+  const responses = [...spoken, ...liveHolds].map(({ lift, action, reason = null, replacement, rotatedAt, weeksLeft }) => ({
     exercise: lift.name,
     action,
     detail: detailFor({ action, lift, goal, reason }),
-    say: sayFor({ action, lift, goal, reason }),
+    /* Inside the block the hold says so every week. Past it the stand-in is
+       simply their lift now, and a weekly reminder that it used to be
+       something else is the app talking about itself. */
+    say: reason === "held" && !(weeksLeft > 0) ? null : sayFor({ action, lift, goal, reason }),
+    ...(reason === "held" ? { reason, replacement, rotatedAt, weeksLeft } : {}),
   }));
 
   return { responses, summary, why };
+}
+
+/**
+ * The rotations the engine has already made, read back off the plans the app
+ * saved, exactly the way cutTakenRecently reads the cut. Every stand-in the
+ * week prescribes carries `rotatedFor` (the lift it replaced) and `rotatedAt`
+ * (the day of the first swap) through the adapter into
+ * `ai_workouts.exercises`, and the stand-in's later rows carry the same two
+ * fields forward, so the first date survives the app's thirty day window on
+ * `plans` as long as the swap is still being prescribed. Read off the earliest
+ * `rotatedAt` rather than the row's own date for that reason: measuring the
+ * hold from whichever row happens to be in the window would restart it every
+ * week.
+ *
+ * `loggedSince` is whether the stand-in has been trained at all since the
+ * swap, which is what decides the hold past its block. Read here, off the
+ * logs, so planPlateauResponse can stay a function of its arguments.
+ *
+ * @param {{ plans?: Array, logs?: Array, today?: Date }} input
+ * @returns {Array<{ from: string, to: string, rotatedAt: string, daysHeld: number, loggedSince: boolean }>}
+ */
+export function rotationsHeld({ plans = [], logs = [], today = new Date() } = {}) {
+  const now = today instanceof Date ? today.getTime() : Date.parse(today);
+  if (!Number.isFinite(now)) return [];
+  const byFrom = new Map();
+  for (const p of (Array.isArray(plans) ? plans : [])) {
+    if (!p || typeof p !== "object" || !Array.isArray(p.exercises)) continue;
+    for (const e of p.exercises) {
+      if (!e || typeof e !== "object" || typeof e.rotatedFor !== "string" || !e.rotatedFor.trim()) continue;
+      if (typeof e.name !== "string" || !e.name.trim()) continue;
+      const at = String(e.rotatedAt || p.entry_date || "").slice(0, 10);
+      const stamp = Date.parse(`${at}T12:00:00Z`);
+      if (!Number.isFinite(stamp)) continue;
+      const days = (now - stamp) / 86400000;
+      if (days < 0) continue;
+      const k = lower(e.rotatedFor);
+      const cur = byFrom.get(k);
+      /* Earliest swap wins, so the hold is measured from the day it started. */
+      if (!cur || stamp < cur.stamp) byFrom.set(k, { from: e.rotatedFor.trim(), to: e.name.trim(), rotatedAt: at, stamp, daysHeld: Math.floor(days) });
+    }
+  }
+  const out = [];
+  for (const [, h] of byFrom) {
+    const to = lower(h.to);
+    const loggedSince = (Array.isArray(logs) ? logs : []).some((l) => l && typeof l === "object"
+      && lower(l.exercise_name) === to && String(l.entry_date || "") > h.rotatedAt);
+    out.push({ from: h.from, to: h.to, rotatedAt: h.rotatedAt, daysHeld: h.daysHeld, loggedSince });
+  }
+  return out;
 }
 
 /**

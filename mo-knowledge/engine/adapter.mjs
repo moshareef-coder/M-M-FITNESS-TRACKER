@@ -821,6 +821,11 @@ export function toWorkout(plan, dayIndex = 0) {
        answer: plateau-response.mjs reads it back to keep "the sets come down
        for seven days, and then they go back up" true. */
     ...(e.volumeCut ? { volumeCut: true } : {}),
+    /* Same idea, for a rotation: the lift this one replaced and the day of the
+       swap ride into the saved plan, and plateau-response.mjs reads them back
+       so the stand-in is held for its block rather than for one week. Absent
+       on everything that is not a stand-in. */
+    ...(e.rotatedFor ? { rotatedFor: e.rotatedFor, rotatedAt: e.rotatedAt ?? null } : {}),
   }));
 
   /* Additive, like swap and alternatives above: the five keys the app has
@@ -1318,6 +1323,10 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
            plan has nothing to say, like every other key here. */
         deload: plan.deload ?? null,
         progression: plan.progression ?? null,
+        /* What rotated this week and why: stalled anchors and their stand-ins,
+           the stand-ins still in their block, and the accessory turns. The
+           sentences already travel in `notes`; this is the structure. */
+        rotation: plan.rotation ?? null,
         volume: {
           byGroup: plan.weeklyVolume ?? {},
           under: plan.volumeNotes?.under ?? [],
