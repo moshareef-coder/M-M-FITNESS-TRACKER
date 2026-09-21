@@ -6333,6 +6333,9 @@
     display: flex; gap: 6px; padding: 4px; margin: 0 0 12px;
     border-radius: 12px; background: var(--panel-2);
   }
+  /* Nothing tracked for this goal empties the strip, and an empty strip has to
+     leave rather than sit there as a blank sunken bar with its own padding. */
+  .tone-chips:empty, .end-chips:empty, .bulk-chips:empty { display: none; }
   .goal-screen .wt-range { display: flex; gap: 6px; margin-top: 12px; padding: 0; background: none; }
   .tone-chip, .end-chip, .bulk-chip {
     flex: 1; min-width: 0; min-height: 34px; padding: 7px 0; border-radius: 9px; cursor: pointer;
@@ -20790,15 +20793,18 @@ function renderToneHero(on, profile, isPartner) {
   /* The tabs are what THEY track, not the four this screen was born with. A row
      offering Thighs to somebody who only measures their waist is offering an
      empty chart, and the picker above exists precisely so they do not have to
-     look at measurements they never take. Falls back to the goal's four when
-     nothing has been chosen, and on a partner's view it stays the four, since
-     tracked_metrics is your column and not theirs. */
-  const wantKeys = isPartner ? TONE_MEASURE_KEYS
-    : trackedMetrics().filter((k) => k !== "weight");
-  const measures = (typeof MEASUREMENTS !== "undefined" ? MEASUREMENTS : [])
-    .filter((m) => (wantKeys.length ? wantKeys : TONE_MEASURE_KEYS).includes(m.key));
-  const measure = measures.find((m) => m.key === TONE_MEASURE) || measures[0] || { key: TONE_MEASURE, label: "Waist" };
-  TONE_MEASURE = measure.key;
+     look at measurements they never take. On a partner's view it stays the
+     four, since tracked_by_goal is your column and not theirs.
+
+     Weight rides at the end of the row now, when they track it. It used to be
+     filtered out of the answer entirely, on the grounds that this screen leads
+     with the tape, and that is what left the bug in: somebody tracking nothing
+     but the scale came back with an empty list, fell through the fallback and
+     got all four tape chips he had just turned off. The card below reads the
+     metric's own unit, so the scale prints lb here and the tape prints in. */
+  const measures = goalStripMetrics(TONE_MEASURE_KEYS, isPartner);
+  const measure = measures.find((m) => m.key === TONE_MEASURE) || measures[0] || null;
+  if (measure) TONE_MEASURE = measure.key;
   const again = () => renderToneHero(true, profile, isPartner);
 
   $("toneTitle").textContent = goalTileFor("tone-lean-abs")?.title || "Tone up";
@@ -20806,17 +20812,19 @@ function renderToneHero(on, profile, isPartner) {
   /* One measurement at a time, and the same language as the range pills under
      the chart: the selected one is a raised tile, not a green one. */
   const chips = $("toneChips");
-  chips.innerHTML = measures.map((m) =>
+  chips.innerHTML = !measure ? "" : measures.map((m) =>
     `<button type="button" class="tone-chip${m.key === measure.key ? " on" : ""}" data-key="${escapeHtml(m.key)}">${escapeHtml(m.label)}</button>`).join("");
   chips.querySelectorAll("[data-key]").forEach((b) => {
     b.onclick = () => { TONE_MEASURE = b.dataset.key; again(); };
   });
 
-  const series = typeof measurementSeries === "function" ? (measurementSeries(name, measure.key, weeks) || []) : [];
-  const sum = typeof measurementSummary === "function" ? measurementSummary(name, measure.key, weeks) : null;
+  const series = measure && typeof measurementSeries === "function" ? (measurementSeries(name, measure.key, weeks) || []) : [];
+  const sum = measure && typeof measurementSummary === "function" ? measurementSummary(name, measure.key, weeks) : null;
   const inch = (v) => Number(v).toFixed(1);
   const stats = $("toneStats");
-  if (!series.length || sum?.now == null) {
+  if (!measure) {
+    nothingTrackedStats(stats);
+  } else if (!series.length || sum?.now == null) {
     stats.innerHTML = `<div class="wth-now">
       <div class="wth-eyebrow">${escapeHtml(measure.label)}</div>
       <div class="tone-none">No readings yet</div>
@@ -20831,11 +20839,17 @@ function renderToneHero(on, profile, isPartner) {
     const span = many ? Math.max(1, Math.round(daysBetween(series[0].entry_date, series[series.length - 1].entry_date) / 7)) : 0;
     const d = sum.delta;
     let delta = "";
-    if (many) {
+    /* Not for the scale. This goal's whole claim is that the number barely
+       moves, so neither colour is the truth about a pound either way, and the
+       smoothed trend directly below is the honest reading of the same column.
+       The Bulk Up hero blanks its weight delta for the same reason: two
+       numbers about one column, disagreeing on a heavy Sunday, is worse than
+       one of them being missing. */
+    if (many && measure.key !== "weight") {
       const flat = Math.abs(d) < 0.05;
       const cls = flat ? "" : d < 0 ? "idx-good" : "idx-bad";
       const sign = flat ? "" : d < 0 ? "-" : "+";
-      delta = `<div class="wth-now-delta ${cls}">${sign}${inch(Math.abs(d))} in in ${span} week${span === 1 ? "" : "s"}</div>`;
+      delta = `<div class="wth-now-delta ${cls}">${sign}${inch(Math.abs(d))} ${escapeHtml(measure.unit)} in ${span} week${span === 1 ? "" : "s"}</div>`;
     }
     /* The start column only once there is a start to compare against. The
        bar is the percent itself, not a percent of some target this goal does
@@ -20846,24 +20860,27 @@ function renderToneHero(on, profile, isPartner) {
       const fill = Math.min(100, Math.max(0, pct));
       start = `<div class="wth-target">
         <div class="wth-target-label">Start</div>
-        <div class="wth-target-val">${inch(sum.start)} in</div>
+        <div class="wth-target-val">${inch(sum.start)} ${escapeHtml(measure.unit)}</div>
         <div class="wth-bar"><b style="width:${fill}%"></b></div>
         <div class="wth-target-pct">${Math.abs(pct) % 1 ? Math.abs(pct).toFixed(1) : Math.round(Math.abs(pct))}% ${pct < 0 ? "up" : "down"}</div>
       </div>`;
     }
     stats.innerHTML = `<div class="wth-now">
       <div class="wth-eyebrow">${escapeHtml(measure.label)}</div>
-      <div class="wth-now-fig"><b>${inch(sum.now)}</b><i>in</i></div>
+      <div class="wth-now-fig"><b>${inch(sum.now)}</b><i>${escapeHtml(measure.unit)}</i></div>
       ${delta}
     </div>${start}`;
   }
 
   el.querySelector(".chart-wrap").classList.toggle("hidden", !series.length);
-  $("toneEmpty").classList.toggle("hidden", !!series.length);
+  /* Both of these are about a metric, so with no metric left they say nothing
+     rather than inviting a measurement the picker was just told not to show. */
+  $("toneEmpty").classList.toggle("hidden", !measure || !!series.length);
   if (toneChart) { toneChart.destroy(); toneChart = null; }
-  if (series.length) renderToneChart(series, isPartner);
+  if (series.length) renderToneChart(series, isPartner, measure.unit);
 
-  $("toneRange").innerHTML = TONE_RANGES.map(([k]) =>
+  $("toneRange").classList.toggle("hidden", !measure);
+  $("toneRange").innerHTML = !measure ? "" : TONE_RANGES.map(([k]) =>
     `<button type="button" class="wt-pill${k === TONE_RANGE ? " on" : ""}" data-range="${k}">${k}</button>`).join("");
   $("toneRange").querySelectorAll("[data-range]").forEach((b) => {
     b.onclick = () => { TONE_RANGE = b.dataset.range; again(); };
@@ -20905,7 +20922,7 @@ function renderToneHero(on, profile, isPartner) {
    last one a ring with its value in a chip over it, the grid, the action
    colour for the line (the partner colour on their screen). Its own canvas
    and instance, so the weight chart and this one never fight over a context. */
-function renderToneChart(series, isPartner) {
+function renderToneChart(series, isPartner, unit = "in") {
   const canvas = $("toneChart");
   if (!canvas) return;
   /* Not hired, no line. The card it would draw into is showing his pitch
@@ -20914,7 +20931,7 @@ function renderToneChart(series, isPartner) {
   if (!hired()) return;
   if (!window.Chart) {
     loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
-      .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner); })
+      .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner, unit); })
       .catch(() => chartUnavailable("toneChart"));
     return;
   }
@@ -20932,7 +20949,9 @@ function renderToneChart(series, isPartner) {
       const pt = chart.getDatasetMeta(0).data[last];
       if (!pt) return;
       const c = chart.ctx;
-      const text = `${values[last].toFixed(1)} in`;
+      /* The strip can put the scale on this chart now, so the chip carries the
+         metric's own unit rather than the inches this screen was born on. */
+      const text = `${values[last].toFixed(1)} ${unit}`;
       c.save();
       c.font = `700 12px ${cssVar("--font-body") || "sans-serif"}`;
       c.textBaseline = "middle";
@@ -21315,12 +21334,11 @@ function bulkWeeks() {
   return (BULK_RANGES.find(([k]) => k === BULK_RANGE) || BULK_RANGES[1])[1];
 }
 
-/* The chips: the scale first, then the three that are supposed to grow. */
-function bulkMetrics() {
-  return [{ key: "weight", label: "Weight", unit: "lb" }]
-    .concat(BULK_MEASURE_KEYS
-      .map((k) => MEASUREMENTS.find((m) => m.key === k))
-      .filter(Boolean));
+/* The chips: the scale first, then the three that are supposed to grow, and
+   only the ones this person tracks. It used to be all four whatever the picker
+   said, which is exactly what Mo was looking at. */
+function bulkMetrics(isPartner) {
+  return goalStripMetrics(["weight", ...BULK_MEASURE_KEYS], isPartner);
 }
 
 function renderBulkHero(on, profile, isPartner) {
@@ -21338,15 +21356,19 @@ function renderBulkHero(on, profile, isPartner) {
   const name = isPartner ? partnerName() : ME;
   const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
   const weeks = bulkWeeks();
-  const metrics = bulkMetrics();
-  const m = metrics.find((x) => x.key === BULK_METRIC) || metrics[0];
-  BULK_METRIC = m.key;
+  const metrics = bulkMetrics(isPartner);
+  /* The chip they were last on may be one they have just untracked, so the
+     strip falls back to its own first chip rather than charting a metric that
+     is no longer on screen. Weight leads the set, so on this goal that is
+     nearly always the scale. */
+  const m = metrics.find((x) => x.key === BULK_METRIC) || metrics[0] || null;
+  if (m) BULK_METRIC = m.key;
   const again = () => renderBulkHero(true, profile, isPartner);
   const num = (v) => (Math.round(v * 10) / 10).toFixed(1);
 
   $("bulkTitle").textContent = goalTileFor("build-muscle")?.title || "Build muscle";
 
-  $("bulkChips").innerHTML = metrics.map((x) =>
+  $("bulkChips").innerHTML = !m ? "" : metrics.map((x) =>
     `<button type="button" class="bulk-chip${x.key === m.key ? " on" : ""}" data-metric="${escapeHtml(x.key)}">${escapeHtml(x.label)}</button>`).join("");
   $("bulkChips").querySelectorAll("[data-metric]").forEach((b) => {
     b.onclick = () => { BULK_METRIC = b.dataset.metric; again(); };
@@ -21355,11 +21377,13 @@ function renderBulkHero(on, profile, isPartner) {
   /* measurementSeries reads whatever column it is handed off the day row, and
      weight is a column on that same row, so the scale needs no separate path
      through any of this. */
-  const series = typeof measurementSeries === "function" ? (measurementSeries(name, m.key, weeks) || []) : [];
-  const sum = typeof measurementSummary === "function" ? measurementSummary(name, m.key, weeks) : null;
+  const series = m && typeof measurementSeries === "function" ? (measurementSeries(name, m.key, weeks) || []) : [];
+  const sum = m && typeof measurementSummary === "function" ? measurementSummary(name, m.key, weeks) : null;
   const stats = $("bulkStats");
 
-  if (!series.length || sum?.now == null) {
+  if (!m) {
+    nothingTrackedStats(stats);
+  } else if (!series.length || sum?.now == null) {
     stats.innerHTML = `<div class="wth-now">
       <div class="wth-eyebrow">${escapeHtml(m.label)}</div>
       <div class="end-none">No readings yet</div>
@@ -21433,14 +21457,18 @@ function renderBulkHero(on, profile, isPartner) {
   }
 
   el.querySelector(".chart-wrap").classList.toggle("hidden", !series.length);
-  $("bulkEmpty").classList.toggle("hidden", !!series.length);
-  $("bulkEmpty").textContent = m.key === "weight"
+  /* Both of these are about a metric, so with no metric left they say nothing
+     rather than inviting a measurement the picker was just told not to show:
+     a range pill over no line is a control of nothing. */
+  $("bulkEmpty").classList.toggle("hidden", !m || !!series.length);
+  $("bulkEmpty").textContent = !m ? "" : m.key === "weight"
     ? "Log a check-in to start the line."
     : `Measure your ${m.label.toLowerCase()} to start the line.`;
   if (bulkChart) { bulkChart.destroy(); bulkChart = null; }
   if (series.length) bulkChart = goalLineChart("bulkChart", series, isPartner, m.unit, () => bulkChart);
 
-  $("bulkRange").innerHTML = BULK_RANGES.map(([k]) =>
+  $("bulkRange").classList.toggle("hidden", !m);
+  $("bulkRange").innerHTML = !m ? "" : BULK_RANGES.map(([k]) =>
     `<button type="button" class="wt-pill${k === BULK_RANGE ? " on" : ""}" data-range="${k}">${k}</button>`).join("");
   $("bulkRange").querySelectorAll("[data-range]").forEach((b) => {
     b.onclick = () => { BULK_RANGE = b.dataset.range; again(); };
@@ -40101,6 +40129,54 @@ function trackedMetrics(goalId = null) {
   return TRACK_DEFAULTS[bubble] || ["weight"];
 }
 const isTracked = (key, goalId = null) => trackedMetrics(goalId).includes(key);
+
+/* THE CHIP STRIP AT THE TOP OF A GOAL SCREEN, for every screen that has one.
+
+   A goal screen is born with a set of readings it leads on, and this narrows
+   that set to the ones the person actually asked for. Deselecting a tile and
+   still seeing its chip is the bug Mo hit twice, the second time in as many
+   words: "I only want to track my weight, I still see chest arms and thighs."
+   The cards below the strip obeyed him from the day the picker shipped; the
+   strip above them consulted nothing at all.
+
+   weight is a key in tracked_metrics exactly like the tape is, so "only
+   weight" is a sayable answer and comes back as one chip. Anything else they
+   track that this screen can chart follows the screen's own, in the order the
+   picker stores it, so a measurement kept on from another goal is not silently
+   dropped from the one place it could be read.
+
+   A partner's strip is the screen's own set: tracked_by_goal is your column
+   and not theirs, so filtering their screen through your choices would be
+   answering their question with your preferences.
+
+   An empty answer comes back empty. Somebody who turned everything off meant
+   it, and the caller draws that rather than quietly refilling the row, which
+   is what the fallback in the tone hero did before this. */
+const STRIP_METRICS = [{ key: "weight", label: "Weight", unit: "lb" }].concat(MEASUREMENTS);
+function goalStripMetrics(screenKeys, isPartner, goalId = null) {
+  const metric = (k) => STRIP_METRICS.find((m) => m.key === k);
+  if (isPartner) return screenKeys.map(metric).filter(Boolean);
+  const want = trackedMetrics(goalId);
+  return screenKeys.filter((k) => want.includes(k))
+    .concat(want.filter((k) => !screenKeys.includes(k)))
+    .map(metric).filter(Boolean);
+}
+
+/* And what a goal screen puts in its card when that comes back empty. Nothing
+   tracked is an answer, not a gap, so the screen says so and offers the way
+   back in rather than drawing a strip of chips nobody asked for over a chart
+   of none of them. The door is the same control the goal row carries, said in
+   words here because at this point the screen has nothing else on it to
+   explain the icon by. Through the lens, like every other reader on the tab,
+   so it edits the goal being looked at rather than the main one. */
+function nothingTrackedStats(host) {
+  host.innerHTML = `<div class="wth-now">
+    <div class="wth-eyebrow">This goal</div>
+    <div class="tone-none">Nothing tracked</div>
+    <button type="button" class="btn-ghost" data-track-open>Choose what to track</button>
+  </div>`;
+  host.querySelector("[data-track-open]").onclick = () => openTrackSheet(PROGRESS_GOAL_LENS || null);
+}
 /* Weight is a column on the same day row, so the check-in sheet can carry it
    as one more row and saveMeasurements writes it with the rest, no special
    case anywhere. */
