@@ -1158,7 +1158,15 @@ const inDefaultPool = (ex, role) =>
    holds, so they cost a little. Bodyweight cannot be loaded at all, so it costs
    3, which is enough to lose to the hardest movement in the pool (2, the top of
    MOVEMENT_RANK) and never enough to outrank the -100 for something they already
-   lift. Every other emphasis keeps the conservative tie break it had. */
+   lift.
+
+   Since 2026-09-21 a second thing reads it: somebody who told us on the styles
+   sheet which implements they have. See `preferLoadable` in `candidates`. It is
+   the same argument arriving from the other side. The one above is about what a
+   GOAL needs, this one is about what a PERSON said is in the room, and both end
+   at the same sentence, that a movement you cannot add weight to is a poor use
+   of a rack you own. Every emphasis with nothing declared keeps the
+   conservative tie break it had. */
 const LOAD_PENALTY = { barbell: 0, machine: 0, bodyweight: 3 };
 const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
 
@@ -1172,8 +1180,14 @@ const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
  *
  * What is gone is the ceiling: `(LEVEL_RANK[level] ?? 0) + (role === "main" ? 2 : 1)`,
  * a number on the person added to a number on the slot and compared against a
- * number on the movement. */
-function candidates({ groups, pattern, equipment, role = "accessory", earned = null, historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null, hurtOut = null }) {
+ * number on the movement.
+ *
+ * `preferLoadable` is the equipment axis, and it is NOT eligibility. Everything
+ * above stays exactly as it was: what a person may be handed is still what they
+ * earned or what is safe to open with. It only decides which of the movements
+ * they were already allowed to see sorts first, and it reads a fact they told
+ * us rather than one we guessed. See buildPlan's `declaredEquipment`. */
+function candidates({ groups, pattern, equipment, role = "accessory", earned = null, historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null, hurtOut = null, preferLoadable = false }) {
   const isEarned = (ex) => Boolean(earned && earned.has(ex.name.toLowerCase()));
   const match = (needPattern) => {
     const pool = [];
@@ -1217,7 +1231,11 @@ function candidates({ groups, pattern, equipment, role = "accessory", earned = n
             library has nothing loadable the bodyweight movement still wins its
             slot rather than the slot going empty. */
     const known = new Set(historyNames);
-    const wantsLoad = emphasis === "strength" && role === "main";
+    /* Two ways to end up preferring something loadable, and they are different
+       claims. The goal's: a strength main lift has to be loadable or it is not
+       a strength plan. The person's: they told us what is in the room, so the
+       simplest movement that USES it beats the simplest movement overall. */
+    const wantsLoad = (emphasis === "strength" && role === "main") || preferLoadable;
     return pool
       .map((e) => {
         const lv = MOVEMENT_RANK[e.level] ?? MOVEMENT_RANK.advanced;
@@ -1276,7 +1294,7 @@ function candidates({ groups, pattern, equipment, role = "accessory", earned = n
 
 export function buildPlan({
   goal, person = {}, logs: rawLogs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
-  limits = null, avoid = [],
+  limits = null, avoid = [], declaredEquipment = null,
 } = {}) {
   /* `ageCaution` defaults to 1, the careful end, and not 0. The adapter reads
      an unknown age as 1 (CONTRACT.md: the age-unknown default looks like the
@@ -1523,6 +1541,35 @@ export function buildPlan({
   const kit = kitAllowed
     ? (equipment ? equipment.filter((e) => kitAllowed.includes(e)) : kitAllowed)
     : equipment;
+
+  /* Did they TELL US what is in the room, and is any of it loadable?
+   *
+   * The bug this answers, in the owner's words: "In the How You Train section I
+   * have With Equipment and Yoga, but I'm getting Without Equipment exercises."
+   * He was right and the equipment filter was not the culprit. `lifting` was
+   * defined as the absence of a restriction, so it subtracted nothing and
+   * therefore did nothing, while the tie break below prefers the simplest
+   * movement and the library tags the bodyweight version of nearly every
+   * pattern beginner and the loaded version intermediate. A man with a gym was
+   * handed Push-Up, Inverted Row and Plank because he was new HERE, and the
+   * only way out was to log a bench press he was never prescribed.
+   *
+   * Equipment access and movement readiness are two axes and this engine had
+   * one. So `declaredEquipment` is the second: it never widens what somebody is
+   * eligible for, which is still `earned` plus the safe default pool, and it
+   * never survives the kit filter above, which is a fact about their room and
+   * still wins. It only reorders what they were already allowed to be shown, so
+   * that the slot picks the simplest movement THAT USES WHAT THEY HAVE rather
+   * than the simplest movement in the library.
+   *
+   * Null means nobody asked, and null changes nothing. Every account made
+   * before the styles column existed, every caller of buildPlan that does not
+   * pass it, and CONTRACT.md's promise that a missing train_styles builds
+   * exactly the week it built before, all ride on that. An implement list of
+   * bodyweight alone, which no style on the sheet produces today, also changes
+   * nothing: there is no rack to prefer. */
+  const declared = Array.isArray(declaredEquipment) ? declaredEquipment : null;
+  const preferLoadable = Boolean(declared && declared.some((e) => e && e !== "bodyweight"));
   /* One set into the one `exclude` parameter, so there is still exactly one
      path into selection and the rotation and the limits cannot fight. */
   /* Movements the caller wants a different answer than. This engine is
@@ -1664,7 +1711,7 @@ export function buildPlan({
     let taken = 0;
     const picks = slots.map((slot) => {
       if (isShort && slot.role !== "main" && taken >= SHORT_DAY_MIN) return null;
-      const args = { ...slot, earned, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, hurtOut: limitOut, emphasis: P.emphasis };
+      const args = { ...slot, earned, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, hurtOut: limitOut, emphasis: P.emphasis, preferLoadable };
       const pool = candidates({ ...args, barred: goalBarred });
       if (!pool.length) {
         /* Empty for want of equipment is an old and quiet case, handled by
