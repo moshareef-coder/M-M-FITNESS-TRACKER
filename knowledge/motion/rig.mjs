@@ -1087,8 +1087,8 @@ function drawHead(ctx, S, C, fill) {
         // drawMarkFace above). Everything else below, mouth, grille, chin
         // light, ear disc, the tiny-size fallback, is shared and unchanged,
         // because Mo's approved design in the film keeps buddy's mouth and
-        // only replaces the eyes. It only takes over face on (latLen < 0.28
-        // is the same test buddy already uses to wrap its own visor to the
+        // only replaces the eyes. It only takes over face on (sideOn, below,
+        // is the same call buddy already makes to wrap its own visor to the
         // front of the head): a profile version existed for a while
         // (drawMarkEye, see the note above drawMarkFace) but needed a
         // different size and position on nearly every pose to look right,
@@ -1103,11 +1103,24 @@ function drawHead(ctx, S, C, fill) {
         // Side on, the visor wraps only the FRONT half of the head, the way
         // the reference draws it, with the ear clear behind it. Face on it
         // spans the face.
-        const sideOn = latLen < 0.28;
+        //
+        // latLen alone got this wrong for a body lying flat: Frog Pump, Plank,
+        // Push-Up, Hip Thrust all read as latLen >= 0.28 (face on) even though
+        // every one of them declares its own camera as view: "side" (or, for
+        // Frog Pump, plane: "sagittal", the anatomical name for the same
+        // thing), and even though every one of them is visibly a side view.
+        // The move already knows what its own camera is; latLen is a derived
+        // guess from the neck's projected axes, which a body rotated flat onto
+        // its back or front can fool. Mo: "frog pump looks weird... this
+        // should be a side view." Measured, not assumed: checked Push-Up,
+        // Plank and Hip Thrust too before concluding this was systemic rather
+        // than a one-off. The declared view wins when the two disagree.
+        const sideOn = latLen < 0.28
+          || VIEW_HINT === "side" || (VIEW_HINT && VIEW_HINT.plane === "sagittal");
         const vis = add(eyeLine, scl(F, R * (sideOn ? 0.72 : 0.66)));
         const halfW = R * (sideOn ? 0.5 : 0.8), halfH = R * 0.42;
-        const along = latLen < 0.28 ? scl(F, 0.9) : Lt;     // visor runs across the face, or along it side on
-        const alongLen = latLen < 0.28 ? 0.9 : latLen;
+        const along = sideOn ? scl(F, 0.9) : Lt;     // visor runs across the face, or along it side on
+        const alongLen = sideOn ? 0.9 : latLen;
         const a = add(vis, scl(along, halfW)), b = add(vis, scl(along, -halfW));
         const useMark = FACE === "mark" && !sideOn;
         ctx.fillStyle = C.seam;
@@ -1120,11 +1133,11 @@ function drawHead(ctx, S, C, fill) {
           // two soft lime marks inside the band so it still reads as a face
           ctx.fillStyle = lime;
           const e1 = add(vis, scl(along, R * 0.3)), e2 = add(vis, scl(along, -R * 0.3));
-          for (const e of (latLen < 0.28 ? [vis] : [e1, e2])) { ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.16, 0, Math.PI * 2); ctx.fill(); }
+          for (const e of (sideOn ? [vis] : [e1, e2])) { ctx.beginPath(); ctx.arc(e.x, e.y, R * 0.16, 0, Math.PI * 2); ctx.fill(); }
           ctx.restore();
           return;
         }
-        const eyeSpread = R * 0.36 * (latLen < 0.28 ? 0.35 : 1);
+        const eyeSpread = R * 0.36 * (sideOn ? 0.35 : 1);
         const eyeAt = [add(vis, scl(along, eyeSpread)), add(vis, scl(along, -eyeSpread))];
         const eyeH = R * 0.26, eyeW = R * 0.105;
         const mood = MOOD || "neutral";
@@ -1161,7 +1174,7 @@ function drawHead(ctx, S, C, fill) {
           }
         }
         }
-        if (big && latLen >= 0.28) {
+        if (big && !sideOn) {
           // grille: three short dashes just outside each eye
           ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = R * 0.045; ctx.lineCap = "round";
           for (const sign of [1, -1]) for (let k = -1; k <= 1; k++) {
@@ -1173,7 +1186,7 @@ function drawHead(ctx, S, C, fill) {
         // rest, straight when focused or neutral, a small ring when surprised
         const mouthAt = add(add(centre, scl(F, R * 0.7)), scl(up, -R * 0.42));
         ctx.strokeStyle = C.seam; ctx.lineWidth = R * 0.05; ctx.lineCap = "round";
-        const mw = R * 0.16 * (latLen < 0.28 ? 0.5 : 1);
+        const mw = R * 0.16 * (sideOn ? 0.5 : 1);
         if (mood === "surprised") {
           ctx.beginPath(); ctx.arc(mouthAt.x, mouthAt.y, R * 0.06, 0, Math.PI * 2); ctx.stroke();
         } else {
@@ -3021,11 +3034,16 @@ function outline(ctx, C, segs) {
 export const STYLE = { face: "buddy", mood: "neutral", lines: false };
 export function setStyle(o = {}) { Object.assign(STYLE, o); return STYLE; }
 
-let FACE = STYLE.face, MOOD = STYLE.mood, LINES_TORSO = STYLE.lines;
+let FACE = STYLE.face, MOOD = STYLE.mood, LINES_TORSO = STYLE.lines, VIEW_HINT = null;
 export function drawFigure(ctx, S, C, opts = {}) {
   FACE = opts.face !== undefined ? opts.face : STYLE.face;
   MOOD = opts.mood !== undefined ? opts.mood : STYLE.mood;
   LINES_TORSO = opts.lines !== undefined ? opts.lines : STYLE.lines;
+  // The move's own declared camera, "side" or { plane: "sagittal" }, passed
+  // down from render()'s `view`. Used below only to catch the cases the
+  // geometric test (latLen, the neck axis actually projected to screen)
+  // gets wrong for a body lying flat: see the note above the face block.
+  VIEW_HINT = opts.view !== undefined ? opts.view : null;
   if (opts.floor !== false) drawFloor(ctx, C, S);
   drawProps(ctx, C, opts.props, S, "back");
   const near = S.frontal ? (S.farSide === "R" ? "L" : "R") : "R";
@@ -3314,7 +3332,7 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   drawFigure(ctx, S, C, {
     props, floor: move.floor, lit,
     grip: gripSides(move, S),
-    face: opts.face, mood: opts.mood, lines: opts.lines,
+    face: opts.face, mood: opts.mood, lines: opts.lines, view,
   });
   return S;
 }
