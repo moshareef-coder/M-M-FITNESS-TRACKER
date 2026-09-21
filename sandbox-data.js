@@ -170,8 +170,15 @@
             duration_min, distance_mi, created_at: day(d) + "T06:15:00Z",
           }))),
       ],
+      /* `slot` says which plan within a day this is, 0 for the day's main
+         workout. It is there on every row because the fixture models the
+         database AFTER supabase/migrations/20260917_ai_workouts_slot.sql has
+         been run, which is the world this app has to be right in; the app also
+         has to work before it is run, and that half is the retry in
+         upsertPlanRow, which a fixture cannot exercise because it never
+         refuses a column. */
       ai_workouts: [
-        { id: "w1", email: ME, entry_date: day(0), archived: false, focus: "Push Day", created_at: day(0) + "T05:00:00Z", exercises: pushWorkout,
+        { id: "w1", email: ME, entry_date: day(0), archived: false, slot: 0, focus: "Push Day", created_at: day(0) + "T05:00:00Z", exercises: pushWorkout,
           /* The engine's timed blocks ride on the row apart from `exercises`
              (ai_workouts.mobility). Two moves each, short, so a walkthrough
              reaches the first lift in under a minute. */
@@ -207,14 +214,14 @@
            cannot show what Plan your week is for: rearranging the days. A gap
            between them is deliberate too, so a drag has an empty day to cross
            and to land on. */
-        { id: "w2", email: ME, entry_date: day(1), archived: false, focus: "Pull Day", created_at: day(0) + "T05:00:00Z",
+        { id: "w2", email: ME, entry_date: day(1), archived: false, slot: 0, focus: "Pull Day", created_at: day(0) + "T05:00:00Z",
           exercises: [
             { name: "Lat Pulldown", sets: 4, reps: 10, targetWeight: 130 },
             { name: "Seated Cable Row", sets: 3, reps: 12, targetWeight: 120 },
             { name: "Face Pull", sets: 3, reps: 15, targetWeight: 40 },
             { name: "Barbell Curl", sets: 3, reps: 10, targetWeight: 60 },
           ] },
-        { id: "w3", email: ME, entry_date: day(3), archived: false, focus: "Leg Day", created_at: day(0) + "T05:00:00Z",
+        { id: "w3", email: ME, entry_date: day(3), archived: false, slot: 0, focus: "Leg Day", created_at: day(0) + "T05:00:00Z",
           exercises: [
             { name: "Barbell Back Squat", sets: 4, reps: 6, targetWeight: 245 },
             { name: "Romanian Deadlift", sets: 3, reps: 10, targetWeight: 185 },
@@ -420,7 +427,7 @@
       label: "Activity planned by hand",
       apply: (db) => {
         const byHand = (date, id, focus, act, mode) => ({
-          id, email: ME, user_name: "Mo", entry_date: date, archived: false,
+          id, email: ME, user_name: "Mo", entry_date: date, archived: false, slot: 0,
           focus, exercises: [], mobility: null,
           cardio: { session: { name: focus, act, mode } },
           created_at: day(0) + "T05:00:00Z", completed_at: null, duration_sec: null,
