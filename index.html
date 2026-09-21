@@ -32917,7 +32917,7 @@ function renderChooseScreen() {
   const actBtn = $("chooseActivityBtn");
   if (actBtn) actBtn.onclick = () => openCardioSession();
   if ($("wktGenWeekBtn")) $("wktGenWeekBtn").onclick = generateTheWeek;
-  if ($("wktPlanWeekBtn")) $("wktPlanWeekBtn").onclick = () => goWorkoutScreen("week");
+  if ($("wktPlanWeekBtn")) $("wktPlanWeekBtn").onclick = openWeekPlanner;
   /* The card said the words and then could not do anything about them. It now
      opens the screen that can: the stretches for what was trained, and the
      numbers behind eat, drink and sleep. */
@@ -33771,6 +33771,30 @@ function endStretchSession() {
    since planning a day that has already happened is not planning. */
 let WEEK_OFFSET = 0;
 
+/* WHICH WEEK THE PLANNER OPENS ON. Mo, 2026-09-20: "when I press 'Plan the
+   week myself', it takes me to my week and my day. No, take me to the next
+   week, and for me to be able to see it immediately."
+
+   He said it on a Sunday, which is the case that makes it obvious: this week
+   is six days he has already lived plus today, the green button above the link
+   already says "Generate next week", and the planner opened on seven rows,
+   six of them greyed out and disabled. Not a hard rule of "always next week"
+   though, because on a Wednesday with Thursday and Friday empty this week is
+   exactly the week he means. The rule is the first week that still has a day
+   free to put something on, read the same way weekGenDays() reads a day, so
+   the link and the button beside it are never about different weeks. */
+function planEntryOffset() {
+  const free = planWeekDays(0).some((d) =>
+    !d.past && !d.done && !d.trained && !d.plan && !(sessionOpen() && d.isToday));
+  return free ? 0 : 1;
+}
+
+/* The one door into the planner, so every way in agrees about the week. */
+function openWeekPlanner() {
+  WEEK_OFFSET = planEntryOffset();
+  goWorkoutScreen("week");
+}
+
 function planWeekStart(offset = WEEK_OFFSET) {
   const d = new Date(todayStr() + "T00:00:00");
   const dow = d.getDay();                 // 0 is Sunday
@@ -34265,6 +34289,11 @@ async function generateTheWeek() {
   await loadAll();
   await loadTodayWorkout();
   renderHero();
+  /* Point the strip at the week that was just built, before the tab redraws.
+     A Sunday press of this button writes seven days of next week, and the
+     strip behind the card stopped at today, so the honest answer to "show me
+     what you built" was a week with none of it on it. */
+  if (weekGenNext()) { HISTORY_WEEK = 1; HISTORY_MONTH = weekMonthOffset(); }
   renderWorkoutTab();
 
   const built = rows.filter((r) => r.state === "done");
@@ -34325,7 +34354,7 @@ function openWeekGenCard(rows) {
         <button type="button" class="btn-ghost" id="wgCloseBtn">I'll look later</button>`;
       const close = () => scrim.remove();
       scrim.querySelector("#wgCloseBtn").onclick = close;
-      scrim.querySelector("#wgSeeBtn").onclick = () => { close(); goWorkoutScreen("week"); };
+      scrim.querySelector("#wgSeeBtn").onclick = () => { close(); openWeekPlanner(); };
       scrim.onclick = (e) => { if (e.target === scrim) close(); };
     },
   };
