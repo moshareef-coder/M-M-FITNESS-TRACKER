@@ -17,7 +17,7 @@
 //   4. a prop type nothing draws, which fails silently
 
 import { TRAININGS } from "../exercise-library/index.mjs";
-import { MOVES_BY_LIBRARY, MOVE_NAMES, IDLES } from "./index.mjs";
+import { MOVES_BY_LIBRARY, MOVE_NAMES, IDLES, MACHINE_MOVES } from "./index.mjs";
 import { solvePose, samplePose, jointAngles, GROUND, PROP_TYPES, LOOPS, VIEWS, PRESETS, BODY_KINDS } from "./rig.mjs";
 
 const allowMissing = process.argv.includes("--allow-missing");
@@ -244,6 +244,12 @@ for (const [id, lib] of Object.entries(MOVES_BY_LIBRARY)) {
 const idleNames = Object.keys(IDLES);
 for (const name of idleNames) checkMove(`idle/${name}`, IDLES[name]);
 lines.push(`  ${"idle".padEnd(16)} ${String(idleNames.length).padStart(3)} rest antics, not library moves`);
+// And the machine variants, for the same reason: a treadmill run is keyed by
+// the machine rather than by a session name, because the library has no indoor
+// run to name it after. The pose still has to be a pose.
+const machineNames = Object.keys(MACHINE_MOVES);
+for (const name of machineNames) checkMove(`machine/${name}`, MACHINE_MOVES[name]);
+lines.push(`  ${"machine".padEnd(16)} ${String(machineNames.length).padStart(3)} machine variants, not library moves`);
 
 console.log("motion validate\n");
 console.log(lines.join("\n"));

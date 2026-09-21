@@ -21,7 +21,7 @@ import { MOVES as YOGA } from "./moves/yoga.mjs";
 import { MOVES as PILATES } from "./moves/pilates.mjs";
 import { MOVES as CALISTHENICS } from "./moves/calisthenics.mjs";
 import { MOVES as STRETCHING } from "./moves/stretching.mjs";
-import { MOVES as CARDIO } from "./moves/cardio.mjs";
+import { MOVES as CARDIO, MACHINE_MOVES as CARDIO_MACHINES } from "./moves/cardio.mjs";
 import { MOVES as IDLE } from "./moves/idle.mjs";
 
 export { palette, render, samplePose, solvePose, jointAngles, cameraFor, litIntensity, VB, GROUND,
@@ -81,6 +81,14 @@ export const MOVE_NAMES = Object.keys(ALL).sort();
 export const IDLES = IDLE;
 export const IDLE_NAMES = Object.keys(IDLE);
 Object.assign(ALL, IDLE);
+
+/* Same deal for the machine variants: mountable by name, not library entries.
+ * A treadmill run is the library's own Easy Run on a belt, and the library has
+ * no name for that because it has no indoor run at all, so the app asks for it
+ * by the machine it is standing on. moves/cardio.mjs has the long version. */
+export const MACHINE_MOVES = CARDIO_MACHINES;
+export const MACHINE_MOVE_NAMES = Object.keys(CARDIO_MACHINES);
+Object.assign(ALL, CARDIO_MACHINES);
 export const hasMove = (name) => moveFor(name) !== null;
 // Names that older plans and logs use for a move the library files under a
 // longer name. A row with an unknown name keeps its old icon, so the miss is

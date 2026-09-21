@@ -187,6 +187,34 @@ export const WALK = {
   ],
 };
 
+/* The same two gaits, on the machine that runs them indoors.
+ *
+ * Mo: "the running on a treadmill does not have a treadmill, which is a
+ * problem." He is right, and it was a hole rather than a decision: the app has
+ * offered a Treadmill activity since the picker was written, and it drew the
+ * outdoor run, so somebody standing on a machine was shown a man running down
+ * a road. The bike and the stepmill have had their machines since the day they
+ * were authored; running was the mode that got a floor line.
+ *
+ * THE GAIT IS NOT TOUCHED. A treadmill changes nothing about how a person
+ * runs, so re-authoring the stride for it would be inventing a difference the
+ * picture cannot honestly make, and it would be two sets of keys to keep in
+ * step. The belt was drawn to meet the feet where RUN already puts them
+ * instead, which is why these are a spread and a prop and nothing else.
+ *
+ * `floor: false` because the machine carries its own. See treadmill.svg: the
+ * belt sits where the feet land, so it is BELOW the rig's floor line, and the
+ * rig's line would be drawn straight across the deck.
+ *
+ * Outdoors is deliberately left alone. Run outside and Treadmill are two rows
+ * in the activity picker because they are two different things to choose, and
+ * the whole point of drawing the machine is that the person on one can see
+ * which of the two the app thinks they are doing.
+ */
+const TREADMILL = [{ type: "artwork", src: "/knowledge/motion/props/treadmill.svg" }];
+export const RUN_TREADMILL = { ...RUN, floor: false, props: TREADMILL };
+export const WALK_TREADMILL = { ...WALK, floor: false, props: TREADMILL };
+
 /* Pedalling, side on, seated on an upright bike.
  *
  * What the real movement looks like: the hips stay still on the saddle, the
@@ -338,8 +366,33 @@ export const MOVES = {
   "Progression Run": RUN,
   "Long Run": RUN,
   "Brisk Walk": WALK,
-  "Incline Walk": WALK,
+  /* The one walking session the library writes for a machine: `indoor`
+     true, `equipment` machine, and a cue about not holding the rails.
+     That is a treadmill, so it gets one. */
+  "Incline Walk": WALK_TREADMILL,
   "Long Walk": WALK,
   "Recovery Walk": WALK,
   "Hike": WALK,
+};
+
+/* Keyed by the MACHINE, not by a session, and that is the whole reason it is a
+   second map rather than another line above.
+ *
+ * The library has no indoor run in it. Every running session it holds is
+ * written for outside, and the app knows that and says so on screen: a
+ * treadmill borrows the outdoor rows and relaxes the venue. So "Easy Run" is
+ * the right name for what somebody on a treadmill is DOING, and there is no
+ * session name left that means "that, on a belt".
+ *
+ * Which is exactly the case the validator refuses, and rightly: a key in MOVES
+ * that is not an exercise in the library is normally a typo nothing will ever
+ * ask for. This one is asked for, by activity key rather than by session name,
+ * the way moves/idle.mjs is asked for by antic. Same shape, same reason, and
+ * validate.mjs checks the poses here without checking the names against a
+ * library they were never meant to be in.
+ *
+ * Only the run is here. The treadmill walk has a library name of its own
+ * ("Incline Walk") and is keyed above with the rest of them. */
+export const MACHINE_MOVES = {
+  "Treadmill Run": RUN_TREADMILL,
 };

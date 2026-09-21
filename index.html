@@ -3115,7 +3115,28 @@
   .sess-stage-main {
     position: relative; flex: 1 1 auto; min-height: 0;
     display: flex; align-items: center; justify-content: center;
-    padding-bottom: var(--quip-strip, 86px);
+    /* Not the whole strip. What the figure has to stay out of is the BUBBLE,
+       which measures 75px in the 86px slot, and the bottom of the drawing is
+       empty anyway: the rig's box is 140 units with the floor at 118, and the
+       deepest ink any of the 283 authored moves puts on the canvas is 127
+       (a Goblet Squat, whose own fit pushes the floor down). So the last 9% of
+       the canvas is blank by construction, and reserving the full strip on top
+       of it was reserving that blankness twice.
+       Measured rather than guessed, because the whole figure is sized off what
+       is left here: the canvas is `min(400px, 94vw, 100%)` and on a 390x844
+       phone it is the 100% that binds, so every pixel taken off this padding is
+       a pixel of robot. Mo: "the animation looks so tiny". This is where the
+       tiny came from. */
+    padding-bottom: var(--quip-strip-clear, 56px);
+  }
+  /* A short screen is the one place the sum above stops working. The clearance
+     is a flat number and the emptiness it is spending is a FRACTION of the
+     canvas, so the shorter the stage the less that 9% buys: measured on a
+     375x667 phone the stage is 172px and a squat's feet finished 18px inside
+     the bubble. Given back below 800px of viewport, where it is still ahead of
+     where it started (a 96px canvas against the 86px this used to allow). */
+  @media (max-height: 800px) {
+    .sess-stage-main { padding-bottom: var(--quip-strip-clear, 76px); }
   }
   /* A layer, not a row: taking it out of the column is the whole fix. Clicks
      pass through the empty parts so nothing behind it goes dead. */
@@ -3142,8 +3163,16 @@
      stage off the icon. See stageFigure for why the icon is what a mode with
      nothing authored shows. */
   .sess-stage:has(.fig-live) .sess-stage-none { display: none; }
+  /* Three caps, and on a phone it is the third that bites: measured on a
+     390x844 session, the stage leaves 217px of height and 88vw would have
+     allowed 343, so raising the width caps alone moves nothing. They are
+     raised anyway because the stretch and cool-down stages are taller and a
+     tablet is taller still, and 360px/88vw held the canvas back there for no
+     reason. The height a figure is actually drawn at is this box divided by
+     the rig's 140 units, so this rule and the padding above it are the whole
+     of how big the robot looks. */
   .sess-fig.sess-fig-stage canvas {
-    width: auto; height: min(360px, 88vw, 100%); max-width: 88vw; aspect-ratio: 1 / 1;
+    width: auto; height: min(400px, 94vw, 100%); max-width: 94vw; aspect-ratio: 1 / 1;
   }
 
   /* Resting. The figure steps to the right and the rest clock takes the left
@@ -22430,11 +22459,34 @@ function activityWhy(act, profile, isRec) {
    marks it `fig-none` and the activity's icon takes the stage, which is what
    every mode left out of this list already gets. */
 const CSN_CLOCK_FIG = {
-  run: "Easy Run", treadmill: "Easy Run",
+  run: "Easy Run",
   walk: "Brisk Walk",
   cycle: "Easy Ride", bikemachine: "Easy Ride",
   stairs: "Stair Intervals",
   yoga: "Mountain Pose", pilates: "Mountain Pose",
+};
+
+/* What you are standing ON, which beats what the session is called.
+ *
+ * Everything above answers "the clock is bare, what is this activity". This
+ * answers a different question, and it has to win even when a session WAS
+ * built: the library holds no indoor run, so a treadmill borrows the outdoor
+ * rows and the card comes back saying Easy Run or Tempo Run. Those are the
+ * right words for the work. They are the wrong picture, because the person is
+ * on a belt with a console in front of them, and until today the app drew them
+ * running down a road. Mo: "the running on a treadmill does not have a
+ * treadmill, which is a problem."
+ *
+ * So the machine decides the drawing and the session still decides the minutes
+ * and the effort. Run outside is untouched and stays propless, which is the
+ * distinction the two rows in the picker exist to make.
+ *
+ * "Treadmill Run" is not a library session, it is a machine variant keyed in
+ * knowledge/motion/moves/cardio.mjs; that file says why it cannot be one. The
+ * treadmill WALK needs no line here, because Incline Walk is a library name
+ * and is keyed straight to the machine gait. */
+const CSN_ACT_FIG = {
+  treadmill: "Treadmill Run",
 };
 
 /* Effort is a 1 to 10 rating of perceived exertion, which is the scale the
@@ -23115,6 +23167,11 @@ function renderActivityLive(a, stage) {
      way `data-fig="Tree Pose"` mounts the pose. A bare clock names nothing, so
      it falls back to what this activity IS.
 
+     And a machine gets checked BEFORE the session name, which is the one place
+     the order matters: a treadmill's session is called Easy Run because the
+     library has nothing else to call it, and the picture owed is a belt and a
+     console rather than a road. CSN_ACT_FIG is that list and says why.
+
      AND WHERE THERE IS NOTHING TO DRAW, NOTHING IS DRAWN. Nineteen of the
      library's twenty seven cardio sessions have a gait; the eight that do not
      are rowing, swimming, the elliptical, HIIT and the rope, and until today
@@ -23131,7 +23188,7 @@ function renderActivityLive(a, stage) {
      mo-knowledge/LIBRARY-REQUESTS.md. */
   const figName = plan
     ? (move?.name || (done ? "Rest: Towel" : ""))
-    : (card?.name || CSN_CLOCK_FIG[a.key] || "");
+    : (CSN_ACT_FIG[a.key] || card?.name || CSN_CLOCK_FIG[a.key] || "");
   const stageFigure = `
     <div class="sess-fig sess-fig-stage" data-fig="${escapeHtml(figName)}" data-theme="light" ${paused || done ? "data-fig-static" : ""}></div>
     <div class="sess-stage-none" aria-hidden="true">${icon(a.ico || "heart", 72)}</div>`;
