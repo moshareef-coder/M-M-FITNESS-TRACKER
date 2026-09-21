@@ -39573,6 +39573,11 @@ function bodyRiveLevel(pct) {
 const BODY_HEAT_STOPS = [
   [0, 242, 208, 36], [0.34, 245, 155, 31], [0.67, 224, 82, 31], [1, 168, 20, 20],
 ];
+/* The one colour a free account's figure is allowed to show. The app's own
+   accent, --accent / --down, already means "this went well" everywhere else
+   a muscle lighting up is not borrowing a colour from nothing, it is the same
+   one the streak flame and every success state already use. */
+const BODY_HIT_GREEN = { r: 168, g: 255, b: 0 };
 function bodyHeatRGB(pct) {
   const p = Math.max(0, Math.min(1, pct));
   for (let i = 1; i < BODY_HEAT_STOPS.length; i++) {
@@ -40113,7 +40118,13 @@ async function renderBodyDiagram(animate) {
     const share = !g ? 0 : peak[g] > 0 ? (volumes[muscle] || 0) / peak[g] : 1;
     const pct = groupPct * share;
     target[muscle] = pct > 0 ? 4 : 0;
-    if (pct > 0) BODY_MUSCLE_COLOR[muscle] = bodyHeatRGB(pct);
+    /* Mo, 2026-09-21: the free figure says which muscles you hit, not how
+       hard. The ramp from yellow through to red IS the reading the rings and
+       "what to train next" are gated on, so painting it here for free would
+       hand over the same information through a side door. One flat colour
+       either says a muscle was worked or it says nothing; hired() decides
+       which fact the figure is allowed to tell. */
+    if (pct > 0) BODY_MUSCLE_COLOR[muscle] = hired() ? bodyHeatRGB(pct) : BODY_HIT_GREEN;
   }
 
   const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
