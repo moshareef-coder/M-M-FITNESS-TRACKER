@@ -436,6 +436,44 @@
       },
     },
 
+    /* Weigh-in sharing switched on, which is the ONLY way the Progress tab
+       draws a partner's weight. The base world deliberately has no
+       share_weigh_ins key at all, because that is what a profile looks like
+       until 20260920_share_weigh_ins.sql is run, and a fixture that quietly
+       adds the column would test a database nobody has. Both profiles get it,
+       so Settings > Partner shows the switch as well as Progress showing the
+       trend. */
+    weighInsShared: {
+      label: "Weigh-ins shared both ways",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => ({ ...p, share_weigh_ins: true }));
+      },
+    },
+
+    /* Her detail off AND her weigh-ins on, so the partner view has something
+       real to draw while every workout number beside it is withheld: the two
+       switches are independent and this is the case that proves it. */
+    weighInsOnlyShared: {
+      label: "Weigh-ins shared, workouts private",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => ({ ...p, share_weigh_ins: true,
+          share_workout_details: p.email === THEM ? false : p.share_workout_details }));
+      },
+    },
+
+    /* Her goal set to the one screen that lists a workout row by row: the
+       endurance hero prints every run with its distance and its clock on it,
+       which is exactly what the timeline withholds two taps away. With her
+       detail off, the partner view must not be able to reach it. */
+    partnerEndurancePrivate: {
+      label: "Partner runs, and keeps it private",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => p.email === THEM
+          ? { ...p, goal: "Build endurance", goal_bubble: "build-endurance", share_workout_details: false }
+          : p);
+      },
+    },
+
     livePrivate: {
       label: "Partner keeps it private",
       apply: (db) => {
