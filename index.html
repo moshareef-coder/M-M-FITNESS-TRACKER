@@ -2180,8 +2180,7 @@
      rather than being cut off at the first ellipsis. Same for the muscles a
      day trains: a list cut off at "lats, trap..." is the app hiding half its
      answer to "what is this day". */
-  #swapSheet .sv-row-meta, #swapDaySheet .sv-row-meta,
-  .day-pick .sv-row-meta { white-space: normal; overflow: visible; line-height: 1.35; }
+  #swapSheet .sv-row-meta, #swapDaySheet .sv-row-meta { white-space: normal; overflow: visible; line-height: 1.35; }
   .gen-err { font-size: 14px; color: rgba(255,255,255,.66); line-height: 1.5; margin: 12px 0 18px; }
   @media (prefers-reduced-motion: reduce) {
     .gen-scrim, .gen-scrim.leaving, .gen-grid { animation: none; }
@@ -21560,7 +21559,7 @@ function sessionOpen() {
 
 /* One session of a training that has a library. Level comes from how many of
    these they have already done, never from a question. */
-async function buildGuidedPlan(act, minutes) {
+async function buildGuidedPlan(act, minutes, { seed = todayStr() } = {}) {
   const engine = await ensureSessionEngine();
   const lib = (typeof EXERCISE_TRAININGS !== "undefined" ? EXERCISE_TRAININGS : null) || [];
   const training = lib.find((t) => t.id === act.training);
@@ -21571,8 +21570,10 @@ async function buildGuidedPlan(act, minutes) {
     level: engine.levelFromSessions(done),
     styleKey: (training.styles || [])[0]?.key || null,
     /* The date, so today's session is the same session all day and a different
-       one tomorrow. Deterministic, which is the rest of the engine's rule. */
-    seed: todayStr(),
+       one tomorrow. Deterministic, which is the rest of the engine's rule. The
+       day it is FOR, not the day it is built on: a class planned onto Thursday
+       is Thursday's class whether it was built on Monday or on the morning. */
+    seed,
     /* What they said hurts, the same column the lifting plan reads. Until
        2026-09-19 nothing was passed and a person who had ticked neck and
        lower back got Roll-Over and Jackknife in their Pilates class. */
@@ -21786,7 +21787,10 @@ function cardioPoolFor(lib, act, prefKey) {
    Seeded on the date and the preference, the same rule every other picker in
    this file keeps, so today asked twice comes back the same and moving the
    segment actually moves the session rather than reshuffling one band. */
-function pickCardioSession(pool, prefKey, actKey) {
+/* `seedDay` is the day the session is FOR, which is today for the clock and
+   Thursday for a Thursday somebody is planning. Same seed either way, so the
+   day planned on Monday is the day that opens on Thursday. */
+function pickCardioSession(pool, prefKey, actKey, seedDay = todayStr()) {
   if (!pool.length) return null;
   const sorted = [...pool].sort((a, b) =>
     (a.effort || 0) - (b.effort || 0)
@@ -21797,7 +21801,7 @@ function pickCardioSession(pool, prefKey, actKey) {
     : prefKey === "hard" ? sorted.slice(-third)
     : sorted.slice(third, Math.max(third + 1, sorted.length - third));
   const from = band.length ? band : sorted;
-  return from[cardioSeedIndex(`${todayStr()}|${actKey}|${prefKey}`, from.length)];
+  return from[cardioSeedIndex(`${seedDay}|${actKey}|${prefKey}`, from.length)];
 }
 
 /* What the library holds for an activity, cached per activity for the life of
@@ -21805,14 +21809,14 @@ function pickCardioSession(pool, prefKey, actKey) {
    somebody presses Generate and finds out. Cleared when the sheet closes. */
 let ACT_LIB_NOTES = {};
 
-async function buildCardioCard(act, prefKey) {
+async function buildCardioCard(act, prefKey, { seed = todayStr() } = {}) {
   if (!act?.cardio) return null;
   const lib = await ensureCardioLibrary();
   if (!lib?.cardioFor) return null;
   const pref = prefKey || defaultActivityPref();
   const { pool, note } = cardioPoolFor(lib, act, pref);
   ACT_LIB_NOTES[act.key] = note || "";
-  const pick = pickCardioSession(pool, pref, act.key);
+  const pick = pickCardioSession(pool, pref, act.key, seed);
   /* Nothing in the library rather than null, so the caller can say which
      machine came up empty instead of showing a generic failure. */
   if (!pick) return { missing: true, note };
@@ -31890,11 +31894,19 @@ function scoredSuggestableDays() {
   });
 }
 
+/* The line under the match figure, on the workout tab and on the plan screen.
+   Mo, 2026-09-20: "the subtext for the match inside of the workout is way too
+   much. Just make it simple, dude." It was two sentences, the second of them
+   advice: what the number means and then what to do about it, under a ring
+   that is already tappable for the whole working. One clause each now. The
+   advice it dropped is not lost, it is said where it can actually be acted on:
+   the rest recommendation on the card below 45, and matchNoteFor behind the
+   ring. */
 function matchReading(pct) {
-  if (pct >= 80) return "Everything here is rested. Good day to push.";
-  if (pct >= 65) return "Lands on what your week has had least of.";
-  if (pct >= 50) return "Reasonable fit. Some of this has had work already.";
-  return "Most of this is already worked. Go lighter, or swap the focus.";
+  if (pct >= 80) return "Everything here is rested.";
+  if (pct >= 65) return "Lands where your week is lightest.";
+  if (pct >= 50) return "Some of this is already worked.";
+  return "Most of this is already worked.";
 }
 /* Mo: "when I click on the percentage match, then it should show me why it's a
    low match." So the ring is a button, and this is what it says.
@@ -32760,11 +32772,15 @@ function renderChooseScreen() {
      card, which IS its preview, and Start the clock is one tap further: one
      preview, not two. */
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = () => goWorkoutScreen(null);
-  /* Planning your own for a day that is not today is the day planner's job,
-     not the manual builder's: the builder writes to today. That planner asks
-     lifting or activity already, which is the same question openPlanKind asks
-     for today, so both branches now fork the same way. */
-  if ($("choosePlanBtn")) $("choosePlanBtn").onclick = () => (allDone ? openDayPlanner(nextDate) : openPlanKind(toManual));
+  /* One door for both days. It used to hand a finished day to the day planner,
+     whose first offer is Generate one, so "Plan my own" answered with the
+     question it had just been told no to. The builder writes to whatever
+     PLAN_FOR_DATE says, which is the only thing the two branches differ on. */
+  if ($("choosePlanBtn")) {
+    $("choosePlanBtn").onclick = () => openPlanKind(nextDate, allDone
+      ? () => { PLAN_FOR_DATE = nextDate; MANUAL_DRAFT = []; saveDraft(); goWorkoutScreen("manual"); }
+      : toManual);
+  }
   /* Past the recommendation rather than around it. The ordinary card is
      already rendered and already wired underneath, so this only uncovers it:
      same screen, same buttons, nothing navigated and nothing rebuilt. */
@@ -33886,40 +33902,89 @@ function spreadOver(list, n) {
 
 /* What each chosen day should be, from what they ticked and nothing else.
 
-   Lifting is the backbone when it is ticked, because that is what a plan of
-   N days a week means to somebody who ticked it. A cardio style and a flow
-   style each take at most ONE of those days, off the end, and never the last
-   lifting day: "I also do yoga" is a yoga session in the week, not half a week
-   of yoga. With no resistance ticked there is no backbone to protect, so the
-   week alternates through whatever they did tick.
+   THE NUMBER THEY CHOSE IS A NUMBER OF TRAINING DAYS, and lifting keeps two
+   thirds of them. This used to hand the yoga day and the cardio day out of
+   that number: five days with yoga and a cardio style ticked came back as
+   three lifting days, and the plan screen went on saying five. Mo, 2026-09-20:
+   "I want to bulk up, get stronger, and then move better... I clearly have it
+   that I'm working out 5 days a week." He is right twice over. The week has to
+   hold the number he agreed to, and a third goal may not quietly take 40% of
+   the first one.
 
-   Returns one entry per day: { kind: "lift" | "cardio" | "flow", training } */
-function weekGenKinds(count, st) {
+   So the arithmetic is the other way round: lifting takes the floor first,
+   which is two thirds of the week and never fewer than three days, and the
+   other styles fit in whatever is left over. Five days becomes four lifts and
+   one other session, not three lifts. Two and three day weeks have no surplus
+   at all, so they are all lifting and the caller says so out loud rather than
+   dropping a ticked style in silence.
+
+   With room for one and both ticked, the two take turns week by week, seeded
+   off the week being built. Always handing the slot to the same one is the
+   same silent loss in a smaller costume: somebody who ticked Running would
+   never run.
+
+   The extras land on evenly spaced days rather than on the end of the week.
+   The week starting on a lift is a property of the arithmetic (the first slot
+   is never index 0), and a lighter day between two lifting blocks is what it
+   is for; at the end it is just the week trailing off, which is the Saturday
+   yoga day Mo was looking at.
+
+   With no resistance ticked there is no backbone to protect, so the week
+   alternates through whatever they did tick.
+
+   Returns { kinds, skipped }: one entry per day as
+   { kind: "lift" | "cardio" | "flow", training }, plus the styles that did not
+   fit, which the caller owes the person a sentence about. */
+function weekGenMix(count, st, { weekStart = null } = {}) {
   const cardio = !!st && st.asked && st.cardio && (st.cardioModes || []).length;
   const flows = (st && st.asked && (st.flowTrainings || [])) || [];
   const lift = !st || !st.asked || st.resistance;
   const out = [];
-  if (lift) {
-    for (let i = 0; i < count; i++) out.push({ kind: "lift" });
-    let at = count - 1;
-    if (flows.length && at > 0) out[at--] = { kind: "flow", training: flows[0] };
-    if (cardio && at > 0) out[at--] = { kind: "cardio" };
-    return out;
+  if (!lift) {
+    /* No lifting at all. Alternate through what is there, so a week of running
+       and yoga is not four runs and then a yoga day at the end. */
+    const ring = [];
+    if (cardio) ring.push({ kind: "cardio" });
+    for (const t of flows) ring.push({ kind: "flow", training: t });
+    if (!ring.length) return { kinds: [], skipped: [] };
+    for (let i = 0; i < count; i++) out.push({ ...ring[i % ring.length] });
+    return { kinds: out, skipped: [] };
   }
-  /* No lifting at all. Alternate through what is there, so a week of running
-     and yoga is not four runs and then a yoga day at the end. */
-  const ring = [];
-  if (cardio) ring.push({ kind: "cardio" });
-  for (const t of flows) ring.push({ kind: "flow", training: t });
-  if (!ring.length) return [];
-  for (let i = 0; i < count; i++) out.push({ ...ring[i % ring.length] });
-  return out;
+  const floorDays = Math.min(count, Math.max(3, Math.ceil((count * 2) / 3)));
+  const room = count - floorDays;
+  const wanted = [];
+  if (cardio) wanted.push({ kind: "cardio" });
+  if (flows.length) wanted.push({ kind: "flow", training: flows[0] });
+  /* Weeks since the epoch, off the Monday of the week being built, so the same
+     week asked twice answers the same and the next one answers the other way. */
+  const day = weekStart instanceof Date ? weekStart : new Date(`${weekStart || todayStr()}T00:00:00`);
+  const parity = Math.floor(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()) / 604800000) % 2;
+  if (wanted.length === 2 && room === 1 && parity) wanted.reverse();
+  const take = wanted.slice(0, room);
+  for (let i = 0; i < count; i++) out.push({ kind: "lift" });
+  take.forEach((w, j) => { out[Math.floor(((j + 1) * count) / (take.length + 1))] = w; });
+  return { kinds: out, skipped: wanted.slice(take.length) };
 }
 
-/* A flow day is a name on a day, not a sequence in the plan row. The moves are
-   built by the activity sheet on the morning somebody does it, off the level
-   they are at by then, and they must never land in `exercises`: a yoga pose in
-   that column is logged as a set and lights the heat map. */
+/* The ticked style the week had no room for, in words, because the alternative
+   is a week that quietly contains less than somebody asked for. */
+function weekGenSkippedSay(kinds, skipped, count) {
+  if (!skipped.length) return "";
+  const word = (k) => (k.kind === "flow" ? (FLOW_LABEL[k.training] || "Mobility") : "Cardio").toLowerCase();
+  const names = skipped.map(word).join(" or ");
+  const got = kinds.find((k) => k.kind !== "lift");
+  return got
+    ? `One day of a ${count} day week goes to something that is not a lift, and this week that is ${word(got)}. Your ${names} day is in next week's.`
+    : `No ${names} day this week: all ${count} of your days are lifting, because one day out of ${count} is too much of a ${count} day week to give away. From four days up there is room for one.`;
+}
+
+/* A flow day carries its class the way a cardio day carries its run: the moves,
+   the minutes and the rounds, written when the week is built. It used to be a
+   name alone, built by the activity sheet on the morning somebody did it, and
+   the cost of that was a Thursday that could not say how long it was next to a
+   Wednesday that could. Whichever way it is built, the moves must never land in
+   `exercises`: a yoga pose in that column is logged as a set and lights the
+   heat map. */
 const FLOW_LABEL = { yoga: "Yoga", pilates: "Pilates" };
 
 async function weekGenBuildDay(date, kind, st, opts = {}) {
@@ -33929,7 +33994,13 @@ async function weekGenBuildDay(date, kind, st, opts = {}) {
   }
   if (kind.kind === "flow") {
     const name = FLOW_LABEL[kind.training] || "Mobility";
-    return (await planActivityOnDay(date, name, { quiet: true })) ? { ok: true, what: name } : { ok: false };
+    const act = CARDIO_ACTS.find((a) => a.training === kind.training) || null;
+    /* The class itself, so the day says its minutes and its moves. Null when
+       the library has nothing for it, and then the day is the name it always
+       was rather than nothing at all. */
+    const built = act ? await plannedActivitySession(act, date) : null;
+    return (await planActivityOnDay(date, name, { quiet: true, act, ...(built || {}) }))
+      ? { ok: true, what: name } : { ok: false };
   }
   /* Cardio, from the library, by the same call the generator makes when the
      styles leave it nothing to lift: one named session rather than "do some
@@ -34033,7 +34104,7 @@ async function generateTheWeek() {
   if (!days.length) { toast("No empty days left this week"); return; }
 
   const st = await ensureStylesModule().then((mod) => (mod?.readStyles ? mod.readStyles(MY_PROFILE?.train_styles) : null));
-  const kinds = weekGenKinds(days.length, st);
+  const { kinds, skipped } = weekGenMix(days.length, st, { weekStart: planWeekStart(weekGenNext() ? 1 : 0) });
   if (!kinds.length) { toast("Nothing ticked in your workouts, so there is nothing to build"); return; }
 
   WEEK_GEN_RUNNING = true;
@@ -34087,7 +34158,10 @@ async function generateTheWeek() {
     built.length
       ? `${built.length} day${built.length === 1 ? "" : "s"} ${built.length === 1 ? "is" : "are"} on your week.`
       : "Nothing landed.",
-    failed.length ? `${failed.map((r) => r.long).join(", ")} wouldn't build. Try ${failed.length === 1 ? "that one" : "those"} from the day itself.` : "",
+    /* Two things can be worth saying and both are the same kind of honesty: a
+       day that would not build, and a style the week had no room for. */
+    [failed.length ? `${failed.map((r) => r.long).join(", ")} wouldn't build. Try ${failed.length === 1 ? "that one" : "those"} from the day itself.` : "",
+      weekGenSkippedSay(kinds, skipped, days.length)].filter(Boolean).join(" "),
   );
 }
 
@@ -34219,32 +34293,36 @@ function sparePlanDay(taken) {
    an activity had to be offered somewhere else on the card, and the card ended
    up with three doors to two decisions.
 
-   Deliberately the same two tiles openDayPlanner shows for a future day, same
-   classes and same wording, because it is the same question. A second shape
-   for it would read as a different feature.
+   TWO DOORS, AND NEITHER OF THEM GENERATES. Mo, 2026-09-20: "when I press
+   'Plan my own', it shouldn't have to ask me to generate a workout. It should
+   be 'I'll plan my own workout' or 'Choose an activity'." Pressing Plan my own
+   on a finished day used to open the day planner, whose first door is Generate
+   one: somebody who has just said no to the generator was asked again. So both
+   days now fork here, and the tiles say the two things he said.
 
-   Today's activity opens the session itself rather than a plan to do later,
-   which is what openActivityInstead already does for today: on the day, the
-   clock is the point. */
-function openPlanKind(onWeights) {
+   Takes the day it is planning, because this card is about tomorrow the moment
+   today is done. Today's activity opens the session itself rather than a plan
+   to do later, which is what openActivityInstead already does for today: on
+   the day, the clock is the point. */
+function openPlanKind(date, onWeights) {
   const scrim = document.createElement("div");
   scrim.className = "pop-scrim";
   scrim.innerHTML = `
     <div class="pop">
       <div class="pop-body">
         <div class="ds-top">
-          <div><div class="pop-who" style="color:var(--muted)">TODAY</div>
+          <div><div class="pop-who" style="color:var(--muted)">${escapeHtml(planDayWord(date).toUpperCase())}</div>
             <div class="sv-name">What would you like to plan?</div></div>
           <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
         </div>
         <div class="dp-ways">
           <button type="button" class="dp-way" id="pkLift">
             <span class="dp-way-ico">${icon("pencil", 18)}</span>
-            <span class="dp-way-txt"><b>Weightlifting</b><i>Pick the exercises yourself.</i></span>
+            <span class="dp-way-txt"><b>I&rsquo;ll plan my own workout</b><i>Pick the exercises yourself.</i></span>
           </button>
           <button type="button" class="dp-way" id="pkAct">
             <span class="dp-way-ico">${icon("run", 18)}</span>
-            <span class="dp-way-txt"><b>Activity</b><i>A run, a ride, yoga, Pilates.</i></span>
+            <span class="dp-way-txt"><b>Choose an activity</b><i>A run, a ride, yoga, Pilates.</i></span>
           </button>
         </div>
       </div>
@@ -34254,7 +34332,10 @@ function openPlanKind(onWeights) {
   scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
   scrim.onclick = (e) => { if (e.target === scrim) close(); };
   scrim.querySelector("#pkLift").onclick = () => { close(); onWeights(); };
-  scrim.querySelector("#pkAct").onclick = () => { close(); openCardioSession(); };
+  /* Not openCardioSession outright any more: on a day that is not today there
+     is no clock to open, and openActivityInstead is the one door that knows
+     the difference. */
+  scrim.querySelector("#pkAct").onclick = () => { close(); openActivityInstead(date, planDayWord(date)); };
 }
 
 /* Putting something on an empty day: generate one, build one, or do an
@@ -34433,70 +34514,6 @@ async function openPlanLimitsSheet(date, dayWord) {
   paint();
 }
 
-/* ---- A different day for one plan ----
-
-   Mo, 2026-09-18: "give me pull day or leg day". The whole-workout swap used to
-   be a sheet that read the rest of the week and offered up to two sessions out
-   of it, which is a good answer to "what would you build instead" and no answer
-   at all to "give me a leg day": it can come back with nothing, it is gated on
-   having opted into built sessions, and it never names the day you are asking
-   for. So this sheet asks the question he asked, in the only vocabulary the
-   engine reads.
-
-   SUGGESTABLE_DAYS is that vocabulary, read rather than retyped: adapter.mjs
-   matches a requested focus through five patterns and drops anything else
-   without a word, so a sixth day invented here would come back as whatever the
-   rotation felt like with nothing on screen admitting it.
-
-   THIS DAY ONLY, like the two sheets below it. The day you want on Thursday is
-   not a change of split. */
-function openPlanDaySheet(date, dayWord, current) {
-  /* The day already on the row is not an offer: asking for the day you have
-     rebuilds the same session under a different name. engineDayFor is how the
-     engine itself reads a focus string, so "Push Day" off the row and
-     "Push day" in the list are matched the way the generator matches them. */
-  const now = engineDayFor(current?.focus);
-  const days = SUGGESTABLE_DAYS.filter((d) => d.name !== now);
-  const pretty = { lowerback: "lower back", abs: "core" };
-  const scrim = document.createElement("div");
-  scrim.className = "pop-scrim";
-  scrim.innerHTML = `
-    <div class="pop">
-      <div class="pop-body">
-        <div class="ds-top">
-          <div class="pop-who" style="color:var(--muted)">JUST FOR ${escapeHtml(dayWord.toUpperCase())}</div>
-          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
-        </div>
-        <p class="muted-note">Which day do you want instead? I will build the whole session around it.</p>
-        <div class="sv-rows day-pick">
-          ${days.map((d) => `<button type="button" class="sv-row" data-day="${escapeHtml(d.name)}">
-            <span class="sv-row-ico">${icon("dumbbell", 18)}</span>
-            <span class="sv-row-txt">
-              <span class="sv-row-name">${escapeHtml(d.name)}</span>
-              <span class="sv-row-meta">${escapeHtml(d.muscles.map((m) => pretty[m] || m).join(", "))}</span>
-            </span>
-            <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
-          </button>`).join("")}
-        </div>
-        <button type="button" class="btn-ghost" data-close>Leave it as it is</button>
-      </div>
-    </div>`;
-  document.body.appendChild(scrim);
-  const close = () => scrim.remove();
-  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
-  scrim.onclick = (e) => { if (e.target === scrim) close(); };
-  scrim.querySelectorAll("[data-day]").forEach((b) => {
-    b.onclick = () => {
-      close();
-      /* The same rebuild the limits and focus sheets run, and it lands back on
-         the plan screen for this day by itself. A week with no such day in it
-         says so out loud in generateWorkout rather than quietly handing back
-         something else. */
-      generateWorkout(date, { keepFocus: b.dataset.day });
-    };
-  });
-}
-
 /* ---- A focus for one plan ----
 
    Mo: "you can have the option to swap it with an activity or choose a focus
@@ -34587,10 +34604,10 @@ function limitsWithMissing(keys) {
 
    Today, an activity is a thing you start, so this opens the clock. Any other
    day it is a thing you plan, and there is no clock to open: the day is
-   written as an activity day and the session itself gets built out of the
-   library on the morning somebody actually does it. Which is also why only the
-   named activities are offered and "Other" is not: "Other" is a bare timer,
-   and a Thursday that says Other tells nobody anything. */
+   written as an activity day with the session built onto it, minutes and all,
+   by plannedActivitySession. Only the named activities are offered and "Other"
+   is not: "Other" is a bare timer, and a Thursday that says Other tells nobody
+   anything. */
 function openActivityInstead(date, dayWord) {
   if (date === todayStr()) { openCardioSession(); return; }
   const acts = CARDIO_ACTS.filter((a) => a.key !== "other");
@@ -34603,7 +34620,7 @@ function openActivityInstead(date, dayWord) {
           <div class="pop-who" style="color:var(--muted)">INSTEAD OF LIFTING</div>
           <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
         </div>
-        <p class="muted-note">Pick what you are doing ${escapeHtml(dayWord)}. I will build the session itself on the day, so it fits how the week has gone.</p>
+        <p class="muted-note">Pick what you are doing ${escapeHtml(dayWord)}. I will build the session now, minutes and all, so it is ready when you get there.</p>
         <div class="sv-rows">
           ${acts.map((a) => `<button type="button" class="sv-row" data-act="${escapeHtml(a.key)}">
             <span class="sv-row-ico">${icon(a.ico, 18)}</span>
@@ -34619,12 +34636,16 @@ function openActivityInstead(date, dayWord) {
   scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
   scrim.onclick = (e) => { if (e.target === scrim) close(); };
   scrim.querySelectorAll("[data-act]").forEach((b) => {
-    b.onclick = () => {
+    b.onclick = async () => {
       const a = acts.find((x) => x.key === b.dataset.act);
       close();
+      if (!a) return;
       /* The activity itself, not only its label: the day is read back off this
-         to know it is an activity at all, and to open on the right clock. */
-      if (a) planActivityOnDay(date, a.label, { act: a });
+         to know it is an activity at all, and to open on the right clock. And
+         the session under it, so the day knows how long it is rather than
+         asking again on the morning. */
+      const built = await plannedActivitySession(a, date);
+      planActivityOnDay(date, a.label, { act: a, ...(built || {}) });
     };
   });
 }
@@ -35074,13 +35095,16 @@ function rememberPlannedDay(date, focus, exercises) {
    afterwards rather than as a lifting plan with nothing in it. `act` is kept
    as well as the mode because yoga and Pilates have no cardio mode, and a day
    that came back through the mode table as Other is a bare clock. */
-async function planActivityOnDay(date, name, { quiet = false, session = null, act = null } = {}) {
+async function planActivityOnDay(date, name, { quiet = false, session = null, act = null, flow = null } = {}) {
   const own = session
     || { name, act: act?.key || null, mode: act?.cardio || null };
   const { error } = await sb.from("ai_workouts").upsert({
     user_name: ME, email: MY_EMAIL, entry_date: date,
     focus: name, exercises: [], mobility: null,
-    cardio: { session: own },
+    /* A class rides under `flow` beside the name, the same key the generator
+       writes it under, because planActivitySession reads that one first and a
+       yoga day with its moves on it is a class rather than a word. */
+    cardio: { session: own, ...(flow ? { flow } : {}) },
     archived: false, completed_at: null, duration_sec: null,
   }, { onConflict: "email,entry_date" });
   /* supabase-js resolves rather than throws, so this is the only place the
@@ -35097,6 +35121,55 @@ async function planActivityOnDay(date, name, { quiet = false, session = null, ac
   await planChangedOn(date);
   toast(`${name} is on ${datedLabel(date)}`);
   return true;
+}
+
+/* The session an activity day IS, built when the day is planned rather than on
+   the morning of it.
+
+   Mo, 2026-09-20: "let's just say they picked running... when you generate
+   tomorrow, it should just be running, and then it will be able to generate for
+   you the minutes that you're going to go on and how long you should go for."
+   Picking Running for tomorrow used to write the word and nothing else, so the
+   day had no length, the plan screen had nothing to print, and the clock opened
+   on the setup screen asking the question again. A run built by the week
+   generator already came with its minutes; a yoga day never did. Both do now,
+   through the same two builders the clock itself uses, so the day somebody
+   plans and the day that opens are the same session.
+
+   Seeded by the day it is FOR, so two activity days in one week are two
+   different sessions and Thursday's is Thursday's however early it was built.
+   The cost of building ahead is that a class is picked at the level somebody is
+   at today rather than the level they will be at on Thursday, which inside one
+   week is a difference the library cannot see anyway.
+
+   Null for the activities with no library behind them, the stair master, the
+   rower, the elliptical, HIIT and Other. Those stay a name and a clock, which
+   is what they have always been: inventing a length for them would be the app
+   making the session up. */
+async function plannedActivitySession(act, date) {
+  if (!act) return null;
+  const minutes = Number(MY_PROFILE?.session_minutes) || 30;
+  if (act.training) {
+    const flow = await buildGuidedPlan(act, minutes, { seed: date });
+    return flow ? { flow } : null;
+  }
+  if (act.cardio) {
+    /* Never the hard band from here, whatever the day count says. The engine
+       draws this exact line for the week it builds, and the reason holds
+       harder on a day somebody picked off a list: they named an activity, not
+       a difficulty. The clock's own setup screen shows the three tiers with
+       the default on screen and a thumb next to it, so picking Hard there is
+       a decision; planning ahead has no such screen, and booking a person ten
+       flat-out sprints they never asked for is the app deciding for them. */
+    const pref = defaultActivityPref();
+    const card = await buildCardioCard(act, pref === "hard" ? "steady" : pref, { seed: date });
+    if (!card || card.missing) return null;
+    /* The activity they picked rides on the session. Treadmill and Run are one
+       cardio mode and two different days, and cardioActFor reads `act` before
+       it falls back to the mode. */
+    return { session: { ...card, act: act.key, mode: act.cardio } };
+  }
+  return null;
 }
 
 /* ---- Building a workout ----
@@ -36327,12 +36400,18 @@ function renderPlanPreview(opts) {
     ? `<button type="button" class="btn-ghost danger" id="planDeleteTodayBtn">Delete today&rsquo;s workout</button>`
     : "";
 
-  /* The doors, in the order somebody reaches for them: a different day, the
-     same day leaning somewhere, the same day around a limit, or not a workout
-     at all. Each one acts on THIS day and nothing else. They are the day
-     planner's own markup because they are the day planner's own buttons: Mo
-     asked for that sheet's job to happen here, on the plan, rather than on a
-     summary of it.
+  /* The doors, in the order somebody reaches for them: the same day leaning
+     somewhere, the same day around a limit, or not a workout at all. Each one
+     acts on THIS day and nothing else. They are the day planner's own markup
+     because they are the day planner's own buttons: Mo asked for that sheet's
+     job to happen here, on the plan, rather than on a summary of it.
+
+     "Give me a different day" was the first of them and is gone. Mo,
+     2026-09-20: "I'm not a big fan of 'Give me a different day'. I think we
+     should just remove that entirely." It offered the five day names the
+     engine can parse, which is a split somebody chose once in Setup being
+     re-asked on a Thursday; the three that are left change THIS day rather
+     than argue with the rotation.
 
      "Swap the whole workout" used to sit above them and opened the session
      swap sheet. Mo, 2026-09-18: "I told you, don't have the swap the whole
@@ -36346,10 +36425,6 @@ function renderPlanPreview(opts) {
   const reviewActions = !review ? "" : `
     <p class="dp-heading">Change it</p>
     <div class="dp-ways">
-      ${isCoachedClient() ? "" : `<button type="button" class="dp-way" id="planReviewDay">
-        <span class="dp-way-ico">${icon("swap", 18)}</span>
-        <span class="dp-way-txt"><b>Give me a different day</b><i>Push day, Pull day, legs, upper body or full body.</i></span>
-      </button>`}
       ${isCoachedClient() || activityDay ? "" : `<button type="button" class="dp-way" id="planReviewFocus">
         <span class="dp-way-ico">${icon("body", 18)}</span>
         <span class="dp-way-txt"><b>Aim it at a body part</b><i>Lean this one toward arms, chest, legs, whatever you pick.</i></span>
@@ -36638,9 +36713,6 @@ function renderPlanPreview(opts) {
      one way to say what kit you have, and one way to put an activity on a day.
      Every one of them rebuilds through generateWorkout, which now lands back on
      this screen by itself, so none of them carries a callback for that. */
-  if ($("planReviewDay")) {
-    $("planReviewDay").onclick = () => openPlanDaySheet(date, planDayWord(date), plan);
-  }
   if ($("planReviewFocus")) {
     $("planReviewFocus").onclick = () => openPlanFocusSheet(date, planDayWord(date));
   }
