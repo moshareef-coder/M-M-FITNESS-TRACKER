@@ -120,7 +120,7 @@
 
       { t: "Warm-up first", scenario: "paired",
         s: "Two timed moves before the first set",
-        note: "Start opens on the warm-up, not the bench. One move at a time with a countdown on the same strip the rest timer uses, the cue under the name, Next to skip a hold, Skip warm-up to drop the block for today (remembered on the plan, so it does not come back on reopen). The clock rolls the next move in on its own. Nothing here is a set: the exercise log stays exactly as it was until the first lift.",
+        note: "Start opens on the warm-up, not the bench. Each move now opens on a ten second get-ready before the hold begins, and the sheet starts shut carrying only the clock, so the figure has the screen. Pull the handle for the cue, Back, Restart and Skip; Skip warm-up drops the block for today and is remembered on the plan, so it does not come back on reopen. The clock rolls the next move in on its own. Nothing here is a set: the exercise log stays exactly as it was until the first lift.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
 
       { t: "Exercise figures", scenario: "paired",
@@ -361,6 +361,76 @@
         s: "Sign out, delete, privacy",
         note: "The delete path has to actually delete, and the privacy policy has to describe clips, photos and live sessions. Right now it predates all three, which is on the issues list.",
         run: (w) => { w.switchTab("setup"); w.openSettingsPage("account"); } },
+    ]},
+
+    /* Everything changed on 2026-09-21, gathered in one run so the last pass
+       before a submission does not mean remembering which screens moved. */
+    { group: "Changed today", note: "The 2026-09-21 work, in one pass.", steps: [
+      { t: "The stretch sheet, shut", scenario: "paired",
+        s: "Just the clock, and a much bigger figure",
+        note: "This is the screen Mo said the figure was too small on. The sheet now starts DOWN carrying only the clock, so the figure gets 367px instead of 181px. The handle says 'Skip, back and restart' because the pull is the only way to those buttons now and a gesture nothing announces is a feature nobody finds. Pull it up, and the cue, Back, Restart, Skip, the big button and the Up next rail are all there. It stays where you leave it for the rest of the block, so skipping four holds in a row is not four pulls.",
+        run: async (w) => {
+          w.eval(`clearSessionStorage(); SESSION = null;`);
+          w.switchTab("workout"); w.goWorkoutScreen(null);
+          w.eval(`startStretchSession([
+            { name: "Cossack Squat", seconds: 45, perSide: true, cue: "Shift the weight over one bent leg, other leg straight with the toes up." },
+            { name: "Forward Fold", seconds: 30, cue: "Soft knees. Fold from the hips and let your head hang." },
+            { name: "Child's Pose", seconds: 40, cue: "Hips back toward your heels, forehead down." }])`);
+        } },
+
+      { t: "Ten seconds to get into it", scenario: "paired",
+        s: "The get-ready, the same one yoga uses",
+        note: "Every hold now opens on a ten second get-ready drawn as a bare numeral, because from a mat with the phone on the floor '7' reads and '00:07' does not. It counts the last three out loud and chimes into the hold. Start now drops the rest of it. The second side of a per-side move gets five rather than ten: you are already in the shape and only swapping a leg, and the line above says 'Switch sides' instead of 'Get into position' so the shorter count explains itself.",
+        run: async (w) => {
+          w.eval(`clearSessionStorage(); SESSION = null;`);
+          w.switchTab("workout"); w.goWorkoutScreen(null);
+          w.eval(`startStretchSession([{ name: "Cossack Squat", seconds: 45, perSide: true, cue: "Shift the weight over one bent leg." }, { name: "Forward Fold", seconds: 30 }])`);
+        } },
+
+      { t: "Still in a workout", scenario: "paired",
+        s: "The bar that follows you off the workout tab",
+        note: "Minimising never dropped the session, on either kind, but nothing said so and Mo forgot a stair session was running. There is now a bar above the tab bar on every other tab saying what is live and how long it has been going, with a pulsing dot that goes still and grey when paused. Tap it to land back in the session. It is hidden on the workout tab itself, where the paused screen is already the whole screen, and it goes the moment the session ends by any door.",
+        run: async (w) => {
+          w.eval(`clearSessionStorage(); SESSION = null;`);
+          w.switchTab("workout"); w.goWorkoutScreen(null); w.startWorkout();
+          await new Promise((r) => setTimeout(r, 500));
+          w.eval(`skipStretchPhase()`);
+          await new Promise((r) => setTimeout(r, 500));
+          w.eval(`minimiseSession()`);
+          w.switchTab("home");
+        } },
+
+      { t: "Remove one session, not the day", scenario: "twoSessions",
+        s: "A day holding more than one thing",
+        note: "A day can hold a lift, a cardio session and a class. The only destructive control used to be the whole-day delete, and the per-session one that did exist was labelled 'Clear this day', which is why it read as nuking everything. It now names what it removes, says which sessions stay, and there is an X on each session row. 'Delete today's workout' is untouched underneath, still two-stage, because that one is about a day that did not happen and it clears the logged sets with it.",
+        run: (w) => { w.switchTab("workout"); } },
+
+      { t: "Building the week", scenario: "paired",
+        s: "One row per day, not per session",
+        note: "The progress card used to list a row per session, so a stacked day read as three rows all called Thursday told apart by '2nd' and '3rd' glued on the name. Fourteen rows of that is what Mo called weird. It is grouped by day now: the day is the row, what is being built is the subtitle, and the row only ticks once every session on it has landed.",
+        run: (w) => {
+          w.eval(`openWeekGenCard([
+            { date: "${new Date(Date.now()).toISOString().slice(0,10)}", name: "Today", long: "Today", kind: { kind: "lift" }, state: "done", what: "Push Day" },
+            { date: "${new Date(Date.now()).toISOString().slice(0,10)}", name: "Today", long: "Today", kind: { kind: "cardio" }, state: "done", what: "Run Intervals" },
+            { date: "${new Date(Date.now()).toISOString().slice(0,10)}", name: "Today", long: "Today", kind: { kind: "flow" }, state: "done", what: "Yoga" },
+            { date: "${new Date(Date.now() + 864e5).toISOString().slice(0,10)}", name: "Tomorrow", long: "Tomorrow", kind: { kind: "lift" }, state: "at", what: "Pull Day" },
+            { date: "${new Date(Date.now() + 1728e5).toISOString().slice(0,10)}", name: "Wed", long: "Wednesday", kind: { kind: "cardio" }, state: "waiting", what: "Hill Repeats" }])`);
+        } },
+
+      { t: "Recovery, without the goal card", scenario: "paired",
+        s: "Rest well, then straight into the stretch",
+        note: "The 'Your goal' card is gone. It was built to hand in the very numbers the Eat and Drink cards print rather than work them out twice, which is exactly why seeing both together read as the app repeating itself: on Bulk up the same protein figure appeared in each. Eat, Drink and Sleep still carry all of it.",
+        run: (w) => { w.switchTab("workout"); w.goWorkoutScreen("recovery"); } },
+
+      { t: "A treadmill under the runner", scenario: "runner",
+        s: "Indoor running gets a machine",
+        note: "Running had no prop at all while the indoor bike drew a bike and the stepmill drew stairs, so a treadmill session was somebody running on open floor. There is a treadmill now, drawn in the same language as the other machines, and the figure stands on the belt rather than on the room's floor line. Outdoor running is deliberately still propless: the app treats Run outside and Treadmill as two different things and only one of them has a machine in it.",
+        run: (w) => { w.switchTab("workout"); } },
+
+      { t: "No sound, anywhere", scenario: "paired",
+        s: "Settings has no Sound row",
+        note: "Voice and effects are off across the whole app and the Settings row for them is gone rather than left as a switch that cannot turn on. The engineering underneath is untouched, so this is one line to reverse when it comes back. The coach still talks in text, and his line now stays on screen until the next one replaces it instead of fading on its own clock.",
+        run: (w) => { w.switchTab("setup"); } },
     ]},
   ];
 
