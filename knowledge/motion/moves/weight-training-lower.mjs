@@ -768,7 +768,7 @@ const HIP_THRUST = {
 // the feet point straight ahead. The stance width and the upright torso are the
 // two things that separate a sumo from a conventional pull and both read.
 const SUMO_DEADLIFT = {
-  view: { yaw: 34, plane: "sagittal" },
+  view: { yaw: -34, plane: "sagittal" },
   loop: "pingpong",
   dur: 3.2,
   breath: 0.2,
@@ -1430,7 +1430,7 @@ const AB_WHEEL_ROLLOUT = {
 // undrawable and the V-sit was worth more; with spineTwist and a
 // three-quarter camera we get both.
 const RUSSIAN_TWIST = {
-  view: { yaw: 34, plane: "sagittal" },
+  view: { yaw: -34, plane: "sagittal" },
   loop: "pingpong",
   dur: 2.8,
   breath: 0.25,
@@ -1479,7 +1479,7 @@ const SIDE_BEND = {
       t: 0,
       root: { x: 70, y: 61.4, rot: 0 },
       joints: {
-        spine: 0, neck: 0, shoulderR: 2, elbowR: 2, shoulderL: 10, elbowL: -95,
+        spine: 0, neck: 0, shoulderR: 2, elbowR: 2, shoulderL: 10, elbowL: 95,
         hipR: 4, hipL: 4, kneeR: 3, kneeL: 3,
       },
       ik: { ankleR: { x: 76, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1, tol: 0.9 } },
@@ -1488,7 +1488,7 @@ const SIDE_BEND = {
       t: 1,
       root: { x: 70, y: 62.4, rot: 6 },
       joints: {
-        spine: 18, neck: -4, shoulderR: 2, elbowR: 2, shoulderL: 10, elbowL: -95,
+        spine: 18, neck: -4, shoulderR: 2, elbowR: 2, shoulderL: 10, elbowL: 95,
         hipR: 4, hipL: 4, kneeR: 3, kneeL: 3,
       },
       ik: { ankleR: { x: 76, y: 113.4, bend: -1 }, ankleL: { x: 64, y: 113.4, bend: -1, tol: 0.9 } },
@@ -1525,7 +1525,7 @@ const SIDE_BEND = {
 // the exercise: the thing a Pallof press exists to resist is trunk rotation, so
 // drawing any would be drawing the failure.
 const PALLOF_PRESS = {
-  view: { yaw: 34, plane: "sagittal" },
+  view: { yaw: -34, plane: "sagittal" },
   loop: "pingpong",
   dur: 2.8,
   breath: 0.2,
