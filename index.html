@@ -11185,6 +11185,8 @@ function renderGoalTilesStep(data = {}) {
       <h1>What is your goal?</h1>
       <p class="sub">Pick as many as you like. The first one is your main goal.</p>
       <div class="goal-tile-grid plain" id="goalTileGrid"></div>
+      <p class="muted-note">You can change this later. Nothing is locked in.</p>
+      <button type="button" class="btn-ghost" id="goalSkipBtn">Skip for now</button>
       <button type="button" class="btn-ghost" id="goalBackBtn">Back</button>
     </div>`;
   initGoalTiles($("goalTileGrid"), {
@@ -11207,6 +11209,14 @@ function renderGoalTilesStep(data = {}) {
       renderOnboardStep("about", { ...next, detail: child ? label : null, tuneIdx: 0 });
     },
   });
+  /* Required like every tile grid the app has: Pick a goal first sits on the
+     confirm button until something is tapped. Skip is the way past that for
+     somebody who wants to look around before committing to a goal, and it
+     writes nothing, the same way a fresh account that never opened this
+     screen would carry no goal fields either. finishOnboardingFromDraft
+     already falls back to the last GOALS entry when goalKey is missing, so a
+     skipped goal is not a broken one, it is a deferred one. */
+  $("goalSkipBtn").onclick = () => renderOnboardStep("about", { ...data, tuneIdx: 0 });
   $("goalBackBtn").onclick = () => renderOnboardStep("intro", { ...data, introIdx: ONBOARD_INTRO.length - 1 });
 }
 
@@ -13630,7 +13640,20 @@ function renderOnboardStep(step, data = {}) {
 
      "Rather not say" is a tile, not an "other". It is stored as nothing,
      because that is what it is, and the figure falls back to the same drawing
-     an unanswered profile has always got. */
+     an unanswered profile has always got.
+
+     Age moved here from Setup on 2026-09-21, the same trip height and weight
+     already made: BMR and the strength standards both read profiles.age
+     (calculateBMR, ageStrengthFactor) and used to get it only from whoever
+     found their way to Setup > Your Body on their own, which on a fresh
+     account is nobody. Same column, same clamp (13 to 100), one field
+     answered twice instead of two places that could disagree.
+
+     The step is required now, not because a personal question is owed an
+     answer, but because a figure and a BMR drawn off nothing is a worse
+     first impression than asking once. Skip is the honest way out of that:
+     it leaves every one of these four fields exactly as unanswered as they
+     were, rather than the app inventing a body to draw. */
   if (step === "about") {
     const SEX_TILES = [
       { id: "Male", label: "Male" },
@@ -13656,6 +13679,10 @@ function renderOnboardStep(step, data = {}) {
         <div class="ob-sexes" id="sexGrid">
           ${SEX_TILES.map((s) => `<button type="button" class="ob-sex${sexPick === s.id ? " on" : ""}" data-sex="${s.id}">${escapeHtml(s.label)}</button>`).join("")}
         </div>
+        <label class="ob-lab">Age <span class="ob-opt">for the calorie estimate and the strength standards, both age adjusted</span></label>
+        <div class="ob-row">
+          <input id="obAge" type="number" inputmode="numeric" min="13" max="100" placeholder="years" value="${data.age || ""}" />
+        </div>
         <label class="ob-lab">Height <span class="ob-opt">for the healthy-weight line and the calorie estimate, not the training</span></label>
         <div class="ob-row">
           <input id="obFt" type="number" inputmode="numeric" min="3" max="8" placeholder="feet" value="${ftv}" />
@@ -13670,29 +13697,47 @@ function renderOnboardStep(step, data = {}) {
         <div class="ob-row">
           <input id="obLb" type="number" inputmode="decimal" min="50" max="700" placeholder="pounds" value="${data.weight_lb || ""}" />
         </div>
-        <button class="btn-primary" id="aboutNext">Looks like me</button>
+        <p class="muted-note">You can change this later. Nothing is locked in.</p>
+        <button class="btn-primary" id="aboutNext" disabled>Looks like me</button>
+        <button class="btn-ghost" id="aboutSkip">Skip for now</button>
         <button class="btn-ghost" id="aboutBack">Back</button>
       </div>`;
-    ob.querySelectorAll("[data-sex]").forEach((b) => b.onclick = () => {
-      sexPick = b.dataset.sex;
-      ob.querySelectorAll("[data-sex]").forEach((x) => x.classList.toggle("on", x === b));
-    });
     const readHeight = () => {
       const f = parseInt($("obFt").value, 10) || 0;
       const i = parseInt($("obIn").value, 10) || 0;
       return f || i ? f * 12 + i : null;
     };
-    /* Nothing here is required. Continue is never disabled, because every one
-       of these three is a personal question and a wizard that will not let you
-       past one is the app deciding it is owed an answer. */
+    /* One real answer anywhere on the screen is enough to unlock Continue: a
+       sex tile, an age, a height, or a weight. Requiring all four would make
+       "About you" the one step in the run that punishes somebody for
+       answering less than everything, which is worse than the old
+       never-disabled button, not better. Skip is what covers the person who
+       wants none of it. */
+    const anyAnswered = () => !!(sexPick || $("obAge").value || readHeight() || $("obLb").value);
+    const refresh = () => { $("aboutNext").disabled = !anyAnswered(); };
+    ob.querySelectorAll("[data-sex]").forEach((b) => b.onclick = () => {
+      sexPick = b.dataset.sex;
+      ob.querySelectorAll("[data-sex]").forEach((x) => x.classList.toggle("on", x === b));
+      refresh();
+    });
+    ["obAge", "obFt", "obIn", "obLb"].forEach((id) => { $(id).oninput = refresh; });
+    refresh();
     $("aboutNext").onclick = () => {
       const next = {
         ...data,
+        age: clampNum($("obAge").value, 13, 100),
         height_in: readHeight(),
         weight_lb: parseFloat($("obLb").value) || null,
         ...(sexPick ? { sex: sexPick === "none" ? null : sexPick, sex_asked: true } : {}),
       };
       renderOnboardStep(tuneQueue(next).length ? "tune" : "styles", { ...next, tuneIdx: 0 });
+    };
+    /* Skip moves on without writing any of the four fields, same as never
+       having opened this screen: whatever was mid-typed is discarded rather
+       than half-saved, so a null here always means "never asked", not "asked
+       and gave up partway". */
+    $("aboutSkip").onclick = () => {
+      renderOnboardStep(tuneQueue(data).length ? "tune" : "styles", { ...data, tuneIdx: 0 });
     };
     $("aboutBack").onclick = () => renderOnboardStep("goal", data);
     return;
@@ -13735,7 +13780,9 @@ function renderOnboardStep(step, data = {}) {
               ${o.sub ? `<span class="occ-sub">${escapeHtml(o.sub)}</span>` : ""}
             </button>`).join("")}
           </div>
+          <p class="muted-note">You can change this later. Nothing is locked in.</p>
           <button type="button" class="btn-primary" id="tuneNext"${chosen ? "" : " disabled"}>That one</button>
+          <button type="button" class="btn-ghost" id="tuneSkip">Skip for now</button>
           <button type="button" class="btn-ghost" id="tuneBack">Back</button>
         </div>`;
       let pick = chosen;
@@ -13745,6 +13792,10 @@ function renderOnboardStep(step, data = {}) {
         $("tuneNext").disabled = false;
       });
       $("tuneNext").onclick = () => onNext({ [spec.field]: pick });
+      /* Writes the field null rather than leaving it at whatever a draft
+         reopen found, so Skip always means "never asked" even on a second
+         look at this screen. */
+      $("tuneSkip").onclick = () => onNext({ [spec.field]: null });
       $("tuneBack").onclick = back;
       return;
     }
@@ -13767,6 +13818,7 @@ function renderOnboardStep(step, data = {}) {
           <h1>${escapeHtml(spec.title)}</h1>
           <p class="sub">${escapeHtml(spec.sub)}</p>
           <div class="limit-chips" id="tuneHurtChips"><p class="muted-note">Loading the options...</p></div>
+          <p class="muted-note">You can change this later. Nothing is locked in.</p>
           <button type="button" class="btn-primary" id="tuneNext">Nothing hurts</button>
           <button type="button" class="btn-ghost" id="tuneBack">Back</button>
         </div>`;
@@ -13816,6 +13868,7 @@ function renderOnboardStep(step, data = {}) {
         <h1>${escapeHtml(spec.title)}</h1>
         <p class="sub">${escapeHtml(spec.sub)}</p>
         <div id="bodyPickRoot">${bodyRegionPickerHTML({ sex: data.sex, selected: picked, sore: spec.kind === "sore" })}</div>
+        <p class="muted-note">You can change this later. Nothing is locked in.</p>
         <button type="button" class="btn-primary" id="tuneNext">Those ones</button>
         <button type="button" class="btn-ghost" id="tuneBack">Back</button>
       </div>`;
@@ -13901,6 +13954,15 @@ function renderOnboardStep(step, data = {}) {
     return;
   }
 
+  /* No Skip here, on purpose, unlike the required steps below it. Every other
+     required step has a real fallback the rest of the app already knows how
+     to read (no goal, no sex, no age, no intensity all mean "never asked"
+     somewhere downstream), but ME has no such fallback: it is read as a
+     literal string all over the app, from the greeting to who a partner sees
+     training with them, and ME = data.name in finishOnboarding is the whole
+     account taking a name from a variable that is a blank string. Skipping a
+     name does not defer a question, it ships a broken account, so this one
+     stays required with no way past it. */
   if (step === "name") {
     ob.innerHTML = `
       <div class="ob-step">
@@ -14033,9 +14095,18 @@ function renderOnboardStep(step, data = {}) {
         <p class="sub">Pick the one you would still do in a bad week. All of it moves later.</p>
         <div class="ob-tiers" id="tierGrid"><p class="muted-note">Working out what this goal needs...</p></div>
         <button class="btn-primary" id="daysNext" disabled>Show me the plan</button>
+        <button class="btn-ghost" id="daysSkip">Skip for now</button>
         <button class="btn-ghost" id="daysBack">Back</button>
       </div>`;
     $("daysNext").onclick = () => renderOnboardStep("plan", data);
+    /* Same null the "could not load this goal's range" fallback below already
+       writes when there was nothing to pick from: intensity, days_per_week
+       and days_range all stay unset, and the plan step falls back to the
+       goal's own legacy day count exactly as it does for that fallback. */
+    $("daysSkip").onclick = () => {
+      data.intensity = null; data.days_per_week = null; data.days_range = null;
+      renderOnboardStep("plan", data);
+    };
     $("daysBack").onclick = () => renderOnboardStep("styles", data);
     goalDayRange({ bubble: data.goal_bubble, child: data.goal_child, secondary: data.goal_secondary }).then((range) => {
       if (!$("tierGrid")) return;   // navigated on before the engine arrived
@@ -14307,6 +14378,7 @@ function finishOnboardingFromDraft(data) {
     challenge_target: days,
     goal_key: g.key,
     height_in: data.height_in || null,
+    age: data.age || null,
     /* Undefined when the about step was never answered, which must not
        overwrite a sex already on the profile. Declining is stored as the
        literal "Rather not say", because that is what Setup's own select
@@ -14393,6 +14465,10 @@ async function finishOnboarding(data) {
     ...(data.committed_at ? { committed_at: data.committed_at } : {}),
     goal_detail: data.goal_detail || null,
     ...(data.height_in ? { height_in: data.height_in } : {}),
+    /* Same conditional as height_in, for the same reason: a fresh account
+       that skipped About must not overwrite whatever Setup > Your Body has
+       already got on file with a null. */
+    ...(data.age ? { age: data.age } : {}),
     /* Sent only when the about step was actually answered: undefined here
        means never asked, and a fresh account that skipped the screen should
        not have anything written over whatever a later Setup visit puts there.
