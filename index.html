@@ -8009,12 +8009,6 @@
           <span class="set-val" id="setNotifySub"></span>
           <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
         </button>
-        <button type="button" class="set-row" id="setRow-sound" data-page="sound">
-          <span class="set-ico" data-ico="speaker"></span>
-          <span class="set-txt"><span class="set-title">Sound</span></span>
-          <span class="set-val" id="setSoundSub"></span>
-          <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
-        </button>
         <button type="button" class="set-row" id="setRow-theme" data-page="theme">
           <span class="set-ico" data-ico="sunMoon"></span>
           <span class="set-txt"><span class="set-title">Appearance</span></span>
@@ -8365,27 +8359,6 @@
       <div id="pushPromiseNote" style="margin-bottom:10px;"></div>
       <button type="button" class="btn-secondary" id="pushToggleBtn">Turn on reminders</button>
       <p class="muted-note" id="pushNote" style="margin-top:8px;"></p>
-    </div>
-    </div>
-    <div class="settings-page hidden" id="page-sound">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
-        <div class="scr-title">Sound</div>
-        <div class="spacer"></div>
-      </div>
-    <div class="card">
-      <h2>Unio out loud</h2>
-      <label class="gym-toggle" id="voiceWrap">
-        <span>Unio talks</span>
-        <input type="checkbox" id="voiceToggle" />
-      </label>
-      <p class="muted-note">He reads his own lines aloud: the greeting on Home, what he says between your sets, the introduction when you set up. Nothing else is read out, and he never reads a message from your partner.</p>
-      <label class="gym-toggle" id="sfxWrap" style="margin-top:12px;">
-        <span>Sounds</span>
-        <input type="checkbox" id="sfxToggle" />
-      </label>
-      <p class="muted-note">Short tones for the things you do: a set logged, a rest up, a workout finished, a record.</p>
-      <p class="muted-note">Both are set on this phone rather than on your account, so a second device keeps its own answer.</p>
     </div>
     </div>
     <div class="settings-page hidden" id="page-theme">
@@ -29172,8 +29145,16 @@ const SFX_OFF_KEY = "ft-sfx-off";
 /* Absence means on. Both start on for a new phone, because a feature nobody
    discovers is a feature nobody has, and the switch to turn him off is two
    taps away in Setup. */
+/* Sound is not supported for now (Mo, 2026-09-21): no voice, no effects,
+   anywhere in the app. Hardcoded rather than deleting voiceSay/sfxPlay and
+   their call sites, so the engineering underneath (speechSynthesis picking,
+   the oscillator kit, the arm-on-first-touch gating) survives untouched if
+   this is ever turned back on; every call site already asks this function
+   first and does nothing when it says off. The Settings row for this is
+   removed too, since a switch for a feature that cannot turn on is worse
+   than no switch. */
 function voiceOff() {
-  try { return localStorage.getItem(VOICE_OFF_KEY) === "1"; } catch { return false; }
+  return true;
 }
 function setVoiceOff(off) {
   try { off ? localStorage.setItem(VOICE_OFF_KEY, "1") : localStorage.removeItem(VOICE_OFF_KEY); }
@@ -29181,7 +29162,7 @@ function setVoiceOff(off) {
   if (off) voiceStop();
 }
 function sfxOff() {
-  try { return localStorage.getItem(SFX_OFF_KEY) === "1"; } catch { return false; }
+  return true;
 }
 function setSfxOff(off) {
   try { off ? localStorage.setItem(SFX_OFF_KEY, "1") : localStorage.removeItem(SFX_OFF_KEY); }
@@ -29791,14 +29772,12 @@ function sayQuip(key) {
   el.onclick = () => hideQuip();
   slot.appendChild(el);
 
-  /* Hold starts when he STOPS typing, not when he starts, or a long line gets
-     pulled off the screen halfway through saying itself. */
-  /* Longer on screen than it used to be: 4s minimum rising with the length of
-     the line, capped at 11. A line you are still reading when it disappears is
-     worse than one that lingers a beat too long, and now that he speaks half
-     as often there is room for it. */
-  const hold = Math.min(11000, 4000 + said.length * 55);
-  const rest = () => { el.classList.add("done"); QUIP_TIMER = setTimeout(hideQuip, hold); };
+  /* He stays on screen once he is done typing, rather than fading on a timer.
+     Mo, 2026-09-21: the line was gone before he had finished reading it. The
+     bubble now just sits there, showing the last thing he said, until the
+     next line replaces it (sayQuip already clears QUIP_TIMER and rebuilds the
+     slot above) or you tap it away yourself via el.onclick. */
+  const rest = () => { el.classList.add("done"); };
   typeQuip(el.querySelector(".sess-quip-txt"), said, rest);
 }
 
@@ -44186,16 +44165,6 @@ function trainingSummary() {
   return bits.join(", ");
 }
 
-/* Four states rather than On and Off, because two switches under one row have
-   four answers and "On" for a phone that is only ticking is a small lie. */
-function soundSummary() {
-  const talks = !voiceOff();
-  const tones = !sfxOff();
-  if (talks && tones) return "On";
-  if (!talks && !tones) return "Off";
-  return talks ? "Voice only" : "Sounds only";
-}
-
 function paintSettingsValues() {
   /* The Goal row's only writer used to be closeSettingsPage, so the row read
      "Not set" from the moment the tab opened until you had been into a subpage
@@ -44207,7 +44176,6 @@ function paintSettingsValues() {
   settingsValue("setProfileSub", ME || "");
   settingsValue("setThemeSub",
     (document.documentElement.getAttribute("data-theme") || "dark") === "light" ? "Light" : "Dark");
-  settingsValue("setSoundSub", soundSummary());
   settingsValue("setAboutSub", APP_VERSION);
   settingsValue("setAccountSub", MY_EMAIL || "");
 
@@ -44598,34 +44566,6 @@ function renderSetupTab() {
     b.onclick = closeSettingsPage;
   });
 
-  /* Sound. Device preferences, so they are read off localStorage the way the
-     coach's mute is, and wired outside the MY_PROFILE block below: somebody
-     who wants him to stop talking should not have to wait on a network round
-     trip for permission to say so.
-
-     Each switch proves itself on the way on rather than promising in copy that
-     it works. Turning one off proves itself by the silence. */
-  if ($("voiceToggle")) {
-    $("voiceToggle").checked = !voiceOff();
-    $("voiceWrap").classList.toggle("checked", !voiceOff());
-    $("voiceToggle").onchange = (e) => {
-      setVoiceOff(!e.target.checked);
-      $("voiceWrap").classList.toggle("checked", e.target.checked);
-      // gap 0: this one is a demonstration, so it repeats as often as it is asked to.
-      if (e.target.checked) voice.say("Loud and clear.", { from: "soundSetting", gap: 0 });
-      settingsValue("setSoundSub", soundSummary());
-    };
-  }
-  if ($("sfxToggle")) {
-    $("sfxToggle").checked = !sfxOff();
-    $("sfxWrap").classList.toggle("checked", !sfxOff());
-    $("sfxToggle").onchange = (e) => {
-      setSfxOff(!e.target.checked);
-      $("sfxWrap").classList.toggle("checked", e.target.checked);
-      if (e.target.checked) sfx.play("set");
-      settingsValue("setSoundSub", soundSummary());
-    };
-  }
   /* The trainer row. Hired reads as a fact about the account; not hired reads
      as the offer it is, and tapping it is the offer. */
   if ($("setRow-hire")) {

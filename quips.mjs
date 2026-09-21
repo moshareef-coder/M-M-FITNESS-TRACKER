@@ -272,7 +272,16 @@ export function formFor(lift) {
   return null;
 }
 const cueOf = (c) => { const f = formFor(c.lift); return f ? f.cue : null; };
-const jokeOf = (c) => { const f = formFor(c.lift); return f ? f.joke : null; };
+/* joke is a plain string on the older entries and an array of 2-3 on newer
+   ones, so a move said often does not always land on the same line. Picked
+   fresh on every call rather than once per move, which is what lets the same
+   exercise say something different across sets; pickQuip's own "already
+   used" tracking in index.html works on the resolved string either way. */
+const jokeOf = (c) => {
+  const f = formFor(c.lift);
+  if (!f) return null;
+  return Array.isArray(f.joke) ? f.joke[Math.floor(Math.random() * f.joke.length)] : f.joke;
+};
 
 export const QUIPS = {
   /* The dashboard. Mo asked for him here: "the robot with a message, a funny
