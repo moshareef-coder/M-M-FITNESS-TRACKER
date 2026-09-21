@@ -20510,7 +20510,11 @@ function renderWeightHero(on, profile, isPartner) {
         <div class="wth-now-fig"><b>${now.toFixed(1)}</b><i>lb</i></div>
       </div>${target}`;
   }
-  renderWeightTrend("wtHeroTrend", name, profile, isPartner, true);
+  /* Not `always` here, alone among the five. With nothing weighed at all this
+     card already draws a full empty state under the chart, in the same words,
+     and two "No weigh-ins yet" on one screen is one of them too many. The
+     block takes over the moment there is a single reading to talk about. */
+  renderWeightTrend("wtHeroTrend", name, profile, isPartner, false);
 
   /* The log row. Yours only: a partner's screen keeps the chart and loses the
      stepper, same as before. The plus opens the stepper that was always here
@@ -21234,8 +21238,9 @@ function renderBulkHero(on, profile, isPartner) {
 
   /* Under the line whichever chip is up, so the scale's direction does not
      depend on having tapped Weight first. On this goal up is the good news,
-     which is the same movement Lose weight paints red. */
-  renderWeightTrend("bulkTrend", name, profile, isPartner, true);
+     which is the same movement Lose weight paints red. Not `always`: the
+     Weight chip above already draws "No readings yet" with nothing on file. */
+  renderWeightTrend("bulkTrend", name, profile, isPartner, false);
 
   /* The same pair Tone Up shows, same rules: yours only, no See all. */
   const photos = $("bulkPhotos");
@@ -39151,20 +39156,31 @@ function weightTrendHTML(name, profile, opts = {}) {
     sub = "Step on the scale once and this starts. A few readings and it can say which way you are going.";
   } else if (t.state === "one") {
     ico = "scale";
-    line = `${lb(t.now)} lb, once`;
-    sub = `One weigh-in is a number, not a direction. ${WEIGHT_TREND_MIN_READS} of them across a fortnight is the least this can read a trend from.`;
+    /* The figure goes in the second line, not the first: on the weight hero
+       the same number is already forty pixels tall directly above this. */
+    line = "One weigh-in so far";
+    sub = `${lb(t.now)} lb, which is a number rather than a direction. `
+      + `${WEIGHT_TREND_MIN_READS} weigh-ins across a fortnight is the least this can read a trend from.`;
   } else if (t.state === "thin") {
     ico = "scale";
-    line = t.since > WEIGHT_TREND_WINDOWS[WEIGHT_TREND_WINDOWS.length - 1]
-      ? `Last weighed ${days(t.since)} ago` : "Not a trend yet";
+    /* Two different shortages, and telling somebody they need three weigh-ins
+       when they have four is how a screen loses an argument it was winning.
+       Out of the widest window is a stale scale; anything else is a thin one. */
+    const stale = t.since > WEIGHT_TREND_WINDOWS[WEIGHT_TREND_WINDOWS.length - 1];
+    line = stale ? `Last weighed ${days(t.since)} ago` : "Not a trend yet";
     sub = `${t.reads} weigh-ins on file, the last at ${lb(t.now)} lb. `
-      + `${WEIGHT_TREND_MIN_READS} across a fortnight is the least this can read a trend from.`;
+      + (stale ? "Step on the scale again and the trend picks up from there."
+        : `${WEIGHT_TREND_MIN_READS} weigh-ins across a fortnight is the least this can read a trend from.`);
   } else {
     const spanWeeks = Math.max(1, Math.round(t.span / 7));
-    const from = `over the last ${weeks(spanWeeks)}, from ${t.reads} weigh-ins`;
+    /* The weigh-ins' own span, never "the last four weeks". A window that
+       widened to find readings can end weeks before today, and claiming the
+       last month for a month nobody stood on the scale is the one lie this
+       function is here to avoid. When that happens the line below says so. */
+    const from = `from ${t.reads} weigh-ins across ${weeks(spanWeeks)}`;
     if (!t.moved) {
       line = "Holding steady";
-      sub = `Inside half a pound ${from}.`;
+      sub = `Inside half a pound, ${from}.`;
     } else {
       /* The aim decides the colour and nothing else does. Same movement, two
          goals, two verdicts, which is the whole of what Mo asked for. */
@@ -39172,7 +39188,7 @@ function weightTrendHTML(name, profile, opts = {}) {
       ico = t.moved < 0 ? "arrowDown" : "arrowUp";
       cls = !aim ? "wtr-level" : t.moved === aim ? "idx-good" : "idx-bad";
       line = `${lb(t.change)} lb ${t.moved < 0 ? "down" : "up"}`;
-      sub = `About ${lb(t.rate)} lb a week ${from}.`;
+      sub = `About ${lb(t.rate)} lb a week, ${from}.`;
     }
     /* A trend drawn from a month that ended weeks ago is still true, and
        saying when it stopped is the difference between a stale reading and a
@@ -39187,12 +39203,13 @@ function weightTrendHTML(name, profile, opts = {}) {
   </div>`;
 }
 
-/* Into whichever screen asked for it. `always` is the three screens where body
-   weight IS the measure, or half of it: they show the block with nothing
-   logged, because there the empty state is the invitation. On Get stronger
-   and Build endurance the scale is a side reading, so it waits until there is
-   something to read rather than nagging about a number that goal never asked
-   for. Somebody who untracked the scale is never shown it at all.
+/* Into whichever screen asked for it. `always` is Tone Up alone, and it is
+   there because that screen filters the scale out of its own chips: with
+   nothing weighed, the block is the only thing on it that mentions body
+   weight, and an invitation beats silence. Everywhere else the screen already
+   draws an empty state of its own, so the block waits until there is a reading
+   to talk about rather than stacking a second "no weigh-ins yet" under the
+   first. Somebody who untracked the scale is never shown it at all.
 
    hired() for the same reason the charts read it: this is a reading, and
    readings are the half of this tab somebody pays for. On the weight hero
