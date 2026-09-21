@@ -22591,16 +22591,16 @@ function renderCardioStage() {
           </button>
         </div>
         ${nextUp.liftWhy ? `<p class="nxt-note">${escapeHtml(nextUp.liftWhy)}</p>` : ""}
-        ${/* Said before the tap rather than discovered after it. ai_workouts is
-              unique on (email, entry_date) and every writer in this file
-              upserts on exactly that, so a second plan built today lands on
-              top of this morning's row. The SETS are safe, they live in
-              exercise_logs and the recap reads them from there; the record of
-              what this morning was asked to be is what goes. The fix is
-              written and not applied: supabase/migrations/20260917_ai_workouts_slot.sql,
-              which cannot run until an app that conflicts on three columns is
-              live. Until then this sentence is the honest version of it. */ ""}
-        ${todaySessions().some((x) => x.state === "done" && String(x.key).startsWith("plan:"))
+        ${/* Said before the tap rather than discovered after it, and only while
+              it is still true. ai_workouts WAS unique on (email, entry_date), so
+              a second plan built today landed on top of this morning's row: the
+              sets were safe in exercise_logs, the record of what the morning was
+              asked to be was not. `slot` is the fix and the app sends it, but the
+              owner runs the migrations, so on a database that has not had
+              20260917_ai_workouts_slot.sql run yet this is still exactly what
+              happens and the sentence is still owed. slotsAvailable answers off a
+              row the database itself handed back. */ ""}
+        ${slotsAvailable() === false && todaySessions().some((x) => x.state === "done" && String(x.key).startsWith("plan:"))
           ? `<p class="nxt-note">Your sets from earlier stay logged. The app can hold one lifting plan a day, so a new one replaces this morning&rsquo;s card.</p>`
           : ""}`}`;
     $("csnX").onclick = csnDismiss;
