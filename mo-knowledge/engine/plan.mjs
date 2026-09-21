@@ -702,17 +702,17 @@ function rungsForReps(reps) {
    the sets. Trading a person's working sets for an uncited rehearsal rung is a
    bad trade. So it moved to `addSecondMainRamps` below, which adds it only where
    the day already has room, and it is therefore free by construction. */
-function rampsForDay(exercises, roleOf) {
-  /* The first main that CAN be ramped, not simply the first main. A day that
-     opens with a pull-up and follows it with a barbell row used to come back
-     with nothing, because the ramp stopped at the first slot and that slot was
-     bodyweight. The row is then the first loaded thing the person meets, and it
-     is the one that should not be met cold. */
-  for (const e of exercises) {
-    if (roleOf.get(e) !== "main") continue;
-    const r = rampFor(e, rungsForReps(e.reps));
-    if (r) return [r];
-  }
+function rampsForDay(_exercises, _roleOf) {
+  /* Off for now, the owner's call on 2026-09-20: "get rid of the ramp feature
+     for now completely." Returning none HERE, at the one place a day's ramp
+     sets are built, rather than filtering `d.rampSets` after this ran, so
+     nothing downstream (prepMinutesFor's wider warm-up reserve, the ramp
+     dayNote, addSecondMainRamps, the adapter's rampMinutes and the RAMPED_
+     WARMUP_SECONDS choice) has to be told separately: every one of them reads
+     `rampSets.length` and already treats zero as "no ramp today". The
+     reasoning below (rampFor, rungsForReps, RAMP_TABLE) is left in place,
+     unreached, because "for now" was his word: bringing it back is un-doing
+     this one return, not re-deriving the load-safety case for it. */
   return [];
 }
 

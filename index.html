@@ -1413,16 +1413,6 @@
   .stretch-fold .stretch-list { border-left: 0; padding: 0 13px 4px; margin: 0; }
   .stretch-fold .stretch-skip { display: block; margin: 2px 13px 12px; }
 
-  /* ---------- Ramp-up sets (CONTRACT.md workout.rampSets) ----------
-     Light sets of the lift itself, worked up to the first real one. They are
-     preparation, so they wear the same blue as the timed blocks and the same
-     flame; they are loads rather than seconds, so they are written as loads and
-     they hang off the lift instead of sitting in the warm-up fold. Nothing here
-     is ever tickable: a ramp set is not a set, and the surest way to keep it out
-     of the counters is to give it no control that could log one. */
-  /* Wrapping rather than truncating: a ramp cut off after the second rung hides
-     the heaviest load, which is the one worth knowing. Two short lines in a
-     narrow row is the honest version. */
   /* What to fetch for this lift, one quiet line under the sets and reps. It
      sits in the muted tone, not the ramp's stretch ink: a ramp is an
      instruction, kit is a fact about the room. */
@@ -1479,14 +1469,6 @@
   @media (prefers-reduced-motion: reduce) {
     .kit-peek { transition: opacity .01s; transform: none; }
   }
-  .ex-ramp {
-    display: flex; align-items: flex-start; gap: 5px; margin-top: 3px;
-    font-size: 12.5px; line-height: 1.35; color: var(--stretch-ink);
-    font-variant-numeric: tabular-nums;
-  }
-  .ex-ramp svg { flex-shrink: 0; opacity: .8; margin-top: 2px; }
-  .ex-ramp span { min-width: 0; }
-
   .ramp-fold {
     border: 1px solid color-mix(in srgb, var(--stretch) 26%, var(--border));
     background: color-mix(in srgb, var(--stretch) 7%, var(--panel));
@@ -36397,15 +36379,6 @@ function rampForExercise(list, name, plan = TODAY_WORKOUT) {
   return { ...found, sets: found.sets.slice(-1) };
 }
 
-/* One ramp said as loads, which is the part worth reading: "bar × 8 · 40 × 5".
-   `weight: 0` is the empty bar, the empty machine or the lightest thing they
-   have (CONTRACT.md), so it is a word rather than a zero. */
-function rampLoadsLine(ramp) {
-  return (ramp?.sets || [])
-    .map((s) => `${Number(s.weight) > 0 ? s.weight : "bar"} × ${s.reps}`)
-    .join(" · ");
-}
-
 /* Which fold is open, remembered while the tab is alive so opening the
    warm-up to read a cue and coming back from the session does not shut it
    again. Not persisted: the default every morning is closed, because the
@@ -36939,13 +36912,8 @@ function renderPlanPreview(opts) {
     ${overLine ? `<p class="plan-time-change plan-time-over" id="planTimeOver">${escapeHtml(overLine)}</p>` : ""}
     ${oneOff?.changed ? `<p class="plan-time-change" id="planTimeChange">${escapeHtml(oneOff.changed)}</p>` : ""}`;
 
-  const planRamps = planMobility(plan)?.ramp || [];
   const rows = exercises.map((ex, i) => {
     const isDone = loggedNow.has(ex.name.toLowerCase());
-    /* One quiet line, not a block: the card is the list of lifts, and a ramp is
-       something you read at the rack rather than here. Gone once the lift is
-       logged, because by then it has been done or it has not. */
-    const ramp = isDone ? null : rampForExercise(planRamps, ex.name, plan);
     const doneMark = isDone ? icon("check") : icon("dumbbell");
     return `<div class="exercise-row ${isDone ? "ex-done" : ""} ${started ? "" : "draggable"}" data-idx="${i}">
       ${started ? "" : `<button type="button" class="grip" data-grip aria-label="Drag to reorder">${icon("grip", 16)}</button>`}
@@ -36964,7 +36932,6 @@ function renderPlanPreview(opts) {
               you are reading the list. Bodyweight says nothing, because
               "nothing needed" is not worth a line on every row. */ ""}
         ${!isDone && kitNamesFor(ex.name).length ? `<span class="ex-kit" data-kit-for="${escapeHtml(ex.name)}" data-kit-eyebrow="${escapeHtml(ex.name)}" role="button" tabindex="0">${escapeHtml(kitNamesFor(ex.name).join(" · "))}</span>` : ""}
-        ${ramp ? `<div class="ex-ramp">${icon("flame", 11)}<span>Ramp ${escapeHtml(rampLoadsLine(ramp))}</span></div>` : ""}
         ${ex.note ? `<div class="ex-note">${escapeHtml(humanizeNoteDates(ex.note))}</div>` : ""}
       </button>
       ${isDone ? "" : `<button type="button" class="wp-chip" data-plan-swap="${i}" aria-label="Swap ${escapeHtml(ex.name)}">${icon("swap", 15)}</button>`}
