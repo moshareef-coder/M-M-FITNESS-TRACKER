@@ -12997,10 +12997,15 @@ function freqForDays(n) {
   return d >= 7 ? "daily" : d >= 4 ? "most" : d >= 2 ? "some" : "rare";
 }
 
-/* Which styles share one dial. Lifting and home are the same session with a
-   shorter list of implements (styles.mjs folds home into an equipment limit),
-   and the week holds one resistance session a day, so two dials for them
-   would be one number asked twice. They move together. */
+/* Which styles are the same KIND of session. Lifting and home are still one
+   slot in the day (styles.mjs folds home into an equipment limit, and
+   composeWeek gives resistance one session a day, never two), so a day
+   cannot hold both. That is a rule about the WEEK, not about the two words
+   on the dial: Mo, 2026-09-21, "working out with weights and working out
+   without those should not necessarily be combined." Somebody may lift most
+   days and only fall back to bodyweight rarely, or the other way round, so
+   the two dials keep their own words now; only the one-session-a-day rule
+   below still treats them as one kind. */
 const isResistanceStyle = (id) => TRAIN_STYLES.find((t) => t.id === id)?.mod === "weight-training";
 
 /* One word per ticked style, defaults filled in, and the defaults are the
@@ -13026,13 +13031,11 @@ function styleFrequencyFor(picked, raw, daysPerWeek) {
     const main = resistance ? isResistanceStyle(id) : i === 0;
     out[id] = main ? (fromDays || "most") : "rare";
   });
-  /* Whatever the map said, the two resistance styles agree, on the heavier
-     word, because that is the one the week has to hold. */
-  const res = picked.filter(isResistanceStyle);
-  if (res.length > 1) {
-    const top = res.map((id) => out[id]).sort((a, b) => freqDays(b) - freqDays(a))[0];
-    for (const id of res) out[id] = top;
-  }
+  /* Used to force both resistance styles to agree here, on the heavier word.
+     Removed 2026-09-21: the week still has one resistance slot a day (see
+     isResistanceStyle), but that is a fact about the day, not a reason lifting
+     and home have to be the same answer to "how often". Each keeps whatever
+     word it was given, or its own independent default from the loop above. */
   return out;
 }
 
@@ -13133,9 +13136,11 @@ function wireTrainStylePicker(root, picked, onChange, { freq = null, onFreq = nu
     dial.querySelectorAll("[data-freq]").forEach((b) => b.onclick = () => {
       const level = b.dataset.freq;
       if (!freq) return;
-      /* Both resistance styles at once: one session a day, one dial. */
-      const ids = isResistanceStyle(id) ? TRAIN_STYLES.filter((t) => t.mod === "weight-training").map((t) => t.id) : [id];
-      for (const x of ids) { freq[x] = level; paintStyleDial(root, x, level); }
+      /* Used to move lifting and home's dials together. Removed 2026-09-21
+         on Mo's word: a turn of one dial is an answer about that one style,
+         not both, so only this card's own word moves. */
+      freq[id] = level;
+      paintStyleDial(root, id, level);
       if (onFreq) onFreq(id, level, { ...freq });
     });
   });
@@ -13162,10 +13167,16 @@ function trainStyleNote(picked, freq = null) {
     : `${shape} Generate the week and that is what it lays down. A single session on its own is still a lifting day.`;
 }
 
-/* "Lifting most days, running sometimes, yoga rarely." The resistance pair
-   first, since the week is built around it, then the rest in the order they
-   were ticked; both resistance styles share one word so they share one
-   clause. Reads the dial's own words, so the sentence and the control never
+/* "Lifting most days, bodyweight work rarely, running sometimes." The
+   resistance pair first, since the week is built around it, then the rest in
+   the order they were ticked. Lifting and home used to always share one word
+   and so always shared one clause; now they can differ, and a clause that
+   read "lifting and bodyweight work most days" when only lifting is most
+   days and home is rarely would be saying something false. So they merge
+   into one clause only while they still happen to agree, which reads
+   smoother than two adjacent clauses saying the same word twice; the moment
+   they differ, each gets its own clause, same as every other style below.
+   Reads the dial's own words, so the sentence and the control never
    disagree. */
 const STYLE_WORD = {
   lifting: "lifting", home: "bodyweight work", running: "running", cycling: "cycling",
@@ -13175,7 +13186,12 @@ function weekShapeSentence(picked, freq) {
   const phrase = (id) => STYLE_FREQ.find((f) => f.id === freq[id])?.phrase || "rarely";
   const clauses = [];
   const res = picked.filter(isResistanceStyle);
-  if (res.length) clauses.push(`${res.map((id) => STYLE_WORD[id]).join(" and ")} ${phrase(res[0])}`);
+  const resWords = new Set(res.map((id) => freq[id]));
+  if (res.length && resWords.size === 1) {
+    clauses.push(`${res.map((id) => STYLE_WORD[id]).join(" and ")} ${phrase(res[0])}`);
+  } else {
+    for (const id of res) clauses.push(`${STYLE_WORD[id]} ${phrase(id)}`);
+  }
   for (const id of picked) if (!isResistanceStyle(id)) clauses.push(`${STYLE_WORD[id] || id} ${phrase(id)}`);
   const line = clauses.join(", ");
   return line.charAt(0).toUpperCase() + line.slice(1) + ".";
@@ -13710,18 +13726,21 @@ function renderOnboardStep(step, data = {}) {
     };
     wireTrainStylePicker(ob, picked, (ids) => { picked = ids; note(); }, { freq, onFreq: () => note() });
     note();
-    /* Only the ticked styles' words travel, and the resistance word becomes
-       the day count the next step opens on: the dial and days_per_week are
-       one number said two ways (see saveTrainingDays), so a person who says
-       "most days" here finds the five day tier already lit on the next screen
-       rather than being asked the same thing again as if they had not. */
+    /* Only the ticked styles' words travel, and days_per_week becomes the
+       BUSIEST resistance word's count, not any one dial's: the week has one
+       resistance slot a day, so whichever style is asking for more of them is
+       the one the count has to satisfy (see saveTrainingDays). Lifting "most
+       days" and home "rarely" opens the next screen on the five day tier, the
+       same as lifting alone would; home's rarer word is honoured on the days
+       nobody insisted on a gym, not by shrinking the count. */
     $("styleNext").onclick = () => {
       const kept = {};
       for (const id of picked) kept[id] = freq[id] || "some";
-      const res = picked.find(isResistanceStyle);
+      const res = picked.filter(isResistanceStyle);
+      const days = res.length ? Math.max(...res.map((id) => freqDays(kept[id]))) : 0;
       const next = { ...data, train_styles: picked, style_frequency: kept };
-      if (res && freqForDays(data.days_per_week) !== kept[res]) {
-        next.days_per_week = freqDays(kept[res]);
+      if (days && days !== Number(data.days_per_week)) {
+        next.days_per_week = days;
         next.intensity = null;
       }
       renderOnboardStep("days", next);
@@ -13898,11 +13917,17 @@ function renderOnboardStep(step, data = {}) {
         data.days_range = [t.days, t.days];
         if (!data.session_minutes_manual) data.session_minutes = t.mins;
         /* The other direction of the same number: a tier is a lifting count,
-           so the resistance dial takes its word. Both resistance styles,
-           since they share the dial. */
+           so the busiest resistance style's word follows it, same rule as
+           the styles step used to get here. Only the style currently driving
+           the count moves; a lighter fallback (home ticked "rarely" beside
+           lifting) is not what this screen is answering and is left alone. */
         const word = freqForDays(t.days);
         if (word && data.style_frequency) {
-          for (const id of Object.keys(data.style_frequency)) if (isResistanceStyle(id)) data.style_frequency[id] = word;
+          const resIds = Object.keys(data.style_frequency).filter(isResistanceStyle);
+          if (resIds.length) {
+            const top = resIds.sort((a, b) => freqDays(data.style_frequency[b]) - freqDays(data.style_frequency[a]))[0];
+            data.style_frequency[top] = word;
+          }
         }
       };
       if (kept) apply(kept); else { data.intensity = null; data.days_per_week = null; data.days_range = null; }
@@ -44332,16 +44357,24 @@ async function syncStyleFrequencyToDays(days) {
   const stored = MY_PROFILE?.style_frequency && typeof MY_PROFILE.style_frequency === "object" ? MY_PROFILE.style_frequency : null;
   if (!word || !stored) return;
   const ids = Object.keys(stored).filter(isResistanceStyle);
-  if (!ids.length || ids.every((id) => stored[id] === word)) return;
-  const next = { ...stored };
-  for (const id of ids) next[id] = word;
+  if (!ids.length) return;
+  /* Used to push every resistance style to the same word here. Now only the
+     one currently driving the count moves: days_per_week is the max across
+     resistance styles (one resistance slot a day, the higher demand is the
+     one the week has to satisfy), so it is that style's word this count is
+     really about. A lighter fallback ticked beside it, home "rarely" next to
+     lifting "most days", is not being asked about by a change to the count
+     and must not be dragged along. */
+  const top = ids.sort((a, b) => freqDays(stored[b]) - freqDays(stored[a]))[0];
+  if (stored[top] === word) return;
+  const next = { ...stored, [top]: word };
   const { error, droppedFrequency } = await upsertGoalFields({
     email: MY_EMAIL, user_name: ME, style_frequency: next, updated_at: new Date().toISOString(),
   });
   if (error || droppedFrequency) { console.warn("the lifting dial is out of step with the day count", error || "column missing"); return; }
   MY_PROFILE.style_frequency = next;
-  if (SETUP_FREQ) for (const id of ids) SETUP_FREQ[id] = word;
-  if ($("setupStyleGrid")?.innerHTML) for (const id of ids) paintStyleDial($("setupStyleGrid"), id, word);
+  if (SETUP_FREQ) SETUP_FREQ[top] = word;
+  if ($("setupStyleGrid")?.innerHTML) paintStyleDial($("setupStyleGrid"), top, word);
 }
 
 /* What actually goes in the column: exactly what is ticked on the grid.
@@ -44998,13 +45031,18 @@ async function saveTrainStyles() {
     toast("How often is not being stored yet");
   } else if (MY_PROFILE) {
     MY_PROFILE.style_frequency = freqNext;
-    /* The resistance dial is days_per_week as a word, so a turn of it moves
-       the count on the card above, the same way a tap on that card moves
-       this dial. Only when the word actually changed the number: four days
-       reads as "most days" and must not become five for being read back. */
-    const res = next.find(isResistanceStyle);
-    const days = res ? freqDays(freqNext[res]) : 0;
-    if (days && freqForDays(MY_GOAL?.days_per_week ?? MY_PROFILE.challenge_target) !== freqNext[res]) await saveTrainingDays(days);
+    /* The resistance dials are days_per_week as a word, so a turn of one
+       moves the count on the card above, the same way a tap on that card
+       moves the dials. When lifting and home disagree, days_per_week is the
+       BUSIER of the two: the week has one resistance slot a day, and the
+       higher demand is the one it actually has to satisfy (the lighter one is
+       honoured by composeWeek preferring bodyweight-friendly movements on
+       days nobody insisted on a gym, not by shrinking the count). Compared as
+       numbers, not words: with two resistance styles a word-to-word compare
+       against a single `res` id no longer means anything. */
+    const resIds = next.filter(isResistanceStyle);
+    const days = resIds.length ? Math.max(...resIds.map((id) => freqDays(freqNext[id]))) : 0;
+    if (days && days !== Number(MY_GOAL?.days_per_week ?? MY_PROFILE.challenge_target)) await saveTrainingDays(days);
   }
 
   /* Nothing is regenerated here, and that is the decision rather than an
