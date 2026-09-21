@@ -5874,118 +5874,24 @@
   .bi-head { font-size: 21px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2; margin: 0 0 16px; }
   .bi-grid .bi-head { position: relative; z-index: 1; }
   /* Single-line rows now that the bars are gone, so they sit closer together
-     and read as one ranked list rather than five floating lines. */
-  /* Each row is a 44px tap target. It used to be 18.8px: one line of 12.5px
-     text, no padding, and a 9px gap doing nothing for the finger, on a control
-     that opens the whole muscle drill-down. The height comes from min-height
-     rather than padding, and the 9px gap is spent paying for it, so the list
-     grows from 130px to 220px and the column beside it is 250px of figure.
-     The card does not get taller. */
+     and read as one ranked list rather than five floating lines. The 44px
+     height stays: it was bought for a finger, but it is also what keeps this
+     column the same height as the figure beside it. */
   .bi-list { display: flex; flex-direction: column; }
-  .bi-row {
-    display: flex; align-items: center; min-height: 44px;
-    width: 100%; text-align: left; padding: 0; border: none; background: none;
-    color: inherit; font: inherit; cursor: pointer; transition: transform .12s;
-  }
-  .bi-row:active { transform: scale(.985); }
+  .bi-row { display: flex; align-items: center; min-height: 44px; width: 100%; }
   .bi-row-top { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12.5px; }
   /* The "top 5 of 10" line sat on the list's gap, which is gone. */
   .bi-row + .bi-empty { margin-top: 8px; }
   .bi-row-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bi-row-level { color: var(--muted); font-weight: 500; flex-shrink: 0; display: flex; align-items: center; gap: 2px; }
-  /* No negative margin: it pushed the chevron 3px past the column edge, so
-     the arrows did not line up with anything else in the card. */
-  .bi-row-level svg { opacity: .55; }
+  .bi-row-level { color: var(--muted); font-weight: 500; flex-shrink: 0; }
   .bi-empty { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
   /* Both figures are always the same pixel size, in every mode. Every Rive instance on
      the page shares one WebGL2 renderer whose render target follows whichever canvas drew
      last, so two canvases of different sizes make it resize twice a frame and one of them
-     comes out blank. Focus mode therefore stacks them in one full-width cell and fades the
-     unused one out rather than resizing either. */
+     comes out blank. */
   .bi-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin-top: -10px; }
-  .bi-fig { position: relative; overflow: hidden; min-width: 0; transition: opacity .35s; }
+  .bi-fig { position: relative; overflow: hidden; min-width: 0; }
   .bi-canvas { width: 100%; height: 250px; display: block; touch-action: manipulation; }
-  .bi-hint { display: flex; justify-content: center; margin-top: 6px; }
-  .bi-hint span {
-    display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--text);
-    padding: 6px 12px; border-radius: 100px; background: var(--panel-2);
-    border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
-  }
-  .bi-hint svg { color: var(--accent-ink); }
-
-  /* Focus mode: one muscle tapped. The other figure folds away, the tapped one
-     grows and zooms, the ranked list gives way to that muscle's own detail. */
-  .bi-grid.focus .bi-col-list { display: none; }
-  .bi-detail { display: none; min-width: 0; }
-  .bi-grid.focus .bi-detail { display: block; animation: popIn .4s cubic-bezier(.22,1,.36,1) both; }
-  .bi-grid.focus .bi-figures { grid-template-columns: 1fr; }
-  .bi-grid.focus .bi-fig { grid-area: 1 / 1; }
-  .bi-grid.focus .bi-fig.collapsed { opacity: 0; pointer-events: none; }
-  .bi-back {
-    display: inline-flex; align-items: center; gap: 4px; border: none; background: var(--panel-2); color: var(--muted);
-    font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 10px 5px 8px; border-radius: 100px; cursor: pointer; margin-bottom: 12px;
-  }
-  .bi-back:active { transform: scale(.96); }
-  .bi-detail-name { font-size: 17px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
-  .bi-detail-sub { font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: 3px; }
-  .bi-detail-impact { margin-top: 12px; }
-  /* The heat hue is the signal, but the raw stop fails as text at both ends of
-     the scale, so the number is pulled towards the page ink in both themes. */
-  .bi-detail-pct { font-size: 28px; font-weight: 800; letter-spacing: -.03em; color: color-mix(in srgb, var(--heat, var(--accent)) 60%, var(--text)); line-height: 1; }
-  .bi-detail-pct.none { color: var(--muted); font-size: 17px; font-weight: 700; }
-  .bi-detail-lvl { font-size: 12.5px; color: var(--muted); font-weight: 500; margin-top: 3px; }
-  .bi-detail-bar { height: 6px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--border); margin-top: 8px; overflow: hidden; }
-  .bi-detail-bar i { display: block; height: 100%; background: var(--heat, var(--accent)); border-radius: 9px; transform-origin: left; transform: scaleX(var(--fill, 0)); transition: transform .6s cubic-bezier(.22,1,.36,1); }
-  .bi-detail-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 14px 0 6px; }
-  .bi-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-  .bi-chip {
-    font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 100px; border: 1px solid var(--border);
-    color: var(--muted); background: var(--panel-2); max-width: 100%;
-  }
-  .bi-chip.hit { color: var(--text); border-color: color-mix(in srgb, var(--heat, var(--accent)) 60%, transparent); background: color-mix(in srgb, var(--heat, var(--accent)) 18%, var(--panel-2)); }
-  .bi-hit { display: flex; justify-content: space-between; gap: 6px; font-size: 12.5px; padding: 4px 0; border-top: 1px solid var(--border); }
-  .bi-hit:first-of-type { border-top: none; }
-  .bi-hit-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bi-hit-sets { color: var(--muted); flex-shrink: 0; }
-  .bi-hit-sets.assist::after { content: " assist"; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
-  .bi-try { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
-  .bi-try b { color: var(--text); font-weight: 600; }
-
-  .bi-pieces { display: none; flex-direction: column; gap: 6px; }
-  .bi-pieces.show { display: flex; animation: popIn .4s cubic-bezier(.22,1,.36,1) both; }
-  .bi-rings.hide { display: none; }
-  .bi-piece {
-    display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; text-align: left;
-    width: 100%; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel-2);
-    color: var(--text); font-family: inherit; cursor: pointer; transition: border-color .2s, background .2s, transform .12s;
-  }
-  .bi-piece:active { transform: scale(.985); }
-  .bi-piece.on { border-color: color-mix(in srgb, var(--heat, var(--accent)) 70%, transparent); background: color-mix(in srgb, var(--heat, var(--accent)) 12%, var(--panel-2)); }
-  .bi-piece-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--heat, var(--accent)); box-shadow: 0 0 8px color-mix(in srgb, var(--heat, var(--accent)) 60%, transparent); }
-  .bi-piece.off .bi-piece-dot { background: none; border: 1.5px solid var(--muted); box-shadow: none; }
-  .bi-piece-name { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bi-piece-where { font-size: 11px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bi-piece-val { text-align: right; }
-  .bi-piece-pct { font-size: 15.5px; font-weight: 700; letter-spacing: -.02em; color: color-mix(in srgb, var(--heat, var(--accent)) 45%, var(--text)); }
-  .bi-piece.off .bi-piece-pct { color: var(--muted); font-size: 12.5px; font-weight: 600; }
-  .bi-piece-bar { width: 64px; height: 4px; border-radius: 9px; background: var(--panel); margin-top: 4px; margin-left: auto; overflow: hidden; }
-  .bi-piece-bar i { display: block; height: 100%; width: calc(var(--fill, 0) * 100%); background: var(--heat, var(--accent)); border-radius: 9px; }
-
-  /* Labels pinned to the zoomed figure, one per piece. Zero-size anchor at the
-     muscle centre; the dot and pill hang off it so positioning is one transform. */
-  .bi-callouts { position: absolute; inset: 0; pointer-events: none; }
-  .bi-callout { position: absolute; width: 0; height: 0; padding: 0; border: 0; background: none; pointer-events: auto; cursor: pointer; font-family: inherit; }
-  .bi-callout i { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--heat, var(--accent)); box-shadow: 0 0 0 2px rgba(0,0,0,.55); }
-  .bi-callout.off i { background: #3a434c; }
-  .bi-callout span {
-    position: absolute; left: var(--dx, 9px); top: calc(var(--dy, 0px) - 10px); height: 20px; line-height: 18px; padding: 0 7px;
-    font-size: 11px; font-weight: 600; white-space: nowrap; border-radius: 9px; color: var(--text);
-    background: var(--panel); border: 1px solid var(--border);
-  }
-  .bi-callout.off span { color: var(--muted); }
-  .bi-callout.on span { background: var(--heat, var(--accent)); color: #fff; border-color: transparent; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
-  .bi-callout.on.off span { color: var(--bg); }
-  .bi-callout.on i { box-shadow: 0 0 0 2px rgba(0,0,0,.55), 0 0 10px var(--heat, var(--accent)); }
 
   .bi-section { display: flex; align-items: center; gap: 7px; font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin: 18px 0 14px; }
   /* The ring stays 18px. The box around it is 44, which is what a thumb needs. */
@@ -6000,11 +5906,7 @@
   .info-dot, .bi-info { position: relative; }
   .info-dot:active, .bi-info:active { color: var(--text); }
   .bi-rings { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-  .bi-ring {
-    display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0;
-    padding: 0; border: none; background: none; color: inherit; font: inherit; cursor: pointer; transition: transform .12s;
-  }
-  .bi-ring:active { transform: scale(.96); }
+  .bi-ring { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
   .bi-ring-svg { width: 64px; height: 64px; position: relative; }
   .bi-ring-svg svg { width: 100%; height: 100%; display: block; }
   .bi-ring-svg .track { stroke: var(--panel-2); }
@@ -6807,8 +6709,8 @@
     .bi-ring-val { font-size: 12.5px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .bi-anim, .bi-share-check.pop, .bi-grid.focus .bi-detail, .bi-pieces.show { animation: none; }
-    .bi-ring-svg .fill, .bi-fig, .bi-canvas, .bi-detail-bar i { transition: none; }
+    .bi-anim, .bi-share-check.pop { animation: none; }
+    .bi-ring-svg .fill, .bi-canvas { transition: none; }
   }
 
   form.form-grid { display: flex; flex-direction: column; gap: 10px; }
@@ -7194,8 +7096,6 @@
      smaller squash off whichever scale it is currently sitting at. */
   .set-circle:active { transform: scale(.94); }
   .set-circle.current:active { transform: scale(1.06); }
-  /* The callout itself is a zero-size anchor; its label is the visible part. */
-  .bi-callout:active span { transform: scale(.985); }
 
   /* Controls that are small on purpose keep their glyph and grow the hit area
      instead, so nothing has to be aimed at. */
@@ -7404,18 +7304,13 @@
           <h3 class="bi-head" id="biHead">Muscles Hit <span id="biLevelsInfo"></span></h3>
           <div class="bi-list" id="biList"></div>
         </div>
-        <div class="bi-detail" id="biDetail"></div>
         <div class="bi-figures" id="biFigures">
-          <div class="bi-fig" data-view="Front"><canvas id="bodyDiagramFront" class="bi-canvas"></canvas><div class="bi-callouts"></div></div>
-          <div class="bi-fig" data-view="Back"><canvas id="bodyDiagramBack" class="bi-canvas"></canvas><div class="bi-callouts"></div></div>
+          <div class="bi-fig" data-view="Front"><canvas id="bodyDiagramFront" class="bi-canvas"></canvas></div>
+          <div class="bi-fig" data-view="Back"><canvas id="bodyDiagramBack" class="bi-canvas"></canvas></div>
         </div>
       </div>
-      <div class="bi-hint" id="biHint"><span>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M12 11V9.5a1.5 1.5 0 0 1 3 0V11"/><path d="M15 11.5v-1a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5.2-3l-2-3.4a1.5 1.5 0 0 1 2.5-1.6L9 15"/></svg>
-        Tap any muscle</span></div>
-      <div class="bi-section"><span id="biSectionTitle">Training Impact</span> <span id="biInfoSlot"></span></div>
+      <div class="bi-section"><span>Training Impact</span> <span id="biInfoSlot"></span></div>
       <div class="bi-rings" id="biRings"></div>
-      <div class="bi-pieces" id="biPieces"></div>
     </div>
 
     <div class="card bi-anim" style="--d:80ms">
@@ -14095,40 +13990,14 @@ function showApp() {
     if (f) uploadBodyPhoto(f);
   });
   document.querySelectorAll("#biPeriod button").forEach((b) => {
-    /* Changing the window changes the answer, so it has to change the view
-       back too. Left zoomed, the redraw repainted the whole heat map behind a
-       muscle that was still isolated and still pulsing, which is neither one
-       state nor the other. */
     b.addEventListener("click", () => {
       BODY_PERIOD = b.dataset.period;
-      bodyResetFocus();
       renderBodyTab(true);
     });
   });
   $("biInfoSlot").innerHTML = infoDot("impact", "What training impact means");
   $("biLevelsInfo").innerHTML = infoDot("muscleLevels", "What low, medium and high mean");
   $("biShareInfoSlot").innerHTML = infoDot("share", "What your partner sees");
-  $("biDetail").addEventListener("click", (e) => {
-    if (e.target.closest("#biBack")) { bodyUnfocus(); return; }
-    const add = e.target.closest("#biFocusAdd");
-    if (add) addFocusGroup(add.dataset.group);
-  });
-  $("biPieces").addEventListener("click", (e) => {
-    const b = e.target.closest(".bi-piece");
-    if (b && BODY_FOCUS) bodyFocusMuscle(b.dataset.muscle, BODY_FOCUS.view, BODY_FOCUS.side);
-  });
-  $("biList").addEventListener("click", (e) => {
-    const b = e.target.closest(".bi-row");
-    if (b) bodyFocusGroup(b.dataset.group);
-  });
-  $("biRings").addEventListener("click", (e) => {
-    const b = e.target.closest(".bi-ring");
-    if (b) bodyFocusGroup(b.dataset.group);
-  });
-  $("biFigures").addEventListener("click", (e) => {
-    const b = e.target.closest(".bi-callout");
-    if (b && BODY_FOCUS) bodyFocusMuscle(b.dataset.muscle, BODY_FOCUS.view, BODY_FOCUS.side);
-  });
   $("adminGymToggleWrap").onclick = () => {
     setTimeout(() => $("adminGymToggleWrap").classList.toggle("checked", $("adminEntryGym").checked), 0);
   };
@@ -14376,10 +14245,10 @@ function switchTab(tab) {
   /* Before anything else renders: the figures cannot be paused, only removed,
      and leaving them up is what made every other tab slow. See
      destroyBodyFigures. */
-  if (tab !== "body") { bodyResetFocus(); destroyBodyFigures(); }
+  if (tab !== "body") destroyBodyFigures();
   if (tab === "home") renderHome(true);
   if (tab === "progress") renderProgressTab();
-  if (tab === "body") { bodyResetFocus(); renderBodyTab(true); }
+  if (tab === "body") renderBodyTab(true);
   if (tab === "workout") {
     /* Reviewing another day is somewhere you went from this tab, not a state
        the tab holds. Coming back to it opens on today, the way every other
@@ -36567,9 +36436,7 @@ const BODY_RING_FILLERS = ["chest", "lats", "quads", "shoulders", "abs", "hamstr
 let BODY_PERIOD = null;        // null until first render, then "today" | "week" | "lastweek"
 let BODY_LAST_KEY = null;      // what was last drawn, so a silent refresh does not replay animations
 let BODY_RAMP_TIMERS = [];
-let BODY_LAST_TARGET = {};      // the full heat map, so focus can isolate and restore
-let BODY_PULSE_RAF = null;      // the selected muscle's slow breath
-let BODY_GREENED = null;        // a muscle recoloured green, to put back on unfocus
+let BODY_LAST_TARGET = {};      // the full heat map, as last painted
 let BODY_HEAT_PALETTE = null;   // the module's own ramp, kept so it can be restored
 let BODY_MUSCLE_COLOR = {};     // muscle -> the exact colour its ring shows
 let BODY_ALL_MUSCLES = [];
@@ -36684,7 +36551,6 @@ function renderBodyTab(animate = false) {
   renderBodyList(ranked, animate);
   renderBodyRings(ranked, animate);
   renderBodyDiagram(animate);
-  if (BODY_FOCUS) renderBodyDetail();
   renderBodyNext(animate);
   renderBodyShare();
 }
@@ -36709,9 +36575,9 @@ function renderBodyList(ranked, animate) {
     return;
   }
   el.innerHTML = top.map((m) =>
-    `<button type="button" class="bi-row" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
-      <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}${icon("chevronRight", 13)}</span></div>
-    </button>`).join("")
+    `<div class="bi-row" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
+      <div class="bi-row-top"><span class="bi-row-name">${escapeHtml(m.label)}</span><span class="bi-row-level">${bodyImpactLevel(m.pct)}</span></div>
+    </div>`).join("")
     // The list is a top five under a heading that reads as all of them, and ten
     // groups can have work, so say how many are not shown.
     + (ranked.length > top.length
@@ -36731,7 +36597,7 @@ function renderBodyRings(ranked, animate) {
   el.innerHTML = shown.map((m, i) => {
     const pct = Math.round(m.pct * 100);
     const off = c * (1 - m.pct);
-    return `<button type="button" class="bi-ring ${i === 0 && m.sets > 0 ? "top" : ""} ${m.sets > 0 ? "" : "dim"}" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
+    return `<div class="bi-ring ${i === 0 && m.sets > 0 ? "top" : ""} ${m.sets > 0 ? "" : "dim"}" data-group="${m.key}" style="--heat:${bodyHeatColor(m.pct)}">
       <div class="bi-ring-svg">
         <svg viewBox="0 0 100 100">
           <circle class="track" cx="50" cy="50" r="${r}" fill="none" stroke-width="9"/>
@@ -36741,7 +36607,7 @@ function renderBodyRings(ranked, animate) {
         <div class="bi-ring-val" data-target="${pct}">${animate ? 0 : pct}%</div>
       </div>
       <div class="bi-ring-label">${escapeHtml(m.label)}</div>
-    </button>`;
+    </div>`;
   }).join("");
   if (!animate) return;
   requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -37157,15 +37023,12 @@ async function renderBodyDiagram(animate) {
   if (document.getElementById("tab-body").classList.contains("hidden")) return;
 
   if (!riveFrontCtrl || riveLoadedSex !== sex) {
-    if (BODY_FOCUS) bodyClearFocusUI();
     riveFrontCtrl?.destroy();
     riveBackCtrl?.destroy();
     const make = (id, view) => mod.createBodyHeatmap({
       canvas: $(id), artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE,
       intensities: {},
-      onMuscleClick: (muscle, group, tap) => bodyFocusMuscle(muscle, view, tap ? (tap.x < 0.5 ? "left" : "right") : null),
       onLoad: (r) => { bodyCapPixelRatio(r); bodyPaintPalettes(); bodyRampFigures(target, animate); },
-      onFrame: () => { if (BODY_FOCUS?.view === view) bodyPositionCallouts(); },
     });
     riveFrontCtrl = make("bodyDiagramFront", "Front");
     riveBackCtrl = make("bodyDiagramBack", "Back");
@@ -37184,7 +37047,7 @@ async function renderBodyDiagram(animate) {
 
    It only holds until the module's own ResizeObserver fires, which calls
    resizeDrawingSurfaceToCanvas() with no argument and puts the full ratio
-   back. That is a rotation or the focus fold, not the common case, and the
+   back. That is a rotation, not the common case, and the
    module is knowledge/ so we cannot fix it here: request 8 in
    mo-knowledge/LIBRARY-REQUESTS.md is still the real answer. */
 function bodyCapPixelRatio(r) {
@@ -37235,12 +37098,11 @@ function bodyPaintPalettes() {
   }
 }
 
-/* ---- Focus mode: tap a muscle, zoom in, see it piece by piece ----
-   The figure cannot recolour one muscle on its own (the .riv shares one palette
-   across all of them), so the emphasis is the zoom itself plus HTML callouts
-   pinned over the canvas. Per-piece credit comes from knowledge/anatomy/
-   muscle-detail.mjs; where to zoom from muscle-bounds.mjs. */
-let BODY_FOCUS = null;      // null | { muscle, view: "Front"|"Back", side: "left"|"right"|null }
+/* ---- Per-piece muscle credit ----
+   The heat map colours each muscle against the hardest worked muscle in its
+   own group, so it needs credit per piece and not just per group. That comes
+   from knowledge/anatomy/muscle-detail.mjs; muscle-bounds.mjs is here for the
+   bottom-to-top build order the figure ramps in. */
 let BODY_DETAIL = null;     // { detail, bounds } modules once loaded
 let bodyDetailPromise = null;
 
@@ -37278,320 +37140,6 @@ function computeMuscleDetailBetween(name, startStr, endStr) {
   return { volumes, hitBy };
 }
 
-async function bodyFocusMuscle(muscle, view, side) {
-  const { detail, bounds } = await ensureBodyDetailModules();
-  if (!detail.MUSCLE_PIECES[muscle] || !riveFrontCtrl) return;
-  const sex = riveLoadedSex || "Male";
-  // A piece picked from the list may only be drawn on the other side of the body.
-  const views = bounds.viewsFor(muscle, sex);
-  if (!views.length) return;
-  if (!views.includes(view)) view = views[0];
-  const artboard = `${sex}-${view}`;
-  const bilateral = !!bounds.MUSCLE_BOUNDS[artboard].muscles[muscle].left;
-  side = bilateral ? (side || BODY_FOCUS?.side || "left") : null;
-
-  const first = !BODY_FOCUS;
-  BODY_FOCUS = { muscle, view, side };
-  $("biGrid").classList.add("focus");
-  $("biHint").classList.add("hidden");
-  document.querySelectorAll("#biFigures .bi-fig").forEach((f) => f.classList.toggle("collapsed", f.dataset.view !== view));
-  $("biRings").classList.add("hide");
-  $("biPieces").classList.add("show");
-
-  const ctrl = view === "Front" ? riveFrontCtrl : riveBackCtrl;
-  const other = view === "Front" ? riveBackCtrl : riveFrontCtrl;
-  other?.focus(null, false);
-  // On the first tap the canvas is still growing; zoom after the layout settles
-  // so the tween lands on the final size instead of chasing it.
-  const go = () => ctrl?.focus(bounds.boundsFor(artboard, muscle, side), true);
-  if (first) setTimeout(go, 60); else go();
-  bodyIsolateMuscle(muscle);
-  renderBodyDetail();
-}
-
-/* Zoomed in on one muscle, the heat map around it is noise: everything else
-   goes dark so the thing being read is the only thing lit. A muscle with no
-   work done on it would be dark too, and a zoom onto nothing says nothing, so
-   that case is lit in the app's green, which the heat scale never uses, and
-   is unmistakably "none" rather than "a little".
-
-   Then it blinks, so a second tap on a second muscle is visibly a new answer
-   and not the same screen. Three blinks, then it holds. */
-const BODY_NONE_GREEN = { r: 0x3b, g: 0xe7, b: 0x6b };   // the app's accent, absent from the heat ramp
-
-/* Built at call time, not at parse time: the base colour comes from the
-   module's own palette so a change there cannot leave this one behind. */
-function bodyGreenPalette() {
-  return {
-    base: BODY_HEAT_PALETTE?.base || { r: 0x23, g: 0x2a, b: 0x31 },
-    level1: BODY_NONE_GREEN, level2: BODY_NONE_GREEN,
-    level3: BODY_NONE_GREEN, level4: BODY_NONE_GREEN,
-  };
-}
-
-function bodyIsolateMuscle(muscle) {
-  bodyStopPulse();
-  bodyRestoreGreen();
-
-  const real = BODY_LAST_TARGET[muscle] || 0;
-  const unused = real === 0;
-  const heat = BODY_HEAT_PALETTE || {};
-  // Its own colour, the one its ring shows, not a step off the shared ramp.
-  const lit = unused ? BODY_NONE_GREEN : (BODY_MUSCLE_COLOR[muscle] || heat.level4 || BODY_NONE_GREEN);
-  const base = heat.base || { r: 0x23, g: 0x2a, b: 0x31 };
-  BODY_GREENED = muscle;   // its palette is ours now either way, so put it back on exit
-
-  // Everything else dark; the selected one carries the only light on the figure.
-  const only = {};
-  for (const k in BODY_LAST_TARGET) only[k] = 0;
-  only[muscle] = 4;
-  riveFrontCtrl?.setIntensities(only);
-  riveBackCtrl?.setIntensities(only);
-
-  const paint = (t) => {
-    const mix = (a, b) => Math.round(a + (b - a) * t);
-    const c = { r: mix(base.r, lit.r), g: mix(base.g, lit.g), b: mix(base.b, lit.b) };
-    const pal = { base, level1: c, level2: c, level3: c, level4: c };
-    riveFrontCtrl?.setMusclePalette(muscle, pal);
-    riveBackCtrl?.setMusclePalette(muscle, pal);
-  };
-
-  const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reduced) { paint(1); return; }
-
-  /* A slow breath rather than a strobe, and it never goes all the way out, so
-     the muscle you picked is always readable while it pulses. Runs for as long
-     as it stays selected. */
-  const PERIOD = 1700, FLOOR = 0.22;
-  const t0 = performance.now();
-  const step = (now) => {
-    if (!BODY_FOCUS || BODY_FOCUS.muscle !== muscle) { BODY_PULSE_RAF = null; return; }
-    const phase = (Math.sin(((now - t0) / PERIOD) * Math.PI * 2 - Math.PI / 2) + 1) / 2;
-    paint(FLOOR + (1 - FLOOR) * phase);
-    BODY_PULSE_RAF = requestAnimationFrame(step);
-  };
-  BODY_PULSE_RAF = requestAnimationFrame(step);
-}
-
-function bodyStopPulse() {
-  if (BODY_PULSE_RAF) { cancelAnimationFrame(BODY_PULSE_RAF); BODY_PULSE_RAF = null; }
-}
-
-/* Put back the colour this muscle is supposed to be, which is its own, not the
-   shared ramp: restoring the shared one would leave it a different colour from
-   its ring, which is the bug this whole path exists to avoid. */
-function bodyRestoreGreen() {
-  if (!BODY_GREENED || !BODY_HEAT_PALETTE) { BODY_GREENED = null; return; }
-  const c = BODY_MUSCLE_COLOR[BODY_GREENED] || BODY_HEAT_PALETTE.level1;
-  const pal = { base: BODY_HEAT_PALETTE.base, level1: c, level2: c, level3: c, level4: c };
-  riveFrontCtrl?.setMusclePalette(BODY_GREENED, pal);
-  riveBackCtrl?.setMusclePalette(BODY_GREENED, pal);
-  BODY_GREENED = null;
-}
-
-/* Everything lit again, exactly as it was before the zoom. */
-function bodyRestoreHeat() {
-  bodyStopPulse();
-  bodyRestoreGreen();
-  riveFrontCtrl?.setIntensities(BODY_LAST_TARGET);
-  riveBackCtrl?.setIntensities(BODY_LAST_TARGET);
-}
-
-function bodyClearFocusUI() {
-  BODY_FOCUS = null;
-  $("biGrid").classList.remove("focus");
-  $("biHint").classList.remove("hidden");
-  document.querySelectorAll("#biFigures .bi-fig").forEach((f) => f.classList.remove("collapsed"));
-  document.querySelectorAll("#biFigures .bi-callouts").forEach((c) => { c.innerHTML = ""; });
-  $("biRings").classList.remove("hide");
-  $("biPieces").classList.remove("show");
-  $("biSectionTitle").textContent = "Training Impact";
-  $("biInfoSlot").innerHTML = infoDot("impact", "What training impact means");
-}
-
-/* Leaving the tab and returning is an arrival: the zoom, the isolated muscle
-   and its pulse all go, without the zoom-out tween, since there is nothing on
-   screen yet to animate away from. */
-function bodyResetFocus() {
-  if (!BODY_FOCUS) return;
-  bodyClearFocusUI();
-  bodyRestoreHeat();
-  riveFrontCtrl?.focus(null, false);
-  riveBackCtrl?.focus(null, false);
-}
-
-function bodyUnfocus() {
-  bodyClearFocusUI();
-  bodyRestoreHeat();
-  riveFrontCtrl?.focus(null, true);
-  riveBackCtrl?.focus(null, true);
-  // The folded figure sat at zero width, so its drawing surface was left alone. Size it
-  // again once the fold has finished opening, otherwise it comes back blank.
-  setTimeout(() => { riveFrontCtrl?.resize(); riveBackCtrl?.resize(); }, 520);
-}
-
-/* Tapping a row in the ranked list or one of the rings: open the group at whichever of
-   its muscles carries the most work, so "Shoulders" lands on the delt that was actually
-   trained rather than always the first one in the list. */
-async function bodyFocusGroup(group) {
-  const { detail } = await ensureBodyDetailModules();
-  const pieces = detail.PIECES_BY_GROUP[group] || [];
-  if (!pieces.length) return;
-  const [start, end] = bodyPeriodRange(BODY_PERIOD);
-  const { volumes } = computeMuscleDetailBetween(ME, start, end);
-  const best = pieces.reduce((a, b) => ((volumes[b] || 0) > (volumes[a] || 0) ? b : a), pieces[0]);
-  bodyFocusMuscle(best, BODY_FOCUS?.view || "Front", BODY_FOCUS?.side || null);
-}
-
-/* Body impact is a viewer, and this is its one way out to a real preference:
-   you tapped a muscle to read it, and if that turns out to be the thing you
-   care about, saying so here means the next generated week acts on it. The
-   picker in Setup is still where a focus is built or dropped, and it is still
-   the only place a level is chosen: this shortcut adds at Secondary, the middle
-   tier, which is what a pick with no level on it has always meant. */
-async function addFocusGroup(group) {
-  await ensureFocusBudget();
-  const { all, picked } = focusParseStored(MY_PROFILE?.focus_groups);
-  if (!group || !BODY_GROUP_LABELS[group] || picked.has(group)) return;
-  // Whole body is one token, and adding a group to it is what un-picks it.
-  const next = all ? new Map() : picked;
-  next.set(group, FOCUS_TIERS.secondary);
-  const { order, kept } = focusKept(next);
-  if (!await saveFocusGroups(order.map(([g, t]) => `${g}:${t}`))) return;
-  /* Same cut the picker shows, said without a number: the pick is saved either
-     way, and if the plan will not get to it, Focus areas is where that shows. */
-  toast(kept.has(group)
-    ? `${BODY_GROUP_LABELS[group]} added as a secondary focus.`
-    : `${BODY_GROUP_LABELS[group]} added. The plan already pushes as much as it can, so Focus areas shows which picks it gets to.`);
-  renderBodyDetail();
-}
-
-function bodyFmtSets(v) {
-  const n = Math.round(v * 10) / 10;
-  return `${n} ${n === 1 ? "set" : "sets"}`;
-}
-
-function renderBodyDetail() {
-  const f = BODY_FOCUS;
-  if (!f || !BODY_DETAIL) return;
-  const { detail, bounds } = BODY_DETAIL;
-  const [start, end] = bodyPeriodRange(BODY_PERIOD);
-  const { volumes, hitBy } = computeMuscleDetailBetween(ME, start, end);
-  const piece = detail.MUSCLE_PIECES[f.muscle];
-  /* Every piece and head on this screen belongs to the tapped muscle's group,
-     so one dose serves all of them: the engine's for that group, or the
-     fallback when the plan has no number for it. */
-  const target = bodyDoseFor(piece.group, BODY_PERIOD);
-  const pctOf = (k) => Math.min(1, (volumes[k] || 0) / target);
-  // Untouched pieces stay neutral rather than showing the level-1 yellow for 0%.
-  const heatOf = (k) => ((volumes[k] || 0) > 0 ? bodyHeatColor(pctOf(k)) : "var(--muted)");
-  const word = bodyPeriodWord(BODY_PERIOD);
-  const groupLabel = BODY_GROUP_LABELS[piece.group] || piece.group;
-  const pct = pctOf(f.muscle);
-  const sets = volumes[f.muscle] || 0;
-
-  // Left column: the tapped muscle itself.
-  const heads = (piece.heads || []).map((h) => {
-    const hp = pctOf(h);
-    return `<span class="bi-chip ${hp > 0 ? "hit" : ""}" style="--heat:${heatOf(h)}">${escapeHtml(detail.MUSCLE_HEADS[h].label)} · ${hp > 0 ? `${Math.round(hp * 100)}%` : "Not hit"}</span>`;
-  }).join("");
-  const hits = [...(hitBy[f.muscle]?.values() || [])].sort((a, b) => b.sets * b.weight - a.sets * a.weight).slice(0, 4);
-  $("biDetail").innerHTML = `
-    <button type="button" class="bi-back" id="biBack">${icon("chevronLeft", 14)} All muscles</button>
-    <div class="bi-detail-name">${escapeHtml(piece.label)}</div>
-    <div class="bi-detail-sub">${escapeHtml(groupLabel)} · ${escapeHtml(piece.where)}</div>
-    <div class="bi-detail-impact" style="--heat:${heatOf(f.muscle)}">
-      ${sets > 0
-        ? `<div class="bi-detail-pct">${Math.round(pct * 100)}%</div><div class="bi-detail-lvl">${bodyImpactLevel(pct)} · ${bodyFmtSets(sets)} ${escapeHtml(word)}</div>`
-        : `<div class="bi-detail-pct none">Not hit ${escapeHtml(word)}</div>`}
-    </div>
-    <div class="bi-detail-bar" style="--heat:${heatOf(f.muscle)}"><i style="--fill:${pct.toFixed(3)}"></i></div>
-    ${focusTierOfGroup(piece.group)
-      ? (() => { const t = focusTierOfGroup(piece.group);
-          /* The level is named and counted in pips, never just tinted: this
-             line is the one place outside the picker that reports a tier. */
-          return `<div class="bi-detail-sub bi-focus-tier focus-t${t}" style="margin-top:12px;">${focusPips(t)} ${escapeHtml(groupLabel)} is a <b>${escapeHtml(FOCUS_TIER_WORD[t].toLowerCase())}</b> focus area.</div>`; })()
-      : `<button type="button" class="bi-back" id="biFocusAdd" data-group="${piece.group}" style="margin:12px 0 0;">${icon("dumbbell", 13)} Focus on this</button>`}
-    ${heads ? `<div class="bi-detail-label">Parts</div><div class="bi-chips">${heads}</div>` : ""}
-    <div class="bi-detail-label">${sets > 0 ? "Hit by" : "Try"}</div>
-    ${sets > 0
-      /* What each exercise counted toward this muscle, not what was logged: the
-         headline is weighted, a helping muscle earning half, so rows printing raw
-         set counts added to more than the total above them. Same unit both places
-         now, with the assist label saying why a row is worth less than it looks. */
-      ? hits.map((h) => `<div class="bi-hit"><span class="bi-hit-name">${escapeHtml(h.name)}</span><span class="bi-hit-sets ${h.weight < 1 ? "assist" : ""}">${bodyFmtSets(h.sets * h.weight)}</span></div>`).join("")
-      : `<div class="bi-try"><b>${escapeHtml(piece.try)}</b> targets it directly.</div>`}`;
-
-  // Below: every piece of the same group, hit or not.
-  const pieces = detail.PIECES_BY_GROUP[piece.group] || [];
-  $("biSectionTitle").textContent = `${groupLabel}, piece by piece`;
-  // The rings are off screen in focus mode, so the dot beside this heading has to
-  // explain pieces rather than rings.
-  $("biInfoSlot").innerHTML = infoDot("pieces", "What the pieces of a muscle are");
-  $("biPieces").innerHTML = pieces.map((k) => {
-    const p = detail.MUSCLE_PIECES[k];
-    const pp = pctOf(k);
-    const hit = (volumes[k] || 0) > 0;
-    return `<button type="button" class="bi-piece ${k === f.muscle ? "on" : ""} ${hit ? "" : "off"}" data-muscle="${k}" style="--heat:${heatOf(k)}">
-      <span class="bi-piece-dot"></span>
-      <span class="bi-piece-text"><div class="bi-piece-name">${escapeHtml(p.label)}</div><div class="bi-piece-where">${escapeHtml(p.where)}</div></span>
-      <span class="bi-piece-val"><div class="bi-piece-pct">${hit ? `${Math.round(pp * 100)}%` : "Not hit"}</div><div class="bi-piece-bar"><i style="--fill:${pp.toFixed(3)}"></i></div></span>
-    </button>`;
-  }).join("");
-
-  // Callouts on the zoomed figure, for the pieces that view actually draws.
-  const artboard = `${riveLoadedSex || "Male"}-${f.view}`;
-  document.querySelectorAll("#biFigures .bi-fig").forEach((fig) => {
-    const wrap = fig.querySelector(".bi-callouts");
-    if (fig.dataset.view !== f.view) { wrap.innerHTML = ""; return; }
-    wrap.innerHTML = pieces.map((k) => {
-      /* Worked pieces and the one you tapped. A callout also hides when its anchor
-         projects off the canvas, and that is positional, so labelling untouched
-         pieces too meant a piece you trained could go unlabelled while one you did
-         not sat there named. The list below still names every piece. */
-      if (k !== f.muscle && !((volumes[k] || 0) > 0)) return "";
-      const box = bounds.boundsFor(artboard, k, f.side);
-      if (!box) return "";
-      return `<button type="button" class="bi-callout ${k === f.muscle ? "on" : ""} ${(volumes[k] || 0) > 0 ? "" : "off"}" data-muscle="${k}"
-        data-ax="${((box[0] + box[2]) / 2).toFixed(4)}" data-ay="${((box[1] + box[3]) / 2).toFixed(4)}" style="--heat:${heatOf(k)}"
-        aria-label="${escapeHtml(detail.MUSCLE_PIECES[k].label)}"><i></i><span>${escapeHtml(detail.MUSCLE_PIECES[k].label)}</span></button>`;
-    }).join("");
-  });
-  bodyPositionCallouts();
-}
-
-// Runs every frame of the zoom tween and after resizes, so it only moves what is
-// already there. Pills sit to the right of their dot unless that would clip, and
-// close neighbours are nudged apart vertically (the dot stays put, the pill slides).
-function bodyPositionCallouts() {
-  const f = BODY_FOCUS;
-  if (!f) return;
-  const ctrl = f.view === "Front" ? riveFrontCtrl : riveBackCtrl;
-  const fig = document.querySelector(`#biFigures .bi-fig[data-view="${f.view}"]`);
-  if (!ctrl || !fig) return;
-  const canvas = fig.querySelector("canvas");
-  const W = canvas.clientWidth, H = canvas.clientHeight;
-  const items = [...fig.querySelectorAll(".bi-callout")].map((el) => ({ el, ...ctrl.project(+el.dataset.ax, +el.dataset.ay) }));
-  items.sort((a, b) => a.y - b.y);
-  let lastY = -Infinity;
-  for (const it of items) {
-    const inside = it.x >= 6 && it.x <= W - 6 && it.y >= 6 && it.y <= H - 6;
-    it.el.classList.toggle("hidden", !inside);
-    if (!inside) continue;
-    const y = Math.max(lastY + 24, it.y);
-    lastY = y;
-    it.el.style.left = `${it.x}px`;
-    it.el.style.top = `${it.y}px`;
-    it.el.style.setProperty("--dy", `${y - it.y}px`);
-    // Pill to the right of the dot; to the left if that clips; slid along if
-    // neither side fits (a wide label on a narrow phone canvas).
-    const w = it.el.lastElementChild.offsetWidth || 80;
-    let dx = 9;
-    if (it.x + 9 + w > W - 4) dx = it.x - 9 - w >= 4 ? -9 - w : Math.max(4 - it.x, W - 4 - w - it.x);
-    it.el.style.setProperty("--dx", `${dx}px`);
-  }
-}
-
 /* Muscles light up one level at a time instead of snapping to their final
    colour, so a heavy chest day visibly "builds" on the figure. */
 /* Feet first, head last, using the real bounding boxes rather than a
@@ -37622,12 +37170,6 @@ function bodyRampFigures(target, animate) {
     riveFrontCtrl?.setIntensities(map);
     riveBackCtrl?.setIntensities(map);
   };
-  /* A refresh while a muscle is being examined must not repaint the whole map
-     behind it. The period buttons drop the zoom before they redraw, but a
-     background data refresh does not, and that left the figure showing every
-     muscle lit with one of them still pulsing on top. Hold the isolation; the
-     new numbers appear when the zoom is dropped. */
-  if (BODY_FOCUS) { bodyIsolateMuscle(BODY_FOCUS.muscle); return; }
   if (!animate) { apply(target); return; }
 
   const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
@@ -37781,10 +37323,6 @@ async function bodyNextReading() {
     dayIndex,
     dayCount: week.length,
     dayGroups: day?.mainGroups || [],
-    /* The body picker's marks, as the engine applied them rather than as they
-       were tapped: meta.focus.why explains any gap between the two. */
-    marked: built.meta?.focus?.applied || [],
-    markedWhy: built.meta?.focus?.why || [],
     targetsChanged,
     planFocus: leftOnPlan.length ? displayFocus(TODAY_WORKOUT.focus, planned.map((e) => e.name)) : null,
     planLeft: leftOnPlan.length,
@@ -37915,7 +37453,6 @@ async function renderBodyNext(animate) {
     renderBodyList(ranked, false);
     renderBodyRings(ranked, false);
     renderBodyDiagram(false);
-    if (BODY_FOCUS) renderBodyDetail();
   }
   const areas = reading ? reading.areas : bodyAreaStates();
   const trained = areas.filter((a) => a.lastDate);
@@ -37996,14 +37533,9 @@ async function renderBodyNext(animate) {
         kind === "go" ? "" : ` <i>${Math.ceil(a.hoursLeft)}h</i>`}</span>`).join("")
     : `<span class="nx-none">None</span>`;
 
-  /* The two rows that only exist when the engine answered, because neither is
+  /* The one row that only exists when the engine answered, because it is not
      something this file can work out for itself: which day of the split comes
-     next, and which groups the body picker marked. */
-  const markedRow = !reading ? "" : `
-      <div class="nx-row"><span class="nx-k">You marked</span><span class="nx-v">${
-        reading.marked.length
-          ? reading.marked.map((g) => `<span class="nx-chip">${escapeHtml(BODY_GROUP_LABELS[g] || g)}</span>`).join("")
-          : `<span class="nx-none">Nothing, so the plan spreads volume evenly</span>`}</span></div>`;
+     next. */
   const splitRow = !reading || !reading.dayName ? "" : `
       <div class="nx-row"><span class="nx-k">Rotation</span><span class="nx-v nx-text">${
         escapeHtml(reading.dayName + (reading.dayCount > 1 && reading.dayIndex >= 0
@@ -38018,7 +37550,6 @@ async function renderBodyNext(animate) {
       <div class="nx-row"><span class="nx-k">Ready now</span><span class="nx-v">${chips(ready, "go")}</span></div>
       <div class="nx-row"><span class="nx-k">Fine to train</span><span class="nx-v">${chips(okToTrain, "easy")}</span></div>
       <div class="nx-row"><span class="nx-k">Give it a day</span><span class="nx-v">${chips(holding, "rest")}</span></div>
-      ${markedRow}
       ${splitRow}
       <div class="nx-row"><span class="nx-k">This week</span><span class="nx-v nx-text">${escapeHtml(weekLine)}</span></div>
     </div>`;
@@ -42508,8 +42039,6 @@ const A11Y_STATE_MAP = [
   [".activity-chip[data-act]", "aria-pressed", "on"],
   [".str-row[data-lift]", "aria-pressed", "on"],
   [".cal-month[data-month]", "aria-pressed", "on"],
-  [".bi-piece[data-muscle]", "aria-pressed", "on"],
-  [".bi-callout[data-muscle]", "aria-pressed", "on"],
   [".wp-chip", "aria-pressed", "on"],
   [".tl-react[data-react]", "aria-pressed", "on"],
   [".choice-card[data-v]", "aria-pressed", "selected"],
