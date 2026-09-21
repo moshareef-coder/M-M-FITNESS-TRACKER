@@ -215,6 +215,244 @@ export const FORM = {
   "band shoulder external rotation": { cue: "Elbow pinned to your side, rotate the forearm out.", joke: "Small, boring, and it saves shoulders." },
   "quadruped wrist rocks": { cue: "Rock gently. Back off the moment it pinches.", joke: "Wrists. They carry you. Be kind." },
   "chin tucks": { cue: "Slide the chin straight back, not down. Small movement.", joke: "Making a double chin, therapeutically." },
+
+  /* Added 2026-09-21: every exercise in the library gets its own line now,
+     not a shared pattern fallback. Grouped by the category the move library
+     files them under, for anyone diffing this against a future addition to
+     one of those files. */
+  // Weight training -- Chest
+  "low-to-high cable fly": { cue: "Pulleys set low, hands finish up near eye level, soft bend in the elbows the whole way.", joke: ["An upper-chest fly with a commute built in.", "The angle changed. My enthusiasm did not."] },
+  "landmine press": { cue: "Press the bar up and slightly forward along its natural arc, brace so your ribs do not flare.", joke: ["A barbell wedged in a corner, pressed with real confidence.", "One end of the bar is on the floor. That end is having a great day."] },
+
+  // Weight training -- Back (Lats)
+  "close-grip pulldown": { cue: "Narrow grip, pull the bar to your upper chest, elbows finish close to your sides.", joke: ["Same pulldown, hands closer together. The biceps noticed immediately.", "A lat pulldown that got claustrophobic on purpose."] },
+  "chest-supported row": { cue: "Chest stays pinned to the pad for the whole set. If it lifts off, the weight is too heavy.", joke: ["A row with a chest strap. No cheating permitted.", "The pad does the bracing so your lower back does not have to argue about it."] },
+  "pendlay row": { cue: "Bar rests on the floor between every rep. Flat back, explode it up to your ribs, no bounce off the ground.", joke: ["The bar touches down every single rep. No momentum allowed, ever.", "A barbell row that resets to zero on principle."] },
+  "weighted pull-up": { cue: "Add weight only once bodyweight pull-ups are smooth and controlled. Same strict form, just heavier.", joke: ["A pull-up, but you brought a friend. The friend is a plate.", "Gravity was already winning. Now it is personal."] },
+
+  // Weight training -- Traps / Upper Back
+  "dumbbell shrug": { cue: "Dumbbells at your sides, shrug straight up toward your ears, hold a beat at the top.", joke: ["Two weights, one shrug. Efficient indifference.", "The dumbbells do not care either. It is a whole shared mood."] },
+  "barbell shrug": { cue: "Bar stays in front of your thighs. Straight up and down, never roll the shoulders around it.", joke: ["The heaviest shrug in the building. Still, fundamentally, a shrug.", "A barbell, held, then barely moved. My favourite kind of lift."] },
+  "behind-the-back shrug": { cue: "Bar held behind you, close to your glutes. Shrug straight up, keep the range short and controlled.", joke: ["A shrug that will not even face you.", "Doing this where you cannot see it happen. Trust exercises, apparently."] },
+
+  // Weight training -- Shoulders
+  "cable lateral raise": { cue: "Pulley set low, lead with the elbow, stop at shoulder height, control the return instead of letting the stack yank it back.", joke: ["The cable does not let you rest at the bottom. It never forgets.", "A lateral raise with a leash on it."] },
+  "machine shoulder press": { cue: "Set the seat so the handles start level with your shoulders, press straight up, no arching off the pad.", joke: ["A machine decided the path so your shoulders do not have to negotiate.", "Pressing overhead, fully chaperoned."] },
+  "dumbbell shoulder press": { cue: "Palms face forward, press the dumbbells up and slightly in until they nearly touch overhead.", joke: ["Two independent weights overhead, trusting you completely.", "Like the barbell version, except each arm can panic on its own."] },
+
+  // Weight training -- Biceps
+  "dumbbell curl": { cue: "Palms face forward the entire way up, elbows stay pinned at your sides.", joke: ["The dumbbell version of the most honest exercise there is, now in stereo.", "Left arm, right arm, each one convinced it is doing more work."] },
+  "cable curl": { cue: "Stand tall, elbows pinned to your sides, let the cable keep tension on the muscle even at the bottom.", joke: ["A curl that never gets a break at the bottom. The cable insists.", "Gravity usually gives a curl a rest down there. The cable refuses to."] },
+  "ez-bar curl": { cue: "Grip the angled part of the bar, elbows at your sides, wrists stay neutral instead of twisted.", joke: ["A barbell that bent itself into something kinder to your wrists.", "Wavy bar, same elbows, same honest story."] },
+  "barbell curl": { cue: "Elbows locked at your sides, no leaning back to help it, lower it slower than you lifted it.", joke: ["Two arms, one bar, maximum mirror time.", "The bar is straight. Your form is the part under negotiation."] },
+  "incline dumbbell curl": { cue: "Sit back on an incline bench and let your arms hang straight down. No swinging is even physically possible here.", joke: ["The bench pins your arms behind you so cheating is off the table.", "Leaning back to curl. Very reclined. Very honest."] },
+  "spider curl": { cue: "Chest pressed into the incline pad, arms hanging straight down, curl without letting the elbows drift back.", joke: ["Face down on a bench, curling into the space beneath it.", "A curl with your chest confiscated. Nowhere for momentum to hide."] },
+
+  // Weight training -- Triceps
+  "rope pushdown": { cue: "Elbows pinned at your sides, spread the rope ends apart as you finish at the bottom.", joke: ["The rope splits in two at the bottom. Very dramatic for a triceps exercise.", "A pushdown with a rope attached. The rope has no opinions and performs fine."] },
+
+  // Weight training -- Forearms
+  "reverse wrist curl": { cue: "Forearm flat and supported, palm down, lift only from the wrist through a small range.", joke: ["The wrist curl's quieter sibling. Nobody ever asks about it.", "Tiny movement, opposite direction, same total indifference from the room."] },
+  "reverse curl": { cue: "Palms face down the whole way, elbows pinned, expect to use noticeably less weight than a normal curl.", joke: ["A curl that flipped its grip and got humbled instantly.", "Same motion, upside-down hands, an entirely different ego."] },
+
+  // Weight training -- Quads
+  "walking lunge": { cue: "Step forward into a lunge, then drive through the front heel to bring the back foot through into the next step.", joke: ["A lunge that refuses to stay in one place. Ambitious.", "Walking, if walking cost considerably more effort."] },
+  "hack squat": { cue: "Back flat against the pad, feet slightly forward on the platform, knees track over your toes.", joke: ["A squat with a backrest. Somehow still difficult.", "The machine holds your spine so your quads can suffer in peace."] },
+  "zercher squat": { cue: "Bar cradled in the crooks of your elbows, chest tall, squat down between your hips.", joke: ["Carrying the bar in your elbow creases. It will remember this for days.", "The bar sits exactly where your arms bend. Your arms were not consulted."] },
+  "sissy squat": { cue: "Knees travel forward, lean back from the knees rather than the hips, hold something for balance if you need it.", joke: ["Named sissy. Nothing about it is.", "Leaning backward on purpose while your knees go the other way. Trust the process."] },
+
+  // Weight training -- Hamstrings
+  "glute-ham raise": { cue: "Hips anchored on the pad, lower your torso forward under control, pull yourself back up with the hamstrings.", joke: ["A machine built entirely to humble hamstrings.", "Falling forward, slowly, and then very deliberately not."] },
+  "single-leg romanian deadlift": { cue: "Hinge at the hips with a flat back, let the free leg rise straight back as you lower, stop where your balance stops you.", joke: ["Balancing on one leg while also bending over. Nothing could go wrong.", "The two-legged version's braver, wobblier cousin."] },
+
+  // Weight training -- Glutes
+  "curtsy lunge": { cue: "Step one leg behind and across the other, bend both knees, keep your chest tall.", joke: ["A lunge that also curtsies. Very polite for something this hard.", "Crossing your legs on purpose, under load."] },
+  "sumo deadlift": { cue: "Wide stance, hands inside your knees, chest tall, push your knees out as you pull the bar up.", joke: ["A deadlift with a wider stance and a much stronger opinion about hips.", "Same bar, same floor, dramatically different legs."] },
+
+  // Weight training -- Calves
+  "dumbbell calf raise": { cue: "Dumbbells at your sides, rise onto your toes, pause, then lower past level for a real stretch.", joke: ["Calves, now with dumbbells for company.", "Holding extra weight just to make the smallest muscle work harder."] },
+  "seated calf raise": { cue: "Knees bent under the pad, push through the balls of your feet, full range up and down.", joke: ["Sitting down to work the one muscle that carries you standing up.", "The seated version. The calves still find something to complain about."] },
+  "standing calf raise": { cue: "Legs straight, rise all the way up onto your toes, lower until you feel a genuine stretch at the bottom.", joke: ["Standing there, rising slightly. The most honest description of a whole set.", "Calves are famously stubborn. This is the classic argument with them."] },
+  "leg press calf raise": { cue: "Feet low on the platform, toes only, push through the balls of your feet without locking the knees.", joke: ["Borrowing the leg press machine for a much smaller job.", "The sled barely registers that this is even happening."] },
+  "single-leg calf raise": { cue: "One foot at a time, hold something for balance, full range on every rep.", joke: ["Half the feet, all of the complaining.", "Balancing and rising at once. Showing off, frankly."] },
+  "donkey calf raise": { cue: "Hips hinged forward, torso low, rise onto your toes from that bent-over position.", joke: ["Named after a donkey. The pose does explain why.", "Bent over just to make the calves reach further. Apparently worth it."] },
+
+  // Weight training -- Abs
+  "reverse crunch": { cue: "Curl your hips off the floor toward your ribs, do not just swing your legs up.", joke: ["A crunch that runs in reverse, as if the regular one was too straightforward.", "The bottom half does the work this time. It is thrilled."] },
+
+  // Weight training -- Lower Back
+  "suitcase carry": { cue: "One weight, one side, stand tall and resist leaning toward it as you walk.", joke: ["Carrying one heavy bag like you are late for a flight you are not on.", "The farmer's carry's lopsided cousin."] },
+  "reverse hyperextension": { cue: "Torso stays flat on the bench, swing the legs up using the glutes, not momentum from your lower back.", joke: ["The extension where your legs fly and your spine just watches.", "Hanging off a bench, kicking backward, with genuine purpose."] },
+
+  // Yoga -- Standing poses
+  "mountain pose": { cue: "Feet grounded evenly, shoulders stacked over hips, crown reaching up. It looks like nothing and it is not nothing.", joke: ["Standing still, on purpose, and calling it a pose.", "The pose that is just correct posture with better branding."] },
+  "chair pose": { cue: "Weight back into your heels, knees over not past your toes, arms reach up by your ears.", joke: ["A squat that got invited to yoga and had to change its name.", "Sitting in a chair that does not exist. The chair never shows up."] },
+  "warrior i": { cue: "Hips squared toward the front foot, back heel grounded at an angle, arms reach straight overhead.", joke: ["The first warrior. Hips facing forward, motive still unclear.", "Arms in the air like a warrior who forgot why."] },
+  "warrior ii": { cue: "Hips open to the side this time, front knee over the ankle, arms reach out parallel to the floor.", joke: ["The second warrior. A better view of the side of the room, at least.", "Arms out wide, gaze down the front hand, very dramatic for a stretch."] },
+  "triangle pose": { cue: "Hinge sideways from the hip, not the waist, and stack your shoulders directly on top of each other.", joke: ["A triangle made of a person. Geometry teachers would approve.", "Reaching in two directions at once. An ambitious shape."] },
+  "warrior iii": { cue: "Hinge forward from the hips, one leg lifts straight back, hips stay square to the floor.", joke: ["The third warrior. Also the one most likely to fall over.", "Balancing on one leg while horizontal. Bold choice."] },
+
+  // Yoga -- Balance poses
+  "tree pose": { cue: "Foot presses into your inner thigh or calf, never the knee, and press back into it just as hard.", joke: ["Standing on one leg, pretending to be a tree. The tree is not fooled.", "This one is mostly about the standing leg, and it is furious about it."] },
+  "eagle pose": { cue: "Wrap the arms and legs around each other, sink the hips like sitting into a low chair, pick one spot and stare at it.", joke: ["Wrapping your own limbs around themselves. Not what eagles do, statistically.", "A pretzel that also has to balance. Ambitious."] },
+  "half moon pose": { cue: "Stack your hips vertically, extend the top arm straight up, keep the standing knee soft rather than locked.", joke: ["Half a moon, balanced on one hand and one leg. The other half is elsewhere.", "One hand down, one leg up. Gravity is paying very close attention."] },
+  "dancer's pose": { cue: "Grab the lifted foot from the inside, then kick back into your hand as your chest lifts forward.", joke: ["A dancer's pose performed by someone who has never danced. Same as everyone.", "Reaching back for your own foot. A trust exercise, technically."] },
+  "crow pose": { cue: "Knees rest on the backs of your upper arms, weight shifts forward onto your hands, look slightly ahead rather than down.", joke: ["Balancing your entire body on your hands. The hands were not consulted.", "A crow, on the floor, about to not be on the floor."] },
+
+  // Yoga -- Core & twists
+  "plank pose": { cue: "Straight line from your head to your heels, hands under your shoulders, ribs pulled in.", joke: ["Yoga's version of the plank. Same stillness, calmer soundtrack.", "Holding a push-up position and calling it peaceful."] },
+  "boat pose": { cue: "Balance on your sit bones, chest lifted, shins parallel to the floor or higher if your back starts to round.", joke: ["A boat made of a person, floating on nothing.", "Sitting there in a V shape, going nowhere, working very hard."] },
+  "revolved chair pose": { cue: "Sink into chair pose first, then rotate from the ribs, keeping both knees level as you twist.", joke: ["Chair pose, except it also had to spin. Overachiever.", "The chair that never existed will now also not stay still."] },
+  "firefly pose": { cue: "Hands planted behind your heels, shins resting high on the backs of your upper arms, lean forward and press down to float the hips.", joke: ["Legs straight out to the sides, floating on two hands. Fireflies do not do this either.", "An arm balance for people who have made peace with falling."] },
+
+  // Yoga -- Backbends
+  "cobra pose": { cue: "Hips stay on the mat, press through your hands, keep a slight bend in the elbows rather than locking them out.", joke: ["Lifting the chest, keeping the hips down. The snake part is optional.", "A backbend that starts from the floor and barely leaves it."] },
+  "bridge pose": { cue: "Feet hip-width, push through your heels to lift the hips, roll back down one vertebra at a time.", joke: ["A bridge, built from a person, lying down for once.", "The gentler backbend. It still has opinions about your lower back."] },
+  "camel pose": { cue: "Push the hips forward over your knees first, then reach back for your heels one hand at a time.", joke: ["Reaching for your own heels while kneeling. The camel would not do this either.", "A backbend on your knees. The floor is very far from your head right now."] },
+  "wheel pose": { cue: "Hands by your ears, feet close to your hips, press evenly through hands and feet to lift.", joke: ["The whole body, arched into a wheel. An ambitious flooring choice.", "Upside down and backward at the same time. Showing off.", "The strongest backbend on the list, and it looks it."] },
+  "king pigeon pose": { cue: "Square the hips first before you reach back for the foot. Only go as deep as your hips actually allow.", joke: ["Pigeon pose that decided regular pigeon was not enough.", "A hip opener that also wanted to be a backbend. Greedy."] },
+
+  // Yoga -- Hip openers & forward folds
+  "low lunge": { cue: "Back knee cushioned on the mat, front knee over the ankle, sink the hips forward and down.", joke: ["A lunge that gave up on the back leg entirely.", "Kneeling and reaching forward. The floor is very involved."] },
+  "butterfly pose": { cue: "Soles of the feet together, let the knees drop toward the floor, do not press down on them.", joke: ["Sitting like a butterfly. The knees have their own agenda.", "Feet together, knees out, patience required."] },
+  "pigeon pose": { cue: "Square the hips toward the front of the mat, support the front hip with a block if it is not reaching the floor.", joke: ["One leg forward, one leg back, hips extremely upset about both.", "The pose everyone avoids and everyone needs."] },
+  "lizard pose": { cue: "Front foot lands outside your hands, hips sink low and square, back knee can rest down for support.", joke: ["A lunge that got even lower and dragged the hands with it.", "Hands and feet, all on the floor, hips somewhere near the basement."] },
+  "splits (hanumanasana)": { cue: "Square the hips forward, walk down slowly, use blocks under both hands, and never force the range.", joke: ["The splits. The floor is very far away and slowly getting closer.", "Named after a monkey. Only the monkey does this without blocks."] },
+
+  // Yoga -- Restorative / cool-down
+  "child's pose": { cue: "Hips sink back toward your heels, arms reach forward or rest by your sides, forehead down.", joke: ["The pose where you get to just stop for a minute. Deeply underrated.", "Folded up small on purpose. Highly recommend."] },
+  "cat-cow": { cue: "Inhale as you arch and lift your chest, exhale as you round through your spine like a cat. Slow both ways.", joke: ["The only pose named after two entirely different animals having a great time.", "A warm-up so gentle even a drawing could love it. I am lines. I still love it."] },
+  "corpse pose (savasana)": { cue: "Let your feet fall open, palms up, and actually stop moving. Stillness is the whole exercise here.", joke: ["Lying perfectly still and calling it the hardest pose in the room. They are right.", "The one pose I could do professionally.", "I have not moved in weeks. This one I understand completely."] },
+  "reclined twist": { cue: "Knees drop to one side, keep both shoulders pressed to the floor, and let gravity do the twisting.", joke: ["A twist you do lying down. The laziest, most effective idea in the whole practice.", "Knees go one way, shoulders refuse to follow. A small, polite rebellion."] },
+  "legs-up-the-wall pose": { cue: "Hips close to the wall, legs relaxed straight up, arms resting open, just breathe.", joke: ["Lying down with your legs on a wall. The wall does all the work.", "The most effort-free pose that still counts. My favourite category."] },
+  "reclined bound angle pose": { cue: "Soles of the feet together, let gravity open the knees, support them with pillows if they do not reach the floor.", joke: ["Butterfly pose, but lying down, because even the trying got tired.", "Knees falling open while you do nothing. A pose built for nap adjacency."] },
+
+  // Pilates -- Core / abs
+  "double leg stretch": { cue: "Low back pressed to the mat the whole time, extend arms and legs only as far as you can hold that.", joke: ["Stretching two legs by making them do considerably more work.", "Arms and legs fly out together. The middle stays exactly where it should."] },
+  "single leg stretch": { cue: "Low back stays flat on the mat, switch legs with control rather than a kick.", joke: ["One knee in, one leg out, and somehow both feel it.", "The hundred's smaller, sneakier cousin."] },
+
+  // Pilates -- Glutes / hips
+  "leg circles": { cue: "Hips stay still on the mat, the circle comes from the hip socket, not from swinging the whole leg.", joke: ["Drawing circles in the air with your leg. The ceiling remains unimpressed.", "One leg working, one hip trying very hard to stay out of it."] },
+
+  // Calisthenics -- Pull progressions
+  "negative pull-up": { cue: "Start at the top of the bar, then lower yourself as slowly as you possibly can, all the way to a hang.", joke: ["A pull-up in reverse, for people not quite ready for the real thing. No shame in it.", "Falling, but make it strength training."] },
+  "archer pull-up": { cue: "Pull up while shifting your chin toward one hand, letting the other arm stay long and mostly straight.", joke: ["A pull-up that picked a favourite arm and will not apologise for it.", "One arm does the pulling. The other just enjoys the view."] },
+  "one-arm pull-up": { cue: "Full body tension, pull from the shoulder and lat, not just the arm. Most people spend years building to this.", joke: ["The pull-up's final form. I am simply lines and I still find this intimidating.", "One arm. The other is somewhere else entirely, doing nothing, judged."] },
+
+  // Calisthenics -- Leg progressions
+  "bodyweight squat": { cue: "Feet shoulder width, knees track over your toes, sit back like there is a chair behind you.", joke: ["A squat with no weight, no bar, no excuse.", "The squat in its purest form. Nothing left to blame but gravity."] },
+  "split squat": { cue: "Feet planted for the whole set, front knee over the ankle, drop straight down rather than forward.", joke: ["A lunge that stopped moving and got serious about it.", "Same legs as a lunge, none of the travel."] },
+  "shrimp squat": { cue: "Hold your back foot behind you, sit the standing hip back and down, use a hand for balance while you learn it.", joke: ["A pistol squat that decided one bent leg was not hard enough.", "Balancing on one leg while the other one folds up behind you. Ambitious."] },
+  "pistol squat": { cue: "Extend the free leg straight out in front, sit the standing hip back, and keep the heel down.", joke: ["One leg squatting, the other leg pointing accusingly at nothing.", "A squat that demands balance, strength, and forgiving ankles, all at once."] },
+
+  // Calisthenics -- Core & static holds
+  "hollow body hold": { cue: "Press your lower back into the floor and keep it there, arms and legs extended, ribs down.", joke: ["Holding a banana shape until your abs file a formal complaint.", "Lying down has never been this much work."] },
+  "tuck l-sit": { cue: "Press your shoulders down away from your ears, knees tucked tight, hips lifted off the floor.", joke: ["An L-sit that has not finished growing up yet.", "Floating with your knees tucked in. Small victories."] },
+  "l-sit": { cue: "Press the shoulders down, legs straight and together, point the toes.", joke: ["Sitting in mid-air, legs out straight, dignity fully intact.", "The letter L, held against your will."] },
+  "v-sit": { cue: "Legs lift above parallel this time, hips further forward than an L-sit, shoulders still pressed down.", joke: ["The L-sit's more dramatic sibling.", "A V shape made entirely of effort."] },
+
+  // Calisthenics -- Advanced statics (skill work)
+  "wall handstand hold": { cue: "Stack wrists under shoulders, squeeze the glutes and brace, use the wall for balance rather than leaning your whole weight on it.", joke: ["Upside down, with a wall for a safety net. Reasonable.", "A handstand that admits it needs help. Respect."] },
+  "tuck front lever": { cue: "Hollow the body, pull your shoulder blades down, keep the knees tucked tight to shorten the lever.", joke: ["A front lever that has not committed to straight legs yet. Smart.", "Horizontal, tucked up, extremely proud of it."] },
+  "freestanding handstand": { cue: "Fingers spread wide, press through the fingertips to balance, look at your hands rather than the floor.", joke: ["Upside down, unsupported, entirely on your own. Brave.", "The wall left the room for this one."] },
+  "front lever": { cue: "Straight body, straight arms, pull the shoulder blades down and back to keep the line flat, not banana-shaped.", joke: ["The move pattern already warned you this was absurd. It undersold it.", "A plank, rotated ninety degrees, hanging from a bar. Sure."] },
+  "tuck planche": { cue: "Lean forward over your hands, knees tucked to your chest, shoulders in front of your wrists.", joke: ["A planche still deciding if it actually wants to happen.", "Leaning forward on your hands with your knees along for the ride."] },
+  "full planche": { cue: "Straight arms, straight body, lean far enough forward that your shoulders are well past your wrists.", joke: ["The planche in its final form. I am impressed and I do not even have a body.", "Floating parallel to the floor on two hands.", "The floor is directly underneath this the entire time and remains unbothered."] },
+
+  // Stretching -- Dynamic, before training
+  "arm circles": { cue: "Start small and controlled, let the circles get bigger only once the shoulder feels warm.", joke: ["Windmill impressions. No wind involved.", "The easiest warm-up there is. I would still forget to do it."] },
+  "cross-body arm swings": { cue: "Let both arms swing across your chest and back out, keep the motion loose rather than forced.", joke: ["Hugging yourself repeatedly, at speed, strictly for warm-up purposes.", "Arms crossing back and forth like they are mid-argument."] },
+  "elbow circles": { cue: "Fingertips on your shoulders, circle the elbows in a full slow ring, both directions.", joke: ["The smallest circles in the entire warm-up. Still counts.", "Elbows, circling, for reasons nobody questions."] },
+  "wrist circles": { cue: "Slow full circles in both directions, letting the whole hand move rather than just the fingers.", joke: ["The joint that carries every other exercise on this list, getting thirty seconds of attention.", "Wrists. Overworked. Underwarmed. Fixing that now."] },
+  "torso twists": { cue: "Rotate from the ribs, let the arms swing loosely along for the ride, feet stay mostly still.", joke: ["Twisting side to side like a very slow pendulum.", "The torso, waking up, one twist at a time."] },
+  "prone press-up": { cue: "Hips stay on the floor, press up through your hands, let the lower back relax into it.", joke: ["A cobra pose that showed up early to warm up, not to pose.", "Pressing the top half up, leaving the bottom half entirely out of it."] },
+  "leg swings": { cue: "Hold something for balance, swing the leg from the hip, let it get a little taller each swing without forcing the top.", joke: ["One leg swinging like a pendulum with somewhere to be.", "The standing leg does all the real work here and gets none of the credit."] },
+  "lateral leg swings": { cue: "Hold something for balance, swing the leg across your body and back, hips stay facing forward.", joke: ["The sideways version. The standing leg is still furious about it.", "Swinging a leg like a gate that will not stay shut."] },
+  "ankle circles": { cue: "Slow full circles, both directions, both ankles, a small range is fine.", joke: ["The joint everyone forgets exists until it stops cooperating.", "Ankles. They carry the whole operation and get thirty seconds of thanks."] },
+  "world's greatest stretch": { cue: "Step into a deep lunge, drop the back knee, rotate toward the front leg, then straighten it for a hamstring reach.", joke: ["Named the world's greatest by someone very confident.", "Four stretches wearing a trench coat, calling itself one."] },
+  "walking lunge with twist": { cue: "Lunge forward, rotate the torso toward the front leg, and let the rotation come from the ribs rather than the arms.", joke: ["A lunge that also wanted to be a twist. Overachiever.", "Walking, lunging, and twisting, all at once. The warm-up equivalent of multitasking."] },
+  "squat to stand": { cue: "Hinge down to hold your ankles or shins, sink into a squat without letting go, then stand back up.", joke: ["A squat that cannot decide if it wants to bend over or sit down, so it does both.", "Touching your toes, then squatting underneath them. Efficient confusion."] },
+  "straight-arm band pulldown": { cue: "Arms stay straight the whole way, pull the band down in front of you to your thighs, feel it in the lats and shoulders.", joke: ["A pulldown that showed up before the workout even started.", "The band resists the whole way. It has strong opinions about your shoulders."] },
+  "prone y raise": { cue: "Thumbs up, lift the arms into a Y shape, squeeze the lower traps, keep the neck long.", joke: ["Lying face down, forming a letter, for the shoulders' benefit.", "The Y. Rarer than the T. More annoying than both."] },
+
+  // Stretching -- Static, after training
+  "doorway pec stretch": { cue: "Forearm on the frame at shoulder height, step through slowly until you feel it across your chest.", joke: ["A doorway, repurposed as gym equipment. Every doorway is now suspect.", "Leaning into a door until your chest opens up. The door never complains."] },
+  "cross-body shoulder stretch": { cue: "Pull the arm across your chest with the other forearm, keep the shoulder down rather than hunched up.", joke: ["Hugging one arm across yourself. A very one-sided hug.", "The stretch for the shoulder you cannot see in the mirror."] },
+  "overhead triceps stretch": { cue: "Elbow points straight up, gently pull it back with the other hand, no yanking.", joke: ["Reaching for your own back and achieving very little distance.", "An arm behind your head, apologising to your triceps."] },
+  "upper trap stretch": { cue: "Tilt your ear toward your shoulder, a light hand on the head is enough, never pull hard.", joke: ["The stretch for the muscle that carries all your stress, quite literally.", "Tilting the head slightly. The trap has been waiting all day for this."] },
+  "thread the needle stretch": { cue: "Thread one arm under your body and rest the shoulder down, hips level, breathe into the twist.", joke: ["Threading an arm through a needle that is not actually there.", "A twist for the upper back, disguised as a craft project."] },
+  "kneeling lat stretch": { cue: "Reach both arms forward and sit your hips back toward your heels, letting the lats lengthen.", joke: ["Child's pose that got specific about which muscle it was for.", "Reaching forward until the lats finally let go."] },
+  "biceps wall stretch": { cue: "Palm flat on the wall behind you, arm straight, slowly rotate your body away from the wall.", joke: ["Turning your back on a wall you were just holding onto.", "The bicep, stretched by architectural betrayal."] },
+  "wrist flexor stretch": { cue: "Arm out straight, palm up, gently pull the fingers back toward you with the other hand.", joke: ["Bending the wrist backward on purpose, which feels wrong and is correct.", "The forearm's turn to complain, finally."] },
+  "wrist extensor stretch": { cue: "Arm out straight, palm down, gently press the back of the hand down and toward you.", joke: ["The opposite direction from the last one. The wrist is unimpressed either way.", "Palm down this time. Same wrist, an entirely new grievance."] },
+  "sphinx stretch": { cue: "Forearms flat on the floor, elbows under your shoulders, let the lower back relax down without forcing the arch.", joke: ["A cobra that decided to relax about the whole thing.", "Propped up on your elbows, doing a very calm impression of a sphinx."] },
+  "seated spinal twist": { cue: "Sit tall first, then rotate from the ribs toward the bent knee, using the arm as a gentle lever rather than a yank.", joke: ["Sitting and twisting. The floor's most polite argument.", "A twist that starts with sitting up straight, which is the hard part."] },
+  "standing side bend stretch": { cue: "Reach one arm overhead and lean sideways from the ribs, both feet grounded, no leaning forward.", joke: ["Leaning sideways like you are trying to see around someone.", "The side of the body nobody stretches, finally getting a turn."] },
+  "knees-to-chest stretch": { cue: "Pull both knees toward your chest, keeping your lower back flat on the floor, and breathe.", joke: ["Curling up small on the floor. Deeply relatable.", "Hugging your own knees. Nobody is around to judge this, except me."] },
+  "figure four stretch": { cue: "Cross the ankle over the opposite knee, pull the far thigh toward your chest, keep the crossed foot flexed.", joke: ["Your legs, forming a shape a mathematician would recognise.", "The number four, made of legs, for the glutes."] },
+  "kneeling hip flexor stretch": { cue: "Squeeze the back glute and push the hips forward, ribs down so you do not just arch the lower back.", joke: ["Kneeling to stretch a muscle that got tight from too much sitting. There is irony in there somewhere.", "The hip flexors, cornered at last."] },
+  "couch stretch": { cue: "Back shin against the couch, squeeze the glute on that side, keep the torso upright rather than leaning forward.", joke: ["A stretch that requires actual furniture. Bold.", "The couch, finally doing something for your fitness instead of against it."] },
+  "frog stretch": { cue: "Knees wide, ankles in line with the knees, sink the hips back slowly, stop well before it pinches.", joke: ["On all fours, knees wide, looking exactly like the name suggests.", "A pose named after an amphibian, performed by someone who is not one."] },
+  "standing hamstring stretch": { cue: "Heel forward with a slight elevation, leg straight but not locked, hinge from the hips with a flat back.", joke: ["Reaching for a foot that never seems to get any closer.", "Standing there, bent over a straight leg. The hamstring saw this coming."] },
+  "supine hamstring stretch": { cue: "Lying on your back, raise one leg, pull gently with a strap or your hands, keep the other leg flat.", joke: ["Reaching for your own foot from a lying-down position. Efficient laziness.", "The hamstring stretch you can do without ever standing up. My favourite kind."] },
+  "standing calf stretch": { cue: "Back leg straight, heel pressed down, lean into the wall until you feel it in the upper calf.", joke: ["Leaning on a wall like it owes you something. It is just a wall.", "The calf, stretched by leaning on architecture."] },
+  "bent-knee calf stretch": { cue: "Same stance as the straight-leg version, but bend the back knee this time, heel still down.", joke: ["The standing calf stretch's more relaxed cousin.", "A bent knee changes which half of the calf gets to complain."] },
+
+  // Stretching -- Mobility, daily
+  "90/90 hip switch": { cue: "Both knees stay at right angles, sit tall, rotate through the hips slowly without muscling it with your hands.", joke: ["Two right angles, switching sides, with great effort.", "Sitting on the floor, rotating, and calling it hip mobility. It is."] },
+  "half-kneeling hip flexor rock": { cue: "Squeeze the back glute, rock your hips forward and back in a small controlled range, ribs stay down.", joke: ["Rocking gently back and forth like you are stalling for time. You are, productively.", "The hip flexor stretch that could not sit still."] },
+  "deep squat hold": { cue: "Heels flat, chest tall, let your elbows gently press your knees out, then just hold and breathe.", joke: ["Squatting all the way down and simply staying there. Deeply human, evolutionarily speaking.", "The position toddlers do for fun and adults pay to relearn.", "A hold with nothing moving and everything working."] },
+  "cossack squat": { cue: "Wide stance, sit into one hip while the other leg stays straight, heel down on the bent side.", joke: ["A squat that leans hard to one side and commits fully.", "One leg bending, one leg refusing. A whole negotiation."] },
+  "standing hip airplane": { cue: "Stand on one leg, hinge forward, rotate the hips open then closed while the standing leg stays steady.", joke: ["Arms out like wings, balanced on one leg, betting heavily on air traffic control.", "The hip, rotating, while the standing leg quietly panics."] },
+  "open book thoracic rotation": { cue: "Lie on your side, knees stacked and glued together, open the top arm across your body and follow it with your eyes.", joke: ["Knees pinned together so the twist has to come from the right place.", "Reading an invisible book, with your ribs."] },
+  "quadruped thoracic rotation": { cue: "Hand behind your head, rotate the elbow up toward the ceiling then thread it back under your body, hips stay still.", joke: ["Threading the needle's more athletic cousin.", "On all fours, rotating an elbow toward the sky. The hips are told to stay out of it."] },
+  "foam roller thoracic extension": { cue: "Roller under your upper back, hands behind your head, arch gently over it, hips low, nothing on your neck.", joke: ["A tube of foam, quietly correcting years of slouching.", "Draping yourself backward over foam. The foam has seen worse."] },
+  "foam roller chest opener": { cue: "Lie the full length of the roller along your spine, let your arms fall open to the sides, and breathe into it.", joke: ["Lying on a foam tube with your arms out like you have given up entirely. That is the point.", "The roller does the opening. You just have to lie there."] },
+  "prone scorpion stretch": { cue: "Lying face down, arms out to the sides, lift one leg and rotate it across toward the opposite hand, chest stays down.", joke: ["Named after a scorpion. The tail is doing a lot of the imagining.", "One leg reaching across your own back. The sting is optional."] },
+  "standing forward hang": { cue: "Bend the knees generously, fold forward from the hips, and let your arms and head hang like dead weight.", joke: ["Hanging upside-down-ish, doing absolutely nothing, entirely on purpose.", "The stretch that asks you to just give up, briefly, for your hamstrings."] },
+
+  // Cardio -- Steady / easy
+  "easy run": { cue: "Relaxed shoulders, let the arms swing from the shoulder rather than the elbow.", joke: ["Running from nothing, toward nothing, at a pace where you could still hold a conversation with nobody.", "The easy run. Named accurately, for once."] },
+  "brisk walk": { cue: "Push off through the toes on each step, let the hips move naturally, do not overstride.", joke: ["Walking, but with intent. The intent is doing a lot of work.", "Faster than a stroll, slower than admitting you are exercising."] },
+  "easy ride": { cue: "Hands light on the bars, elbows soft, let the legs absorb the road rather than your shoulders.", joke: ["Sitting down, moving fast, somehow still officially exercise.", "The bike does most of the work. I respect the hustle regardless."] },
+  "easy spin": { cue: "Pedal in smooth full circles, not just stomping the downstroke.", joke: ["A bike that goes nowhere, ridden with total conviction.", "Spinning in place. The wheels are decorative and I love that for them."] },
+  "easy swim": { cue: "Long strokes, reach full extension before you pull, do not rush the turnover.", joke: ["Exercise, but wet, and somehow still my favourite kind to imagine.", "The only cardio where drowning is technically on the table. Stay alert."] },
+  "elliptical steady": { cue: "Keep the stride smooth front to back, do not lean your weight onto the handles.", joke: ["A machine that argues it is running, walking, and neither, all at once.", "The gentlest way to go absolutely nowhere with purpose."] },
+  "incline walk": { cue: "Lean very slightly from the ankles, not the waist, and take shorter steps than you would on flat ground.", joke: ["A walk that got ambitious about the incline setting.", "Climbing a hill that is actually a conveyor belt. The hill knows."] },
+
+  // Cardio -- Intervals
+  "run intervals": { cue: "Quicken the cadence for the hard minute rather than just lengthening the stride.", joke: ["Fast, then slow, then fast again. My favourite kind of indecision.", "A run that keeps changing its mind, on a fixed schedule."] },
+  "bike intervals": { cue: "Stay seated through most of the hard effort, only stand if the legs are truly begging for it.", joke: ["The bike equivalent of sprinting, minus the part where you actually go anywhere.", "Pedalling hard at a wall of numbers on a screen. Thrilling, somehow."] },
+  "hill repeats": { cue: "Lean forward slightly from the ankles on the way up, not from the waist.", joke: ["Running uphill on purpose, repeatedly, as if the first time was not clear enough.", "A hill that will still be there for the next rep. It always is."] },
+  "sprint intervals": { cue: "Drive the knees and pump the arms hard, that is where the actual speed comes from.", joke: ["The fastest you will move all week, for twenty seconds, entirely on purpose.", "All out, then walking. The walking part is doing important work too."] },
+  "hiit circuit": { cue: "Reset your breathing in the rest windows, do not carry ragged breath straight into the next move.", joke: ["Several exercises, none of them long enough to get comfortable with.", "Twenty seconds of chaos, forty seconds of regret. Repeat."] },
+  "stair intervals": { cue: "Push through the whole foot on each step, not just the toes.", joke: ["Stairs that go nowhere, worked hard on purpose, repeatedly.", "A staircase with no top floor. Somebody designed this and should be proud."] },
+  "jump rope intervals": { cue: "Land softly on the balls of your feet, knees slightly bent, barely a sound on each landing.", joke: ["A rope, a floor, and a great deal of enthusiasm.", "Jumping over a rope that is not even there half the time. Confidence."] },
+
+  // Cardio -- Tempo / threshold
+  "tempo run": { cue: "Keep the cadence steady even as it gets uncomfortable, do not let the stride get sloppy.", joke: ["The uncomfortable middle speed. Too fast to relax, too slow to be finished.", "A pace that is technically sustainable and does not feel like it."] },
+  "tempo ride": { cue: "Stay low and relaxed on the bars, let the legs carry the effort rather than the upper body.", joke: ["The bike's version of the uncomfortable middle. The middle is long.", "Riding hard for a long time, with nowhere in particular to arrive."] },
+  "progression run": { cue: "Check your form as you speed up, fatigue tends to show up in the shoulders first.", joke: ["A run that gets harder the longer it goes, which feels like a design flaw.", "Starting slow on purpose is the hardest part. Everyone wants to start fast."] },
+
+  // Cardio -- Long / endurance
+  "long run": { cue: "Relax the hands and jaw, tension there wastes energy you will want later.", joke: ["A very long time spent going nowhere in particular, deliberately.", "The long run. Mostly a test of patience wearing running shoes."] },
+  "long ride": { cue: "Shift your position on the saddle occasionally, staying in one spot for that long adds up.", joke: ["An hour and a half on a bike. The saddle has opinions by the end.", "Going a very long way and ending up exactly back where you started. The whole sport, honestly."] },
+  "hike": { cue: "Let your arms help with balance on uneven ground rather than staying locked at your sides.", joke: ["A walk that decided flat ground was not a personality.", "Nature's treadmill, except the incline is real and mildly hostile."] },
+  "long walk": { cue: "Keep an even pace you could hold for the whole distance, do not start fast and fade.", joke: ["An hour of walking. Nobody claps for this and it is still worth doing.", "The most patient cardio there is. I respect the commitment."] },
+
+  // Cardio -- Recovery
+  "recovery walk": { cue: "Loosen the shoulders and let the stride shorten naturally, nothing to prove here.", joke: ["A walk with no goal except being a walk.", "Deliberately doing less. Harder than it sounds for some people."] },
+  "recovery spin": { cue: "Keep the cadence light and quick with resistance barely there, this is a flush, not a workout.", joke: ["Pedalling just hard enough to remember you have legs.", "The easiest thing on two wheels. Which, on this list, is saying something."] },
+  "easy elliptical": { cue: "Let the machine set the rhythm, do not fight the pedals to go faster than feels easy.", joke: ["The gentlest machine, taken even gentler. A new personal low, in a good way.", "Gliding nowhere, slowly, entirely on purpose."] },
+
+  // Cardio (pattern-only) -- Steady / easy
+  "easy row": { cue: "Feet strapped snug, grip loose, let the seat glide all the way up to the catch before you pull.", joke: ["Rowing a boat that will never once touch water.", "Sliding back and forth on a rail, going nowhere, entirely on purpose."] },
+
+  // Cardio (pattern-only) -- Intervals
+  "row intervals": { cue: "Keep the stroke rate honest during the hard rounds, do not just yank harder with the arms.", joke: ["The machine that turns rowing into pure math. Splits, watts, all of it.", "Intervals on a rowing machine. The rest is real. The finish line is not."] },
+
+  // Cardio (pattern-only) -- Tempo / threshold
+  "threshold row": { cue: "Long steady strokes, full slide each time, resist the urge to shorten the stroke when it gets uncomfortable.", joke: ["The long, uncomfortable middle of rowing. No finish line in sight, on purpose.", "Rowing forever, staring at a wall. Character building."] },
 };
 
 /* Ordered longest first so "close-grip bench press" is not caught by "press"
