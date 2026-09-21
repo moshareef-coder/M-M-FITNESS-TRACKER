@@ -1157,7 +1157,19 @@ function drawHead(ctx, S, C, fill) {
           // Mo: "give him those long green eyes like the old one." Scaling
           // off the housing instead made the pad about half that length,
           // which was the actual "his eyes are too small."
-          drawMarkEye(ctx, vis, (eyeH * 2) / 186.46, blink || mood === "sleepy", C.seam, lime);
+          //
+          // Positioned closer to centre than `vis` itself (F * 0.5 rather
+          // than F * 0.72): bent over with the head pitched hard forward
+          // (Rear Delt Fly, Mo: "looks so weird"), vis rides all the way out
+          // to the chin, which buddy's own eye does too here but a thin
+          // curved line hides that a lot better than a solid plate does.
+          // Confirmed against buddy on the exact same pose before changing
+          // this, rather than assumed: same drift, just far less visible on
+          // a line than a shape. Pulling the mark in trades a touch of
+          // "forward on the face" in the ordinary case for not walking off
+          // the chin in the extreme one.
+          const eyeVis = add(eyeLine, scl(F, R * 0.5));
+          drawMarkEye(ctx, eyeVis, (eyeH * 2) / 186.46, blink || mood === "sleepy", C.seam, lime);
         } else if (useMark) {
           // Only blink ports: happy/focused/surprised have no equivalent on
           // a fixed rounded-rect pad the way they do on a drawn eye, and
