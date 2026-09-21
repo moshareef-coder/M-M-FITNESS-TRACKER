@@ -7862,11 +7862,6 @@
         <div class="pf-swatches" id="pfSwatches"></div>
       </div>
 
-      <div class="card">
-        <h2>About your body</h2>
-        <p class="muted-note" style="margin-top:-6px;">Sex, age and height set your starting weights. They live on their own page.</p>
-        <button type="button" class="btn-secondary" id="pfBodyBtn" style="margin-top:10px;">Open Your body</button>
-      </div>
     </div>
     <div class="settings-page hidden" id="page-partner">
       <div class="scr-head">
@@ -7943,54 +7938,44 @@
         <div class="scr-title">Training</div>
         <div class="spacer"></div>
       </div>
-    <div class="set-group" style="margin-bottom:10px;">
-      <button type="button" class="set-row" id="setupGoalRow" data-page="goal">
-        <span class="set-ico" data-ico="medal"></span>
-        <span class="set-txt"><span class="set-title">Your goal</span><span class="set-sub" id="setupGoalSub">Not set</span></span>
-        <span class="set-go" data-ico="chevronLeft" data-ico-size="16"></span>
-      </button>
-    </div>
-    <div class="card">
-      <h2>More about your goal</h2>
-      <p class="muted-note" style="margin-top:-6px;">Optional. Anything the goal above does not say on its own.</p>
-      <textarea id="setupGoalDetail" placeholder="e.g. training for a wedding in June, prefer 4 days/week"></textarea>
-    </div>
     <!-- Asked on the way in and then never again: somebody who joined a gym,
          stopped going, or took up running was planned for the answer they gave
          on the day they signed up, forever. Same seven cards as onboarding,
          same column, and it saves with the button at the bottom of this page
          because nothing here writes until Save. -->
     <div class="card">
-      <h2>What you actually do</h2>
-      <p class="muted-note" style="margin-top:-6px;">We only ever plan what is ticked. Change it whenever what you do changes.</p>
+      <h2>How you train</h2>
       <div class="set-styles" id="setupStyleGrid"></div>
       <p class="muted-note" id="setupStyleNote"></p>
     </div>
     <div class="card">
       <h2>Weekly goal</h2>
-      <label class="gym-toggle" id="sharedGoalToggleWrap">
-        <span>Use one shared goal for both of us</span>
+      <!-- Hidden with nobody to share with. Save has always skipped it in that
+           case, so on a solo account it was a switch that said "both of us" and
+           then did nothing. -->
+      <label class="gym-toggle hidden" id="sharedGoalToggleWrap">
+        <span>Use one shared goal</span>
         <input type="checkbox" id="sharedGoalToggle" />
       </label>
       <div id="sharedGoalFields" class="hidden" style="margin-top:12px;">
-        <label>Workout days per week (both of you)</label>
+        <label>Workout days per week</label>
         <input type="number" id="setupSharedGoal" min="1" max="7" value="4" />
-        <p class="muted-note">Either of you can change this. It applies to you both.</p>
+        <p class="muted-note">Either of you can change it, and it applies to you both.</p>
       </div>
       <div id="ownGoalFields" style="margin-top:12px;">
-        <label>Workout days per week (just you)</label>
+        <label>Workout days per week</label>
         <input type="number" id="setupChallengeTarget" min="1" max="7" value="4" />
       </div>
     </div>
     <div class="card">
-      <h2>How long per session?</h2>
-      <p class="muted-note" style="margin-top:-6px;">Minutes. The plan is built to fit it: fewer sets when the time is short, more when there is room.</p>
+      <h2>Session length</h2>
+      <p class="muted-note" style="margin-top:-6px;">Minutes, give or take. The plan is built to fit it: fewer sets when the time is short, more when there is room.</p>
       <div class="rest-pref five" id="setupSessionLen"></div>
       <p class="muted-note" id="setupSessionLenNote"></p>
     </div>
     <div class="card">
       <h2>Rest between sets</h2>
-      <p class="muted-note" style="margin-top:-6px;">Used for workouts you build yourself. A generated plan budgets its own rest per exercise, because a heavy squat and a lateral raise do not want the same wait.</p>
+      <p class="muted-note" style="margin-top:-6px;">Seconds, give or take. Used for workouts you build yourself. A generated plan budgets its own rest per exercise, because a heavy squat and a lateral raise do not want the same wait.</p>
       <div class="rest-pref" id="setupRestChoices"></div>
     </div>
     <div class="card">
@@ -41024,11 +41009,9 @@ function openSettingsPage(key) {
   // The only two pages whose contents are built rather than sitting in the
   // markup: both carry a Rive canvas that has to be created and destroyed.
   if (key === "goal") renderGoalPage();
-  // Training shows the goal in words rather than owning a second copy of it,
-  // so it has to re-read the profile every time it is opened.
   if (key === "training") {
-    $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
-    // Same reason: what the goal suggests moves when the goal does.
+    // What the goal suggests moves when the goal does, so this re-reads the
+    // profile every time the page is opened.
     renderSessionLengthPage();
     // And the same again: this one paints the stored answer, so an edit that
     // was abandoned by leaving the page must not still be sitting here.
@@ -41067,7 +41050,8 @@ function renderRestChoices() {
   const mine = Number(MY_PROFILE?.rest_sec);
   const current = Number.isFinite(mine) && mine > 0 ? mine : DEFAULT_REST_SEC;
   el.innerHTML = REST_CHOICES.map((s) =>
-    `<button type="button" class="${s === current ? "on" : ""}" data-rest="${s}">${restLabel(s)}</button>`).join("");
+    `<button type="button" class="${s === current ? "on" : ""}" data-rest="${s}"
+      aria-pressed="${s === current}" aria-label="about ${s} seconds">~${s}</button>`).join("");
   el.querySelectorAll("[data-rest]").forEach((b) => {
     b.onclick = async () => {
       const sec = Number(b.dataset.rest);
@@ -41075,7 +41059,7 @@ function renderRestChoices() {
       renderRestChoices();
       const { error } = await sb.from("profiles").update({ rest_sec: sec }).eq("email", MY_EMAIL);
       if (error) { console.warn("could not save rest length", error); toast("Could not save that"); return; }
-      toast(`Rest set to ${restLabel(sec)}`);
+      toast(`Rest set to about ${sec} seconds`);
     };
   });
 }
@@ -41112,7 +41096,7 @@ function trainingSummary() {
   const rest = Number.isFinite(mine) && mine > 0 ? mine : DEFAULT_REST_SEC;
   const bits = [];
   if (days) bits.push(`${days} ${days === 1 ? "day" : "days"} a week`);
-  bits.push(restLabel(rest));
+  bits.push(`~${rest}s rest`);
   return bits.join(", ");
 }
 
@@ -41227,7 +41211,7 @@ function renderSessionLengths(el, { chosen, suggested, onPick }) {
   const lit = Number.isFinite(chosen) ? chosen : suggested;
   el.innerHTML = SESSION_LENGTHS.map((m) => `
     <button type="button" class="${m === lit ? "on" : ""}" data-len="${m}"
-      aria-pressed="${m === lit}" aria-label="${m} minutes">${m}</button>`).join("");
+      aria-pressed="${m === lit}" aria-label="about ${m} minutes">~${m}</button>`).join("");
   el.querySelectorAll("[data-len]").forEach((b) => {
     b.onclick = () => {
       const m = Number(b.dataset.len);
@@ -41327,7 +41311,7 @@ function renderTrainStylesPage() {
 function trainStyleSetupNote(picked, stored) {
   if (!picked.length) {
     return stored === null
-      ? "You have never answered this, so your plans are built on what your goal suggests. Tick what you actually do and the next one is built on that."
+      ? "You have never answered this, so your plans are built on what your goal suggests. Tick what you train and the next one is built on that."
       : "Pick at least one.";
   }
   return trainStyleNote(picked) || "The next plan you generate is built on this.";
@@ -41355,7 +41339,6 @@ function renderSetupTab() {
   }
   renderProfileHeader();
   renderAccentSwatches();
-  if ($("pfBodyBtn")) $("pfBodyBtn").onclick = () => openSettingsPage("stats");
   $("appVersion").textContent = APP_VERSION;
   renderMilestoneBadges();
   $("saveNameBtn").onclick = saveDisplayName;
@@ -41512,8 +41495,6 @@ function renderSetupTab() {
   if (MY_EMAIL === ADMIN_EMAIL) renderAdminPanel();
 
   if (MY_PROFILE) {
-    $("setupGoalSub").textContent = goalTileLabel(MY_PROFILE);
-    $("setupGoalDetail").value = MY_PROFILE.goal_detail || "";
     $("setupChallengeTarget").value = MY_PROFILE.challenge_target || 4;
     /* Device preference, not an account one, so it is read off localStorage
        here rather than off the profile with the rest of this page. */
@@ -41536,11 +41517,12 @@ function renderSetupTab() {
     $("skipStretchWrap").classList.toggle("checked", MY_PROFILE.skip_stretching === true);
     $("skipStretchToggle").onchange = (e) => $("skipStretchWrap").classList.toggle("checked", e.target.checked);
     const shared = MY_PARTNERSHIP?.shared_weekly_goal;
+    $("sharedGoalToggleWrap").classList.toggle("hidden", !MY_PARTNERSHIP);
     $("sharedGoalToggle").checked = !!shared;
     $("setupSharedGoal").value = shared || 4;
     $("sharedGoalToggleWrap").classList.toggle("checked", !!shared);
-    $("sharedGoalFields").classList.toggle("hidden", !shared);
-    $("ownGoalFields").classList.toggle("hidden", !!shared);
+    $("sharedGoalFields").classList.toggle("hidden", !shared || !MY_PARTNERSHIP);
+    $("ownGoalFields").classList.toggle("hidden", !!shared && !!MY_PARTNERSHIP);
     $("setupSex").value = MY_PROFILE.sex || "";
     $("setupAge").value = MY_PROFILE.age || "";
     $("setupActivity").value = MY_PROFILE.activity_level || "";
@@ -41829,7 +41811,6 @@ async function saveTrainingPrefs() {
        must never touch it: the old dropdown held five strings the tiles do not
        all produce, so a profile set to "Stay consistent" opened Training
        reading "Lose weight" and one Save wrote that over it. */
-    goal_detail: $("setupGoalDetail").value.trim() || null,
     challenge_target: clampNum($("setupChallengeTarget").value, 1, 7, 4),
     skip_stretching: $("skipStretchToggle").checked,
   }, { toastText: "Training saved" });
@@ -41849,7 +41830,7 @@ async function saveTrainingPrefs() {
   renderHome();
 }
 
-/* What they actually do, saved with the rest of the page but in its own write.
+/* How you train, saved with the rest of the page but in its own write.
    Through upsertGoalFields rather than commitProfile for the reason the session
    length goes the same way: train_styles is in PENDING_PROFILE_COLUMNS, and on
    a database without the migration a write that names it comes back PGRST204
@@ -41872,11 +41853,11 @@ async function saveTrainStyles() {
     email: MY_EMAIL, user_name: ME, train_styles: next,
     updated_at: new Date().toISOString(),
   });
-  if (error) { toast("Could not save what you do"); console.error(error); return; }
+  if (error) { toast("Could not save how you train"); console.error(error); return; }
   if (droppedStyles) {
     /* Not saved, so nothing here pretends it was, and the grid goes back to
        what the database actually holds. */
-    $("setupStyleNote").textContent = "What you do is not being stored yet, so this part has not been saved.";
+    $("setupStyleNote").textContent = "How you train is not being stored yet, so this part has not been saved.";
     renderTrainStylesPage();
     return;
   }
