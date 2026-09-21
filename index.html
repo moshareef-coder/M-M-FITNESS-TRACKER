@@ -2583,6 +2583,70 @@
   .clip-pill svg { display: block; }
   @media (prefers-reduced-motion: reduce) { .clip-pill { animation: none; } }
 
+  /* Still training, seen from anywhere else in the app. Both session screens
+     minimise on purpose and keep their clocks running underneath, and nothing
+     outside the workout tab said so: the FAB's pulse was the whole signal, and
+     a pulsing circle cannot name what is running or how long it has been. Mo,
+     after minimising a stair session and walking off to another tab: "I just
+     kind of forgot about it."
+
+     It sits above the raised FAB rather than flush on the tab bar, because
+     that button breaks 10px above the bar's hairline and a strip tucked under
+     it would be sliced in half. Same column, same fill and same blur as
+     .tabs, so the two read as one piece of furniture rather than a card that
+     happens to have landed there. */
+  .inprog {
+    position: fixed; z-index: 9; cursor: pointer;
+    left: max(14px, calc((100% - 452px) / 2));
+    right: max(14px, calc((100% - 452px) / 2));
+    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 14px; border-radius: 14px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--panel) 96%, transparent);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: var(--shadow-float);
+    color: var(--text); font-family: inherit; text-align: left;
+    animation: inprogIn .3s cubic-bezier(.22,1,.36,1);
+  }
+  @keyframes inprogIn { from { opacity: 0; transform: translateY(10px); } }
+  .inprog:active { transform: scale(0.99); }
+  /* The bar is fixed, so it hangs over the page the way the tab bar does and
+     needs the same clearance underneath. Only while it is up: every tab would
+     otherwise carry a band of dead space for a session nobody is having. */
+  body.inprog-on #app { padding-bottom: calc(146px + env(safe-area-inset-bottom, 0px)); }
+  .inprog-dot {
+    flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent); animation: inprogBeat 1.9s ease-out infinite;
+  }
+  /* Paused has to read from the corner of the eye, without the word. A dot
+     still beating over a stopped clock is the app insisting you are training. */
+  .inprog-dot.paused { background: var(--muted); animation: none; }
+  @keyframes inprogBeat {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent); }
+    70%  { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+    100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+  }
+  .inprog-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .inprog-eyebrow {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  /* One line, clipped. A class carrying a long authored name must not push the
+     clock off the end of the bar, and the clock is the half he asked for. */
+  .inprog-name {
+    font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .inprog-clock {
+    flex: 0 0 auto; font-size: 15px; font-weight: 700;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .inprog, .inprog-dot { animation: none; }
+  }
+
   /* Working muscles: the Body tab's anatomical figure, lit for one exercise.
      Front and back side by side, the names beside them. Two sizes: the watch
      sheet gets the large one, the session card the small one, and the colour
@@ -4840,8 +4904,14 @@
   .momentum-go { color: var(--muted); flex-shrink: 0; }
 
   /* The partner popup */
+  /* Above everything, because a question is always about the thing underneath
+     it. It was 70, which was above every surface that existed when it was
+     written but not above the activity screen (.csn-scrim, 2400, high so that
+     a running session covers the tab bar and every sheet): asking pause or end
+     from a run drew the dialog BEHIND the run. The buttons were live and
+     nothing was on screen. */
   .pop-scrim {
-    position: fixed; inset: 0; z-index: 70;
+    position: fixed; inset: 0; z-index: 2500;
     padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
     display: flex; align-items: center; justify-content: center;
     background: rgba(12,14,19,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
@@ -7339,9 +7409,12 @@
   .toast {
     position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
     background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    /* Above every overlay layer (sheets 65, pops 70, clip 90, generate 95/96):
-       a toast is the top-most transient layer or it is invisible where it fires. */
-    padding: 10px 18px; border-radius: 100px; font-size: 15.5px; z-index: 100;
+    /* Above every overlay layer (sheets 65, clip 90, generate 95/96, the
+       activity screen 2400, pops 2500): a toast is the top-most transient layer
+       or it is invisible where it fires. It was 100, written when the tallest
+       thing in the app was 96, and it has been firing underneath the activity
+       screen ever since that one arrived. */
+    padding: 10px 18px; border-radius: 100px; font-size: 15.5px; z-index: 2600;
     opacity: 0; pointer-events: none; transition: opacity 0.25s;
   }
   /* While a lift is on screen the only button is the lime bar at the bottom,
@@ -8573,6 +8646,10 @@
     <div class="clip-stage" id="clipViewStage"></div>
   </div>
   <button type="button" class="clip-pill hidden" id="clipPill"></button>
+  <!-- Outside every .tab-panel on purpose: switchTab only swaps those, so
+       a session left running survives the tab change that made it easy to
+       forget. See renderSessionBar. -->
+  <button type="button" class="inprog hidden" id="inprogBar"></button>
 
   <!-- The exercise picker. It is a sheet so the workout you are building stays
        on screen underneath: with the grid inline, adding one meant scrolling up
@@ -14484,12 +14561,12 @@ function showApp() {
   wirePageLock();
 
   $("fabStart").onclick = () => {
-    switchTab("workout");
     // Mid-session, the button just takes you back to it. An activity on the
     // clock is a session too, and reads the same way: this button cannot start
-    // a second one on top of one that is already open.
-    if (SESSION) { reopenSession(); return; }
-    if (csnRunning()) { openCardioSession(); return; }
+    // a second one on top of one that is already open. The in-progress bar
+    // presses the same lever, so the two cannot drift apart.
+    if (goBackToSession()) return;
+    switchTab("workout");
     if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
     // A plan already exists: switchTab above already rendered its overview,
     // with its own Begin Workout button. Starting it from here instead would
@@ -14811,6 +14888,10 @@ function switchTab(tab) {
      tab needs this once, on the way in, or the ring stays lit on an avatar
      that no longer means anything on the screen underneath it. */
   syncAvatarPairView();
+  /* Last, because it reads which panel ended up visible. This is the tab
+     change he was complaining about: leaving the workout tab is exactly when
+     a running session stops being on screen anywhere. */
+  renderSessionBar();
 }
 
 /* ---------- Offline write queue ----------
@@ -15164,6 +15245,15 @@ async function loadAll() {
      against it. Harmless to call again from renderWorkoutTab later, it no-ops
      once SESSION is set. */
   resumeSessionIfAny();
+  /* Its twin, and for the same reason, one bug later: a run restored only by
+     renderWorkoutTab meant a reload landing on Home had no CARDIO_SES, so the
+     FAB did not pulse and the in-progress bar had nothing to draw. The clock
+     had been counting the whole time; the app just could not say so until the
+     workout tab was opened once. Also a no-op once CARDIO_SES is set. */
+  restoreCardioSession();
+  /* Both of the above changed what is live, and neither of the two things that
+     say so is redrawn by anything else on this path. */
+  renderFab();
   /* Said out loud, once per failed load. Somebody looking at numbers that are
      quietly out of date should be told, because the alternative is that they
      believe them. Not per failed table: eight toasts is not eight times the
@@ -22664,6 +22754,7 @@ function openCardioSession(state, act, { after = false } = {}) {
   renderCardioStage();
   armBackGuard();    // so a back gesture minimises the session, see registerBackGuard
   pinSheets();
+  renderSessionBar();
 }
 
 /* The finished card's one button. It opens the picker on whichever activity
@@ -22686,6 +22777,7 @@ function closeCardioSession() {
      gap with nothing in between is allowed to conclude. */
   csnSave();
   pinSheets();
+  renderSessionBar();   // hidden, and the clock is still running: see renderSessionBar
 }
 
 /* Leaving a screen where nothing has started throws the session away; leaving a
@@ -23242,11 +23334,29 @@ function renderActivityLive(a, stage) {
   $("csnX").onclick = closeCardioSession;
   /* Pausing hands the screen over to the paused screen, which is the lift's
      paused screen: renderCardioStage sends a live session with no `since` on
-     it there, so all this has to do is stop the clock. */
-  $("csnPause").onclick = () => {
-    if (CARDIO_SES.since) { CARDIO_SES.accum = csnElapsedMs(); CARDIO_SES.since = null; }
-    else CARDIO_SES.since = Date.now();
-    csnSave(); renderCardioStage();
+     it there, so all this has to do is stop the clock.
+
+     It asks first, because the lift's identical button asks first. The two
+     screens are built to look like one screen and this one silently paused
+     while the other stopped to offer pause or end, which is the inconsistency
+     Mo felt here without being able to name it. The play icon still just
+     resumes, same as the lift: nobody needs talking out of carrying on.
+
+     End goes straight to the save screen with no second confirm, where the
+     lift's endWorkoutNow stops to ask again. That is not an oversight: the
+     lift's exit decides what happens to a part-finished plan, while this one
+     banks the minutes and hands you the save. There is nothing to talk
+     somebody out of. */
+  $("csnPause").onclick = async () => {
+    if (!CARDIO_SES) return;
+    if (!CARDIO_SES.since) { CARDIO_SES.since = Date.now(); csnSave(); renderCardioStage(); return; }
+    const choice = await askPauseOrEnd({ noun: actNoun(a) });
+    if (!CARDIO_SES) return;   // the dialog is awaited, and a save could have landed under it
+    if (choice === "pause") {
+      CARDIO_SES.accum = csnElapsedMs();
+      CARDIO_SES.since = null;
+      csnSave(); renderCardioStage();
+    } else if (choice === "end") endActivityNow({ overlay: true });
   };
   $("csnEnd").onclick = () => endActivityNow({ overlay: true });
   /* Steering the class. Back is the move before this one and it is the whole of
@@ -28759,8 +28869,12 @@ function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going" }) {
 }
 
 /* The pause button asks what you meant. Mo did not want an End workout link
-   buried under the fold; pausing and ending are the same tap, then a choice. */
-function askPauseOrEnd() {
+   buried under the fold; pausing and ending are the same tap, then a choice.
+
+   Both session kinds ask it now, so the noun is passed in: a run is not a
+   workout, and "End treadmill session here" is already what the Finish button
+   on that same screen calls it. */
+function askPauseOrEnd({ noun = "workout" } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "pop-scrim";
@@ -28772,8 +28886,8 @@ function askPauseOrEnd() {
             <button type="button" class="ds-x" data-choice="" aria-label="Close">&times;</button>
           </div>
           <button type="button" class="btn-primary" data-choice="" style="margin-top:8px;">Keep going</button>
-          <button type="button" class="btn-ghost" data-choice="pause">Pause workout</button>
-          <button type="button" class="btn-ghost" data-choice="end" style="color:var(--danger, #ff5c5c);">End workout here</button>
+          <button type="button" class="btn-ghost" data-choice="pause">Pause ${escapeHtml(noun)}</button>
+          <button type="button" class="btn-ghost" data-choice="end" style="color:var(--danger, #ff5c5c);">End ${escapeHtml(noun)} here</button>
         </div>
       </div>`;
     document.body.appendChild(scrim);
@@ -32161,6 +32275,7 @@ document.addEventListener("visibilitychange", () => {
 
 function openSessionUI() {
   document.body.classList.add("session-open");
+  renderSessionBar();   // the session is on screen now, so the bar about it is noise
   keepScreenAwake();
   armBackGuard();    // something for a back gesture to land on other than the exit
   startQuipBeat();   // he talks on a clock while this screen is up
@@ -32220,6 +32335,7 @@ function closeSessionUI() {
   stopStretchTicker();
   renderClipPill();
   document.body.classList.remove("session-open");
+  renderSessionBar();   // the overlay is going, so the bar takes over saying it is still there
   const card = $("sessionCard");
   card.style.animation = "";   // a wake parked the entrance; the exit must still run
   card.classList.add("leaving");
@@ -32578,6 +32694,85 @@ function renderFab() {
   fab.classList.toggle("in-progress", running);
   fab.innerHTML = icon(running ? "play" : "dumbbell", 26);
   fab.setAttribute("aria-label", running ? "Resume your workout" : "Start a workout");
+  // The other half of the same signal, and the half that can say what and how
+  // long. Drawn from here so the two can never disagree about what is live.
+  renderSessionBar();
+}
+
+/* Still training, from wherever you happen to be. Both session screens
+   minimise on purpose and keep counting underneath, which is the whole point
+   of the chevron, but until now nothing off the workout tab said so. Mo, after
+   minimising a stair session: "perhaps it should show me at the top like hey
+   you're still doing this workout or something, because I just kind of forgot
+   about it." It is at the bottom rather than the top because that is where the
+   thing it belongs to lives, one gap above the raised FAB.
+
+   The three facts come out of pausedFacts, which is what the paused screen
+   reads, so the bar and that screen can never disagree about whether a clock
+   is moving. Both session kinds go through it already.
+
+   Not drawn over the session itself, and not on the workout tab, which hands
+   itself over to the paused screen whenever either kind is live: a second copy
+   of the clock beside the big one is furniture, not information. */
+let INPROG_TICKER = null;
+function renderSessionBar() {
+  const el = $("inprogBar");
+  if (!el) return;
+  const covered = document.body.classList.contains("session-open")
+    || !$("csnScrim")?.classList.contains("hidden")
+    || !$("tab-workout")?.classList.contains("hidden");
+  const facts = !covered && sessionOpen() ? pausedFacts() : null;
+  if (!facts) {
+    el.classList.add("hidden");
+    document.body.classList.remove("inprog-on");
+    clearInterval(INPROG_TICKER); INPROG_TICKER = null;
+    return;
+  }
+  /* Built once and patched after that. The ticker below comes back every
+     second, and replacing the node each time would restart the dot's pulse on
+     every tick, which reads as a stutter rather than a heartbeat. */
+  if (el.classList.contains("hidden")) {
+    el.innerHTML = `
+      <span class="inprog-dot"></span>
+      <span class="inprog-txt"><span class="inprog-eyebrow"></span><span class="inprog-name"></span></span>
+      <span class="inprog-clock"></span>`;
+    el.onclick = () => { goBackToSession(); };
+    el.classList.remove("hidden");
+    document.body.classList.add("inprog-on");
+  }
+  const state = facts.paused ? "Paused" : "In progress";
+  const name = liveSessionName();
+  el.querySelector(".inprog-dot").classList.toggle("paused", !!facts.paused);
+  el.querySelector(".inprog-eyebrow").textContent = state;
+  el.querySelector(".inprog-name").textContent = name;
+  el.querySelector(".inprog-clock").textContent = facts.clock;
+  el.setAttribute("aria-label", `${state}: ${name}, ${facts.clock}. Back to it.`);
+  /* A clock only redrawn when something else happens to call this is a clock
+     that is wrong. The same beat also stands the bar down on its own if an
+     exit path forgets to, and in a file with this many exits that is worth
+     more than the second it costs. It runs only while the bar is up. */
+  if (!INPROG_TICKER) INPROG_TICKER = setInterval(renderSessionBar, 1000);
+}
+
+/* What to call whatever is running. The lift borrows the plan's own name, the
+   one the workout tab and the recap already print, rather than inventing a
+   second way of saying the same thing. */
+function liveSessionName() {
+  if (SESSION) {
+    if (SESSION.standaloneStretch) return "Stretch";
+    return TODAY_WORKOUT ? displayFocus(TODAY_WORKOUT.focus, TODAY_WORKOUT.exercises) : "Workout";
+  }
+  return actTitle(csnAct()) || "Session";
+}
+
+/* Back into whichever session is open. The FAB and the bar both do this now,
+   and two buttons that mean "take me back" must not land in two places. */
+function goBackToSession() {
+  if (!SESSION && !csnRunning()) return false;
+  switchTab("workout");
+  if (SESSION) reopenSession();
+  else openCardioSession();
+  return true;
 }
 
 function formatDuration(sec) {
