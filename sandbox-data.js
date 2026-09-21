@@ -170,8 +170,15 @@
             duration_min, distance_mi, created_at: day(d) + "T06:15:00Z",
           }))),
       ],
+      /* `slot` says which plan within a day this is, 0 for the day's main
+         workout. It is there on every row because the fixture models the
+         database AFTER supabase/migrations/20260917_ai_workouts_slot.sql has
+         been run, which is the world this app has to be right in; the app also
+         has to work before it is run, and that half is the retry in
+         upsertPlanRow, which a fixture cannot exercise because it never
+         refuses a column. */
       ai_workouts: [
-        { id: "w1", email: ME, entry_date: day(0), archived: false, focus: "Push Day", created_at: day(0) + "T05:00:00Z", exercises: pushWorkout,
+        { id: "w1", email: ME, entry_date: day(0), archived: false, slot: 0, focus: "Push Day", created_at: day(0) + "T05:00:00Z", exercises: pushWorkout,
           /* The engine's timed blocks ride on the row apart from `exercises`
              (ai_workouts.mobility). Two moves each, short, so a walkthrough
              reaches the first lift in under a minute. */
@@ -207,14 +214,14 @@
            cannot show what Plan your week is for: rearranging the days. A gap
            between them is deliberate too, so a drag has an empty day to cross
            and to land on. */
-        { id: "w2", email: ME, entry_date: day(1), archived: false, focus: "Pull Day", created_at: day(0) + "T05:00:00Z",
+        { id: "w2", email: ME, entry_date: day(1), archived: false, slot: 0, focus: "Pull Day", created_at: day(0) + "T05:00:00Z",
           exercises: [
             { name: "Lat Pulldown", sets: 4, reps: 10, targetWeight: 130 },
             { name: "Seated Cable Row", sets: 3, reps: 12, targetWeight: 120 },
             { name: "Face Pull", sets: 3, reps: 15, targetWeight: 40 },
             { name: "Barbell Curl", sets: 3, reps: 10, targetWeight: 60 },
           ] },
-        { id: "w3", email: ME, entry_date: day(3), archived: false, focus: "Leg Day", created_at: day(0) + "T05:00:00Z",
+        { id: "w3", email: ME, entry_date: day(3), archived: false, slot: 0, focus: "Leg Day", created_at: day(0) + "T05:00:00Z",
           exercises: [
             { name: "Barbell Back Squat", sets: 4, reps: 6, targetWeight: 245 },
             { name: "Romanian Deadlift", sets: 3, reps: 10, targetWeight: 185 },
@@ -420,7 +427,7 @@
       label: "Activity planned by hand",
       apply: (db) => {
         const byHand = (date, id, focus, act, mode) => ({
-          id, email: ME, user_name: "Mo", entry_date: date, archived: false,
+          id, email: ME, user_name: "Mo", entry_date: date, archived: false, slot: 0,
           focus, exercises: [], mobility: null,
           cardio: { session: { name: focus, act, mode } },
           created_at: day(0) + "T05:00:00Z", completed_at: null, duration_sec: null,
@@ -433,6 +440,44 @@
            and a week count actually moving rather than a number already there. */
         db.exercise_logs = db.exercise_logs.filter((e) => e.email !== ME || e.entry_date !== day(0));
         db.fit_entries = db.fit_entries.filter((e) => e.email !== ME || e.entry_date !== day(0));
+      },
+    },
+
+    /* Weigh-in sharing switched on, which is the ONLY way the Progress tab
+       draws a partner's weight. The base world deliberately has no
+       share_weigh_ins key at all, because that is what a profile looks like
+       until 20260920_share_weigh_ins.sql is run, and a fixture that quietly
+       adds the column would test a database nobody has. Both profiles get it,
+       so Settings > Partner shows the switch as well as Progress showing the
+       trend. */
+    weighInsShared: {
+      label: "Weigh-ins shared both ways",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => ({ ...p, share_weigh_ins: true }));
+      },
+    },
+
+    /* Her detail off AND her weigh-ins on, so the partner view has something
+       real to draw while every workout number beside it is withheld: the two
+       switches are independent and this is the case that proves it. */
+    weighInsOnlyShared: {
+      label: "Weigh-ins shared, workouts private",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => ({ ...p, share_weigh_ins: true,
+          share_workout_details: p.email === THEM ? false : p.share_workout_details }));
+      },
+    },
+
+    /* Her goal set to the one screen that lists a workout row by row: the
+       endurance hero prints every run with its distance and its clock on it,
+       which is exactly what the timeline withholds two taps away. With her
+       detail off, the partner view must not be able to reach it. */
+    partnerEndurancePrivate: {
+      label: "Partner runs, and keeps it private",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => p.email === THEM
+          ? { ...p, goal: "Build endurance", goal_bubble: "build-endurance", share_workout_details: false }
+          : p);
       },
     },
 
