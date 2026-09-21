@@ -140,7 +140,10 @@ batch**, at the end, not per commit. They have drifted apart repeatedly.
 - **App globals are top-level `let`/`const`**, so they are NOT on `window`. Inside
   `page.evaluate` use bare identifiers.
 - **The sandbox's fake client**: `.update()` DOES persist (it carries `__i` back in
-  `settle()`); `upsert` matches only the first `onConflict` column.
+  `settle()`); `.not()` is a no-op stub, so a server-side filter cannot be
+  verified there. `upsert` matches EVERY `onConflict` column (it used to match
+  only the first; the note saying so was stale and cost an agent a detour on
+  2026-09-20).
 - **Capacitor 7 registers plugins only from `packageClassList`**, which it fills by
   scanning `node_modules`. A plugin in the app target is never registered and reads
   as `undefined` in JS rather than throwing. `scripts/register-native-plugins.mjs`
