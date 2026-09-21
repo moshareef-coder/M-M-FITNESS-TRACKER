@@ -1059,8 +1059,15 @@ function drawHead(ctx, S, C, fill) {
     ctx.save();
     ctx.translate(center.x, center.y);
     ctx.fillStyle = dark;
-    const hw = 147.27 * scale, hh = 375.30 * scale, hr = 47.51 * scale;
-    roundRect(ctx, -hw / 2, -hh / 2, hw, hh, hr);
+    const hw = 147.27 * scale, hh = 375.30 * scale;
+    // The artwork's own corner radius (47.51, about two thirds of the half
+    // width) reads as a soft rectangle on the full mark, sitting among six
+    // other rects that all read as machined plate. On its own, next to a
+    // round head, it read as a sticker rather than an eye. Every other eye
+    // this rig draws, buddy's own and this shape's own pad, is a full
+    // stadium: passed a radius past its own clamp so roundRect's defensive
+    // min() rounds it all the way, matching them rather than the artwork.
+    roundRect(ctx, -hw / 2, -hh / 2, hw, hh, hw);
     ctx.fill();
     ctx.fillStyle = lime;
     const pw = 62.95 * scale, ph = 186.46 * scale * (squash ? 0.12 : 1), pr = 31.47 * scale;
