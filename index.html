@@ -6766,7 +6766,15 @@
     background: var(--panel); border: 1px solid var(--border);
     transition: transform .12s ease, filter .12s ease;
   }
-  .nxt-pick.on { border-color: var(--accent-ink); }
+  /* The same badge and border the onboarding styles picker wears, per Mo,
+     2026-09-21: "Recommended should be highlighted like how we always have
+     recommended." The plain white card read as no opinion at all next to the
+     tinted ones everywhere else this word appears. Position and top padding
+     mirror .ob-style, which carries the same .obs-rec badge. */
+  .nxt-pick.on {
+    position: relative; padding-top: 19px; border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+  }
   .nxt-pick:active { transform: translateY(1px); filter: brightness(.97); }
   .nxt-ico {
     flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
@@ -23538,10 +23546,6 @@ function renderCardioStage() {
        name and its reason, and the same sentence twice on one screen is the app
        padding. */
     const picks = nextUp ? nextUp.picks.filter((x) => x.key !== a.key) : [];
-    /* The lifting door is a row up there or a tile down here, never both. It
-       used to be both, which printed its one sentence twice on any day that
-       recommended it. */
-    const liftPicked = picks.some((x) => x.key === "lift");
     /* An opinion is stated once, in the highest place it has on the screen.
        The hero already wears it in its eyebrow, and a Recommended block below
        the hero says everything else we would argue for, with the reason
@@ -23553,6 +23557,20 @@ function renderCardioStage() {
        that is the honest state of it: a clock and a minutes field. */
     const canGenerate = !!(a.cardio || a.training);
     const libNote = a.cardio ? (ACT_LIB_NOTES[a.key] || "") : "";
+    /* HIIT and Other stay in CARDIO_ACTS, because actForExerciseName and
+       ACT_MET_NAME still have to answer for anyone who logged one before Mo
+       pulled them from the list, 2026-09-21: "remove HIIT," "remove other."
+       They are filtered out here, the same way openActivityInstead already
+       keeps "Other" off its own list, rather than out of the array itself. */
+    const gridActs = CARDIO_ACTS.filter((x) => x.key !== "hiit" && x.key !== "other");
+    /* Elliptical carries no `cardio` mode (see the note on CARDIO_ACTS), so a
+       tap on it opens the same bare clock as Other, not the built session its
+       venue neighbours now generate. Grouping it by venue said it belonged
+       next to the treadmill and the rower, which was no longer true, so it is
+       pulled out of "In the gym" and drawn on its own after every venue,
+       where the bare-clock tier already lived. */
+    const ellipticalAct = gridActs.find((x) => x.key === "elliptical");
+    const groupActs = gridActs.filter((x) => x.key !== "elliptical");
     stage.innerHTML = `
       <div class="csn-head">
         ${/* "Add a session" is for a day that already has one. Arriving here
@@ -23631,7 +23649,8 @@ function renderCardioStage() {
       ${picks.length ? `
       <p class="act-q">Recommended</p>
       <div class="nxt-picks">
-        ${picks.map((x) => `<button type="button" class="nxt-pick" data-next="${escapeHtml(x.key)}">
+        ${picks.map((x) => `<button type="button" class="nxt-pick on" data-next="${escapeHtml(x.key)}">
+          <span class="obs-rec">Recommended</span>
           <span class="nxt-ico">${icon(x.ico, 18)}</span>
           <span class="nxt-b"><b>${escapeHtml(x.label)}</b><i>${escapeHtml(x.why)}</i></span>
           <span class="nxt-go">${icon("chevronRight", 15)}</span>
@@ -23647,7 +23666,7 @@ function renderCardioStage() {
             signs are gone, and a gap between the grids does the grouping. */ ""}
       <p class="act-q${picks.length ? " act-q-rest" : ""}">${picks.length ? "Everything else" : "What do you want to do?"}</p>
       ${ACT_GROUPS.map((g) => {
-        const list = CARDIO_ACTS.filter((x) => (x.venue || null) === g.venue);
+        const list = groupActs.filter((x) => (x.venue || null) === g.venue);
         if (!list.length) return "";
         return `
           <div class="ob-styles act-styles">
@@ -23658,6 +23677,17 @@ function renderCardioStage() {
             </button>`).join("")}
           </div>`;
       }).join("")}
+      ${/* Elliptical, on its own after every venue: see the note above
+            gridActs for why it no longer sits with the treadmill and the
+            rower. */ ""}
+      ${ellipticalAct ? `
+          <div class="ob-styles act-styles">
+            <button type="button" class="ob-style${ellipticalAct.key === a.key ? " on" : ""}" data-act="${ellipticalAct.key}">
+              ${flagged(ellipticalAct) ? `<span class="obs-rec">Recommended</span>` : ""}
+              <span class="obs-ico">${icon(ellipticalAct.ico, 20)}</span>
+              <span class="obs-label">${escapeHtml(actTitle(ellipticalAct))}</span>
+            </button>
+          </div>` : ""}
       ${/* A lift used to be offered at the bottom of this sheet, handing off
             to the screen that builds plans. Mo, 2026-09-19: "I don't like how
             when I start an activity I see lifting workout, that shouldn't be
@@ -23671,19 +23701,14 @@ function renderCardioStage() {
             to ask me whether I want an activity, and one of those activities
             will be weightlifting, let's make sure to have that." Nobody chose
             lifting-or-activity on the way to this screen, so this screen owes
-            them both. Everywhere else it stays gone. */ ""}
+            them both. Everywhere else it stays gone.
+
+            Reversed the next day: Mo, 2026-09-21, "remove weightlifting."
+            The "lift" key stays valid in secondSessionPicks, so a day where
+            lifting IS the recommendation still argues for it up in the
+            Recommended cards; only this standalone door, the one this same
+            tile existed to add, is gone. */ ""}
       ${!nextUp ? "" : `
-        ${/* Only when it is not already a row up there. On a day the week has
-              room for a lift it IS one of the recommendations, with the same
-              sentence under it, and this used to draw it a second time. */ ""}
-        ${liftPicked ? "" : `
-        <div class="ob-styles act-styles">
-          <button type="button" class="ob-style" data-next="lift">
-            <span class="obs-ico">${icon("dumbbell", 20)}</span>
-            <span class="obs-label">Weightlifting</span>
-          </button>
-        </div>
-        ${nextUp.liftWhy ? `<p class="nxt-note">${escapeHtml(nextUp.liftWhy)}</p>` : ""}`}
         ${/* Said before the tap rather than discovered after it, and only while
               it is still true. ai_workouts WAS unique on (email, entry_date), so
               a second plan built today landed on top of this morning's row: the
