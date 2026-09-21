@@ -706,6 +706,16 @@ function shadeSide(p0, p1) {
 // the figure read as armour plates rather than one body.
 let COLLECT = null;
 let LINES = true;
+/* CSS pixels per VB unit on the canvas render() just sized, so part() can
+   floor its stroke to a physical pixel width instead of a fixed fraction of
+   the drawing box. A lift's session stage runs wide and the outline was
+   already legible there; the same 0.28-unit line on a squeezed stage (the
+   cool-down sheet leaves it under 220px tall) works out under one device
+   pixel and all but disappears, which is what Mo saw on that screen and
+   called "I can barely see the character." Bumping every stroke's absolute
+   width would thicken it everywhere it did not need thickening; this only
+   adds ink back on a small canvas and leaves a full-size one alone. */
+let UNIT_PX = 2;
 // Pass two only: every ARM capsule painted so far, in order. drawTorso reads
 // it to find the arms that are UNDER the torso, so it can give them the same
 // shoulder seam a near arm leaves. Legs are deliberately not recorded: the hip
@@ -732,7 +742,11 @@ function part(ctx, C, pts, o = {}) {
      UNDERNEATH declines to stroke (see drawTorso). Opt out with line: false. */
   if (o.line !== false) {
     ctx.strokeStyle = o.lineColor || C.seam;
-    ctx.lineWidth = (LINES ? (o.lineW || 0.28) : 0.15) * 2;
+    /* Floored at 1.3 CSS px on the outer contour rather than left to shrink
+       with the canvas: a hairline that scales all the way down with the box
+       is how the figure itself goes pale even though C.seam is near black. */
+    const base = (LINES ? (o.lineW || 0.28) : 0.15) * 2;
+    ctx.lineWidth = Math.max(base, 1.3 / UNIT_PX);
     ctx.lineJoin = "round";
     for (const g of segs) { capsulePath(ctx, g[0], g[1], g[2], g[3]); ctx.stroke(); }
   }
@@ -3304,6 +3318,7 @@ export function render(canvas, move, C, cycle, timeSec = 0, opts = {}) {
   }
   const ctx = canvas.getContext("2d");
   const s = (w / VB) * dpr;
+  UNIT_PX = w / VB;   // CSS px per VB unit, dpr already folded into s above
   ctx.setTransform(s, 0, 0, s, 0, 0);
   ctx.clearRect(0, 0, VB, VB);
   const fit = move.fit;
