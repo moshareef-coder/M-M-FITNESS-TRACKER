@@ -32967,6 +32967,15 @@ function renderChooseScreen() {
   const tomorrowPlan = allDone
     ? (ALL_PLANS || []).find((w) => w.email === MY_EMAIL && w.entry_date === nextDate && !w.archived)
     : null;
+  /* Same condition the acts row below picks the Generate button under: a
+     length only means something on a day this card is about to build, not on
+     one that already has a plan (Start/Resume) or already offers to look at
+     one (See tomorrow's plan). Mo: "I think you removed where I can edit the
+     time for workout" -- he was on THIS card, where estMin (the plan screen's
+     own guard) does not exist yet because there is no plan yet to measure. */
+  const showGenerate = !(p.real && !allDone) && !tomorrowPlan;
+  const genMinutes = PRE_GEN_MINUTES?.date === nextDate ? PRE_GEN_MINUTES.minutes : null;
+  const genSuggested = nearestSessionLength(MY_PROFILE?.session_minutes);
   /* The match and the muscle list ARE "what to train next", which is one of
      the things he is hired for. The card stays, with its title and both
      buttons, and his pitch sits where the reading would have been: a free
@@ -33039,6 +33048,14 @@ function renderChooseScreen() {
               ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
               : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
           ${tomorrowPlan ? "" : `<button type="button" class="wkt-btn-soft sm" id="choosePlanBtn">Plan my own</button>`}
+          ${/* Ahead of the generate, not after it: the plan screen's own time
+                control (planTimeBtn) only exists once a plan does, and this is
+                the moment "how long have you got" actually matters, before
+                there is anything built to fit. Same session_minutes one-off
+                the plan screen's control writes, just asked earlier. */ ""}
+          ${showGenerate
+            ? `<button type="button" class="wkt-more" id="chooseGenLenBtn">${icon("clock", 13)} About ${genMinutes || genSuggested} min ${icon("chevronRight", 13)}</button>`
+            : ""}
           ${/* Two doors, not three. Mo, 2026-09-19: "we're gonna have the plan
                 my own and generate workout, and then when it's the plan my own
                 you could pick an activity through there." So the invitation to
@@ -33147,8 +33164,18 @@ function renderChooseScreen() {
      anywhere that they had ever been related. p.ask is the card's own focus
      string, in the vocabulary adapter.mjs can parse (SUGGESTABLE_DAYS). */
   /* Generating for tomorrow rather than today once today is done: the same
-     function, handed the date it already knows how to take. */
-  if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout(allDone ? nextDate : null, { keepFocus: p.ask || null });
+     function, handed the date it already knows how to take. genMinutes is
+     null unless the length button below was actually tapped, in which case
+     this is the same one-off session_minutes applySessionBudget writes after
+     a plan exists, just handed to the first generate instead of a rebuild. */
+  if ($("chooseGenerateBtn")) $("chooseGenerateBtn").onclick = () => generateWorkout(allDone ? nextDate : null, { keepFocus: p.ask || null, sessionMinutes: genMinutes });
+  if ($("chooseGenLenBtn")) $("chooseGenLenBtn").onclick = () => openPreGenLengthSheet({
+    date: nextDate, chosen: genMinutes, suggested: genSuggested,
+    onPick: (minutes) => {
+      PRE_GEN_MINUTES = minutes == null ? null : { date: nextDate, minutes };
+      renderWorkoutTab();
+    },
+  });
   /* The same screen as the one before a workout, for tomorrow, in review.
      It used to open a summary sheet whose only offer was a swap, which is not
      what "see the plan" means. */
@@ -36531,6 +36558,14 @@ async function savePlanExercises() {
    row left in the database under a 30 minute session is somebody punished with
    lighter weights for having been busy on a Tuesday. */
 let ONE_OFF_SESSION = null;   // { date, minutes, made, changed, from: { minutes, focus, exercises, mobility, cardio } }
+/* The other half of a one-off: ONE_OFF_SESSION describes rebuilding a plan
+   that already exists, and on a day with nothing on it yet there is nothing
+   to rebuild. This is the same session_minutes override read before the
+   first generate rather than after it, so "how long have you got" is
+   answerable before there is anything to build, not only once there is.
+   Keyed by date so paging from today to tomorrow's proposal (allDone) does
+   not carry today's answer onto a day nobody has asked about yet. */
+let PRE_GEN_MINUTES = null;   // { date, minutes } | null
 /* meta.session from the last generate, whoever asked for it. This is for
    applySessionBudget, which only gets a boolean back and needs the engine's
    `restCompressed` to describe the change honestly. */
@@ -36584,6 +36619,38 @@ function openSessionBudgetSheet({ estimate, current, onPick }) {
       }
       onPick(minutes);
     },
+  });
+}
+
+/* The pre-generate twin of openSessionBudgetSheet: same five lengths, same
+   component, but asked before there is a plan to describe rather than after,
+   so the copy cannot claim an estimate that does not exist yet. `onPick`
+   gets handed straight to the caller; this sheet only presents the choice,
+   it does not decide what happens with it. */
+function openPreGenLengthSheet({ date, chosen, suggested, onPick }) {
+  const dayWord = date === todayStr() ? "today" : planDayWord(date);
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">HOW LONG HAVE YOU GOT</div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note">Say it before you generate and the plan is built to fit from the start: fewer sets when the time is short, more when there is room.</p>
+        <div class="rest-pref five" id="preGenLengths"></div>
+        <p class="muted-note" style="margin-top:12px;">Just for ${escapeHtml(dayWord)}. Your usual session length, in Setup then Training, is not touched.</p>
+        <button type="button" class="btn-ghost" data-close>Never mind</button>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  renderSessionLengths($("preGenLengths"), {
+    chosen, suggested,
+    onPick: (minutes) => { close(); onPick(minutes); },
   });
 }
 
