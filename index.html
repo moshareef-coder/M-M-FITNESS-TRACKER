@@ -3662,6 +3662,10 @@
   .cal-title:active { background: var(--panel-2); }
   .cal-title svg { color: var(--muted); transition: transform .18s; }
   .cal-title.open svg { transform: rotate(180deg); }
+  /* Week view: a name, not a door. The Week/Month pill under it is the only
+     way to reach month view now, so this no longer looks pressable. */
+  .cal-title-static { cursor: default; }
+  .cal-title-static:active { background: none; }
   /* On the planner the month leads, so it opens already showing the grid and
      carries a little more air under it than it does as a footnote on the tab. */
   /* Under the week rows now, so the gap it owns is above it rather than below. */
@@ -5716,23 +5720,15 @@
      A ring rather than a fill, because that is the language the header pair
      already speaks for these same two people, and because a filled orange
      circle with white on it does not clear contrast in either theme. */
-  .prog-who { margin-left: auto; align-self: center; display: flex; gap: 6px; }
+  /* Positioning only: the pill's own look is cal-scope's, shared with the
+     Week/Month switch. A name can run longer than "Week" or "Month", so the
+     row is allowed to shrink the pill rather than push the title off screen. */
+  .prog-who { margin-left: auto; flex: none; max-width: 52%; }
   .prog-who ~ .track-kebab { margin-left: 2px; }
   .prog-who button {
-    position: relative; width: 28px; height: 28px; border-radius: 50%; padding: 0;
-    display: grid; place-items: center; cursor: pointer;
-    background: none; border: 2px solid transparent; color: var(--muted);
-    font: inherit; font-size: 10.5px; font-weight: 800; letter-spacing: -.02em;
-    transition: border-color .15s, color .15s, transform .12s ease;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding: 8px 11px; min-height: 32px;
   }
-  /* 30px is the right size beside a tab title and the wrong size for a thumb,
-     so the tappable box is grown past the paint instead of the paint being
-     grown to meet the thumb: 30 plus 7 either side is 44 and the row keeps the
-     height the title gave it. */
-  .prog-who button::after { content: ""; position: absolute; inset: -7px; }
-  .prog-who button:active { transform: scale(.93); }
-  .prog-who button[aria-pressed="true"].me { border-color: var(--me); color: var(--me-ink); }
-  .prog-who button[aria-pressed="true"].them { border-color: var(--partner); color: var(--partner-ink); }
   .prog-who button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   /* Their view has no goal tabs, because their goals are theirs. Their name
      stands where the title was and reads like the tab it replaces, minus the
@@ -8754,7 +8750,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.20.2";
+const APP_VERSION = "2026.09.20.3";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -32635,10 +32631,17 @@ function calendarInnerHTML(opts = {}) {
      in one tap. */
   const atStart = asMonth ? HISTORY_MONTH <= oldest : HISTORY_WEEK <= historyOldestWeek();
   const atEnd = asMonth ? HISTORY_MONTH >= historyFurthestMonth() : HISTORY_WEEK >= historyFurthestWeek();
+  /* The title used to double as a second door into month view, the exact job
+     the Week/Month pill already does below it. Mo, 2026-09-20: "remove the
+     dropdown because we have the ticker instead." In week view it is now
+     inert text; in month view it still opens the year and month picker, which
+     the pill has no way to reach. */
   const nav = `
     <div class="cal-head">
       <button type="button" class="wk-nav-btn" id="calPrev" ${atStart ? "disabled" : ""} aria-label="${asMonth ? "Previous month" : "Previous week"}">${icon("chevronLeft", 16)}</button>
-      <button type="button" class="cal-title${HISTORY_PICK ? " open" : ""}" id="calTitle" aria-label="${asMonth ? "Pick a month or a year" : "Show the whole month"}">${escapeHtml(historyMonthLabel(asMonth ? HISTORY_MONTH : monthOff))}${icon("chevronDown", 14)}</button>
+      ${asMonth
+        ? `<button type="button" class="cal-title${HISTORY_PICK ? " open" : ""}" id="calTitle" aria-label="Pick a month or a year">${escapeHtml(historyMonthLabel(HISTORY_MONTH))}${icon("chevronDown", 14)}</button>`
+        : `<span class="cal-title cal-title-static">${escapeHtml(historyMonthLabel(monthOff))}</span>`}
       <button type="button" class="wk-nav-btn" id="calNext" ${atEnd ? "disabled" : ""} aria-label="${asMonth ? "Next month" : "Next week"}">${icon("chevronRight", 16)}</button>
     </div>
     ${HISTORY_PICK ? calendarPickerHTML(oldest) : ""}`;
@@ -32753,8 +32756,9 @@ function wireWorkoutCalendar(root) {
   };
   if ($("calPrev")) $("calPrev").onclick = () => (asMonth ? goMonth(HISTORY_MONTH - 1) : goWeek(HISTORY_WEEK - 1));
   if ($("calNext")) $("calNext").onclick = () => (asMonth ? goMonth(HISTORY_MONTH + 1) : goWeek(HISTORY_WEEK + 1));
+  /* Only rendered as a button in month view now; the week-view title is plain
+     text, so there is nothing here to wire in that case. */
   if ($("calTitle")) $("calTitle").onclick = () => {
-    if (!asMonth) { CAL_MONTH_OPEN = true; HISTORY_PICK = false; HISTORY_MONTH = weekMonthOffset(); repaint(); return; }
     HISTORY_PICK = !HISTORY_PICK;
     const today = new Date(todayStr() + "T00:00:00");
     HISTORY_PICK_YEAR = new Date(today.getFullYear(), today.getMonth() + HISTORY_MONTH, 1).getFullYear();
@@ -32831,13 +32835,13 @@ function goWorkoutScreen(mode, { back = false, before } = {}) {
 }
 
 function renderChooseScreen() {
-  /* The month belongs to the planner, which opens it on the way in and nobody
-     ever closed it again. So arriving here after a visit there found the week
-     strip already sitting under a whole month, with the chevron pointing up on
-     a screen you had only just opened. Here the week IS the answer and the
-     month is the follow-up question, so this screen states what it wants
-     rather than inheriting whatever the last screen left behind. */
-  CAL_MONTH_OPEN = false;
+  /* Mo, 2026-09-20: "In the workout, when you scroll down, it says Week and
+     Month. Have it always start on Month, and then we can go to Week. I
+     think that's a better way to do it." States what it wants on every
+     entry, the same way it always has (this used to force Week for the
+     opposite reason: the planner opens on a month and nobody ever closed
+     it), rather than inheriting whatever the last visit left behind. */
+  CAL_MONTH_OPEN = true;
   // A coached client does not generate their own plan. That is what the coach
   // is paid for, so the option is not offered rather than offered and refused.
   const coached = isCoachedClient();
@@ -41023,14 +41027,19 @@ function paintProgWho(host) {
   if (!PARTNER_EMAIL || !PARTNER_PROFILE) return;
   const mine = PROGRESS_VIEW !== "partner";
   const them = partnerName();
+  /* Mo, 2026-09-20: he didn't like the two initials in rings and asked for
+     "another ticker" instead, the same word he used for the Week/Month
+     switch. It is the same control: cal-scope is already the app's one pill
+     for "which of two readings is this screen showing", so this reuses it
+     rather than drawing a second switch that happens to look similar. */
   const wrap = document.createElement("div");
-  wrap.className = "prog-who";
+  wrap.className = "cal-scope prog-who";
   wrap.id = "progWho";
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", "Whose progress");
   wrap.innerHTML = `
-    <button type="button" class="me" data-who="me" aria-pressed="${mine}"
-      aria-label="Your progress">${escapeHtml(initials(ME))}</button>
-    <button type="button" class="them" data-who="partner" aria-pressed="${!mine}"
-      aria-label="${escapeHtml(them)}'s progress">${escapeHtml(initials(them))}</button>`;
+    <button type="button" data-who="me" class="${mine ? "on" : ""}" aria-pressed="${mine}">Me</button>
+    <button type="button" data-who="partner" class="${!mine ? "on" : ""}" aria-pressed="${!mine}">${escapeHtml(them)}</button>`;
   const keb = host.querySelector("#trackOpen");
   keb ? host.insertBefore(wrap, keb) : host.appendChild(wrap);
   wrap.querySelectorAll("[data-who]").forEach((b) => {
