@@ -676,7 +676,32 @@ export function composeWeek(styles, days, { liftCount = null, window = 7, seed =
   if (!n || !styles?.asked) return answer();
   const picked = styles.styles || [];
   const freq = styles.frequency || {};
-  const daysOf = (s) => FREQUENCY_DAYS[freq[s]] || 0;
+  const resStyles = picked.filter((s) => STYLE_KIND[s]?.kind === "resistance");
+  /* What "every day" is worth for a CARDIO OR FLOW style. Mo, 2026-09-21: "we're
+     going to cap it at the training days... we're just going based off of
+     those days." A flat seven was the week this engine built before the dial
+     existed and it outlived its reason: somebody lifting four days who ticks
+     Running "every day" does not mean seven runs, they mean a run on every day
+     they train, which is the lifting count. That count is `liftCount` when the
+     caller has it (weekGenDescriptors passes days_per_week in), and when it
+     does not the resistance block below is about to fall back to the busiest
+     resistance style's own word for the same number, so it is read off that
+     word here rather than computed twice and risking the two disagreeing.
+
+     With no resistance style ticked at all there is no training-days number to
+     cap against: this profile has no lifting schedule, cardio and flow are the
+     whole week, and "every day" keeps meaning all seven, exactly what it meant
+     before this fix and exactly what somebody asking for a run every day and
+     nothing else is actually asking for. That is the fallback, written out
+     rather than left implicit, because guessing a number nobody gave us is the
+     mistake this file keeps warning against elsewhere. */
+  const liftDays = liftCount != null && Number.isFinite(Number(liftCount))
+    ? Math.max(0, Math.round(Number(liftCount)))
+    : resStyles.length ? Math.max(...resStyles.map((s) => FREQUENCY_DAYS[freq[s]] || 0)) : null;
+  const daysOf = (s) => {
+    if (freq[s] === "daily" && liftDays != null && STYLE_KIND[s]?.kind !== "resistance") return liftDays;
+    return FREQUENCY_DAYS[freq[s]] || 0;
+  };
   const owed = (per) => {
     if (per <= 0) return 0;
     if (window > 0 && n < window) return Math.max(1, Math.round((per * n) / window));
@@ -688,7 +713,6 @@ export function composeWeek(styles, days, { liftCount = null, window = 7, seed =
   /* Resistance first, because everything else is placed around it. One
      session for the whole kind, whichever of the two styles were ticked: the
      plan builder narrows by equipment, it does not build two days. */
-  const resStyles = picked.filter((s) => STYLE_KIND[s]?.kind === "resistance");
   if (resStyles.length) {
     const pinned = list.filter((d) => d.lift === true);
     const free = list.filter((d) => d.lift === null && !count(d, "resistance"));

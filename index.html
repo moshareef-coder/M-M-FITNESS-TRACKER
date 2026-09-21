@@ -13127,6 +13127,21 @@ const STYLE_FREQ = [
 const STYLE_FREQ_IDS = STYLE_FREQ.map((f) => f.id);
 const freqDays = (id) => STYLE_FREQ.find((f) => f.id === id)?.days || 0;
 
+/* What "every day" on a CARDIO OR FLOW style is worth, days_per_week's cap
+   read the same way composeWeek reads it (styles.mjs, 2026-09-21): a runner
+   who lifts four days a week ticking "every day" means a run on those four
+   days, not seven, so the preview under the grid has to say four or the note
+   and the generated week would disagree. Resistance styles are untouched,
+   same as the engine. With nothing resistance ticked there is no training
+   days number to cap against, so daily still means seven, the total this
+   picker has always shown for a cardio or flow only week. */
+const styleDaysOf = (id, picked, freq) => {
+  const word = (freq || {})[id];
+  if (word !== "daily" || isResistanceStyle(id)) return freqDays(word);
+  const res = picked.filter(isResistanceStyle);
+  return res.length ? Math.max(...res.map((r) => freqDays((freq || {})[r]))) : 7;
+};
+
 /* The nearest word for a count of days, the direction days_per_week is read
    back into the resistance dial. Same table as frequencyForDays in styles.mjs
    and not its inverse: four days is "most days", because that is what a
@@ -13300,11 +13315,83 @@ function trainStyleNote(picked, freq = null) {
      class), and never two of a kind, which is composeWeek's rule and the
      week builder's. A single generated session on its own is still the
      lifting day; the runs and the classes arrive through the week. */
-  const total = picked.filter((id) => !isResistanceStyle(id)).reduce((n, id) => n + freqDays((freq || {})[id]), 0)
+  const total = picked.filter((id) => !isResistanceStyle(id)).reduce((n, id) => n + styleDaysOf(id, picked, freq), 0)
     + Math.max(0, ...picked.filter(isResistanceStyle).map((id) => freqDays((freq || {})[id])));
   return total > 7
     ? `${shape} That is more than seven, so some days hold two or three sessions: a lift, a run and a class can share a day, two of a kind cannot.`
     : `${shape} Generate the week and that is what it lays down. A single session on its own is still a lifting day.`;
+}
+
+/* What he says right after a tap, said in front of the summary rather than
+   instead of it: Mo wants the screen to react in the moment ("Okay perfect,
+   we'll go on a nice morning or night run"), and the summary still has to
+   say the thing that matters, which day this became a two or three session
+   one, or that nothing is on the resistance card. Same character as
+   quips.mjs and OB_ROBOT: deadpan, warm, never a bit at the user's expense.
+   Keyed by style id, then "on"/"off" for a tick and the four dial words for
+   a turn. Onboarding only, because Setup > Training already says what
+   changed in trainStyleSetupNote and a second voice on top of that one would
+   be the app talking over itself. */
+const STYLE_TAP = {
+  lifting: {
+    on: "Okay, the weight room it is. I'll build around what's there.",
+    off: "Lifting's off. I won't reach for a barbell again.",
+    daily: "Every day with weights. I'll pace the sets so that actually holds up.",
+    most: "Most days lifting, got it.",
+    some: "Lifting sometimes, worked in around the rest.",
+    rare: "Rarely lifting. Noted.",
+  },
+  home: {
+    on: "Okay, we'll work in some bodyweight and bands, no gym required.",
+    off: "Bodyweight work's off.",
+    daily: "Bodyweight every day. I'll keep it interesting.",
+    most: "Most days without equipment, noted.",
+    some: "Bodyweight sometimes, folded into the rest.",
+    rare: "Rarely without equipment. Got it.",
+  },
+  running: {
+    on: "Perfect, a run's going in.",
+    off: "No running. I won't bring it up again.",
+    daily: "A run every day. I'll find you a nice morning or evening one.",
+    most: "Running most days, on it.",
+    some: "A run now and then, in the mix.",
+    rare: "Rarely running, understood.",
+  },
+  cycling: {
+    on: "Nice, cycling's on the board.",
+    off: "Cycling's off. Consider it forgotten.",
+    daily: "Cycling every day. I'll spread the effort so your legs forgive you.",
+    most: "Most days on the bike, noted.",
+    some: "A ride now and then.",
+    rare: "Rarely cycling, got it.",
+  },
+  walking: {
+    on: "Good, walking counts and it's in.",
+    off: "Walking's off the list.",
+    daily: "A walk every day. That adds up more than people think.",
+    most: "Most days walking, got it.",
+    some: "Walking sometimes, in the mix.",
+    rare: "Rarely walking, noted.",
+  },
+  pilates: {
+    on: "Good call, Pilates is on.",
+    off: "Pilates is off for now.",
+    daily: "Pilates every day. Your core will notice.",
+    most: "Most days of Pilates, noted.",
+    some: "Pilates now and then.",
+    rare: "Rarely Pilates, got it.",
+  },
+  yoga: {
+    on: "Good, yoga's in. Breathing included.",
+    off: "Yoga's off. Noted.",
+    daily: "Yoga every day. Not every class has to be hard.",
+    most: "Most days of yoga, got it.",
+    some: "Yoga now and then.",
+    rare: "Rarely yoga, noted.",
+  },
+};
+function trainStyleTapLine(id, action) {
+  return STYLE_TAP[id]?.[action] || null;
 }
 
 /* "Lifting most days, bodyweight work rarely, running sometimes." The
@@ -13856,15 +13943,27 @@ function renderOnboardStep(step, data = {}) {
         <h1>Pick your workouts</h1>
         <p class="sub">We have ticked what suits your goals. Change any of it, and say how often. We only ever plan what is ticked here.</p>
         ${trainStylePickerHTML(picked, recs, freq)}
-        <p class="ob-style-note" id="styleNote"></p>
+        <p class="ob-style-note" id="styleNote" aria-live="polite"></p>
+        <p class="sub">You can change this later. Nothing is locked in.</p>
         <button type="button" class="btn-primary" id="styleNext">On to the fun stuff</button>
+        <button type="button" class="btn-ghost" id="styleSkip">Skip for now</button>
         <button type="button" class="btn-ghost" id="styleBack">Back</button>
       </div>`;
-    const note = () => {
-      $("styleNote").textContent = trainStyleNote(picked, freq);
+    /* `tap` is the last thing they touched, a tick/untick or a turn of a
+       dial, so the note can react to it before falling back to the plain
+       summary. Cleared once said: the reactive line is about the tap that
+       just happened, not a fact that should still be true next time
+       something else changes it. */
+    const note = (tap = null) => {
+      const said = tap ? trainStyleTapLine(tap.id, tap.action) : null;
+      $("styleNote").textContent = [said, trainStyleNote(picked, freq)].filter(Boolean).join(" ");
       $("styleNext").disabled = !picked.length;
     };
-    wireTrainStylePicker(ob, picked, (ids) => { picked = ids; note(); }, { freq, onFreq: () => note() });
+    wireTrainStylePicker(ob, picked, (ids, id) => {
+      const action = picked.includes(id) ? "off" : "on";
+      picked = ids;
+      note({ id, action });
+    }, { freq, onFreq: (id, level) => note({ id, action: level }) });
     note();
     /* Only the ticked styles' words travel, and days_per_week becomes the
        BUSIEST resistance word's count, not any one dial's: the week has one
@@ -13885,6 +13984,18 @@ function renderOnboardStep(step, data = {}) {
       }
       renderOnboardStep("days", next);
     };
+    /* Zero styles is not a coherent thing to save: normalizeStyles in
+       styles.mjs folds an empty array back into null anyway, so writing one
+       here would not mean "plan nothing", it would silently mean "never
+       asked" through a route that looks deliberate and is not. That is
+       exactly the state this Skip is for, reached honestly: train_styles and
+       style_frequency are left off `next` entirely, so the draft carries
+       forward whatever it already had (nothing, for a first run), the same
+       null the column would hold if this screen had never existed. The
+       account gets the unrestricted plan every profile got before the
+       question did, and Setup > Training is right there whenever they want
+       to answer it for real. */
+    $("styleSkip").onclick = () => renderOnboardStep("days", { ...data, train_styles: undefined, style_frequency: undefined });
     $("styleBack").onclick = () => {
       const q = tuneQueue(data);
       if (q.length) renderOnboardStep("tune", { ...data, tuneIdx: q.length - 1 });
