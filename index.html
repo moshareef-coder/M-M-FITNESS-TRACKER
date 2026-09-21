@@ -38037,6 +38037,19 @@ let PLAN_VIEW_DATE = null;
    halfway through editing the second. */
 let PLAN_VIEW_SLOT = 0;
 
+/* Which screen Back on the review returns to. Mo, 2026-09-21: pressing back
+   after opening a day from Plan your week landed on Build Next Workout
+   instead, "it just takes me directly to the home page" every time. Review
+   used to hardcode "choose" as its one way out regardless of how it was
+   reached, which was correct only for the doors that actually open FROM
+   choose (See tomorrow, a fresh generate) and wrong for every other one: the
+   week planner's day rows and its own calendar both funnel through
+   openPlanReview too. Captured in openPlanReview, off whatever screen was
+   showing the moment the door was opened, so Back retraces the actual door
+   rather than a screen chosen for it in advance. */
+let PLAN_VIEW_RETURN = "choose";
+const PLAN_VIEW_RETURN_MODES = new Set(["choose", "manual", "week", "recovery"]);
+
 function planBeingEdited() {
   return PLAN_VIEW_DATE ? planForDate(PLAN_VIEW_DATE, PLAN_VIEW_SLOT)
     : TODAY_PLANS.find((w) => planSlot(w) === PLAN_VIEW_SLOT) || TODAY_WORKOUT;
@@ -38055,6 +38068,11 @@ function rerenderPlanScreen() {
    tab when they land, and the tab has to know it is showing Saturday. */
 function openPlanReview(date) {
   PLAN_VIEW_DATE = date;
+  /* Read before goWorkoutScreen below changes it. null is today's own plan,
+     itself a valid door to retrace; anything this tab cannot name on its own
+     (mid transition, a stale value) falls back to choose rather than to
+     whatever that turned out to be. */
+  PLAN_VIEW_RETURN = WORKOUT_MODE === null || PLAN_VIEW_RETURN_MODES.has(WORKOUT_MODE) ? WORKOUT_MODE : "choose";
   goWorkoutScreen("review");
 }
 
@@ -38397,7 +38415,7 @@ function renderPlanPreview(opts) {
     </div>` : "";
 
   $("workoutContent").innerHTML = `
-    ${backBar("Back", () => goWorkoutScreen("choose", { back: true }))}
+    ${backBar("Back", () => goWorkoutScreen(review ? PLAN_VIEW_RETURN : "choose", { back: true }))}
     ${dayList}
     ${overview}
     ${/* Not on an activity day: "0/0" over a class is a progress bar for a
