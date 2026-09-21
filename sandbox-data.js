@@ -188,7 +188,7 @@
               { name: "Cross-Body Arm Swings", seconds: 20, perSide: false, group: "chest", kind: "dynamic", prepares: ["horizontalPush", "horizontalPull"], cue: "Swing the arms wide open, then cross them in front. Stay relaxed, this is not a stretch you force." },
             ],
             cooldown: [
-              { name: "Doorway Chest Stretch", seconds: 20, perSide: false, group: "chest", kind: "static", cue: "Forearms on the frame, step through until the chest opens. Breathe out into it." },
+              { name: "Doorway Pec Stretch", seconds: 20, perSide: false, group: "chest", kind: "static", cue: "Forearms on the frame, step through until the chest opens. Breathe out into it." },
               { name: "Overhead Triceps Stretch", seconds: 20, perSide: true, group: "triceps", kind: "static", cue: "Elbow to the ceiling, hand down the spine, ease the elbow back with the other hand." },
             ],
             /* Ramp-up sets (CONTRACT.md workout.rampSets), which a stated
