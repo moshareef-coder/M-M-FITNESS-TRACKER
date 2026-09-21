@@ -2452,16 +2452,20 @@
      thing you find and this is a thing you are offered; the seat stays exactly
      as it was underneath as the quiet permanent way in. */
   .home-hire { display: flex; flex-direction: column; gap: 12px; }
-  .home-hire-top { display: flex; align-items: center; gap: 13px; }
+  /* A button now, not a div: tapping the line is the whole interaction, the
+     same as the other robot bubble on Home. Reset to plain text rather than
+     look like a control that does something other than dismiss itself. */
+  .home-hire-top {
+    display: flex; align-items: center; gap: 13px; width: 100%;
+    border: 0; background: none; padding: 0; margin: 0; text-align: left; cursor: pointer;
+    font-family: inherit; transition: opacity .12s ease;
+  }
+  .home-hire-top:active { opacity: .6; }
   .home-hire-face { flex: none; width: 52px; height: auto; }
   .home-hire-line {
     min-width: 0; flex: 1 1 auto; font-size: 13.5px; font-weight: 600; line-height: 1.38;
     letter-spacing: -.01em; color: var(--text);
   }
-  /* Side by side, so "Not now" is as easy to reach as the invite. A skip that
-     takes a second tap to find is not a skip. */
-  .home-hire-acts { display: flex; gap: 8px; }
-  .home-hire-acts > button { margin-top: 0; font-size: 14.5px; padding: 12px 14px; }
   /* One blocked person. The address can be long and the button must not be
      pushed off the edge by it, so the name takes the slack and ellipsises. */
   .block-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
@@ -3294,18 +3298,6 @@
     padding: 0; border: 0; background: none; color: inherit;
     font-family: inherit; text-align: left; cursor: pointer;
   }
-  /* His action is deliberately quiet. Mo's rule for this screen is that the
-     workout button is the loudest green thing on it, and a robot suggestion is
-     not allowed to compete with the thing it is suggesting. */
-  .home-quip-act {
-    width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 11px 14px; border-radius: 12px; cursor: pointer;
-    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    font: inherit; font-size: 14px; font-weight: 700; letter-spacing: -.01em;
-  }
-  .home-quip-act:active { filter: brightness(.92); }
-  .home-quip-act:disabled { opacity: .6; }
-  .home-quip-act .hq-go { display: inline-flex; opacity: .45; margin-right: -4px; }
   .home-quip-av {
     flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px; overflow: visible;
     display: block; object-fit: contain;
@@ -17873,10 +17865,12 @@ function skipPartnerCard() {
    trainer says to you and not a feature announcement, and because the line has
    to work read aloud later.
 
-   It sits above the empty seat in the hero rather than replacing it. The seat
-   is the permanent quiet way in, findable on any day by somebody who decided
-   on their own; this is the one that speaks first, once, and can be put down.
-   Two of them shouting would be worse than either. */
+   It sits above the empty seat in the hero rather than replacing it, and that
+   is now the ONLY door here rather than one of three. Mo: "The robot should
+   not have a CTA. At all." Send an invite and Not now are gone; tapping the
+   line is Not now, since a card that only speaks and can be put down needs
+   no second way to put it down, and the seat beside your ring was always the
+   real way in, findable on any day by somebody who decided on their own. */
 function renderPartnerInviteCard() {
   const el = $("homePartnerCard");
   if (!el) return;
@@ -17887,25 +17881,11 @@ function renderPartnerInviteCard() {
   el.classList.toggle("hidden", !show);
   if (!show) { el.replaceChildren(); return; }
   el.innerHTML = `
-    <div class="home-hire-top">
+    <button type="button" class="home-hire-top" id="homePartnerCardSay" aria-label="He says: Bring your partner. They are included in your package. I will watch you both. Tap to dismiss">
       ${robotFaceSVG(52, "home-hire-face")}
       <span class="home-hire-line">Bring your partner. They&rsquo;re included in your package. I&rsquo;ll watch you both.</span>
-    </div>
-    <div class="home-hire-acts">
-      <button type="button" class="btn-primary" id="homePartnerInviteBtn">Send an invite</button>
-      <button type="button" class="btn-ghost" id="homePartnerSkipBtn">Not now</button>
-    </div>`;
-  $("homePartnerInviteBtn").onclick = async (e) => {
-    const sent = await shareInviteLink(e.currentTarget);
-    /* Already paired, on a device that had not caught up. The card is wrong
-       rather than the tap, so it goes and the reload puts the truth back. */
-    if (sent === "paired") { toast("You already have a partner"); skipPartnerCard(); renderPartnerInviteCard(); await loadAll(); return; }
-    /* An invitation that actually went somewhere is an answer for today. It
-       comes back next launch if nobody accepted, which is the same rule as
-       the skip and for the same reason. */
-    if (sent) { skipPartnerCard(); renderPartnerInviteCard(); }
-  };
-  $("homePartnerSkipBtn").onclick = () => { skipPartnerCard(); renderPartnerInviteCard(); };
+    </button>`;
+  $("homePartnerCardSay").onclick = () => { skipPartnerCard(); renderPartnerInviteCard(); };
 }
 
 /* Everything on Home that is written for two people, in one place. Training
@@ -30073,17 +30053,6 @@ function hideHomeQuip() {
   }, 300);
 }
 
-/* One tap of encouragement. The composer is still there for anything longer;
-   this is the version for when the whole message is "go". */
-async function sendNudge(btn) {
-  if (!PARTNER_EMAIL) return;
-  btn.disabled = true;
-  const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "Let's go!" });
-  if (error) { toast("Couldn't send"); console.error(error); btn.disabled = false; return; }
-  btn.textContent = "Sent";
-  setTimeout(hideHomeQuip, 900);
-}
-
 /* Does this person reliably train on this weekday? Eight weeks back, and it
    only counts at three, because two of anything is a coincidence. The clock
    comes from workout_at when there is one, so "Thursday evenings" is something
@@ -30110,8 +30079,17 @@ function weekdayHabit(who) {
 
 /* Mo, on the old version: "'I have run the numbers...' feels decorative. Make
    him react to real behaviour." So the written bank is now the fallback and
-   not the first choice. If anything true is happening between the two of you he
-   says that, and the card carries the one action that line implies.
+   not the first choice: if anything true is happening between the two of you
+   he says that instead of a stock line.
+
+   HE NO LONGER CARRIES A BUTTON. He used to, one that did whatever the line
+   implied (Start workout, Nudge X, Watch X). Mo, looking at a fresh account
+   with both this card and "Start Today's Workout" on screen at once: "The
+   robot should not have a CTA. At all." Two calls to action stacked under
+   each other, one of them spoken by a drawing, is the app asking twice. He
+   still reacts to what is actually true; he just says it now instead of also
+   offering a shortcut to it, and the shortcut he used to offer was always
+   reachable the ordinary way regardless.
 
    Order is by who needs an answer soonest: somebody mid-workout, then the day,
    then the week, then a habit. He says one thing. Returning null hands the slot
@@ -30123,19 +30101,10 @@ function homeBotLine() {
   const todayPlan = TODAY_WORKOUT && !TODAY_WORKOUT.archived && !TODAY_WORKOUT.completed_at ? TODAY_WORKOUT : null;
   const iAmIn = !!SESSION && !SESSION.finished;
 
-  const goWorkout = () => {
-    switchTab("workout");
-    if (SESSION) { reopenSession(); return; }
-    if (csnRunning()) { openCardioSession(); return; }
-    if (!TODAY_WORKOUT) { WORKOUT_MODE = "choose"; renderWorkoutTab(); }
-  };
-  const start = { label: todayPlan ? "Start workout" : "Plan a workout", run: goWorkout };
-  const nudge = partner ? { label: `Nudge ${partner}`, run: sendNudge, send: true } : null;
-
   if (partner && LIVE_PARTNER) {
     return iAmIn
       ? { text: `You are both training right now. Neither of you gets to stop first.` }
-      : { text: `${partner} is training right now.`, act: { label: `Watch ${partner}`, run: openLiveSheet } };
+      : { text: `${partner} is training right now.` };
   }
   if (partner && mineToday && theirsToday) {
     return { text: `Both of you, same day. That is the whole thing working.` };
@@ -30145,21 +30114,21 @@ function homeBotLine() {
   }
   if (partner && mineToday && !theirsToday) {
     const gap = gymDaysThisWeek(ME) - gymDaysThisWeek(partner);
-    if (gap >= 1) return { text: `${partner} is ${gap} workout${gap === 1 ? "" : "s"} behind you this week.`, act: nudge };
-    return { text: `Done for today. ${partner} has not logged one yet.`, act: nudge };
+    if (gap >= 1) return { text: `${partner} is ${gap} workout${gap === 1 ? "" : "s"} behind you this week.` };
+    return { text: `Done for today. ${partner} has not logged one yet.` };
   }
   if (partner && !mineToday && theirsToday) {
-    return { text: `${partner} already trained today. Your move.`, act: start };
+    return { text: `${partner} already trained today. Your move.` };
   }
   if (!mineToday) {
     const habit = weekdayHabit(ME);
     if (habit) {
       return { text: todayPlan
         ? `You usually train ${habit}. ${displayFocus(todayPlan.focus, todayPlan.exercises)} is ready.`
-        : `You usually train ${habit}.`, act: start };
+        : `You usually train ${habit}.` };
     }
     if (gymDaysThisWeek(ME) === 0) {
-      return { text: `Nothing on the board this week yet. First one is the hard one.`, act: start };
+      return { text: `Nothing on the board this week yet. First one is the hard one.` };
     }
   }
   return null;
@@ -30182,12 +30151,11 @@ function sayHomeQuip() {
   const real = homeBotLine();
   const line = real ? real.text : pickQuip("home");
   if (!line) return;                    // bank not loaded yet, or nothing applied
-  const act = real?.act || null;
   HOME_QUIP_AT = Date.now();
 
-  /* The card was one big button that dismissed him. It cannot stay one now
-     that he carries an action, because a button inside a button is not a
-     thing: the line is the dismiss target, the action is its own control. */
+  /* One button, the whole card. He used to carry a second control, his own
+     action beside the line, until Mo called that a second CTA stacked under
+     the real one. Back to a single big button that dismisses him. */
   const el = document.createElement("div");
   el.className = "home-quip";
   el.innerHTML = `
@@ -30199,9 +30167,7 @@ function sayHomeQuip() {
       <span class="home-quip-bub">
         <span class="home-quip-line"><span class="home-quip-txt"></span><i class="home-quip-cur"></i></span>
       </span>
-    </button>
-    ${act ? `<button type="button" class="home-quip-act">${escapeHtml(act.label)}
-      <span class="hq-go">${icon("chevronRight", 17)}</span></button>` : ""}`;
+    </button>`;
   const said = decodeEntities(line);
   /* The whole line on aria-label from the start, for the same reason the
      session bubble does it: nobody should have to wait out an animation before
@@ -30209,11 +30175,6 @@ function sayHomeQuip() {
   const say = el.querySelector(".home-quip-say");
   say.setAttribute("aria-label", `He says: ${said}. Tap to dismiss`);
   say.onclick = () => hideHomeQuip();
-  if (act) {
-    /* Nudge reports back inside the button it was pressed on, so nothing about
-       whether it sent has to be taken on trust. Everything else just goes. */
-    el.querySelector(".home-quip-act").onclick = (ev) => act.run(ev.currentTarget);
-  }
   slot.replaceChildren(el);
   document.getElementById("tab-home")?.classList.add("bot-between");
   /* He stays. There is no set coming to push him off, and a line that vanishes
@@ -38901,13 +38862,7 @@ function renderPlanPreview(opts) {
          <button type="button" class="btn-primary" id="planStartActBtn" style="margin-top:12px;">${actLive
            ? `${icon("play", 17)} Back to your ${escapeHtml(actNounWord)}, ${csnClock(csnElapsedMs())}`
            : `${icon("play", 17)} Start ${escapeHtml(displayFocus(plan.focus, exercises).toLowerCase())}`}</button>
-         ${started || isCoachedClient() ? "" : `${/* Regenerate offers to build
-               this day again, and a day somebody planned by hand was not built:
-               there is nothing to run a second time, and what it would produce
-               is a lifting workout over the top of the activity they chose.
-               Swap this workout is that offer, and it is honest about it. */ ""}
-           ${handPlanned ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}
-           <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`
+         ${started || isCoachedClient() || handPlanned ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`
       : `${/* Who can see it is a question about the live lifting session, which
                hides an exercise name and a set count. An activity has neither:
                what a watcher sees of it is the minutes, and those are not
@@ -38918,13 +38873,8 @@ function renderPlanPreview(opts) {
              <span class="wp-open-go">${icon("chevronRight", 16)}</span>
            </button>` : ""}
          <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>
-         ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>
-           <button type="button" class="btn-ghost" id="planSwapDayBtn">Swap this workout</button>`}`}
-    ${addSessionFootHTML(date || todayStr(), review)}
-    ${/* On a reviewed day this already sits up in "Change it"; today has no
-          such block, so it comes in here, between the door that adds a session
-          and the one that deletes the day. */ ""}
-    ${review ? "" : removeThis}
+         ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}
+    ${review ? addSessionFootHTML(date, review) : ""}
     ${delToday}`;
   wireTodaySessions($("workoutContent"));
   /* The other session on a day that has not arrived. Straight back through this
@@ -39065,14 +39015,6 @@ function renderPlanPreview(opts) {
       });
       if (ok) generateWorkout(null, { sameAgain: true });
     };
-  }
-  /* Next to Regenerate and doing the opposite of it: Regenerate keeps the day
-     type and changes the movements, this changes the day. */
-  if ($("planSwapDayBtn")) {
-    $("planSwapDayBtn").onclick = () => openSessionSwapSheet({
-      date: plan.entry_date || todayStr(),
-      current: plan,
-    });
   }
   if ($("planNewBtn")) $("planNewBtn").onclick = startFreshWorkout;
   /* Lands on the choose screen rather than redrawing this one: with today
@@ -43389,6 +43331,23 @@ function lastMeasurement(key) {
   return rows.length ? Number(rows[rows.length - 1][key]) : null;
 }
 
+/* Which rows actually show, out of whatever the caller asked for. Mo: "when
+   I log my measurements, it should not show me all the measurements, but
+   only the measurements that I have selected." trackedMetrics() is the same
+   answer the chip strip already gives for "what does this person want to
+   see", so a tile deselected there stops being asked about here too, rather
+   than this sheet quietly disagreeing with the screen that opened it.
+
+   Falls back to the full list if that leaves nothing: an empty sheet with a
+   Save button and no fields is a worse answer than showing everything, and
+   it can only happen on an account that turned off every tape reading for
+   its goal, which is a real but rare choice. */
+function measRowsToShow() {
+  const rows = MEAS_ROWS || MEASUREMENTS;
+  const filtered = rows.filter((m) => isTracked(m.key));
+  return filtered.length ? filtered : rows;
+}
+
 function renderMeasurementsSheet() {
   $("measureSheet").innerHTML = `
     <div class="ds-grip"></div>
@@ -43398,7 +43357,7 @@ function renderMeasurementsSheet() {
       <div class="spacer"></div>
     </div>
     <p class="muted-note" style="margin:-6px 0 14px;">Taken today. Only the ones you change are saved.</p>
-    ${(MEAS_ROWS || MEASUREMENTS).map((m) => {
+    ${measRowsToShow().map((m) => {
       const last = lastMeasurement(m.key);
       return `<div class="meas-item" data-key="${m.key}">
         <div class="wt-log-head">${m.label}</div>
@@ -43436,7 +43395,7 @@ async function saveMeasurements() {
   /* The patch is the touched rows and nothing else. A touched row that was
      then emptied is a mistake to point at, not a null to write. */
   const patch = {};
-  for (const m of (MEAS_ROWS || MEASUREMENTS)) {
+  for (const m of measRowsToShow()) {
     if (!MEAS_TOUCHED.has(m.key)) continue;
     const typed = parseFloat($("measureSheet").querySelector(`[data-key="${m.key}"] input`)?.value);
     if (!Number.isFinite(typed) || typed <= 0) { toast(`Enter a ${m.label.toLowerCase()} measurement first`); return; }
