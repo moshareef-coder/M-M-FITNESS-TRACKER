@@ -468,6 +468,18 @@
       },
     },
 
+    /* Progress sharing column applied, both profiles get the key so the
+       kebab-menu picker on Progress (and the mirrored card under Setup >
+       Partner) has something to read. The base world has no progress_hidden
+       key at all for the same reason weighInsShared exists: that is what a
+       real profile looks like until 20260921_progress_hidden.sql is run. */
+    progressHiddenReady: {
+      label: "Progress sharing picker live",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => ({ ...p, progress_hidden: p.email === THEM ? ["volume"] : [] }));
+      },
+    },
+
     /* Her goal set to the one screen that lists a workout row by row: the
        endurance hero prints every run with its distance and its clock on it,
        which is exactly what the timeline withholds two taps away. With her
