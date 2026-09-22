@@ -486,6 +486,52 @@
       },
     },
 
+    /* Lose weight, tracking Weight only, nothing from the tape. Mo: "if I
+       deselect weight from the measurements that I want, I shouldn't see
+       waist measurements down there" (and the sheet it opens shouldn't
+       offer them either). Exercises the Waist Trend tile's new gate on
+       renderProgTiles. */
+    waistUntracked: {
+      label: "Lose weight, no tape tracked",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => p.email === ME
+          ? { ...p, goal: "Lose weight", goal_bubble: "lose-weight",
+              tracked_by_goal: { "lose-weight": ["weight"] } }
+          : p);
+      },
+    },
+
+    /* Lose fat and build muscle: exercises the reordered tone-lean-abs
+       screen, weight (toneTrend) now first, photos second, the tape chips
+       and chart last. */
+    toneReorder: {
+      label: "Recomp screen, weight up top",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => p.email === ME
+          ? { ...p, goal: "Lose fat and build muscle", goal_bubble: "tone-lean-abs" }
+          : p);
+      },
+    },
+
+    /* Move better, with an old flat tracked_metrics list carrying Weight,
+       Best Lifts, Weekly Volume and Photos in from whatever goal actually
+       tracked them. Mo, seeing those leak into this goal's picker as "kept":
+       "I should not see anything that has to do with weightlifting... don't
+       even show weight... just mobility sessions, cardio sessions, walks,
+       and that's it." No tracked_by_goal entry for move-better on purpose,
+       so trackedMetrics() falls through to this flat legacy list, the exact
+       path that used to leak. */
+    moveBetterKeptGone: {
+      label: "Move better, no cross-goal leak",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => p.email === ME
+          ? { ...p, goal: "Move better", goal_bubble: "move-better",
+              tracked_metrics: ["weight", "photos", "lifts", "volume", "cardio_wk"],
+              tracked_by_goal: null }
+          : p);
+      },
+    },
+
     /* Photos opted in, THEM side: "photos" present in progress_hidden means
        shown for this one key (progressKeyShared's inverted default), the
        opposite of every other entry in the same array. Two fake rows so the

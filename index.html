@@ -7821,10 +7821,19 @@
          tile and the second button: the tiles answered questions this screen
          is not asking, and "Add body photos" was a second call to action for
          something the photos card at the top already offers. -->
+    <!-- Weight first, then photos, then the tape: Mo, "put the lose weight,
+         build muscle, always the weight up top... always, always, always
+         weight up top, and then we'll put the body photos below." This used
+         to lead with the tape on purpose (a recomp's whole claim is that the
+         scale barely moves, so opening with it read as telling somebody
+         they'd failed); the order below is the direct reversal of that,
+         by his own repeated instruction. renderToneHero fills each id the
+         same way regardless of where it sits in the markup. -->
     <div class="tone-screen goal-screen hidden" id="toneHero">
       <div class="tone-head">
         <div class="wth-title" id="toneTitle">Tone up</div>
       </div>
+      <div class="wtr-slot hidden" id="toneTrend"></div>
       <div class="tone-photos" id="tonePhotos"></div>
       <div class="tone-chips" id="toneChips"></div>
       <div class="tone-card">
@@ -7833,7 +7842,6 @@
         <p class="tone-empty hidden" id="toneEmpty">Log a measurement to start the line.</p>
         <div class="wt-range" id="toneRange"></div>
       </div>
-      <div class="wtr-slot hidden" id="toneTrend"></div>
       <div class="tone-actions" id="toneActions">
         <button type="button" class="btn-primary" id="toneLogBtn"></button>
       </div>
@@ -8963,7 +8971,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.25";
+const APP_VERSION = "2026.09.21.26";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -43506,24 +43514,34 @@ function renderProgTiles(kind, isPartner, opts = {}) {
   if (!on) return;
 
   const name = isPartner ? partnerName() : ME;
-  const t = waistTrend(name);
+  /* Mo: after deselecting every tape measurement (keeping only Weight), "I
+     shouldn't see waist measurements down there" on this tile row, and "I
+     also shouldn't see this page [the sheet it opens] except wait [weight]
+     on here." The tile was offered unconditionally whenever this row shows
+     at all, whatever the tracking picker said; a partner's own tape is a
+     separate question (bodyShared) and stays exactly as it was. */
   const chev = `<span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
-  const fmt = (n) => `${Math.abs(n) < 0.05 ? "" : n < 0 ? "-" : "+"}${Math.abs(n).toFixed(1)} in`;
-  let value = "", sub;
-  if (!t) sub = isPartner ? "No readings yet" : "Add a measurement";
-  else if (t.delta === null) { value = `${t.now.toFixed(1)} in`; sub = "first reading"; }
-  else {
-    const cls = Math.abs(t.delta) < 0.05 ? "" : t.delta < 0 ? "idx-good" : "idx-bad";
-    value = `<span class="${cls}">${fmt(t.delta)}</span>`;
-    sub = "this month";
-  }
+  const waistOffered = isPartner || MEASUREMENTS.some((m) => isTracked(m.key));
   const waist = $("tileWaist");
-  waist.innerHTML = `<span class="prog-tile-ico">${icon("tape", 18)}</span>
-    <span class="prog-tile-body"><span class="prog-tile-title">Waist Trend</span>${value ? `<span class="prog-tile-val">${value}</span>` : ""}<span class="prog-tile-sub">${sub}</span></span>${isPartner ? "" : chev}`;
-  /* A partner's tape is read only, same as their scale: the sheet writes to
-     YOUR row and has no business opening on their screen. */
-  waist.disabled = isPartner;
-  waist.onclick = isPartner ? null : () => openMeasurementsSheet();
+  waist.classList.toggle("hidden", !waistOffered);
+  if (waistOffered) {
+    const t = waistTrend(name);
+    const fmt = (n) => `${Math.abs(n) < 0.05 ? "" : n < 0 ? "-" : "+"}${Math.abs(n).toFixed(1)} in`;
+    let value = "", sub;
+    if (!t) sub = isPartner ? "No readings yet" : "Add a measurement";
+    else if (t.delta === null) { value = `${t.now.toFixed(1)} in`; sub = "first reading"; }
+    else {
+      const cls = Math.abs(t.delta) < 0.05 ? "" : t.delta < 0 ? "idx-good" : "idx-bad";
+      value = `<span class="${cls}">${fmt(t.delta)}</span>`;
+      sub = "this month";
+    }
+    waist.innerHTML = `<span class="prog-tile-ico">${icon("tape", 18)}</span>
+      <span class="prog-tile-body"><span class="prog-tile-title">Waist Trend</span>${value ? `<span class="prog-tile-val">${value}</span>` : ""}<span class="prog-tile-sub">${sub}</span></span>${isPartner ? "" : chev}`;
+    /* A partner's tape is read only, same as their scale: the sheet writes to
+       YOUR row and has no business opening on their screen. */
+    waist.disabled = isPartner;
+    waist.onclick = isPartner ? null : () => openMeasurementsSheet();
+  }
 
   /* Photos are never shared, so on a partner's view there is no tile rather
      than an empty one, and the tape takes the whole row. Same when the photo
@@ -43537,7 +43555,10 @@ function renderProgTiles(kind, isPartner, opts = {}) {
      account), and the card's own hidden class only decides elsewhere. */
   const showPhotos = opts.photosAvailable ?? (!isPartner && card && !card.classList.contains("hidden"));
   photos.classList.toggle("hidden", !showPhotos);
-  host.classList.toggle("solo", !showPhotos);
+  // Solo whichever one tile is left standing, and fold the whole row away
+  // when neither has anything to offer rather than leaving an empty strip.
+  host.classList.toggle("solo", showPhotos !== waistOffered);
+  host.classList.toggle("hidden", !showPhotos && !waistOffered);
   if (showPhotos) {
     const n = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL).length;
     photos.innerHTML = `<span class="prog-tile-ico">${icon("camera", 18)}</span>
@@ -43782,16 +43803,24 @@ function closeTrackSheet() {
 function renderTrackSheet() {
   const goalId = TRACK_SHEET_GOAL;
   const tile = goalTileFor(goalId);
-  const on = new Set(trackedMetrics(goalId));
-  /* This goal's own six, same table the first run reads. Anything already on
-     that fell out of the list stays in the grid, marked kept, rather than
-     disappearing: turning the offers into a per-goal set must not read as
-     silently un-tracking something somebody chose on purpose. */
+  /* This goal's own offers, and ONLY its own offers. There used to be a
+     second tier here, "kept" tiles for anything tracked outside this list
+     (weight, best lifts, whatever a DIFFERENT goal once turned on), so a
+     goal's offer list changing could never read as silently un-tracking a
+     real choice. Mo, on Move Better carrying Weight and Body Photos in from
+     somewhere else as "kept": "I should not see anything that has to do
+     with weightlifting... don't even show weight... just mobility sessions,
+     cardio sessions, walks, and that's it." That is the same rule the
+     comment two screens up already states for the offer list itself
+     ("Get stronger offering mobility sessions... is that full set doing
+     exactly what it was built to do, and Mo does not want it"); kept tiles
+     were a second, quieter way back into the same thing. `on` is seeded
+     from the offer list alone, so a legacy key sitting in the flat/global
+     union neither shows here nor survives the next save for this goal. */
   const offerKeys = TRACK_OFFERS[goalId] || TRACK_OFFERS.consistent;
-  const offers = offerKeys.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
-  const kept = TRACK_ALL.filter((m) => on.has(m.key) && !offerKeys.includes(m.key));
-  const shown = [...offers, ...kept];
-  const keptSet = new Set(kept.map((m) => m.key));
+  const tracked = new Set(trackedMetrics(goalId));
+  const on = new Set(offerKeys.filter((k) => tracked.has(k)));
+  const shown = offerKeys.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
   /* Same chrome as the measurements sheet next door: grip, back chevron,
      centred title. Two sheets on one tab that open differently is the kind of
      small inconsistency people feel without being able to name.
@@ -43808,7 +43837,7 @@ function renderTrackSheet() {
       <div class="spacer"></div>
     </div>
     <p class="trk-any" style="margin:0 0 14px">What this goal shows you. Your other goals keep their own. Everything logs either way, so turning one back on shows its whole history.</p>
-    <div class="trk-grid" id="trackSheetGrid">${trackTilesHTML(shown, on, keptSet)}</div>
+    <div class="trk-grid" id="trackSheetGrid">${trackTilesHTML(shown, on, null)}</div>
     <button type="button" class="btn-primary" id="trackDone" style="margin-top:16px">Done</button>`;
 
   /* Saved on every tap rather than on the way out, which is what this sheet has
