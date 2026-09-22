@@ -7826,20 +7826,22 @@
          tile and the second button: the tiles answered questions this screen
          is not asking, and "Add body photos" was a second call to action for
          something the photos card at the top already offers. -->
-    <!-- Weight first, then photos, then the tape: Mo, "put the lose weight,
-         build muscle, always the weight up top... always, always, always
-         weight up top, and then we'll put the body photos below." This used
-         to lead with the tape on purpose (a recomp's whole claim is that the
-         scale barely moves, so opening with it read as telling somebody
-         they'd failed); the order below is the direct reversal of that,
-         by his own repeated instruction. renderToneHero fills each id the
-         same way regardless of where it sits in the markup. -->
+    <!-- Same order as the other three goal screens, and that is the point:
+         chips, the chart card, the weight trend under it, then photos.
+
+         Mo asked for "always, always, always weight up top, and then we'll
+         put the body photos below" and this screen first answered it by
+         hoisting the TREND block to the top, which is not what he meant and
+         put the trend above the chart: "the weight trend should be below the
+         weight chart every time, I'm telling you this a million freaking
+         times." The weight he wants up top is the chart with the number on
+         it, which is what the chips select into; the trend is a reading that
+         goes under it, on every screen, without exception. renderToneHero
+         fills each id the same way wherever it sits in the markup. -->
     <div class="tone-screen goal-screen hidden" id="toneHero">
       <div class="tone-head">
         <div class="wth-title" id="toneTitle">Tone up</div>
       </div>
-      <div class="wtr-slot hidden" id="toneTrend"></div>
-      <div class="tone-photos" id="tonePhotos"></div>
       <div class="tone-chips" id="toneChips"></div>
       <div class="tone-card">
         <div class="wth-stats" id="toneStats"></div>
@@ -7847,6 +7849,8 @@
         <p class="tone-empty hidden" id="toneEmpty">Log a measurement to start the line.</p>
         <div class="wt-range" id="toneRange"></div>
       </div>
+      <div class="wtr-slot hidden" id="toneTrend"></div>
+      <div class="tone-photos" id="tonePhotos"></div>
       <div class="tone-actions" id="toneActions">
         <button type="button" class="btn-primary" id="toneLogBtn"></button>
       </div>
@@ -7959,7 +7963,6 @@
         <div class="wth-head hidden" id="wtHeroHead"></div>
         <p class="muted-note idx-lead" style="margin-top:-6px" id="weightLead"></p>
         <div class="wth-stats hidden" id="wtHeroStats"></div>
-        <div class="wtr-slot hidden" id="wtHeroTrend"></div>
         <div class="chart-wrap"><canvas id="weightChart"></canvas></div>
         <!-- The goal weight, asked here rather than during setup. It left
              onboarding because it was being asked before somebody had weighed
@@ -7969,6 +7972,13 @@
              would join. -->
         <div class="wt-goal" id="weightGoalRow"></div>
         <div class="wt-range" id="weightRange"></div>
+        <!-- Under the chart, never over it. Mo: "the weight trend should be
+             below the weight chart every time, I'm telling you this a million
+             freaking times." Below the range pills too, since those are the
+             chart's own controls and splitting them off it would read as
+             broken. Same place the other four goal screens put it: after the
+             chart block, before whatever else the screen carries. -->
+        <div class="wtr-slot hidden" id="wtHeroTrend"></div>
         <div class="ms-list" id="weightHistory"></div>
       </div>
       <div class="wt-logcard">
@@ -8976,7 +8986,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.29";
+const APP_VERSION = "2026.09.21.30";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -17619,8 +17629,7 @@ function activityPace(l) {
    instead of quietly borrowing somebody else's. */
 const ACT_MET_NAME = {
   run: "Running", treadmill: "Running", walk: "Walking",
-  cycle: "Cycling", bikemachine: "Cycling", stairs: "Stair climber",
-  row: "Rowing machine", elliptical: "Elliptical",
+  cycle: "Cycling", stairs: "Stair climber",
   yoga: "Yoga", pilates: "Pilates", hiit: "HIIT",
 };
 
@@ -22426,27 +22435,40 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
    than the log ("Run outside"), and `alias` carries a label this app used to
    write, so old rows keep counting. Rowing was logged as "Row" until the
    machines arrived and it took its full name. */
+/* Mo, 2026-09-21: "I told you a million times, remove elliptical, remove
+   rowing machine, and remove cycling outside... we're gonna have running
+   outside, and then we're gonna have treadmill, and we're gonna have
+   cycling, that's it. I don't want cycling outside or any of that."
+
+   So the wheel of cardio choices is Run outside, Treadmill, Cycle, plus Walk
+   (its own style, and the Walks card counts it). Cycling is ONE entry now
+   rather than a road/machine pair, which is what "cycling outside" was: with
+   one tile the split had nowhere to read from, and the `venue` it keeps is
+   only what shelves it beside Run outside in the picker, since those
+   headings are not drawn.
+
+   The retired labels live on as aliases on `other` rather than being
+   deleted outright. `label` is what went into exercise_logs.exercise_name,
+   and countsAsCardio reads history back through actForExerciseName, so
+   dropping the string would quietly stop counting every elliptical and
+   rowing session anybody ever logged. They resolve to a plain clock now,
+   which is what they already were: neither carried a `cardio` mode, so
+   neither was ever built into a session. */
 const CARDIO_ACTS = [
   { key: "run",        label: "Run",           title: "Run outside",   ico: "run",      dist: true,  cardio: "running",    venue: "outdoor" },
   { key: "walk",       label: "Walk",                                  ico: "walk",     dist: true,  cardio: "walking",    venue: "outdoor" },
-  { key: "cycle",      label: "Cycle",         title: "Cycle outside", ico: "bike",     dist: true,  cardio: "cycling",    venue: "outdoor" },
+  { key: "cycle",      label: "Cycle",                                 ico: "bike",     dist: true,  cardio: "cycling",    venue: "outdoor", alias: ["bike machine"] },
   { key: "treadmill",  label: "Treadmill",   short: "Treadmill",       ico: "run",      dist: true,  cardio: "running",    venue: "gym" },
-  /* The stair master, the rower, the elliptical and HIIT carry no `cardio`
-     mode since 2026-09-19, so they are a clock like Other: the library's
-     stairs, rowing, elliptical and HIIT rows are never built into a session
-     any more, on Mo's call that the app offers running, cycling and walking
-     and nothing it has one row for. The machines stay on the shelf because a
-     rowing session is still a thing a person does and logs, and Progress
-     reads the label back out of history. A `cardio` key put back on one of
-     these would offer that mode again from three places at once. */
+  /* The stair master carries no `cardio` mode, so it is a clock like Other:
+     the library's stairs row is never built into a session, on Mo's call
+     that the app offers running, cycling and walking and nothing it has one
+     row for. A `cardio` key put back here would offer that mode again from
+     three places at once. */
   { key: "stairs",     label: "Stair master", short: "Stairs",         ico: "trending", dist: false, venue: "gym" },
-  { key: "bikemachine",label: "Bike machine", short: "Bike",           ico: "bike",     dist: true,  cardio: "cycling",    venue: "gym" },
-  { key: "row",        label: "Rowing machine", short: "Rower",        ico: "dumbbell", dist: true,  venue: "gym", alias: ["row"] },
-  { key: "elliptical", label: "Elliptical",  short: "Elliptical",      ico: "refresh",  dist: false, venue: "gym" },
   { key: "yoga",       label: "Yoga",                                  ico: "heart",    dist: false, training: "yoga" },
   { key: "pilates",    label: "Pilates",                               ico: "star",     dist: false, training: "pilates" },
   { key: "hiit",       label: "HIIT",                                  ico: "bolt",     dist: false },
-  { key: "other",      label: "Other",                                 ico: "clock",    dist: false },
+  { key: "other",      label: "Other",                                 ico: "clock",    dist: false, alias: ["elliptical", "rowing machine", "row"] },
 ];
 
 /* What the screen calls it, which is not always what the log calls it. */
@@ -22467,8 +22489,7 @@ function actForExerciseName(exerciseName) {
    does not, which is why this is a written list and not label.toLowerCase(). */
 const ACT_NOUN = {
   run: "run", walk: "walk", cycle: "ride", treadmill: "treadmill session",
-  stairs: "stair session", bikemachine: "bike session", row: "row",
-  elliptical: "elliptical session", yoga: "yoga session",
+  stairs: "stair session", yoga: "yoga session",
   pilates: "Pilates session", hiit: "HIIT session", other: "session",
 };
 function actNoun(a) { return ACT_NOUN[a?.key] || "session"; }
@@ -23018,7 +23039,7 @@ function activityWhy(act, profile, isRec) {
 const CSN_CLOCK_FIG = {
   run: "Easy Run",
   walk: "Brisk Walk",
-  cycle: "Easy Ride", bikemachine: "Easy Ride",
+  cycle: "Easy Ride",
   stairs: "Stair Intervals",
   yoga: "Mountain Pose", pilates: "Mountain Pose",
 };
@@ -23998,14 +24019,12 @@ function renderCardioStage() {
        They are filtered out here, the same way openActivityInstead already
        keeps "Other" off its own list, rather than out of the array itself. */
     const gridActs = CARDIO_ACTS.filter((x) => x.key !== "hiit" && x.key !== "other");
-    /* Elliptical carries no `cardio` mode (see the note on CARDIO_ACTS), so a
-       tap on it opens the same bare clock as Other, not the built session its
-       venue neighbours now generate. Grouping it by venue said it belonged
-       next to the treadmill and the rower, which was no longer true, so it is
-       pulled out of "In the gym" and drawn on its own after every venue,
-       where the bare-clock tier already lived. */
-    const ellipticalAct = gridActs.find((x) => x.key === "elliptical");
-    const groupActs = gridActs.filter((x) => x.key !== "elliptical");
+    /* Every remaining tile shelves by venue now. Elliptical used to be
+       carved out of "In the gym" and drawn on its own, because it carried no
+       `cardio` mode and opened a bare clock rather than a built session; it
+       is off the list entirely as of 2026-09-21, so the carve-out went with
+       it. */
+    const groupActs = gridActs;
     stage.innerHTML = `
       <div class="csn-head">
         ${/* "Add a session" is for a day that already has one. Arriving here
@@ -24112,17 +24131,6 @@ function renderCardioStage() {
             </button>`).join("")}
           </div>`;
       }).join("")}
-      ${/* Elliptical, on its own after every venue: see the note above
-            gridActs for why it no longer sits with the treadmill and the
-            rower. */ ""}
-      ${ellipticalAct ? `
-          <div class="ob-styles act-styles">
-            <button type="button" class="ob-style${ellipticalAct.key === a.key ? " on" : ""}" data-act="${ellipticalAct.key}">
-              ${flagged(ellipticalAct) ? `<span class="obs-rec">Recommended</span>` : ""}
-              <span class="obs-ico">${icon(ellipticalAct.ico, 20)}</span>
-              <span class="obs-label">${escapeHtml(actTitle(ellipticalAct))}</span>
-            </button>
-          </div>` : ""}
       ${/* A lift used to be offered at the bottom of this sheet, handing off
             to the screen that builds plans. Mo, 2026-09-19: "I don't like how
             when I start an activity I see lifting workout, that shouldn't be
