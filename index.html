@@ -2639,6 +2639,31 @@
      it would be sliced in half. Same column, same fill and same blur as
      .tabs, so the two read as one piece of furniture rather than a card that
      happens to have landed there. */
+  /* The settings save bar, built on the same furniture as the in-progress
+     bar below it: fixed over the nav, same gutters, same blur, so the two
+     read as one family rather than a card that happened to land there. It
+     only ever appears with a real pending edit on the page under it, which
+     is why it can be this loud. */
+  .set-savebar {
+    position: fixed; z-index: 10;
+    left: max(14px, calc((100% - 452px) / 2));
+    right: max(14px, calc((100% - 452px) / 2));
+    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    padding: 9px; border-radius: 16px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--panel) 96%, transparent);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: var(--shadow-lift);
+    animation: savebar-in .18s ease both;
+  }
+  .set-savebar .btn-primary { width: 100%; margin: 0; }
+  @keyframes savebar-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .set-savebar { animation: none; } }
+
   .inprog {
     position: fixed; z-index: 9; cursor: pointer;
     left: max(14px, calc((100% - 452px) / 2));
@@ -8352,7 +8377,6 @@
         <input type="text" id="setupDisplayName" placeholder="Your name" maxlength="24" autocomplete="off" />
         <label class="pf-lab" for="setupBio">About you <span class="pf-count" id="bioCount">0/140</span></label>
         <textarea id="setupBio" rows="2" maxlength="140" placeholder="A line about you. Your partner sees this."></textarea>
-        <button type="button" class="btn-secondary" id="saveNameBtn" style="margin-top:10px;">Save</button>
         <p class="muted-note" id="nameNote" style="margin-top:8px;">This is what your partner sees.</p>
       </div>
 
@@ -8472,9 +8496,7 @@
       <!-- The one control here that cannot save on the tap: going from lifting
            to running is an untick and a tick, and the untick in between would
            write the empty list, which is the one value this column must never
-           hold. So it keeps its button, sitting under the grid it saves rather
-           than at the bottom of a page full of controls it no longer owns. -->
-      <button class="btn-primary" id="saveSetupBtn" style="margin-top:12px;">Save how you train</button>
+           hold. So it waits for the save bar rather than writing as you go. -->
       <!-- This was "Weekly goal": a bare 1 to 7 number box, the one control on
            the page that never said what it moved, under a heading that collides
            with the Goal row one screen up (lose weight, build muscle).
@@ -8577,7 +8599,6 @@
         <option value="Active">Active</option>
       </select>
     </div>
-    <button class="btn-primary" id="saveBodyBtn">Save</button>
     </div>
     <div class="settings-page hidden" id="page-focus">
       <div class="scr-head">
@@ -8746,6 +8767,22 @@
         <button type="button" class="btn-ghost" id="deleteCancelBtn">Cancel</button>
       </div>
     </div>
+    </div>
+    <!-- One save bar for every settings page. Mo, 2026-09-21: "anything, and
+         I mean anything you update inside of settings should always have a
+         pop-up save button, so we should never have save buttons inside of
+         the settings, it would just pop up if you do any change."
+
+         It replaces the three Save buttons that used to sit inside cards
+         (Profile, Training, Your body), which were three different words in
+         three different places for one idea. Controls that write on the tap
+         still write on the tap: a privacy switch that waited for a Save is a
+         switch that can read as on while it is off, which is the one class of
+         bug a privacy control may not have. This bar is for the edits that
+         genuinely need confirming, which are the ones those three buttons
+         already owned. -->
+    <div class="set-savebar hidden" id="setSaveBar">
+      <button type="button" class="btn-primary" id="setSaveBtn">Save changes</button>
     </div>
     <div class="settings-page hidden" id="page-admin">
       <div class="scr-head">
@@ -8999,7 +9036,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.37";
+const APP_VERSION = "2026.09.21.38";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -14969,8 +15006,7 @@ function showApp() {
     try { await navigator.clipboard.writeText(text); toast("Invite copied"); }
     catch { toast(`Your code is ${code}`); }
   });
-  $("saveSetupBtn").addEventListener("click", saveTrainingPrefs);
-  $("saveBodyBtn").addEventListener("click", saveBodyStats);
+  // Both of these are the save bar's job now (SET_SAVERS).
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
   $("adminAddEntryBtn").addEventListener("click", adminAddEntry);
   $("adminAddExBtn").addEventListener("click", adminAddExercise);
@@ -44920,8 +44956,7 @@ async function saveDisplayName() {
     return;
   }
 
-  const btn = $("saveNameBtn");
-  btn.disabled = true;
+  // The bar owns the saving state now; this only owns the message.
   note.textContent = "Saving…";
   const previous = ME;
 
@@ -44959,8 +44994,9 @@ async function saveDisplayName() {
   } catch (err) {
     console.error(err);
     note.textContent = "Could not save that name.";
-  } finally {
-    btn.disabled = false;
+    /* Rethrown so the save bar stays up: it hides on a clean return, and a
+       name that did not save must not look like one that did. */
+    throw err;
   }
 }
 
@@ -45469,8 +45505,63 @@ async function leavePartnership() {
    rather than at the top of a long list you just scrolled through. */
 let SETUP_SCROLL = 0;
 
+/* The save bar, and the three edits that need it.
+
+   Everything else in Settings writes on the tap and keeps doing so: see the
+   note on #setSaveBar for why a privacy switch may not wait for a confirm.
+   These three cannot write on the tap. A name is not a name until somebody
+   stops typing, a height is two fields that are wrong in between, and the
+   style grid's untick-then-tick would write the empty list on the way past.
+
+   Keyed by page so the bar can only ever offer to save the page it is
+   standing on, and cleared when a page opens so a half-typed name left
+   behind on one page cannot put a Save button on another. */
+const SET_SAVERS = {
+  "page-profile": () => saveDisplayName(),
+  "page-training": () => saveTrainingPrefs(),
+  "page-stats": () => saveBodyStats(),
+};
+let SET_DIRTY = null;
+
+function openSettingsPageId() {
+  return document.querySelector(".settings-page:not(.hidden)")?.id || null;
+}
+function paintSaveBar() {
+  const bar = $("setSaveBar");
+  if (!bar) return;
+  bar.classList.toggle("hidden", !SET_DIRTY || SET_DIRTY !== openSettingsPageId());
+}
+/* Called by the controls that stage rather than write. */
+function settingsTouched(pageId) {
+  SET_DIRTY = pageId;
+  paintSaveBar();
+}
+function settingsSaved() {
+  SET_DIRTY = null;
+  paintSaveBar();
+}
+/* The saver reports failure by returning false or throwing; either way the
+   bar stays up, because hiding it would say the edit landed. */
+async function runSettingsSave() {
+  const fn = SET_SAVERS[SET_DIRTY];
+  if (!fn) { settingsSaved(); return; }
+  const btn = $("setSaveBtn");
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+  try {
+    const out = await fn();
+    if (out !== false) settingsSaved();
+  } catch (err) {
+    console.error(err);
+    toast("Could not save");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Save changes"; }
+  }
+}
+
 function openSettingsPage(key) {
   SETUP_SCROLL = window.scrollY;
+  /* A page opens showing what is stored, so nothing is pending on it yet. */
+  SET_DIRTY = null;
   $("setupRoot").classList.add("hidden");
   document.querySelectorAll(".settings-page").forEach((el) => {
     el.classList.toggle("hidden", el.id !== `page-${key}`);
@@ -45497,6 +45588,8 @@ function openSettingsPage(key) {
 }
 
 function closeSettingsPage() {
+  SET_DIRTY = null;
+  paintSaveBar();
   document.querySelectorAll(".settings-page").forEach((el) => el.classList.add("hidden"));
   closeBodyFocusPage();
   closeLimitsPage();
@@ -45797,8 +45890,9 @@ function renderTrainStylesPage() {
       return false;
     }
     SETUP_STYLES = ids;
+    settingsTouched("page-training");
     note();
-  }, { freq: SETUP_FREQ, onFreq: () => note() });
+  }, { freq: SETUP_FREQ, onFreq: () => { settingsTouched("page-training"); note(); } });
   note();
 }
 
@@ -45986,11 +46080,25 @@ function renderSetupTab() {
     $("setupBio").oninput = count;
     count();
   }
+  /* Typing raises the bar. Wired here rather than in the markup so the set of
+     staged controls is written down in one place next to the savers that
+     answer for them: profile is the name and the bio, Your body is the four
+     boxes saveBodyStats reads, and the style grid raises it from inside
+     wireTrainStylePicker. Everything else in Settings still writes on the
+     tap and never raises it. */
+  for (const id of ["setupDisplayName", "setupBio"]) {
+    const el = $(id);
+    if (el) el.addEventListener("input", () => settingsTouched("page-profile"));
+  }
+  for (const id of ["setupAge", "setupHeightFt", "setupHeightIn", "setupSex", "setupActivity"]) {
+    const el = $(id);
+    if (el) el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => settingsTouched("page-stats"));
+  }
   renderProfileHeader();
   renderAccentSwatches();
   $("appVersion").textContent = APP_VERSION;
   renderMilestoneBadges();
-  $("saveNameBtn").onclick = saveDisplayName;
+  if ($("setSaveBtn")) $("setSaveBtn").onclick = runSettingsSave;
   $("setupPartnerName").textContent = PARTNER_PROFILE?.user_name || "Not paired";
   // Training alone is a choice, not a dead end: offer pairing whenever there is none.
   $("setupPairWrap").classList.toggle("hidden", !!PARTNER_EMAIL || isCoachedClient());
@@ -46435,14 +46543,10 @@ async function commitProfile(payload, { toastText }) {
    tap for a reason written above saveTrainStyles, so the button follows it up
    the page and says what it saves. */
 async function saveTrainingPrefs() {
-  const btn = $("saveSetupBtn");
-  if (btn) btn.disabled = true;
-  try {
-    /* "Nothing to save" rather than silence: a Save button that answers a tap
-       with nothing on screen reads as broken, and the commonest reason to get
-       here is opening the page, reading it, and tapping Save out of habit. */
-    if (await saveTrainStyles() === false) toast("Nothing to save");
-  } finally { if (btn) btn.disabled = false; }
+  /* "Nothing to save" rather than silence, kept from when this was a button
+     somebody could tap out of habit. The bar only appears after a real
+     change, so this is now the belt to that braces. */
+  if (await saveTrainStyles() === false) toast("Nothing to save");
 }
 
 /* Setup > Training. Saved on the tap, like the rest length and the session
