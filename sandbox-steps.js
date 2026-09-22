@@ -283,6 +283,16 @@
         note: "Photos live on progress, not on home, because they are the most private thing in the app. Adding one opens the file picker for real.",
         run: (w) => { w.switchTab("progress"); setTimeout(() => w.document.getElementById("cardPhotos")?.scrollIntoView({ behavior: "smooth", block: "start" }), 220); } },
 
+      { t: "Their weigh-ins, shared", scenario: "weighInsShared",
+        s: "The switch on, on their side of Progress",
+        note: "Mell has turned her weigh-ins on, so her side of the tab has a weight trend on it and reads the same line you do about your own. Flip the You / Mell toggle back and forth: two people, two charts, and hers is only here because she said so.",
+        run: (w) => { w.switchTab("progress"); w.PROGRESS_VIEW = "partner"; w.renderProgressTab(); } },
+
+      { t: "Their weigh-ins, private", scenario: "weighInsPrivate",
+        s: "The switch off, and the server means it",
+        note: "The same screen with her switch off. The weight card is gone, the headline falls back to something that does not lead with a number she did not share, and \"Not shown here\" names it as HER choice rather than leaving a hole that reads like an accusation. What changed on 2026-09-21 is underneath: her weigh-ins used to arrive anyway and the client simply declined to draw them. They now live in body_measurements, whose policy checks her share_weigh_ins, so there is nothing to draw. Check the days she TRAINED are all still there, on the calendar and in the streak: that is the regression this whole change was shaped to avoid.",
+        run: (w) => { w.switchTab("progress"); w.PROGRESS_VIEW = "partner"; w.renderProgressTab(); } },
+
       { t: "Body", scenario: "paired",
         s: "What you have hit, what is next",
         note: "The tab we just rewrote. It answers one question, which muscle group to train next, and everything else is supporting detail. The information dots explain the levels and the rings.",
@@ -451,10 +461,12 @@
     soloNoData:  "Signed up, training alone, nothing logged yet.",
     invitePending: "You sent an invite. They have not accepted it.",
     pairedNoData: "Both of you are in. Neither has trained yet.",
+    weighInsShared: "Mell has switched her weigh-ins on. You can see her scale.",
+    weighInsPrivate: "Mell keeps her weigh-ins to herself. Her training days are still shared.",
     finished:    "Today's push day is done, every exercise logged, one of them a record.",
   };
   const SCENARIO_ORDER = ["paired", "signedout", "fresh", "solo", "live", "livePrivate", "clip", "behind", "restday", "finished",
-    "soloNoData", "invitePending", "pairedNoData"];
+    "soloNoData", "invitePending", "pairedNoData", "weighInsShared", "weighInsPrivate"];
   const SCENARIO_LABEL = {
     signedout: "Signed out", fresh: "Brand new account", paired: "Paired, mid-week",
     solo: "Training alone", live: "Partner training now", livePrivate: "Partner keeps it private",
@@ -463,6 +475,8 @@
     soloNoData: "Alone, nothing logged",
     invitePending: "Invite sent, not accepted",
     pairedNoData: "Paired, day one",
+    weighInsShared: "Her weigh-ins shared",
+    weighInsPrivate: "Her weigh-ins private",
   };
 
   /* ---------- driving the phone ---------- */
