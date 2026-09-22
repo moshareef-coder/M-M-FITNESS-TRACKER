@@ -7888,9 +7888,8 @@
     <!-- The Build Muscle screen (renderBulkHero), for the build-muscle goal
          whether or not it carries a goal weight. Weight, Chest, Arms, Thighs
          over one chart, the same photo pair Tone Up uses, and one check-in
-         that writes all four. chest_in is added by
-         20260916_chest_measurement.sql; the other three have existed for a
-         while. -->
+         that writes all four, into body_measurements alongside the
+         weigh-in. -->
     <div class="bulk-screen goal-screen hidden" id="bulkHero">
       <div class="end-head">
         <div class="wth-title" id="bulkTitle">Build muscle</div>
@@ -8372,16 +8371,17 @@
     </div>
     <!-- The scale is a separate question from the gym, so it is a separate
          switch. Hidden until the column exists (weighInSharingLive): a privacy
-         switch that silently fails to save is worse than no switch, and
-         share_weigh_ins is written in 20260920_share_weigh_ins.sql and not
-         applied. Off until then, which is what the Progress tab shows. -->
+         switch that silently fails to save is worse than no switch. Since
+         20260921_body_measurements_table.sql this switch is enforced by RLS
+         and not only by the client, so off really does mean the rows never
+         leave the account. -->
     <div class="card hidden" id="shareWeighInsCard">
       <h2>Your weigh-ins</h2>
       <label class="gym-toggle" id="shareWeighInsToggleWrap">
         <span>Share weigh-ins and measurements with <span id="shareWeighPartnerName">your partner</span></span>
         <input type="checkbox" id="shareWeighInsToggle" />
       </label>
-      <p class="muted-note">Off, and nothing on their Progress tab shows your weight, your goal weight or your tape: the switch on the right of their title simply has no weight trend behind it. On, and they read the same line you do. Body photos are never shared either way, and this changes nothing about what they see of your workouts.</p>
+      <p class="muted-note">Off, and your weight, your goal weight and your tape are not sent to them at all: not drawn, not hidden behind anything, simply never leave your account. On, and they read the same line you do. This changes nothing about what they see of your workouts, or about the days you trained, which they see either way.</p>
     </div>
     <!-- The finer layer under "While you train" above: that switch is
          category-wide, this is per card. Same "hidden until the column
@@ -8986,7 +8986,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.30";
+const APP_VERSION = "2026.09.21.31";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9103,6 +9103,14 @@ function redeemOk(res, error) {
 let ME = "";
 let MY_EMAIL = "";
 let ALL_ENTRIES = [];
+/* The weigh-ins and the tape, which live in their own table now
+   (20260921_body_measurements_table.sql) precisely so a partner's RLS can be
+   told about share_weigh_ins. Held separately only between the read and
+   mergeBodyReadings(), which folds every reading back onto the day row it
+   belongs to: ALL_ENTRIES is the shape the whole app already reads, and a
+   hundred call sites asking `e.weight` should not have to learn that the
+   answer now comes from a second table. */
+let ALL_BODY = [];
 let ALL_EXERCISE_LOGS = [];
 let ALL_PROFILES = [];
 let ALL_PLANS = [];
@@ -14835,15 +14843,11 @@ async function finishOnboarding(data) {
      start of the chart, it is the start_value the projection measures against,
      and it is the only body weight the engine has on day one, without which
      CONTRACT.md (a) says there are no starting weights at all and the plan
-     says so in meta.missing. Same shape and same conflict key as
-     saveScaleEntry, so a weigh-in logged later today replaces it rather than
-     colliding with it. */
-  if (data.weight_lb) {
-    await safeWrite("fit_entries", "upsert", {
-      user_name: ME, email: MY_EMAIL, entry_date: todayStr(), weight: data.weight_lb,
-      gym: false, sessions: 0, proof_path: null, rest_day: false, note: null, workout_at: null,
-    }, { onConflict: "email,entry_date" });
-  }
+     says so in meta.missing. Through the same helper as every other weigh-in,
+     so one logged later today replaces it rather than colliding with it, and
+     so the very first number in the account lands in the table whose policy
+     can keep it private. */
+  if (data.weight_lb) await saveBodyReading(todayStr(), { weight: data.weight_lb });
   if (data.goal_key) await setActiveGoal(data);
   applyAccentColors();
   /* Armed here rather than asked here. Onboarding ends by handing over to
@@ -15543,6 +15547,16 @@ function applyLocally(table, payload) {
     const i = ALL_ENTRIES.findIndex((e) => e.email === payload.email && e.entry_date === payload.entry_date);
     if (i >= 0) ALL_ENTRIES[i] = { ...ALL_ENTRIES[i], ...payload };
     else ALL_ENTRIES.push({ ...payload, id: localId });
+  } else if (table === "body_measurements") {
+    /* Replaced whole rather than merged, because the payload IS the whole row:
+       saveBodyReading carries all six fields through every time, so a null in
+       it is a reading somebody removed and merging would put it back. */
+    const i = ALL_BODY.findIndex((b) => bodyKey(b.email, b.entry_date) === bodyKey(payload.email, payload.entry_date));
+    if (i >= 0) ALL_BODY[i] = { ...ALL_BODY[i], ...payload };
+    else ALL_BODY.push({ ...payload, id: localId });
+    /* The screen that called this repaints without waiting for loadAll, and it
+       reads the day rows, not this table. */
+    mergeBodyReadings();
   }
 }
 
@@ -15568,7 +15582,12 @@ async function resetMyData() {
     /* supabase-js resolves with { error } rather than throwing, so the catch
        below never sees a rejected delete. Raise the first one instead of
        telling the user everything was wiped when nothing was. */
-    for (const t of ["exercise_logs", "body_photos", "ai_workouts", "fit_entries", "challenge_completions", "saved_workouts"]) {
+    /* body_measurements joined this list when the weigh-ins moved off the day
+       row: a reset that leaves every weigh-in and tape reading standing is not
+       the clean account the card promises. */
+    for (const t of ["exercise_logs", "body_photos", "ai_workouts", "fit_entries",
+                     ...(BODY_TABLE_LIVE ? ["body_measurements"] : []),
+                     "challenge_completions", "saved_workouts"]) {
       const { error } = await sb.from(t).delete().eq("email", MY_EMAIL);
       if (error) throw error;
     }
@@ -15668,8 +15687,14 @@ async function loadAll() {
      rather than an error. Caught by the sandbox walk returning zero rows for
      a fixture that has 77. */
   const LOAD_EMAILS = PARTNER_EMAIL ? [MY_EMAIL, PARTNER_EMAIL] : [MY_EMAIL];
-  const [entriesRes, exLogRes, profilesRes, plansRes, theirPlansRes, goalsRes, reactRes, badgesRes, swapsRes] = await Promise.all([
+  const [entriesRes, bodyRes, exLogRes, profilesRes, plansRes, theirPlansRes, goalsRes, reactRes, badgesRes, swapsRes] = await Promise.all([
     sb.from("fit_entries").select("*").in("email", LOAD_EMAILS).order("entry_date", { ascending: true }),
+    /* The weigh-ins and the tape, which a partner's RLS can hold back on its
+       own now (20260921_body_measurements_table.sql). Beside fit_entries in
+       the same batch rather than after it, because loadAll runs after nearly
+       every write and a second round trip would be on all of them. Same
+       email scoping as everything else here, for the same reason. */
+    sb.from("body_measurements").select("*").in("email", LOAD_EMAILS).order("entry_date", { ascending: true }),
     sb.from("exercise_logs").select("*").in("email", LOAD_EMAILS).order("entry_date", { ascending: true }),
     sb.from("profiles").select("*").in("email", LOAD_EMAILS),
     /* Mine and everybody else's as two reads, each with its own ceiling. One
@@ -15728,10 +15753,24 @@ async function loadAll() {
      So a failed read now keeps whatever was already in memory instead of
      replacing it with emptiness, and says so once. Stale is a much smaller lie
      than zero. */
+  /* A table that has not been created yet is not a failed read. Until the
+     owner runs 20260921_body_measurements_table.sql this comes back PGRST205
+     every time, and reporting it would put "Some numbers may be out of date"
+     in front of everybody on every load for something that is not wrong. Say
+     it once to the console, fall back to the columns still on the day rows,
+     and stop asking about it for the rest of the session. */
+  if (bodyRes?.error && bodyTableMissing(bodyRes.error)) {
+    if (BODY_TABLE_LIVE) console.warn("body_measurements is not there yet, reading weigh-ins off fit_entries");
+    BODY_TABLE_LIVE = false;
+  } else if (bodyRes && !bodyRes.error) {
+    BODY_TABLE_LIVE = true;
+  }
+
   const reads = {
     entries: entriesRes, exerciseLogs: exLogRes, profiles: profilesRes,
     plans: plansRes, theirPlans: theirPlansRes, goals: goalsRes, reactions: reactRes,
     badges: badgesRes, swaps: swapsRes,
+    ...(BODY_TABLE_LIVE ? { bodyReadings: bodyRes } : {}),
   };
   const failed = Object.entries(reads).filter(([, res]) => res && res.error);
   for (const [what, res] of failed) console.error(`could not read ${what}`, res.error);
@@ -15755,6 +15794,10 @@ async function loadAll() {
   ALL_SWAPS = keep(swapsRes, ALL_SWAPS);
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
+  /* After ALL_PROFILES, because a reading on a day with no fit_entries row
+     needs a name to sit under, and after ALL_ENTRIES for the obvious reason. */
+  ALL_BODY = keep(bodyRes, ALL_BODY);
+  mergeBodyReadings();
   applyAccentColors();
   /* Was only ever called from inside renderWorkoutTab, so a reload landing on
      Home (the default tab) left SESSION null until the workout tab was opened
@@ -15826,28 +15869,15 @@ async function saveScaleEntry() {
   const weight = Number.isFinite(typed) && typed > 0 ? typed : null;
   if (weight === null) { toast("Enter a weight first"); return; }
 
-  // An upsert replaces the whole row, so carry today's other fields through
-  // rather than blanking proof, session count and rest-day state.
-  const existing = todayEntryFor(MY_EMAIL);
-  const payload = {
-    user_name: ME,
-    email: MY_EMAIL,
-    entry_date: todayStr(),
-    weight,
-    gym: existing?.gym ?? false,          // a weigh-in is not a workout
-    sessions: existing?.sessions ?? 0,
-    proof_path: existing?.proof_path ?? null,
-    rest_day: existing?.rest_day ?? false,
-    note: existing?.note ?? null,
-    workout_at: existing?.workout_at ?? null,
-  };
-  const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
-
-  if (landed) {
+  /* The day row is not touched at all any more. A weigh-in was never a
+     workout, and now that the number lives in body_measurements it does not
+     even need a day row to hang off: carrying gym, sessions, proof and the
+     rest through an upsert was only ever the price of sharing a row with
+     them. */
+  if (await saveBodyReading(todayStr(), { weight })) {
     toast("Weigh-in saved");
     await loadAll();
   } else {
-    applyLocally("fit_entries", payload);
     toast("Saved offline");
   }
   /* The hero's stepper folds back under its plus once the number is in. */
@@ -15857,6 +15887,119 @@ async function saveScaleEntry() {
 
 function entriesFor(name) {
   return ALL_ENTRIES.filter((e) => e.user_name === name).sort((a, b) => a.entry_date.localeCompare(b.entry_date));
+}
+
+/* ---------- Weight and the tape ----------
+
+   These six were columns on the fit_entries day row until 2026-09-21, and
+   20260920_share_weigh_ins.sql said out loud why they could not stay: row
+   security allows or denies a WHOLE row, so a policy honouring
+   share_weigh_ins on fit_entries would also have hidden gym, sessions and
+   rest_day on every day somebody weighed in. A partner's calendar would grow
+   holes on exactly the days that mattered. So partnerSharesBody() in the
+   client was the only thing standing between a partner and the scale, and a
+   client-side curtain in front of an open window is not privacy: the rows
+   came down the wire regardless, and anybody reading the table directly saw
+   the number.
+
+   They live in body_measurements now, keyed the same (email, entry_date),
+   with a SELECT policy that reads the OWNER'S share_weigh_ins. fit_entries
+   keeps the training day and keeps its policy exactly as it was.
+
+   Nothing else in the app was taught about the second table. mergeBodyReadings
+   folds every reading back onto its day row, so `e.weight` and `e[m.key]` go
+   on answering the same question in the hundred places that ask, and a
+   partner who shares nothing simply arrives with nothing to fold. */
+const BODY_FIELDS = ["weight", "waist_in", "hips_in", "thigh_in", "arm_in", "chest_in"];
+
+/* Assumed live until a read says otherwise, because the migration is run by
+   the owner and not by this session. PostgREST answers a missing table with
+   PGRST205; until that migration lands the six columns are still on
+   fit_entries, so the fallback is exact rather than approximate and nobody
+   loses sight of their weigh-ins because a deploy beat a migration by an
+   hour. Writes need no such branch: safeWrite treats a missing table as
+   retryable and holds them in the offline queue until it exists. */
+let BODY_TABLE_LIVE = true;
+function bodyTableMissing(err) {
+  const code = String(err?.code || "");
+  const msg = String(err?.message || "");
+  return code === "PGRST205" || code === "42P01"
+    || (/body_measurements/.test(msg) && /does not exist|could not find/i.test(msg));
+}
+
+const bodyKey = (email, date) => `${String(email || "").toLowerCase()}|${date}`;
+function bodyRowFor(email, date) {
+  const k = bodyKey(email, date);
+  return ALL_BODY.find((b) => bodyKey(b.email, b.entry_date) === k) || null;
+}
+/* All six, always, nulls included: an upsert replaces the row it lands on, so
+   sending only the field that changed would blank the other five. The same
+   carry-through every fit_entries writer already does, over a row that is now
+   nothing but these six, which is why it can be one helper instead of five
+   copies of somebody's whole day. */
+function bodyFieldsOf(row) {
+  return Object.fromEntries(BODY_FIELDS.map((f) => [f, row?.[f] ?? null]));
+}
+
+function mergeBodyReadings() {
+  /* Before the migration the readings are still on the day rows themselves
+     and select("*") brings them down. Leave them exactly where they are. */
+  if (!BODY_TABLE_LIVE) return;
+  const byKey = new Map();
+  for (const b of ALL_BODY) byKey.set(bodyKey(b.email, b.entry_date), b);
+  const seen = new Set();
+  for (const e of ALL_ENTRIES) {
+    const k = bodyKey(e.email, e.entry_date);
+    seen.add(k);
+    const b = byKey.get(k);
+    /* Deleted, not merely left alone. Between the two migrations fit_entries
+       still HAS these columns, carrying whatever the old client last wrote, so
+       a partner with sharing off would keep showing a weight read off a stale
+       copy the server was right not to hide. The app has to stop believing
+       that copy the moment it stops writing it, or the fix does not arrive
+       until the column drop. */
+    for (const f of BODY_FIELDS) {
+      delete e[f];
+      if (b && b[f] != null) e[f] = b[f];
+    }
+  }
+  /* A reading on a day with no fit_entries row, which is now the ordinary
+     shape of a day somebody only stepped on the scale: logging a weigh-in no
+     longer writes an empty day row full of falses. The calendar's weigh-in
+     mark and every chart read entriesFor(), so without this the reading would
+     be in memory with nowhere to be drawn. */
+  for (const b of ALL_BODY) {
+    const k = bodyKey(b.email, b.entry_date);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const low = (v) => String(v || "").toLowerCase();
+    const who = ALL_PROFILES.find((p) => low(p.email) === low(b.email));
+    ALL_ENTRIES.push({
+      id: `body-${k}`, email: b.email, user_name: who?.user_name || "",
+      entry_date: b.entry_date, gym: false, rest_day: false, sessions: 0,
+      proof_path: null, note: null, workout_at: null,
+      ...bodyFieldsOf(b),
+    });
+  }
+  /* loadAll asks the database for entry_date ascending and several readers
+     take the last element of a filter as "the latest", so a synthesised row
+     appended at the end must not arrive out of order. */
+  ALL_ENTRIES.sort((a, b2) => String(a.entry_date).localeCompare(String(b2.entry_date)));
+}
+
+/* THE one way a weigh-in or a tape reading is written. `patch` is the fields
+   that changed; everything else on the row rides through, and a field set to
+   null is a reading being removed rather than one left alone.
+
+   No fit_entries write goes with it. A weigh-in has never been a workout and
+   now it does not even create the day row: markGymDayDone still owns gym and
+   sessions, and a day with nothing on it but a number on the scale is one row
+   in one table. */
+async function saveBodyReading(entry_date, patch) {
+  const row = { email: MY_EMAIL, entry_date, ...bodyFieldsOf(bodyRowFor(MY_EMAIL, entry_date)), ...patch };
+  const landed = await safeWrite("body_measurements", "upsert", row, { onConflict: "email,entry_date" });
+  if (!landed) applyLocally("body_measurements", row);
+  return landed;
 }
 
 /* Last logged weigh-in for a person, used everywhere a calorie/TDEE estimate needs a body weight. */
@@ -15930,7 +16073,6 @@ async function markRestDay(date) {
   const payload = {
     user_name: ME, email: MY_EMAIL, entry_date: date, rest_day: true,
     gym: existing?.gym ?? false,
-    weight: existing?.weight ?? null,
     sessions: existing?.sessions ?? 0,
     proof_path: existing?.proof_path ?? null,
   };
@@ -20589,7 +20731,7 @@ function openNoteComposer(mode) {
       // touch gym or sessions; everything else copies what is already there.
       const payload = {
         user_name: ME, email: MY_EMAIL, entry_date: todayStr(), note: text,
-        gym: e?.gym ?? false, weight: e?.weight ?? null, sessions: e?.sessions ?? 0,
+        gym: e?.gym ?? false, sessions: e?.sessions ?? 0,
         proof_path: e?.proof_path ?? null, rest_day: e?.rest_day ?? false,
         workout_at: e?.workout_at ?? null,
       };
@@ -20823,18 +20965,11 @@ async function saveDayWeight(date, raw, { remove = false } = {}) {
   if (txt === "" && !remove) { toast("Enter a weight"); return; }
   const weight = remove ? null : parsed;
 
-  const existing = ALL_ENTRIES.find((x) => x.email === MY_EMAIL && x.entry_date === date);
-  const payload = {
-    user_name: ME, email: MY_EMAIL, entry_date: date, weight,
-    gym: existing?.gym ?? false,
-    sessions: existing?.sessions ?? 0,
-    proof_path: existing?.proof_path ?? null,
-    rest_day: existing?.rest_day ?? false,
-    note: existing?.note ?? null,
-    workout_at: existing?.workout_at ?? null,
-  };
-  const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
-  if (!landed) applyLocally("fit_entries", payload);
+  /* The weigh-in only, and the day's workout is not in the same row to be
+     damaged by touching it. Removing one writes null into body_measurements
+     rather than deleting the row, because the tape readings taken the same day
+     are a separate decision and nobody asked for those to go. */
+  await saveBodyReading(date, { weight });
   toast(weight === null ? "Weight removed" : "Weight updated");
   await loadAll();
   closeDaySheet();
@@ -20987,7 +21122,6 @@ async function uploadProof(file) {
       entry_date: date,
       proof_path: path,
       gym: existing?.gym ?? false,
-      weight: existing?.weight ?? null,
       sessions: existing?.sessions ?? 0,
       rest_day: existing?.rest_day ?? false,
       note: existing?.note ?? null,
@@ -22123,9 +22257,8 @@ function renderLiftHero(on, profile, isPartner) {
    Up is good on every one of these, which is the opposite of Tone Up reading
    the same columns. That is the goal talking, not the tape.
 
-   chest_in is added by 20260916_chest_measurement.sql. Until it runs the Chest
-   chip has no readings and says so, the same way the others do before a first
-   measurement. */
+   No account has taken a chest reading yet, so that chip has no readings and
+   says so, the same way the others do before a first measurement. */
 const BULK_RANGES = TONE_RANGES;
 let BULK_METRIC = "weight";
 let BULK_RANGE = "3M";
@@ -22176,9 +22309,9 @@ function renderBulkHero(on, profile, isPartner) {
     b.onclick = () => { BULK_METRIC = b.dataset.metric; again(); };
   });
 
-  /* measurementSeries reads whatever column it is handed off the day row, and
-     weight is a column on that same row, so the scale needs no separate path
-     through any of this. */
+  /* measurementSeries reads whatever key it is handed off the merged day row,
+     and weight arrives on it from the same body_measurements row the tape
+     does, so the scale needs no separate path through any of this. */
   const series = m && typeof measurementSeries === "function" ? (measurementSeries(name, m.key, weeks) || []) : [];
   const sum = m && typeof measurementSummary === "function" ? measurementSummary(name, m.key, weeks) : null;
   const stats = $("bulkStats");
@@ -26476,7 +26609,14 @@ async function confirmDeleteDay(date) {
     /* supabase-js resolves with { error } instead of throwing, so the catch
        below never sees a failed delete and the day was reported deleted
        whatever happened. */
-    for (const t of ["exercise_logs", "ai_workouts", "fit_entries"]) {
+    /* body_measurements is on this list because the sheet above promises "the
+       weigh-in" is one of the things going, and since 2026-09-21 the weigh-in
+       is not on the fit_entries row any more. Leaving it off would delete the
+       day and leave the number behind, which is the day coming back as a
+       weigh-in-only row the next time loadAll runs. Named only once the read
+       has proved the table is there, so an app running ahead of its migration
+       reports "Could not delete" over a table that simply does not exist. */
+    for (const t of ["exercise_logs", "ai_workouts", "fit_entries", ...(BODY_TABLE_LIVE ? ["body_measurements"] : [])]) {
       const { error } = await sb.from(t).delete().eq("email", MY_EMAIL).eq("entry_date", date);
       if (error) throw error;
     }
@@ -26655,12 +26795,17 @@ async function deleteTodaysTraining() {
       if (error) throw error;
     }
     /* The fit_entries row is emptied rather than deleted when it is carrying
-       something that is not a workout. A weigh-in belongs to the scales and a
-       rest day belongs to the streak; taking either of them because a workout
-       was deleted is this feature quietly doing a second thing nobody asked
-       for. With nothing left on it the row goes, so the day reads as blank
-       everywhere rather than as a row full of falses. */
-    const keep = f.entry && (f.entry.weight != null || f.entry.rest_day);
+       something that is not a workout. A rest day belongs to the streak;
+       taking it because a workout was deleted is this feature quietly doing a
+       second thing nobody asked for. With nothing left on it the row goes, so
+       the day reads as blank everywhere rather than as a row full of falses.
+
+       The weigh-in used to be on this list and is not any more, not because it
+       stopped mattering but because it is not on this row: it is a
+       body_measurements row of its own now and this delete cannot reach it
+       either way. The scale survives the workout going, same as before, and
+       the day comes back as a weigh-in the next time loadAll runs. */
+    const keep = !!(f.entry && f.entry.rest_day);
     if (keep) {
       const { error } = await sb.from("fit_entries")
         .update({ gym: false, sessions: 0, workout_at: null, proof_path: null, note: null })
@@ -32366,7 +32511,6 @@ async function doMarkGymDayDone() {
     user_name: ME, email: MY_EMAIL, entry_date: date, gym: true,
     // Capped: a runaway re-render should not be able to claim 16 workouts.
     sessions: Math.min((existing?.sessions || 0) + 1, 12),
-    weight: existing?.weight ?? null,
     proof_path: existing?.proof_path ?? null,
     rest_day: existing?.rest_day ?? false,
     note: existing?.note ?? null,
@@ -41507,15 +41651,22 @@ function partnerSharesDetails() {
   return !!PARTNER_PROFILE && PARTNER_PROFILE.share_workout_details !== false;
 }
 
-/* Her body weight and her tape, which are a different question and until now
-   had no answer at all. RLS on fit_entries is ROW level, and the waist and
-   measurement migrations say so in as many words: a partner who can read your
-   day row can read every column on it, weight included, and a policy cannot
-   hide one column of a visible row. So the server has always sent it. What
-   never happened is any screen DRAWING it, which means nobody has ever agreed
-   to it, and a number nobody agreed to is not shared just because it arrived.
+/* Her body weight and her tape, which are a different question from her
+   workouts. This used to be the ONLY thing standing between a partner and the
+   scale: the readings were columns on the fit_entries day row, RLS is row
+   level, and a policy cannot hide one column of a visible row, so the server
+   sent every weigh-in whatever this function said. A curtain, not a wall.
 
-   So this reads share_weigh_ins as a strict opt in, `=== true` and not
+   Since 20260921_body_measurements_table.sql the readings are their own table
+   with their own SELECT policy, and that policy reads the owner's
+   share_weigh_ins exactly the way this does. A partner with sharing off now
+   gets no rows at all, so this is the same answer said twice rather than a
+   promise only the client was keeping. It stays because the screen still has
+   to decide what to DRAW over an absence: a card quietly missing reads as an
+   accusation, and renderProgressWithheld needs to know to say whose choice it
+   was.
+
+   It reads share_weigh_ins as a strict opt in, `=== true` and not
    `!== false`: a profile written before 20260920_share_weigh_ins.sql runs has
    no such key, that reads as not shared, and not shared is the truth. */
 function partnerSharesBody() {
@@ -41783,10 +41934,9 @@ function headlineWeighIns(name, days = HEADLINE_WEIGHT_DAYS) {
 
 /* ---- Tape measurements: waist, hips, thighs, arms ----
 
-   Four columns on the day row (waist_in in 20260916_waist_measurements.sql,
-   the other three in 20260916_body_measurements.sql, neither applied yet),
-   read here as one thing so the Waist Trend tile, the Tone Up hero and the
-   logging sheet cannot disagree about what a reading is. Inches for all
+   Five columns on the body_measurements row, beside the weigh-in, read here
+   as one thing so the Waist Trend tile, the Tone Up hero and the logging
+   sheet cannot disagree about what a reading is. Inches for all
    four, the app is imperial everywhere else. One value per measurement, not
    per side: thighs and arms are whichever side you always use. */
 const MEASUREMENTS = [
@@ -42035,9 +42185,9 @@ function nothingTrackedStats(host) {
   </div>`;
   host.querySelector("[data-track-open]").onclick = () => openTrackSheet(PROGRESS_GOAL_LENS || null);
 }
-/* Weight is a column on the same day row, so the check-in sheet can carry it
-   as one more row and saveMeasurements writes it with the rest, no special
-   case anywhere. */
+/* Weight is a column on the same body_measurements row, so the check-in sheet
+   can carry it as one more row and saveMeasurements writes it with the rest,
+   no special case anywhere. */
 const CHECKIN_ROWS = [{ key: "weight", label: "Weight", unit: "lb" }]
   .concat(MEASUREMENTS.filter((m) => m.key !== "hips_in"));
 
@@ -43605,10 +43755,10 @@ function paintProgIndex(host) {
 /* ---- The two doors under Weight: the tape and the camera ----
 
    Shown for a weight goal only, because that is the goal a waist and a photo
-   are evidence for. Waist has had no data behind it until now: fit_entries
-   grows a nullable waist_in in 20260916_waist_measurements.sql, which is
-   written and not yet applied, so every branch below has to survive the
-   column not existing. The tile says "Add a measurement" when there is
+   are evidence for. Waist readings live on body_measurements alongside the
+   weigh-in, and nobody has taken one yet on any real account, so every branch
+   below has to survive there being nothing at all. The tile says "Add a
+   measurement" when there is
    nothing, the number when there is one, and the trend once there are two,
    and never invents a line through fewer points than that. */
 
@@ -44098,59 +44248,25 @@ async function saveMeasurements() {
   }
   if (!Object.keys(patch).length) { toast("Nothing changed"); return; }
 
-  const today = todayEntryFor(MY_EMAIL);
-  /* Same row the scale writes, same carried fields: an upsert replaces the
-     whole row, so today's weigh-in, proof and rest-day state ride along or
-     they are gone. When today's row already exists it is an update instead,
-     the touched columns on the row that is there. That is safer on the real
-     database (nothing another device wrote today gets blanked) and it is the
-     write the sandbox's client actually persists: its upsert matches on the
-     first onConflict column alone and would rewrite the oldest row's date. */
-  const payload = {
-    user_name: ME,
-    email: MY_EMAIL,
-    entry_date: todayStr(),
-    ...patch,
-    weight: today?.weight ?? null,
-    gym: today?.gym ?? false,
-    sessions: today?.sessions ?? 0,
-    proof_path: today?.proof_path ?? null,
-    rest_day: today?.rest_day ?? false,
-    note: today?.note ?? null,
-    workout_at: today?.workout_at ?? null,
-  };
-  const opts = { onConflict: "email,entry_date" };
-  const done = async (msg) => {
+  /* The scale's helper, because a tape reading and a weigh-in are the same
+     kind of thing in the same table and the check-in sheet writes both (weight
+     is a CHECKIN_ROWS key like any other). Untouched rows ride through it
+     unchanged; the day row is not involved at all any more, so there is
+     nothing here that can blank a proof photo or a rest day.
+
+     The old "Measurements are not switched on yet" branch went with it. That
+     existed because the columns were behind an unrun migration and a save came
+     back PGRST204 forever; a missing body_measurements table is retryable
+     instead, so the reading waits in the offline queue and lands the moment
+     20260921_body_measurements_table.sql runs, which is a better answer than
+     asking somebody to measure themselves twice. */
+  if (await saveBodyReading(todayStr(), patch)) {
     closeMeasurementsSheet();
-    toast(msg);
+    toast("Measurements saved");
     await loadAll();
     if (typeof renderProgressTab === "function") renderProgressTab();
-  };
-
-  if (navigator.onLine) {
-    const { error } = today
-      ? await sb.from("fit_entries").update(patch).eq("email", MY_EMAIL).eq("entry_date", payload.entry_date)
-      : await sb.from("fit_entries").upsert(payload, opts);
-    if (!error) { await done("Measurements saved"); return; }
-    /* The columns are behind 20260916_waist_measurements.sql and
-       20260916_body_measurements.sql. Until the owner runs them every save
-       comes back PGRST204, and "Could not find the 'hips_in' column" is the
-       database talking, not something to show. */
-    const missing = new RegExp(MEASUREMENTS.map((m) => m.key).join("|"));
-    if (String(error.code || "") === "PGRST204" || missing.test(String(error.message || ""))) {
-      toast("Measurements are not switched on yet");
-      return;
-    }
-    if (!isRetryable(error)) {
-      toast(`Couldn't save. ${error.message ? String(error.message).slice(0, 80) : "Please try again."}`);
-      return;
-    }
+    return;
   }
-  /* Offline, or the connection dropped: the scale's queue, the scale's job
-     shape, so it replays with everything else logged in the gym. */
-  const landed = await safeWrite("fit_entries", "upsert", payload, opts);
-  if (landed) { await done("Measurements saved"); return; }
-  applyLocally("fit_entries", payload);
   closeMeasurementsSheet();
   toast("Saved offline");
   renderProgressTab();
@@ -45970,11 +46086,23 @@ async function adminAddEntry() {
   if (!isAdmin()) return;
   const target = adminTargetInfo();
   if (!target.email) { toast("No target profile"); return; }
+  const date = $("adminEntryDate").value;
   const { error } = await sb.from("fit_entries").upsert({
-    user_name: target.name, email: target.email, entry_date: $("adminEntryDate").value,
-    weight: ADMIN_ENTRY_STATE.weight || null, gym: $("adminEntryGym").checked,
+    user_name: target.name, email: target.email, entry_date: date,
+    gym: $("adminEntryGym").checked,
   }, { onConflict: "email,entry_date" });
   if (error) { toast("Could not add the entry"); console.error(error); return; }
+  /* Two writes since the weigh-in left the day row, and the second one is
+     expected to be refused for anybody but yourself: body_measurements is self
+     write only by policy, which is the whole reason it exists. Said out loud
+     rather than swallowed, because the panel otherwise reports a weight it
+     did not save. */
+  if (ADMIN_ENTRY_STATE.weight) {
+    const { error: wErr } = await sb.from("body_measurements")
+      .upsert({ email: target.email, entry_date: date, weight: ADMIN_ENTRY_STATE.weight },
+              { onConflict: "email,entry_date" });
+    if (wErr) { toast("Entry added, but the weight is self only"); console.error(wErr); }
+  }
   toast(`Entry added for ${target.name}`);
   ADMIN_ENTRY_STATE.weight = 0;
   $("adminEntryGym").checked = false;
