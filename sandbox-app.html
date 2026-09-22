@@ -6459,16 +6459,17 @@
     position: relative; overflow: hidden; margin-bottom: 10px;
     background: var(--panel); box-shadow: var(--shadow-lift);
   }
-  .wth-head { position: relative; padding-right: 100px; }
+  .wth-head { position: relative; padding-right: 66px; }
   .wth-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
   .wth-title { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; margin-top: 4px; }
   .wth-sub { font-size: 14px; color: var(--muted); margin-top: 3px; }
-  /* Decoration, not data: a silhouette in the text colour at a whisper, so it
-     reads as the same thing on white and on graphite. */
-  .wth-mtn { position: absolute; top: -8px; right: -6px; width: 108px; height: 68px; pointer-events: none; }
-  .wth-mtn .m1 { fill: color-mix(in srgb, var(--text) 13%, transparent); }
-  .wth-mtn .m2 { fill: color-mix(in srgb, var(--text) 8%, transparent); }
-  .wth-mtn .snow { fill: color-mix(in srgb, var(--text) 30%, transparent); }
+  /* Him, in the corner the weight hero used to draw a mountain in, and now
+     on all five goal screens (paintGoalHeadMark). His own tokens rather than
+     a silhouette tinted to match the card, so he is the same robot here as
+     on Home and in onboarding, and the eyes keep blinking because that is
+     how he reads as alive everywhere else he appears. */
+  .wth-bot { position: absolute; top: -4px; right: -2px; width: 58px; pointer-events: none; }
+  .wth-bot svg { display: block; width: 100%; height: auto; }
   .wth-stats { display: flex; align-items: stretch; gap: 14px; margin: 18px 0 0; }
   .wth-now { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
   .wth-now-fig { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
@@ -6536,7 +6537,9 @@
      the two tiles and the two ways in. Colour is all tokens, so one layout
      holds in both themes. Not a card, so arrange mode does not list it, same
      as the tiles under Weight. */
-  .tone-head { margin: 2px 0 12px; }
+  /* Same positioning context and the same clearance as the weight hero
+     head, so the robot lands in the same corner on every goal screen. */
+  .tone-head { margin: 2px 0 12px; position: relative; padding-right: 66px; min-height: 54px; }
   .tone-head .wth-title { margin-top: 0; }
   /* The photos lead. They are the evidence this goal is actually about, and
      two pictures answer "is it working" in a glance where a number has to be
@@ -6622,7 +6625,7 @@
      No Row chip. Mo cut it, and the app's own muscle rules already read a bare
      "row" as a barbell row, so a Row chip would have collected the logs that
      are not cardio at all. */
-  .end-head { margin: 2px 0 12px; }
+  .end-head { margin: 2px 0 12px; position: relative; padding-right: 66px; min-height: 54px; }
   .end-head .wth-title { margin-top: 0; }
   .goal-screen .wth-stats { margin-top: 0; }
   .goal-screen .wth-now-fig { margin-top: 6px; }
@@ -8972,7 +8975,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.26";
+const APP_VERSION = "2026.09.21.28";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -13766,6 +13769,26 @@ function robotFaceSVG(size = 40, cls = "", { bust = false } = {}) {
       </g>
     </g>
   </svg>`;
+}
+
+/* The one mark every goal screen wears, top right. Mo: "there's always that
+   mountain on the lose weight chart, and the whole chart is very
+   inconsistent, like across everything... instead of it being a mountain at
+   the top right, let's just have it be our robot. Just put our robot face
+   there."
+
+   The weight hero was the only one of the five goal screens carrying any art
+   at all, and what it carried was a mountain nothing else in this app draws.
+   One helper rather than five copies of the same SVG, so the heads cannot
+   drift apart again, and idempotent so a renderer that rebuilds its head
+   from innerHTML (the weight hero does) and one that never touches it (the
+   other four) can both just call it on every paint. */
+function paintGoalHeadMark(head) {
+  if (!head || head.querySelector(":scope > .wth-bot")) return;
+  const wrap = document.createElement("span");
+  wrap.className = "wth-bot";
+  wrap.innerHTML = robotFaceSVG(58);
+  head.appendChild(wrap);
 }
 
 async function paintObBot() {
@@ -21400,13 +21423,8 @@ function renderWeightHero(on, profile, isPartner) {
   head.innerHTML = `
     <div class="wth-eyebrow">${escapeHtml(eyebrow)}</div>
     <div class="wth-title">${escapeHtml(tile?.title || profile?.goal || "Weight")}</div>
-    ${tile?.sub ? `<div class="wth-sub">${escapeHtml(tile.sub)}</div>` : ""}
-    <svg class="wth-mtn" viewBox="0 0 108 68" aria-hidden="true">
-      <path class="m2" d="M22 68 52 22l16 20 12-14 28 40Z"/>
-      <path class="m1" d="M0 68 30 20l14 18L62 6l26 44 10-12 10 14V68Z"/>
-      <path class="snow" d="M62 6l7 14-4-3-3 4-3-4-4 3Z"/>
-      <path class="snow" d="M30 20l5 10-3-2-2 3-2-3-3 2Z"/>
-    </svg>`;
+    ${tile?.sub ? `<div class="wth-sub">${escapeHtml(tile.sub)}</div>` : ""}`;
+  paintGoalHeadMark(head);
 
   /* Where they are is the latest weigh-in on file. Which way it has been
      going is the trend block under this one: it used to be a line here
@@ -21532,6 +21550,7 @@ function renderToneHero(on, profile, isPartner) {
   const again = () => renderToneHero(true, profile, isPartner);
 
   $("toneTitle").textContent = goalTileFor("tone-lean-abs")?.title || "Tone up";
+  paintGoalHeadMark(el.querySelector(".tone-head"));
 
   /* One measurement at a time, and the same language as the range pills under
      the chart: the selected one is a raised tile, not a green one. */
@@ -21808,6 +21827,7 @@ function renderLiftHero(on, profile, isPartner) {
   const lb = (v) => Math.round(v).toLocaleString();
 
   $("liftTitle").textContent = goalTileFor("get-stronger")?.title || "Get stronger";
+  paintGoalHeadMark(el.querySelector(".end-head"));
 
   /* Nothing weighted logged at all: there is no lift to pick, no line to draw
      and no browser worth opening, so the screen says that once and stops. */
@@ -22092,6 +22112,7 @@ function renderBulkHero(on, profile, isPartner) {
   const num = (v) => (Math.round(v * 10) / 10).toFixed(1);
 
   $("bulkTitle").textContent = goalTileFor("build-muscle")?.title || "Build muscle";
+  paintGoalHeadMark(el.querySelector(".end-head"));
 
   $("bulkChips").innerHTML = !m ? "" : metrics.map((x) =>
     `<button type="button" class="bulk-chip${x.key === m.key ? " on" : ""}" data-metric="${escapeHtml(x.key)}">${escapeHtml(x.label)}</button>`).join("");
@@ -24683,6 +24704,7 @@ function renderEnduranceHero(on, profile, isPartner) {
   const mi = (v) => (Math.round(v * 10) / 10).toFixed(1);
 
   $("endTitle").textContent = goalTileFor("build-endurance")?.title || "Build endurance";
+  paintGoalHeadMark(el.querySelector(".end-head"));
 
   $("endChips").innerHTML = CARDIO_ACTIVITIES.map((a) =>
     `<button type="button" class="end-chip${a.key === act.key ? " on" : ""}" data-act="${escapeHtml(a.key)}">${escapeHtml(a.label)}</button>`).join("");
@@ -41805,28 +41827,61 @@ const TRACK_ALL = [{ key: "weight", label: "Weight", unit: "lb", card: "cardWeig
    it. The tape (waist, hips, chest, thighs, arms) is evidence about fat and
    size, so it appears on the three goals about fat and size and nowhere else.
    Get stronger gets the bar. Endurance and Move better get the sessions. */
+/* One owner per training metric, 2026-09-21. Mo: "can't have duplicates in
+   certain stuff. Like for get stronger, bulk up, I can see weekly volume and
+   best lifts. That's only should be for the get stronger, not for the bulk
+   up. Go and check every single duplicate, fix all of them."
+
+   The rule this settles on: anything that measures the TRAINING (best lifts,
+   tonnage, session counts, minutes, distance, mobility, walks) belongs to
+   exactly one goal, the one it actually answers the question for. Two goals
+   offering the same training number is two goals claiming to be measured the
+   same way, which is what made Bulk Up read as Get Stronger wearing a
+   different title.
+
+   Body evidence (the scale, the tape, photos) is the deliberate exception:
+   several goals genuinely read the same body, and Mo's own call an hour
+   before this one was "always, always, always weight up top" on BOTH Lose
+   Weight and Build Muscle. "consistent" is the second exception, on purpose:
+   it is the Not-sure-yet goal, so borrowing the basics is the whole of what
+   it is for, and it keeps showing up plus the body metrics while losing the
+   two signature ones (Weekly Volume, Mobility sessions) that belong to a
+   goal with a name. */
 const TRACK_OFFERS = {
   /* Mo, editing the Track Menu artifact 2026-09-18: dropped Workouts a week
      and Hips from this one. What is left still covers what the goal is
      measured by (the scale, the waist) plus the two things worth keeping in
      view (Body Photos, Cardio sessions). */
   "lose-weight": ["weight", "waist_in", "photos", "cardio_wk"],
-  "tone-lean-abs": ["waist_in", "hips_in", "photos", "weight", "arm_in", "workouts_wk"],
-  "build-muscle": ["weight", "chest_in", "arm_in", "photos", "volume", "lifts"],
-  /* Weight is offered and not pre-ticked: somebody adding size wants to see
-     it, somebody holding a weight class needs it, and neither of them is what
-     this goal is measured by. Cardio sessions dropped the same day. */
-  "get-stronger": ["lifts", "volume", "workouts_wk", "photos", "weight"],
+  /* Arms went to Build Muscle, which is the goal a growing arm is evidence
+     for, and Workouts a week to the goal that IS showing up. What is left is
+     what a recomp is actually read on: the tape, the photos, and the scale
+     that is meant to hold still. */
+  "tone-lean-abs": ["waist_in", "hips_in", "photos", "weight"],
+  /* Weekly Volume and Best Lifts both went to Get Stronger, Mo's own
+     example: "that's only should be for the get stronger, not for the bulk
+     up." Size is read on the scale going up and the tape going with it, and
+     that is the whole of this list now. */
+  "build-muscle": ["weight", "chest_in", "arm_in", "photos"],
+  /* Nothing but the bar. Body Photos and the scale came off here rather than
+     off the three body goals: this file already conceded the scale was "not
+     what this goal is measured by" while offering it anyway, and strength is
+     the one goal with no visual claim at all. */
+  "get-stronger": ["lifts", "volume", "workouts_wk"],
   /* Weight, Body Photos and Weekly Volume dropped: none of the three answer
-     "did I go further, more often", which is the whole question here. */
+     "did I go further, more often", which is the whole question here. Cardio
+     minutes and Distance are owned here too, so Move Better lost the minutes
+     and kept the sessions. */
   "build-endurance": ["cardio_wk", "cardio_min", "distance_wk"],
   /* No tape and no scale in this one at all. Neither answers the question
      "am I moving better", and offering them here is what made the old screen
      read as a form somebody had to fill in rather than a choice. Workouts a
      week and Body Photos dropped too, for the same reason: the sessions this
-     goal actually runs on (mobility, walking) are what is left. */
-  "move-better": ["mobility_wk", "walk_wk", "cardio_wk", "cardio_min"],
-  "consistent": ["workouts_wk", "weight", "photos", "volume", "cardio_wk", "mobility_wk"],
+     goal actually runs on (mobility, walking) are what is left. Mo, naming
+     the whole list out loud: "just mobility sessions, cardio sessions,
+     walks, and that's it." */
+  "move-better": ["mobility_wk", "walk_wk", "cardio_wk"],
+  "consistent": ["workouts_wk", "weight", "photos", "cardio_wk"],
 };
 
 /* The keys this person wants, in the order they should appear. Falls through
