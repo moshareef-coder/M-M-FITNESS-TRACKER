@@ -7886,7 +7886,6 @@
         <p class="end-empty hidden" id="endEmpty">Log a run to start the line.</p>
         <div class="wt-range" id="endRange"></div>
       </div>
-      <div class="wtr-slot hidden" id="endTrend"></div>
       <div class="card end-recent hidden" id="endRecent"></div>
       <div class="prog-tiles end-tiles" id="endTiles">
         <button type="button" class="prog-tile" id="endMinutes" disabled></button>
@@ -7937,7 +7936,6 @@
         <p class="end-empty hidden" id="liftEmpty"></p>
         <div class="wt-range" id="liftRange"></div>
       </div>
-      <div class="wtr-slot hidden" id="liftTrend"></div>
       <div class="card lift-records hidden" id="liftRecords"></div>
       <div class="prog-tiles end-tiles" id="liftTiles">
         <button type="button" class="prog-tile" id="liftVolume" disabled></button>
@@ -9002,7 +9000,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.36";
+const APP_VERSION = "2026.09.21.37";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -22279,9 +22277,16 @@ function renderLiftHero(on, profile, isPartner) {
     <span class="prog-tile-body"><span class="prog-tile-title">Recent PRs</span><span class="prog-tile-val">${prs}</span><span class="prog-tile-sub">${
       prs ? "in the last 30 days" : "beat a weight to set one"}</span></span>`;
 
-  /* Same as Build endurance: a lift goal makes no claim about body weight, so
-     the trend is here without a colour and only once there is one to draw. */
-  renderWeightTrend("liftTrend", name, profile, isPartner, false);
+  /* No weight trend here. Mo, 2026-09-21: "[the] trend should not show in
+     build endurance, or anything that has nothing to do with weight." This
+     screen used to draw it colourless, on the reasoning that somebody lifting
+     still gets to see which way the scale is going. That reasoning is what
+     TRACK_OFFERS now answers: get-stronger offers lifts, volume and workouts
+     a week and no scale at all, so a weight line on this screen is the one
+     card contradicting the picker. It also leaked past isTracked("weight"),
+     which falls through to the legacy flat tracked_metrics list on an account
+     that has one, so the check the old call relied on was not holding
+     anyway. */
 
   /* What Mo asked for by name: every lift, and what each one is doing. The
      browser already exists, it was just only reachable from a card this screen
@@ -25224,11 +25229,9 @@ function renderEnduranceHero(on, profile, isPartner) {
   $("endConsistency").innerHTML = `<span class="prog-tile-ico">${icon("calendar", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Workout Consistency</span><span class="prog-tile-val">${days} of ${goal}</span><span class="prog-tile-sub">this week</span></span>`;
 
-  /* Body weight says nothing about this goal, so the trend carries no colour
-     here and stays away entirely until there is something to read. Somebody
-     running four times a week still gets to see which way the scale is
-     going. */
-  renderWeightTrend("endTrend", name, profile, isPartner, false);
+  /* No weight trend here either, and this is the screen Mo named: endurance
+     is cardio sessions, minutes and distance, which is exactly what
+     TRACK_OFFERS offers for it. See the note in renderLiftHero. */
 
   /* One call to action, the same rule the other goal screens follow. */
   const acts = $("endActions");
