@@ -2665,6 +2665,24 @@
   .pb-day.ahead { opacity: .45; }
   .pb-day.now { border-color: var(--accent); }
   .pb-line { margin: 0; font-size: 13.5px; color: var(--muted); }
+  /* The stat row borrows .sc-stats from the finish screen; this only takes
+     the bottom rule off it, since a rule against the card's own edge reads as
+     a line that lost its table. */
+  .pb-stats { margin: 16px 0 0; border-bottom: none; }
+  .pb-heat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 20px 0 8px; }
+  /* Twelve columns of seven. The gap is the grid: no borders, no labels on
+     the cells, so the shape of the habit is the only thing being read. */
+  .pb-heat, .pb-months { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+  .pb-months { margin-bottom: 5px; }
+  .pb-mon { font-size: 9.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); min-width: 0; }
+  .pb-col { display: grid; grid-template-rows: repeat(7, 1fr); gap: 4px; }
+  .pb-cell {
+    aspect-ratio: 1; border-radius: 3px; background: var(--panel-2);
+    border: 1px solid transparent;
+  }
+  .pb-cell.on { background: var(--accent); }
+  .pb-cell.rest { background: none; border-color: var(--border); }
+  .pb-cell.ahead { opacity: .35; }
 
   .set-savebar {
     position: fixed; z-index: 10;
@@ -9066,7 +9084,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.39";
+const APP_VERSION = "2026.09.21.40";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -44859,24 +44877,88 @@ function renderPartnerBare(on, name, email) {
   if (!box) return;
   box.classList.toggle("hidden", !on);
   if (!on) { box.innerHTML = ""; return; }
-  const dates = currentWeekDates();
+
   const today = todayStr();
   const days = gymDaysThisWeek(name);
   const target = weeklyGoalFor(email);
-  /* Their own week, counted the same way their own ring counts it. */
-  const strip = dates.map((d, i) => {
+  const week = currentWeekDates().map((d, i) => {
     const e = entryOn(name, d);
     const cls = ["pb-day", e?.gym ? "on" : "", e?.rest_day ? "rest" : "", d === today ? "now" : "", d > today ? "ahead" : ""]
       .filter(Boolean).join(" ");
     return `<span class="${cls}"><i>${DAY_LETTERS[i]}</i></span>`;
   }).join("");
+
+  const all = entriesFor(name);
+  const trained = all.filter((e) => e.gym).length;
+  const streak = typeof currentDayStreak === "function" ? currentDayStreak(name) : 0;
+  const together = typeof sharedDayStreak === "function" ? sharedDayStreak() : 0;
+
   box.innerHTML = `
     <div class="pb-top">
       <span class="pb-who">${escapeHtml(name)} this week</span>
       <span class="pb-count"><b>${days}</b> of ${target}</span>
     </div>
-    <div class="pb-week">${strip}</div>
-    <p class="pb-line">${escapeHtml(bareWeekLine(name, days, target))}</p>`;
+    <div class="pb-week">${week}</div>
+    <p class="pb-line">${escapeHtml(bareWeekLine(name, days, target))}</p>
+    ${/* The app's own stat tiles, the ones the finish screen uses, because
+          three numbers in a row is a shape this app already has and a fourth
+          one invented here would read as a different app. Together is a pair
+          fact rather than one of theirs, and it is the number this whole
+          screen exists to be about. */ ""}
+    <div class="sc-stats pb-stats">
+      <div class="sc-stat"><b>${streak}</b><span>${streak === 1 ? "Day streak" : "Day streak"}</span></div>
+      <div class="sc-stat"><b>${trained}</b><span>Workouts</span></div>
+      <div class="sc-stat"><b>${together}</b><span>Together</span></div>
+    </div>
+    ${bareHeatmapHTML(name)}`;
+}
+
+/* Twelve weeks of turning up, oldest column on the left. A week is a column
+   and a day is a row, which is the one layout that reads as "how long have
+   they been at it" rather than as a calendar somebody has to date-read.
+
+   This is the same fact the week strip above draws, over more time, and it is
+   the honest way to fill this screen: every OTHER thing a partner can share
+   is off, so the only material left is the showing up, and there is a lot
+   more of that than one week. */
+function bareHeatmapHTML(name) {
+  const weeks = 12;
+  const start = new Date(weekStartStr() + "T00:00:00");
+  start.setDate(start.getDate() - (weeks - 1) * 7);
+  const today = todayStr();
+  let trained = 0;
+  const cols = [];
+  const months = [];
+  let lastMonth = null;
+  for (let w = 0; w < weeks; w++) {
+    const cells = [];
+    let label = "";
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(start);
+      day.setDate(day.getDate() + w * 7 + d);
+      const ds = isoDate(day);
+      /* The month label belongs to the week its Monday falls in, so the row
+         of labels lines up with the columns rather than drifting. */
+      if (d === 0) {
+        const m = day.toLocaleDateString(undefined, { month: "short" });
+        if (m !== lastMonth) { label = m; lastMonth = m; }
+      }
+      const e = entryOn(name, ds);
+      if (e?.gym) trained += 1;
+      const cls = ["pb-cell", e?.gym ? "on" : "", e?.rest_day ? "rest" : "", ds > today ? "ahead" : ""]
+        .filter(Boolean).join(" ");
+      cells.push(`<span class="${cls}" aria-hidden="true"></span>`);
+    }
+    months.push(`<span class="pb-mon">${escapeHtml(label)}</span>`);
+    cols.push(`<span class="pb-col">${cells.join("")}</span>`);
+  }
+  return `
+    <div class="pb-heat-head">
+      <span class="pb-who">Turning up</span>
+      <span class="pb-count">${trained} day${trained === 1 ? "" : "s"} in ${weeks} weeks</span>
+    </div>
+    <div class="pb-months">${months.join("")}</div>
+    <div class="pb-heat">${cols.join("")}</div>`;
 }
 
 /* One sentence about the week, and never about what is hidden. */
