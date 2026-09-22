@@ -538,10 +538,14 @@
      sharing. The title, the card and the buttons under it are untouched,
      because planning and logging a workout are free and this card is still
      where you do them. */
-  .wkt-next-hire { grid-area: pitch; }
+  /* Free: the ring and the muscle list are the reading he does for you, so
+     they are what goes, and the card keeps its title and its buttons because
+     planning and logging a workout are free. The pitch that used to take the
+     row between them is gone (see renderWorkoutTab): the paywall opens on
+     Generate workout itself. */
   .wkt-next.not-hired .wkt-next-grid {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "words" "pitch" "acts";
+    grid-template-areas: "words" "acts";
   }
   .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
   /* A button, because the figure is a claim and tapping it shows the working.
@@ -8017,6 +8021,16 @@
          Not cards: the goal order and a saved drag order both walk past this
          block, and renderProgTiles() keeps it pinned under Weight. Photos are
          yours alone, so that tile goes on a partner's view, same as the card. -->
+    <!-- The Start/Now pair on the weight goal, the same card the recomp and
+         bulk screens carry. Mo: "for the body photos for lose weight, it
+         should be that same body photo where it goes from this to that, where
+         it shows you now to the start. Right now it's not doing that. Make
+         every single body photo in this tab look the exact same across all of
+         them." This screen was the odd one out: it offered photos as a small
+         tile in the row below instead, so the one goal most likely to want a
+         before and after was the one goal that could not see one. -->
+    <div class="tone-photos" id="weightPhotos"></div>
+
     <div class="prog-tiles hidden" id="progTiles">
       <button type="button" class="prog-tile" id="tileWaist"></button>
       <button type="button" class="prog-tile" id="tilePhotos"></button>
@@ -8987,7 +9001,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.33";
+const APP_VERSION = "2026.09.21.34";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -19646,7 +19660,8 @@ function hireSkippedThisSession() {
    same seven ninety nine. Each one says what HE would do on THIS screen, which
    is the only reason the sentence is different at all. */
 const HIRE_PITCH_LINES = {
-  next: "Hire me and I'll pick your next workout and build it for you.",
+  /* `next` went with the pitch on the next-workout card, 2026-09-21: that
+     card gates on the Generate button now rather than selling above it. */
   progress: "Hire me and I'll track all of this for you, and show you the line.",
   generic: "Hire me as your personal trainer and I'll take this from here.",
 };
@@ -21602,6 +21617,17 @@ function renderWeightHero(on, profile, isPartner) {
   /* A partner's screen has nothing to log, so the whole logging card goes,
      not just its insides: an empty card is a question nobody asked. */
   card.querySelector(".wt-logcard")?.classList.toggle("hidden", isPartner);
+  /* Same gate the recomp and bulk screens put on their own copy of this card:
+     yours only, and only when photos are something this person asked to
+     track. Off with the hero too, so it does not sit under a folded index row
+     with no screen around it. */
+  const photos = $("weightPhotos");
+  const showPhotos = on && !isPartner && isTracked("photos") && typeof renderComparePhotos === "function";
+  if (photos) {
+    photos.classList.toggle("hidden", !showPhotos);
+    if (showPhotos) renderComparePhotos(photos, isPartner);
+    else photos.innerHTML = "";
+  }
   if (!on) {
     stats.classList.add("hidden");
     $("wtHeroTrend")?.classList.add("hidden");
@@ -35455,11 +35481,20 @@ function renderChooseScreen() {
                 a run has no ring to tap for it. */ ""}
           ${p.cardio ? `<p class="wkt-next-sub">${escapeHtml(cardioSaid(p.cardio))}</p>` : ""}
         </div>
-        ${!hiredHere ? `<div class="wkt-next-hire">${hirePitchHTML("next")}</div>` : p.match == null ? "" : `
+        ${/* No pitch on this card. Mo, 2026-09-21: "there should[n't] be a
+              hire me here, just when they press generate workout it will pop
+              up as paying." generateWorkout already opens the paywall through
+              requirePremium before it builds anything, so the button is the
+              gate and a block of sell above it was the same ask made twice,
+              the louder time in a card that exists to start a workout. Same
+              call he made about the robot's CTAs on Home. The ring still goes
+              on a free account, because the match number IS the reading being
+              paid for. */ ""}
+        ${hiredHere && p.match != null ? `
         <button type="button" class="wkt-arc" data-info="planMatchWhy" aria-label="Why this is a ${p.match}% match">
           ${arcGaugeSVG(Math.max(0, Math.min(100, p.match)) / 100, freshTone(p.match), 136)}
           <div class="wkt-arc-num"><b>${p.match}%</b><i>MATCH</i></div>
-        </button>`}
+        </button>` : ""}
         <div class="wkt-next-acts">
           ${/* p.real can now be true about TOMORROW too (planPreview reads
                 whichever day the card is on), so this has to ask about
@@ -41716,7 +41751,7 @@ function refreshPhotoSurfaces() {
   /* Every goal screen that shows the pair, not just the one that had it
      first: Build Muscle carries the same card, and a photo added there has to
      appear there. */
-  for (const id of ["tonePhotos", "bulkPhotos"]) {
+  for (const id of ["tonePhotos", "bulkPhotos", "weightPhotos"]) {
     const host = $(id);
     if (host && !host.classList.contains("hidden")) renderComparePhotos(host, false);
   }
@@ -44000,36 +44035,19 @@ function renderProgTiles(kind, isPartner, opts = {}) {
     waist.onclick = isPartner ? null : () => openMeasurementsSheet();
   }
 
-  /* Photos are never shared, so on a partner's view there is no tile rather
-     than an empty one, and the tape takes the whole row. Same when the photo
-     card itself is off (a brand new account), because a door to a hidden card
-     is a dead tap. */
+  /* The photos tile is gone. It was a third shape for the one thing this tab
+     shows three ways: a small "N photos, see progress" door here, the
+     Start/Now pair on the recomp and bulk screens, and the strip card behind
+     both. Mo: "make every single body photo in this tab look the exact same
+     across all of them." The weight screen now carries the same Start/Now
+     card the other two do (renderWeightHero paints #weightPhotos), so a door
+     to it from directly underneath it would be pointing at itself. */
   const photos = $("tilePhotos");
-  const card = $("cardPhotos");
-  /* On the weight screen the photos card is hidden by design and this tile is
-     its door, so "is the card visible" is the wrong test there: the caller
-     says whether photos exist to be shown at all (yours, not a blank
-     account), and the card's own hidden class only decides elsewhere. */
-  const showPhotos = opts.photosAvailable ?? (!isPartner && card && !card.classList.contains("hidden"));
-  photos.classList.toggle("hidden", !showPhotos);
-  // Solo whichever one tile is left standing, and fold the whole row away
-  // when neither has anything to offer rather than leaving an empty strip.
-  host.classList.toggle("solo", showPhotos !== waistOffered);
-  host.classList.toggle("hidden", !showPhotos && !waistOffered);
-  if (showPhotos) {
-    const n = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL).length;
-    photos.innerHTML = `<span class="prog-tile-ico">${icon("camera", 18)}</span>
-      <span class="prog-tile-body"><span class="prog-tile-title">Body Photos</span><span class="prog-tile-val">${n} photo${n === 1 ? "" : "s"}</span><span class="prog-tile-sub go">See progress &rsaquo;</span></span>${chev}`;
-    photos.onclick = () => {
-      document.querySelectorAll("#tab-progress .card.peek").forEach((c) => c.classList.remove("peek"));
-      /* The door opens the card, so it is un-hidden here; folding it again
-         puts it back (see the accordion), so the screen returns to the mockup. */
-      card.classList.remove("hidden");
-      card.classList.add("peek");
-      primeOpenedCard(card);
-      card.scrollIntoView({ block: "start", behavior: "smooth" });
-    };
-  }
+  photos.classList.add("hidden");
+  // The tape is the only tile left, so it is always solo, and the row folds
+  // away entirely when even that has nothing to offer.
+  host.classList.toggle("solo", true);
+  host.classList.toggle("hidden", !waistOffered);
 }
 
 /* ---- The tiles, one renderer ----
@@ -44698,10 +44716,9 @@ function renderProgressTab() {
   renderBulkHero(bulkScreen, lensProfile, isPartner);
   renderLiftHero(liftScreen, lensProfile, isPartner);
 
-  /* photosAvailable is passed rather than read off cardPhotos's hidden class,
-     because on the weight screen that card is hidden ON PURPOSE and the tile
-     is meant to be its door, not to vanish with it. */
-  renderProgTiles(kind, isPartner, { photosAvailable: !isPartner && !blank, bodyShared });
+  /* photosAvailable went with the photos tile: there is no door to keep open
+     now that the weight screen carries the Start/Now card itself. */
+  renderProgTiles(kind, isPartner, { bodyShared });
   /* After every screen has drawn itself, because this takes readings away
      rather than deciding which ones there were: the goal, the head and the
      shape of the tab are the same whether or not he has been hired, and one
