@@ -55,6 +55,18 @@ const BY_EMAIL: Array<[string, string]> = [
   ["apns_tokens", "email"],
   ["live_sessions", "email"],
   ["group_members", "email"],
+  /* Four more found on 2026-09-21, the same way apns_tokens was found: this
+     list was last checked against the live schema on 2026-09-15 and none of
+     these four existed yet or had not been noticed. A person exercises the
+     right to erasure, this function answers ok: true, and their address sat
+     on in four tables regardless. subscriptions carries a RevenueCat app user
+     id alongside the email; blocks and invite_links both need two passes,
+     since a person's address can be on either side of them. */
+  ["subscriptions", "email"],
+  ["blocks", "blocker_email"],
+  ["blocks", "blocked_email"],
+  ["invite_links", "owner_email"],
+  ["invite_links", "claimed_by"],
   /* The invite-code rate limiter's memory, added by the 2026-09-15 migration.
      It holds this person's address against every code they ever typed. Losing
      the lockout state with the account is fine: deleting the account is a far
@@ -77,6 +89,29 @@ async function del(path: string): Promise<boolean> {
   });
   if (!res.ok && res.status !== 404) {
     console.error("delete failed", path, res.status, await res.text());
+    return false;
+  }
+  return true;
+}
+
+/* content_reports gets a PATCH rather than a DELETE, one direction of it.
+   A report this person FILED is theirs and goes with the rest of BY_EMAIL. A
+   report FILED ABOUT them is moderation evidence: something they did to
+   another person that a moderator may still need to act on, and there is a
+   legitimate-interest reason to keep the record of what happened even after
+   the account that did it is gone. Deleting it would let the worst behaviour
+   on this app erase its own trail on request. So the row stays and the
+   identity comes off it: subject_email is overwritten with a stable,
+   unguessable placeholder rather than left pointing at an address that could
+   be reassigned. */
+async function pseudonymise(path: string): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: "PATCH",
+    headers: { ...svc, "Content-Type": "application/json" },
+    body: JSON.stringify({ subject_email: "deleted-account@unio.invalid" }),
+  });
+  if (!res.ok && res.status !== 404) {
+    console.error("pseudonymise failed", path, res.status, await res.text());
     return false;
   }
   return true;
@@ -209,6 +244,13 @@ Deno.serve(async (req) => {
   // 2. Rows keyed by this user.
   for (const [table, col] of BY_EMAIL) {
     await drop(`${table}?${col}=eq.${enc}`, table);
+  }
+
+  /* 2a. content_reports, both directions, not the same way. See
+     pseudonymise() above for why the two halves differ. */
+  await drop(`content_reports?reporter_email=eq.${enc}`, "content_reports (filed by them)");
+  if (!(await pseudonymise(`content_reports?subject_email=eq.${enc}`))) {
+    failed.push("content_reports (about them)");
   }
 
   /* 2b. Groups they own. Their membership row went with group_members above,
