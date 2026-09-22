@@ -11360,6 +11360,22 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
     if (isMain(bubble, child)) { primary = extras.shift() || null; return; }
     const at = extraAt(bubble, child);
     if (at >= 0) { extras.splice(at, 1); return; }
+    /* "Not sure yet" is none of the above, not a goal that sits alongside
+       real ones. Mo, looking at it ticked "Also" next to Lose fat and build
+       muscle: "sure yet should automatically deselect everything because
+       that's like a none of the above." Picking it clears whatever else was
+       held rather than joining it, and it is total rather than about one
+       claim, which is why it is handled before conflictsWith below: that
+       function only knows about the scale, and this goal disagrees with
+       every goal, on every axis, by definition. */
+    if (bubble === "consistent") {
+      if (primary || extras.length) toast("Not sure yet is its own answer, so the rest came off.");
+      primary = { bubble, child }; extras = [];
+      return;
+    }
+    /* The other direction of the same rule: picking any real goal while Not
+       sure yet is held retires it rather than sitting an "Also" beside it. */
+    if (primary?.bubble === "consistent") primary = null;
     const clash = conflictsWith(bubble);
     if (clash.length) {
       const names = clash.map((c) => goalTileFor(c.bubble)?.title).filter(Boolean);
