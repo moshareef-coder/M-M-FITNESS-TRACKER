@@ -3073,10 +3073,12 @@
     margin-top: 6px; font-size: 15.5px; font-weight: 600; letter-spacing: -.01em;
     color: color-mix(in srgb, var(--sess-ink) 72%, transparent);
   }
-  .stretch-cue {
-    margin: 14px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); text-align: center;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  }
+  /* Used to clamp at two lines and cut a longer cue off mid word: "there's
+     too many information here... even the description is cut off." The
+     block it sits in now scrolls on its own (.stretch-more) instead of the
+     figure paying for the room, so there is nowhere left this needs to
+     truncate a real sentence to fit. */
+  .stretch-cue { margin: 14px 0 0; font-size: 14px; line-height: 1.4; color: var(--muted); text-align: center; }
   /* Skip is a way out, not a choice between equals, so it is a text link under
      the CTA rather than the second of two buttons the old strip had. */
   .stretch-skip {
@@ -3189,8 +3191,16 @@
      pinned to that strip rather than floated at a guessed offset. */
   .sess-stage {
     position: relative;
-    flex: 1 1 auto; min-height: 0; overflow: hidden;
+    flex: 1 1 auto; overflow: hidden;
     display: flex; flex-direction: column;
+    /* Was 0. .sess-sheet is flex-shrink: 0, refuses to give an inch, so this
+       was the only flexible thing in the column and took the whole deficit
+       when the sheet opened: measured on a real cool-down, the stage went to
+       83px and the figure inside it to 27px, which is "the animation looks
+       minuscule" exactly. A floor here means the sheet can no longer crush
+       the figure to nothing; past this point IT has to give way instead, see
+       .stretch-more's own scroll below. */
+    min-height: 172px;
     /* Vertical panning is not this element's job (nothing here scrolls), so
        the browser is told to leave the horizontal axis alone rather than
        treat a swipe as its own edge-navigation gesture. */
@@ -3568,7 +3578,13 @@
     max-height: 0; opacity: 0; overflow: hidden;
     transition: max-height .3s cubic-bezier(.22,1,.36,1), opacity .2s ease, margin-top .3s cubic-bezier(.22,1,.36,1);
   }
-  .sess-sheet.open .stretch-more { max-height: 560px; opacity: 1; margin-top: 14px; }
+  /* 560 was a guess, and a bad one: on a real phone it let the sheet demand
+     more room than the screen had, and .sess-stage above (flex-shrink: 0
+     refuses, so the stage is the one flexible thing left) paid for every
+     pixel of it, down to a 27px figure. 300 is sized to what is actually
+     left once the header and the stage's own floor are accounted for; past
+     that this scrolls on its own instead of asking the stage for more. */
+  .sess-sheet.open .stretch-more { max-height: 300px; opacity: 1; margin-top: 14px; overflow-y: auto; }
   .sess-sheet.dragging .stretch-more { transition: none; }
   /* The rail inside it does NOT fold on its own any more: the block above is
      what folds, and a rail collapsed inside a collapsing parent measures its
