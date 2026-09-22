@@ -15,6 +15,7 @@ const ASSETS = [
      them out gives a 404 where App Review expects to find a privacy policy. */
   "privacy.html",
   "support.html",
+  "terms.html",
   "manifest.webmanifest",
   /* index.html imports this at runtime for everything the character says. On
      the web it resolves from the repo root; left out of the bundle the import
