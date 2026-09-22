@@ -476,7 +476,13 @@
     progressHiddenReady: {
       label: "Progress sharing picker live",
       apply: (db) => {
-        db.profiles = db.profiles.map((p) => ({ ...p, progress_hidden: p.email === THEM ? ["volume"] : [] }));
+        /* Also off Lose weight and onto Move better for ME: the base goal is
+           a weightScreen hero with nothing folded under it, which is exactly
+           the one shape that never shows the granular cards this scenario
+           exists to exercise. Habit surfaces cardConsistency, cardStrength
+           and cardVolume all as ordinary index rows. */
+        db.profiles = db.profiles.map((p) => ({ ...p, progress_hidden: p.email === THEM ? ["volume"] : [],
+          ...(p.email === ME ? { goal: "Move better", goal_bubble: "move-better" } : {}) }));
       },
     },
 

@@ -1127,6 +1127,28 @@
     padding: 16px 15px; margin-bottom: 10px;
     box-shadow: var(--shadow-card);
   }
+  /* Whether your partner sees this card, right on the card itself. Mo: "we
+     need it on the actual card... that's too much scrolling down" about the
+     old picker sheet. One eye, top right, no sheet to open at all.
+
+     A folded index row (paintProgIndex) hides every card child except h2 and
+     the summary line, so the toggle has to live inside h2 to survive that,
+     grouped with the chevron in one .idx-actions wrapper so h2 keeps exactly
+     two flex children (title, actions) instead of space-between scattering
+     three apart. A hero screen never folds and gets the simpler overlay. */
+  .goal-screen { position: relative; }
+  .goal-screen:has(.share-toggle) .wth-title { padding-right: 32px; }
+  .idx-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .share-toggle {
+    width: 24px; height: 24px; flex-shrink: 0;
+    border-radius: 50%; border: none; background: var(--panel-2); color: var(--ink-2);
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .share-toggle svg { width: 13px; height: 13px; }
+  .share-toggle.off { color: var(--mut); }
+  .share-toggle:active { transform: scale(.92); }
+  .share-toggle.overlay { position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; }
+  .share-toggle.overlay svg { width: 14px; height: 14px; }
   /* The hero is the one card that should feel lit from inside. */
   #heroCard { box-shadow: var(--shadow-lift); }
   #tab-home #heroCard { padding: 16px 15px 15px; }
@@ -8963,7 +8985,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.22";
+const APP_VERSION = "2026.09.21.23";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9102,6 +9124,8 @@ const $ = (id) => document.getElementById(id);
 
 /* Inline SVG icons, 20x20, stroke-based, used instead of emoji throughout */
 const ICON_PATHS = {
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 5.2A9.6 9.6 0 0 1 12 5c6.4 0 10 7 10 7a17.7 17.7 0 0 1-3.4 4.3M6.6 6.6C4 8.3 2 12 2 12s3.6 7 10 7c1.4 0 2.6-.3 3.7-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5Z"/>',
   sunMoon: '<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',
   swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
@@ -43747,20 +43771,13 @@ function renderTrackSheet() {
   const keptSet = new Set(kept.map((m) => m.key));
   /* Same chrome as the measurements sheet next door: grip, back chevron,
      centred title. Two sheets on one tab that open differently is the kind of
-     small inconsistency people feel without being able to name. */
-  /* What your partner sees, in the same sheet the three dots already open.
-     Mo: "I want it to be in the same three bubble... I want everything to
-     be very minimal, very quick... I believe in the concept of everything
-     staying around the same area." It was a trip to Setup before this,
-     exactly the extra trip he is naming. Not per goal, unlike the grid
-     above it: the concepts page's own recommendation was a flat list, so it
-     renders once regardless of which goal chip is showing, under its own
-     heading, so nobody reads it as governed by the goal above it. */
-  const shareOffer = !!PARTNER_EMAIL && progressSharingLive();
-  const shareHidden = new Set(Array.isArray(MY_PROFILE?.progress_hidden) ? MY_PROFILE.progress_hidden : []);
-  const shareOn = new Set(PROGRESS_SHARE_KEYS.filter((k) => !shareHidden.has(k)));
-  const shareMetrics = PROGRESS_SHARE_KEYS.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
+     small inconsistency people feel without being able to name.
 
+     What your partner sees used to live in a second grid at the bottom of
+     this same sheet. Mo: "That's too much scrolling down... we need it on
+     the actual card." Moved to a small eye toggle painted directly on each
+     shareable card by paintShareToggles(), so there is nothing left to
+     scroll past here. */
   $("trackSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="scr-head">
@@ -43770,20 +43787,7 @@ function renderTrackSheet() {
     </div>
     <p class="trk-any" style="margin:0 0 14px">What this goal shows you. Your other goals keep their own. Everything logs either way, so turning one back on shows its whole history.</p>
     <div class="trk-grid" id="trackSheetGrid">${trackTilesHTML(shown, on, keptSet)}</div>
-    ${shareOffer ? `
-    <p class="trk-any" style="margin:22px 0 14px">What ${escapeHtml(partnerName())} sees, every goal, not just this one. On is shown to them today. Off holds that one back.</p>
-    <div class="trk-grid" id="shareSheetGrid">${trackTilesHTML(shareMetrics, shareOn, null)}</div>` : ""}
     <button type="button" class="btn-primary" id="trackDone" style="margin-top:16px">Done</button>`;
-
-  if (shareOffer) {
-    wireTrackTiles($("shareSheetGrid"), shareOn, async (live) => {
-      const nowHidden = PROGRESS_SHARE_KEYS.filter((k) => !live.has(k));
-      const { error } = await sb.from("profiles")
-        .update({ progress_hidden: nowHidden }).eq("email", MY_EMAIL);
-      if (error) { console.error(error); toast("Could not save"); return; }
-      if (MY_PROFILE) MY_PROFILE.progress_hidden = nowHidden;
-    });
-  }
 
   /* Saved on every tap rather than on the way out, which is what this sheet has
      always done: nobody expects to have to confirm a preference. Through the
@@ -44233,6 +44237,7 @@ function renderProgressTab() {
   if (live.has("cardPhotos")) renderBodyPhotos();
   for (const spec of WEEK_CARDS) if (live.has(spec.card)) renderWeekCard(spec);
   renderProgressWithheld(isPartner, sharing, bodyShared);
+  paintShareToggles();
 }
 
 /* What their screen is NOT showing, said plainly.
@@ -44252,6 +44257,81 @@ function renderProgressTab() {
    It also carries the one link Mo asked for. The controls for your own half
    live in Settings and there is exactly one copy of them, because two copies
    of a privacy switch is how one of them ends up wrong. */
+/* One eye icon, top right of each shareable card, painted on your own view
+   only: it is a switch over what YOUR partner sees, so it has no meaning on
+   their screen and does not appear there. Tapping it flips that one card
+   instantly, no sheet, nothing to scroll past to find it. Replaces the
+   picker that used to live at the bottom of the kebab-menu sheet; see the
+   comment on renderTrackSheet for why it moved. */
+/* Get stronger is a hero screen (renderLiftHero, #liftHero), not the folded
+   cardStrength row: the goal replaces the card with the whole-screen answer,
+   same numbers, so "lifts" needs a second place this toggle can land or the
+   most common goal in the app would never show one at all. */
+const SHARE_HOSTS = { lifts: ["liftHero", "cardStrength"] };
+function paintShareToggles() {
+  /* Called every render, including a switch onto the partner's own view,
+     where stale buttons from a moment ago must come off rather than sit
+     there controlling a screen that is not yours to control. */
+  if (PROGRESS_VIEW === "partner") {
+    document.querySelectorAll(".share-toggle").forEach((el) => el.remove());
+    return;
+  }
+  const offer = !!PARTNER_EMAIL && progressSharingLive();
+  const hidden = new Set(Array.isArray(MY_PROFILE?.progress_hidden) ? MY_PROFILE.progress_hidden : []);
+  for (const m of TRACK_ALL) {
+    if (!PROGRESS_SHARE_KEYS.includes(m.key)) continue;
+    const hostIds = SHARE_HOSTS[m.key] || [m.card];
+    const card = hostIds.map((id) => $(id)).find((el) => el && !el.classList.contains("hidden"));
+    const stale = hostIds.map((id) => $(id)).filter(Boolean);
+    if (!card) { for (const el of stale) el.querySelector(".share-toggle")?.remove(); continue; }
+    for (const el of stale) if (el !== card) el.querySelector(".share-toggle")?.remove();
+    /* A folded index row hides every child of the card except h2 and the
+       summary line (see the collapse rule just above idx-chev), so a toggle
+       sitting loose in the card would vanish the moment the row closes. The
+       chevron already solves this by living inside h2; the toggle joins it
+       there, in one small wrapper so the two-item space-between layout on h2
+       still holds instead of spreading three items apart. A hero screen
+       (Get stronger's own full page) never folds, so it keeps the simpler
+       card-level overlay. */
+    const folds = card.classList.contains("idx-card");
+    let mount = card;
+    if (folds) {
+      const h2 = card.querySelector(":scope > h2");
+      if (!h2) continue;
+      mount = h2.querySelector(":scope > .idx-actions");
+      if (!mount) {
+        mount = document.createElement("span");
+        mount.className = "idx-actions";
+        const chev = h2.querySelector(":scope > .idx-chev");
+        h2.appendChild(mount);
+        if (chev) mount.appendChild(chev);
+      }
+    }
+    let btn = mount.querySelector(".share-toggle");
+    if (!offer) { btn?.remove(); continue; }
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = folds ? "share-toggle" : "share-toggle overlay";
+      mount.insertBefore(btn, mount.firstChild);
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        const nowHidden = new Set(Array.isArray(MY_PROFILE?.progress_hidden) ? MY_PROFILE.progress_hidden : []);
+        if (nowHidden.has(m.key)) nowHidden.delete(m.key); else nowHidden.add(m.key);
+        const list = [...nowHidden];
+        if (MY_PROFILE) MY_PROFILE.progress_hidden = list;
+        paintShareToggles();
+        const { error } = await sb.from("profiles").update({ progress_hidden: list }).eq("email", MY_EMAIL);
+        if (error) { console.error(error); toast("Could not save"); }
+      };
+    }
+    const isOn = !hidden.has(m.key);
+    btn.classList.toggle("off", !isOn);
+    btn.setAttribute("aria-label", isOn ? `Shown to ${partnerName()}, tap to hide` : `Hidden from ${partnerName()}, tap to show`);
+    btn.innerHTML = icon(isOn ? "eye" : "eyeOff", 14);
+  }
+}
+
 function renderProgressWithheld(isPartner, sharing, bodyShared) {
   const box = $("progWithheld");
   if (!box) return;
