@@ -92,8 +92,16 @@ const DATA = {
     { email: "mel@x.com", user_name: "Mel", tracked_metrics: ["weight"], challenge_target: 5 },
   ],
   fit_entries: [
-    { email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-09-01", gym: true, weight: 180, sessions: 1, proof_path: "x/p.jpg" },
-    { email: "mel@x.com", user_name: "Mel", entry_date: "2026-09-01", gym: true, weight: 140, sessions: 2, proof_path: "x/q.jpg" },
+    { email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-09-01", gym: true, sessions: 1, proof_path: "x/p.jpg" },
+    { email: "mel@x.com", user_name: "Mel", entry_date: "2026-09-01", gym: true, sessions: 2, proof_path: "x/q.jpg" },
+  ],
+  /* The weigh-ins, which left the day row on 2026-09-21 so a partner's RLS
+     could be told about share_weigh_ins. Here so the boot exercises
+     mergeBodyReadings rather than an empty table: a merge that throws on a
+     real reading is exactly the kind of thing this check is for. */
+  body_measurements: [
+    { email: "mo.shareef@creativelab1.com", entry_date: "2026-09-01", weight: 180, waist_in: 34 },
+    { email: "mel@x.com", entry_date: "2026-09-01", weight: 140 },
   ],
   exercise_logs: [{ email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-08-30", exercise_name: "Bench", weight: 135, reps: 8, sets: 3 }],
   ai_workouts: [{ id: "w1", email: "mo.shareef@creativelab1.com", user_name: "Mo", entry_date: "2026-08-30", archived: false,
