@@ -64,3 +64,65 @@ points for the fitness side of weight loss:
   described above is not a suggestion to relax later for "better results" -- the unanimous
   point across every trainer researched here is that the aggressive version is the one that
   does not work long-term.
+
+## Starting point, reps, and sets by experience tier
+
+Cross-checked against `experience-tiers.md`, `volume-landmarks.md`, and what's already coded
+in `exercise-selector.mjs`.
+
+- **Rep/set scheme**: already correctly coded — `REP_RANGES.general = [8, 12]` (≈10 reps),
+  30-second rest (`sessionStyleForGoal` → "circuit"), 3 sets/exercise for beginner and
+  intermediate, 4 for advanced. This matches the circuit-style, moderate-rep structure the
+  cross-trainer research above converges on. Nothing to change here.
+- **Weekly muscle-group allocation**: `pickFocusCategories()` already ranks the most
+  under-trained groups first each session, which naturally produces full-body rotation across
+  the week — the shape most associated with fat-loss-oriented resistance training in the
+  research above (Itsines, Wicks). `weeklyVolumeTarget()` already scales to
+  near-MEV/low-MAV for beginners per `experience-tiers.md`. Nothing to change here either.
+- **Cold-start load, barbell lifts**: `COLD_START_MULTIPLIER` already covers squat, bench,
+  deadlift, overhead press, and row with bodyweight-ratio starting points by tier. Per
+  `sex-and-anthropometry.md`, this doesn't need a separate male/female multiplier — hypertrophy
+  and lower-body strength response don't differ meaningfully by sex, and relative upper-body
+  strength gains actually favor women early on, so a lower starting multiplier for women isn't
+  supported by the evidence.
+- **Cold-start load, bodyweight movements — a real gap.** `COLD_START_MULTIPLIER` only covers
+  barbell lifts; there's no equivalent starting point for push-ups, bodyweight squats, etc.
+  Per `equipment-substitution.md`, bodyweight overload comes from leverage, not load, so a
+  weight-multiplier table is the wrong shape for it anyway. What's needed instead is a starting
+  *rung* on a difficulty ladder (e.g. "can't do 5 clean standard push-ups → start on an incline"),
+  the same mechanic the skill-ladder categories in `real-goals.md` already use. Worth building
+  once, shared across every goal that can land someone on bodyweight-only equipment, not just
+  this one.
+
+## Progression across weeks
+
+- `progressiveOverload()` already implements the right rule from `progressive-overload.md`: hit
+  target reps → add load next time; missed reps → hold, don't push a lift just failed.
+- **Bodyweight progression — another real gap.** `incrementForEquipment("bodyweight")` currently
+  returns 0, meaning bodyweight exercises never progress in the generated plan at all. Per
+  `equipment-substitution.md`, bodyweight progression should move through leverage changes,
+  added reps up to a point, tempo/isometric holds, and unilateral variations instead of load —
+  right now the algorithm has no mechanism for any of that, so a bodyweight-only trainee's plan
+  would currently stall indefinitely on the same movement and difficulty.
+- Deload logic (`periodization-deloads.md`) applies to this goal exactly as it does to any
+  other — fatigue accumulates on a circuit-style fat-loss program the same way it does on a
+  straight-sets strength program, and rising RPE or missed reps should trigger the same
+  lighter-week response regardless of goal.
+
+## Equipment variants for a circuit day
+
+Same movement-pattern skeleton (squat, hinge, horizontal push, horizontal pull, core), two
+rounds, ~10 reps, 30-second rest between exercises — only the equipment tier changes which
+exercise fills each slot, per `equipment-substitution.md`:
+
+| Pattern | Full gym | Dumbbells only | Bodyweight only | Machine-only |
+|---|---|---|---|---|
+| Squat | Barbell back squat | Goblet squat | Bodyweight squat / split squat | Leg press |
+| Hinge | Barbell deadlift or RDL | Dumbbell RDL | Glute bridge / single-leg hip thrust | Machine hip thrust / leg curl |
+| Horizontal push | Barbell or dumbbell bench press | Dumbbell floor press | Push-up (incline if needed) | Chest press machine |
+| Horizontal pull | Barbell row | Dumbbell row | Inverted row (table/low bar) or band row | Seated cable/machine row |
+| Core | Weighted plank / cable chop | Dumbbell deadbug/ carry | Plank / dead bug / hollow hold | Cable or machine crunch |
+
+This is a representative skeleton, not the exercise library itself — actual selection still
+goes through `selectExercisesForCategory()` filtering by level and equipment, same as any
+other goal.
