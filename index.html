@@ -1127,28 +1127,6 @@
     padding: 16px 15px; margin-bottom: 10px;
     box-shadow: var(--shadow-card);
   }
-  /* Whether your partner sees this card, right on the card itself. Mo: "we
-     need it on the actual card... that's too much scrolling down" about the
-     old picker sheet. One eye, top right, no sheet to open at all.
-
-     A folded index row (paintProgIndex) hides every card child except h2 and
-     the summary line, so the toggle has to live inside h2 to survive that,
-     grouped with the chevron in one .idx-actions wrapper so h2 keeps exactly
-     two flex children (title, actions) instead of space-between scattering
-     three apart. A hero screen never folds and gets the simpler overlay. */
-  .goal-screen { position: relative; }
-  .goal-screen:has(.share-toggle) .wth-title { padding-right: 32px; }
-  .idx-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .share-toggle {
-    width: 24px; height: 24px; flex-shrink: 0;
-    border-radius: 50%; border: none; background: var(--panel-2); color: var(--ink-2);
-    display: flex; align-items: center; justify-content: center; padding: 0;
-  }
-  .share-toggle svg { width: 13px; height: 13px; }
-  .share-toggle.off { color: var(--mut); }
-  .share-toggle:active { transform: scale(.92); }
-  .share-toggle.overlay { position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; }
-  .share-toggle.overlay svg { width: 14px; height: 14px; }
   /* The hero is the one card that should feel lit from inside. */
   #heroCard { box-shadow: var(--shadow-lift); }
   #tab-home #heroCard { padding: 16px 15px 15px; }
@@ -6420,8 +6398,8 @@
      will set this once and never look at it again. */
   /* Right aligned above the tiles, so it sits with the cards it controls and
      takes no width from them. */
+  .prog-goal-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
   .track-kebab {
-    margin-left: auto;
     width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
     background: none; border: 1px solid transparent; color: var(--muted); cursor: pointer;
   }
@@ -8985,7 +8963,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.23";
+const APP_VERSION = "2026.09.21.24";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9125,7 +9103,6 @@ const $ = (id) => document.getElementById(id);
 /* Inline SVG icons, 20x20, stroke-based, used instead of emoji throughout */
 const ICON_PATHS = {
   eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
-  eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 5.2A9.6 9.6 0 0 1 12 5c6.4 0 10 7 10 7a17.7 17.7 0 0 1-3.4 4.3M6.6 6.6C4 8.3 2 12 2 12s3.6 7 10 7c1.4 0 2.6-.3 3.7-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5Z"/>',
   sunMoon: '<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',
   swap: '<path d="M7 4v13M7 4 3 8M7 4l4 4M17 20V7m0 13 4-4m-4 4-4-4"/>',
@@ -43284,9 +43261,22 @@ function renderGoalChips(profile) {
      edits THAT goal only, which is why it cannot live anywhere else on the
      screen: a control above the cards would look like it governed all of them.
      Never on a partner's view, where the goals and the choices are theirs. */
+  /* One door into sharing, not one eye per card. Mo, after seeing per-card
+     icons go unnoticed: "let's come up with a different concept... I don't
+     see what you did at all." He picked keeping the one button this tab
+     already had (renderProgressWithheld's "What X can see of you") over
+     scattering a toggle on every card, just moved up where it is actually
+     seen instead of waiting at the bottom of the tab. */
+  const shareOffer = !!PARTNER_EMAIL && progressSharingLive();
   host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("")
-    + (PROGRESS_VIEW === "partner" ? "" : `<button type="button" class="track-kebab" id="trackOpen"
-        aria-label="Change what this goal shows">${icon("more", 18)}</button>`);
+    + (PROGRESS_VIEW === "partner" ? "" : `<span class="prog-goal-actions">
+      ${shareOffer ? `<button type="button" class="track-kebab" id="progShareBtn"
+        aria-label="What ${escapeHtml(partnerName())} sees of you">${icon("eye", 17)}</button>` : ""}
+      <button type="button" class="track-kebab" id="trackOpen"
+        aria-label="Change what this goal shows">${icon("more", 18)}</button>
+    </span>`);
+  const shareBtn = host.querySelector("#progShareBtn");
+  if (shareBtn) shareBtn.onclick = () => { switchTab("setup"); openSettingsPage("partner"); };
   const keb = host.querySelector("#trackOpen");
   if (keb) keb.onclick = () => openTrackSheet(showing);
 
@@ -43773,11 +43763,10 @@ function renderTrackSheet() {
      centred title. Two sheets on one tab that open differently is the kind of
      small inconsistency people feel without being able to name.
 
-     What your partner sees used to live in a second grid at the bottom of
-     this same sheet. Mo: "That's too much scrolling down... we need it on
-     the actual card." Moved to a small eye toggle painted directly on each
-     shareable card by paintShareToggles(), so there is nothing left to
-     scroll past here. */
+     What your partner sees is a separate door entirely: the eye button next
+     to this same kebab in renderGoalChips, straight to Setup > Partner. It
+     spent a round in this sheet and then on a toggle per card; Mo's call
+     both times was the same thing, one clear place rather than several. */
   $("trackSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="scr-head">
@@ -44237,101 +44226,23 @@ function renderProgressTab() {
   if (live.has("cardPhotos")) renderBodyPhotos();
   for (const spec of WEEK_CARDS) if (live.has(spec.card)) renderWeekCard(spec);
   renderProgressWithheld(isPartner, sharing, bodyShared);
-  paintShareToggles();
 }
 
-/* What their screen is NOT showing, said plainly.
+/* What their screen is NOT showing, ONLY where it is an active choice.
 
-   A card that is simply absent reads as "she has not done any of that", which
-   is worse than a zero: a zero is a wrong number and an absence is an
-   accusation. So everything this tab decided to withhold gets named, without
-   a verdict attached to it, in the same voice dayNotes and meta.missing use
-   for what the engine could not do.
-
-   The wording splits on WHY, because the two reasons are not the same thing
-   and saying they are would be a small lie in both directions. Workout detail
-   is a switch she has flipped, so it is attributed to her. Weigh-ins are not:
-   nobody has ever been asked, so that line says the sharing is off and does
-   not put the choice in her mouth.
+   This used to also name the cases nobody had ever decided (weigh-ins never
+   turned on by either side, body photos, which are never shared at all): Mo,
+   "there's no need for that message, they're already gonna know that." A
+   card that is simply absent from someone who genuinely turned it off still
+   reads as an accusation if left unexplained, so that half stays; the half
+   that was just restating the product's own defaults to people already
+   living inside them did not need to be here.
 
    It also carries the one link Mo asked for. The controls for your own half
    live in Settings and there is exactly one copy of them, because two copies
-   of a privacy switch is how one of them ends up wrong. */
-/* One eye icon, top right of each shareable card, painted on your own view
-   only: it is a switch over what YOUR partner sees, so it has no meaning on
-   their screen and does not appear there. Tapping it flips that one card
-   instantly, no sheet, nothing to scroll past to find it. Replaces the
-   picker that used to live at the bottom of the kebab-menu sheet; see the
-   comment on renderTrackSheet for why it moved. */
-/* Get stronger is a hero screen (renderLiftHero, #liftHero), not the folded
-   cardStrength row: the goal replaces the card with the whole-screen answer,
-   same numbers, so "lifts" needs a second place this toggle can land or the
-   most common goal in the app would never show one at all. */
-const SHARE_HOSTS = { lifts: ["liftHero", "cardStrength"] };
-function paintShareToggles() {
-  /* Called every render, including a switch onto the partner's own view,
-     where stale buttons from a moment ago must come off rather than sit
-     there controlling a screen that is not yours to control. */
-  if (PROGRESS_VIEW === "partner") {
-    document.querySelectorAll(".share-toggle").forEach((el) => el.remove());
-    return;
-  }
-  const offer = !!PARTNER_EMAIL && progressSharingLive();
-  const hidden = new Set(Array.isArray(MY_PROFILE?.progress_hidden) ? MY_PROFILE.progress_hidden : []);
-  for (const m of TRACK_ALL) {
-    if (!PROGRESS_SHARE_KEYS.includes(m.key)) continue;
-    const hostIds = SHARE_HOSTS[m.key] || [m.card];
-    const card = hostIds.map((id) => $(id)).find((el) => el && !el.classList.contains("hidden"));
-    const stale = hostIds.map((id) => $(id)).filter(Boolean);
-    if (!card) { for (const el of stale) el.querySelector(".share-toggle")?.remove(); continue; }
-    for (const el of stale) if (el !== card) el.querySelector(".share-toggle")?.remove();
-    /* A folded index row hides every child of the card except h2 and the
-       summary line (see the collapse rule just above idx-chev), so a toggle
-       sitting loose in the card would vanish the moment the row closes. The
-       chevron already solves this by living inside h2; the toggle joins it
-       there, in one small wrapper so the two-item space-between layout on h2
-       still holds instead of spreading three items apart. A hero screen
-       (Get stronger's own full page) never folds, so it keeps the simpler
-       card-level overlay. */
-    const folds = card.classList.contains("idx-card");
-    let mount = card;
-    if (folds) {
-      const h2 = card.querySelector(":scope > h2");
-      if (!h2) continue;
-      mount = h2.querySelector(":scope > .idx-actions");
-      if (!mount) {
-        mount = document.createElement("span");
-        mount.className = "idx-actions";
-        const chev = h2.querySelector(":scope > .idx-chev");
-        h2.appendChild(mount);
-        if (chev) mount.appendChild(chev);
-      }
-    }
-    let btn = mount.querySelector(".share-toggle");
-    if (!offer) { btn?.remove(); continue; }
-    if (!btn) {
-      btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = folds ? "share-toggle" : "share-toggle overlay";
-      mount.insertBefore(btn, mount.firstChild);
-      btn.onclick = async (e) => {
-        e.stopPropagation();
-        const nowHidden = new Set(Array.isArray(MY_PROFILE?.progress_hidden) ? MY_PROFILE.progress_hidden : []);
-        if (nowHidden.has(m.key)) nowHidden.delete(m.key); else nowHidden.add(m.key);
-        const list = [...nowHidden];
-        if (MY_PROFILE) MY_PROFILE.progress_hidden = list;
-        paintShareToggles();
-        const { error } = await sb.from("profiles").update({ progress_hidden: list }).eq("email", MY_EMAIL);
-        if (error) { console.error(error); toast("Could not save"); }
-      };
-    }
-    const isOn = !hidden.has(m.key);
-    btn.classList.toggle("off", !isOn);
-    btn.setAttribute("aria-label", isOn ? `Shown to ${partnerName()}, tap to hide` : `Hidden from ${partnerName()}, tap to show`);
-    btn.innerHTML = icon(isOn ? "eye" : "eyeOff", 14);
-  }
-}
-
+   of a privacy switch is how one of them ends up wrong. As of the "one
+   button" pass, the same link is also one tap away from your OWN view, next
+   to the kebab in renderGoalChips, so this copy is no longer the only door. */
 function renderProgressWithheld(isPartner, sharing, bodyShared) {
   const box = $("progWithheld");
   if (!box) return;
@@ -44339,14 +44250,15 @@ function renderProgressWithheld(isPartner, sharing, bodyShared) {
   if (!isPartner) { box.innerHTML = ""; return; }
   const them = partnerName();
   const lines = [];
-  if (!bodyShared) {
-    /* Two different facts wearing one sentence otherwise. With the column
-       live she has made a choice and it is hers to be named; without it
-       nobody has been asked yet, and saying she keeps her weight private
-       would be putting a decision in her mouth she never made. */
-    lines.push(weighInSharingLive()
-      ? `${escapeHtml(them)} has weigh-in sharing off, so their weight, their goal weight and their tape are not here.`
-      : "Weigh-ins and tape measurements are not shared yet, in either direction.");
+  /* Mo, on the old copy here (the weigh-ins/tape boilerplate and "Body
+     photos are never shared" that ran regardless of state): "there's no
+     need for that message, they're already gonna know that." Cut both. What
+     is left is only the case worth actually saying: an ACTIVE choice
+     somebody made, named as theirs, same as workout detail already was.
+     Nothing that was never true of anyone stays on the screen explaining
+     itself. */
+  if (!bodyShared && weighInSharingLive()) {
+    lines.push(`${escapeHtml(them)} has weigh-in sharing off, so their weight, their goal weight and their tape are not here.`);
   }
   if (!sharing) {
     /* they/their, not she/hers: every other third person line in this tab
@@ -44354,12 +44266,8 @@ function renderProgressWithheld(isPartner, sharing, bodyShared) {
        sex is not something a privacy note should be guessing from. */
     lines.push(`${escapeHtml(them)} has workout detail switched off, so the lifts, the loads, the tonnage and the muscle map stay theirs. The sessions and the effort above are real, and are the part they do share.`);
   }
-  // Said whatever else is or is not on, because it is the question everybody
-  // asks second and the answer has never been anywhere near this screen.
-  lines.push("Body photos are never shared, in either direction.");
-  box.innerHTML = `<h2>Not shown here</h2>${
-    lines.map((l) => `<p>${l}</p>`).join("")}
-    <button type="button" class="btn-ghost" id="progShareSettings">What ${escapeHtml(them)} can see of you</button>`;
+  box.innerHTML = (lines.length ? `<h2>Not shown here</h2>${lines.map((l) => `<p>${l}</p>`).join("")}` : "")
+    + `<button type="button" class="btn-ghost" id="progShareSettings">What ${escapeHtml(them)} can see of you</button>`;
   /* Straight to the card, not to the top of Settings: "let's have that option
      there" is not answered by a link to a page somebody then has to search. */
   $("progShareSettings").onclick = () => { switchTab("setup"); openSettingsPage("partner"); };
