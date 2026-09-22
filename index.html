@@ -8365,7 +8365,7 @@
          exists" guard as the weigh-ins card next to it, same reason. -->
     <div class="card hidden" id="progressShareCard">
       <h2>What <span id="progressSharePartnerName">your partner</span> sees on Progress</h2>
-      <p class="muted-note" style="margin-top:-4px;">On is shown to them, same as today. Off holds that one card back, whatever else above is on. This only covers cards they could see anyway; a category switched off above stays off no matter what is ticked here.</p>
+      <p class="muted-note" style="margin-top:-4px;">On is shown to them, off holds that one back. Everything here starts on, same as today, except photos, which starts off until you turn it on. A category switched off above stays off no matter what is ticked here.</p>
       <div class="trk-grid" id="progressShareGrid"></div>
     </div>
     <div class="card danger-card hidden" id="leavePartnerCard">
@@ -8963,7 +8963,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.24";
+const APP_VERSION = "2026.09.21.25";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -41072,30 +41072,47 @@ function hexPath(cx, cy, r) {
 
 let BODY_PHOTOS = [];
 
-/* Progress photos are the most private thing in the app and nothing opts into
-   sharing them, so only your own rows are ever fetched. The server side of this
-   is the body_photos RLS policy; this is the client half. */
+/* Progress photos are the most private thing in the app. Mo, 2026-09-21:
+   "let's have the progress pictures in here, but always make them
+   deselected... it shouldn't have its own separate one, it should be
+   inside of what [partner] sees on progress." So a paired partner's rows
+   are now IN this query's explicit allow-list (never the whole table),
+   same shape as the ai_workouts partner read a few lines up. Whether their
+   specific rows actually come back is still the server's call, not this
+   query's: 20260921_share_body_photos.sql only returns them once that
+   account's own progress_hidden opts photos in, and until that migration
+   runs the existing self-only RLS still wins regardless of what this asks
+   for. */
 async function loadBodyPhotos() {
+  const emails = PARTNER_EMAIL ? [MY_EMAIL, PARTNER_EMAIL] : [MY_EMAIL];
   const { data } = await sb.from("body_photos").select("*")
-    .eq("email", MY_EMAIL)
+    .in("email", emails)
     .order("taken_on", { ascending: false });
   BODY_PHOTOS = data || [];
 }
 
 async function renderBodyPhotos() {
   const mine = PROGRESS_VIEW === "me";
-  /* Hiding on the partner view stays: photos are yours alone, so their view
-     has no card at all rather than an empty one implying there is something
-     to share. SHOWING is not this function's call, and used to be. On a goal
-     screen this card is hidden on purpose and a door is the only thing that
-     opens it, so un-hiding here meant that adding or deleting a photo, which
-     repaints both surfaces, made the whole Body Photos card reappear under
-     the goal screen. renderProgressTab decides which cards a screen has and
-     the doors decide the rest; this only fills the one it is given. */
-  if (!mine) { $("cardPhotos").classList.add("hidden"); return; }
-  const shots = BODY_PHOTOS.filter((p) => p.email === MY_EMAIL);
+  /* Blanket hiding on the partner view is gone: photos joined the sharing
+     picker like everything else on it, off by default (progressKeyShared),
+     on only once THEY turn it on for you. Re-checked here rather than
+     trusted from renderProgressTab's barred set, because adding or deleting
+     your OWN photo repaints this function directly and bypasses that
+     computation; the partner's own choice still has to be the thing that
+     decides whether THEIR card shows on your screen. On a goal screen this
+     card is hidden on purpose and a door is the only thing that opens it,
+     so un-hiding here unconditionally would make the whole Body Photos
+     card reappear under the goal screen on its own; renderProgressTab
+     decides which cards a screen has and the doors decide the rest, this
+     only fills the one it is given. */
+  if (!mine && !progressKeyShared("photos", PARTNER_PROFILE?.progress_hidden)) {
+    $("cardPhotos").classList.add("hidden");
+    return;
+  }
+  const shots = BODY_PHOTOS.filter((p) => p.email === viewedEmail());
 
-  $("addBodyPhotoBtn").classList.remove("hidden");
+  // Logging is yours alone even once the gallery itself is shared.
+  $("addBodyPhotoBtn").classList.toggle("hidden", !mine);
 
   /* This card is collapsible in the index now, same as every other reading
      card, and a collapsed row with nothing on it reads as broken rather than
@@ -41426,12 +41443,28 @@ function progressSharingLive() {
   return !!MY_PROFILE && "progress_hidden" in MY_PROFILE;
 }
 
-/* The eight workout-activity cards this picker covers. Deliberately not
-   weight or the tape (share_weigh_ins is that question) and not photos
-   (never shared, unconditionally, see renderProgressTab). Built off
-   TRACK_ALL rather than a second list of labels, so a card added there is
-   offered here for free and the two can never describe a key differently. */
-const PROGRESS_SHARE_KEYS = ["lifts", "volume", "workouts_wk", "cardio_wk", "cardio_min", "distance_wk", "mobility_wk", "walk_wk"];
+/* The nine cards this picker covers. Deliberately not weight or the tape
+   (share_weigh_ins is that question). Photos joined 2026-09-21: Mo, "let's
+   have the progress pictures in here, but always make them deselected...
+   it shouldn't have its own separate one, it should be inside of what
+   [partner] sees on progress, like weight or whatever." One list, one tile
+   shape, same as everything else here; only its DEFAULT differs, which
+   progressKeyShared() below is what actually carries. Built off TRACK_ALL
+   rather than a second list of labels, so a card added there is offered
+   here for free and the two can never describe a key differently. */
+const PROGRESS_SHARE_KEYS = ["lifts", "volume", "workouts_wk", "cardio_wk", "cardio_min", "distance_wk", "mobility_wk", "walk_wk", "photos"];
+/* Every key here defaults to shared unless listed in progress_hidden,
+   EXCEPT photos, which Mo wants off until somebody actively turns it on.
+   One jsonb array still holds the whole picker rather than growing a second
+   column for one exception: presence flips meaning for this one key, so
+   "photos" in the list means the one time it was switched ON, same array,
+   opposite default. Every existing profile already has photos off (nobody
+   has ever been offered this switch), so this needs no backfill. */
+const PROGRESS_SHARE_OPT_IN = new Set(["photos"]);
+function progressKeyShared(key, hiddenList) {
+  const present = Array.isArray(hiddenList) && hiddenList.includes(key);
+  return PROGRESS_SHARE_OPT_IN.has(key) ? present : !present;
+}
 function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME; }
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
 
@@ -44077,11 +44110,15 @@ function renderProgressTab() {
   if (!bodyShared) barred.add("cardWeight");
   /* The finer layer under share_workout_details, 2026-09-21: Mo wants to
      share Best Lifts without sharing Weekly Volume, which a single category
-     switch cannot say. progress_hidden only ever narrows what `sharing`
-     above already allowed through; it is read from the profile being
-     VIEWED, same as the category switches, so a partner's own picks never
-     touch what they see of you. */
-  if (isPartner) for (const key of (profile?.progress_hidden || [])) {
+     switch cannot say. For the eight workout-activity keys this only ever
+     NARROWS what `sharing` above already allowed through. Photos is not
+     narrowing anything above it (it was never part of `sharing` or
+     `bodyShared`, and defaults off on its own via progressKeyShared) so it
+     is read from the same array on the same terms as the rest of this
+     picker. Read from the profile being VIEWED either way, so a partner's
+     own picks never touch what they see of you. */
+  if (isPartner) for (const key of PROGRESS_SHARE_KEYS) {
+    if (progressKeyShared(key, profile?.progress_hidden)) continue;
     const card = TRACK_ALL.find((m) => m.key === key)?.card;
     if (card) barred.add(card);
   }
@@ -44100,12 +44137,12 @@ function renderProgressTab() {
   const chosenCards = (isPartner ? [] : trackedMetrics())
     .map((k) => TRACK_ALL.find((m) => m.key === k)?.card)
     .filter((c, i, all) => c && PICKED_CARDS.has(c) && !barred.has(c) && all.indexOf(c) === i);
-  /* Photos are never a partner's business, and renderBodyPhotos hides that
-     card on their view whatever this list says. Leaving it in meant the rule
-     above it counted one card, drew itself, and then labelled nothing: a
-     heading with an empty section under it, which is the shape of a bug. */
+  /* Photos used to be barred from a partner's view unconditionally, here and
+     again in renderBodyPhotos. Now it is only barred (above, with the rest
+     of the picker) when it has not been switched on, so nothing extra is
+     needed in this filter. */
   const rest = PROGRESS_CARDS.filter((c) => !barred.has(c) && !wanted.includes(c)
-    && !WEEK_CARD_IDS.has(c) && !(isPartner && c === "cardPhotos"));
+    && !WEEK_CARD_IDS.has(c));
   /* On a brand new account every card is an empty card, so none of them are
      drawn. The one exception is Weight on a weight goal, because logging into
      it IS the single action the empty state is pointing at, and it opens
@@ -45406,20 +45443,25 @@ function renderProgressSharing() {
   card.classList.toggle("hidden", !offer);
   if (!offer) return;
   $("progressSharePartnerName").textContent = partnerName();
-  const hidden = new Set(Array.isArray(MY_PROFILE?.progress_hidden) ? MY_PROFILE.progress_hidden : []);
-  const on = new Set(PROGRESS_SHARE_KEYS.filter((k) => !hidden.has(k)));
+  const on = new Set(PROGRESS_SHARE_KEYS.filter((k) => progressKeyShared(k, MY_PROFILE?.progress_hidden)));
   const metrics = PROGRESS_SHARE_KEYS.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
   $("progressShareGrid").innerHTML = trackTilesHTML(metrics, on, null);
   wireTrackTiles($("progressShareGrid"), on, async (live) => {
-    const nowHidden = PROGRESS_SHARE_KEYS.filter((k) => !live.has(k));
+    /* One array, two meanings: everything but photos is stored as what is
+       HIDDEN (its own default is shared, so only the exceptions need a
+       row); photos is stored as the one time it was turned ON (its default
+       is hidden, so the exception runs the other way). PROGRESS_SHARE_OPT_IN
+       is what tells this which keys to store, not the "on" state itself. */
+    const nowStored = PROGRESS_SHARE_KEYS.filter((k) =>
+      PROGRESS_SHARE_OPT_IN.has(k) ? live.has(k) : !live.has(k));
     const { error } = await sb.from("profiles")
-      .update({ progress_hidden: nowHidden }).eq("email", MY_EMAIL);
+      .update({ progress_hidden: nowStored }).eq("email", MY_EMAIL);
     if (error) {
       console.error(error);
       toast("Could not save");
       return;
     }
-    if (MY_PROFILE) MY_PROFILE.progress_hidden = nowHidden;
+    if (MY_PROFILE) MY_PROFILE.progress_hidden = nowStored;
   });
 }
 

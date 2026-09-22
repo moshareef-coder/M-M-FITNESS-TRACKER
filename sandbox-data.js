@@ -486,6 +486,29 @@
       },
     },
 
+    /* Photos opted in, THEM side: "photos" present in progress_hidden means
+       shown for this one key (progressKeyShared's inverted default), the
+       opposite of every other entry in the same array. Two fake rows so the
+       gallery has something to fold/unfold, same shape loadBodyPhotos()
+       would actually receive once 20260921_share_body_photos.sql is live. */
+    photosShared: {
+      label: "Partner shared their progress photos",
+      apply: (db) => {
+        /* Both off to Move better: the base "Get stronger" goal renders as
+           the lift hero, which (own screen, nothing folded under it) hides
+           cardPhotos structurally regardless of any sharing setting, same
+           as it hides cardStrength/cardVolume. Habit keeps every card as an
+           ordinary folded row so this scenario actually exercises the new
+           logic instead of a goal-screen quirk unrelated to it. */
+        db.profiles = db.profiles.map((p) => ({ ...p, progress_hidden: p.email === THEM ? ["photos"] : [],
+          goal: "Move better", goal_bubble: "move-better" }));
+        db.body_photos = [
+          { id: "bp1", email: THEM, taken_on: day(-14), path: `${THEM}/body/${day(-14)}-1.jpg` },
+          { id: "bp2", email: THEM, taken_on: day(-1), path: `${THEM}/body/${day(-1)}-2.jpg` },
+        ];
+      },
+    },
+
     /* Her goal set to the one screen that lists a workout row by row: the
        endurance hero prints every run with its distance and its clock on it,
        which is exactly what the timeline withholds two taps away. With her

@@ -77,8 +77,10 @@ const chain = (rows = []) => {
   const p = Promise.resolve({ data: rows, error: null });
   Object.assign(p, {
     // gte is here because loadAll windows exercise_swaps to the last 90 days,
-    // and neq because it reads the partner's ai_workouts rows apart from mine.
+    // neq because it reads the partner's ai_workouts rows apart from mine,
+    // and in because loadBodyPhotos reads both paired emails in one query.
     select: () => chain(rows), eq: () => chain(rows), neq: () => chain(rows), order: () => chain(rows), gte: () => chain(rows),
+    in: () => chain(rows),
     limit: () => chain(rows), maybeSingle: () => Promise.resolve({ data: rows[0] || null, error: null }),
     insert: () => chain([]), upsert: () => chain([]), update: () => chain([]), delete: () => chain([]),
   });
