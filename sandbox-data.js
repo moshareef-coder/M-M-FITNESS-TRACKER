@@ -457,6 +457,24 @@
       },
     },
 
+    /* The switch present and deliberately OFF on her side, which is not the
+       same fixture as the base world's "no such column yet" and until
+       2026-09-21 there was nothing to tell them apart with: the rows came
+       down the wire either way and only the client declined to draw them.
+       Now body_measurements' policy withholds them, so this is the scenario
+       that proves the withholding is real, and the one that shows the "Not
+       shown here" note naming it as HER choice rather than a card silently
+       missing. Both profiles carry the key, because renderProgressWithheld
+       only says anything once weighInSharingLive() can tell the switch
+       exists. */
+    weighInsPrivate: {
+      label: "Her weigh-ins kept private",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => ({ ...p,
+          share_weigh_ins: p.email === THEM ? false : true }));
+      },
+    },
+
     /* Her detail off AND her weigh-ins on, so the partner view has something
        real to draw while every workout number beside it is withheld: the two
        switches are independent and this is the case that proves it. */
@@ -666,8 +684,31 @@
     },
   };
 
+  /* Weight and the tape left the day row on 2026-09-21
+     (20260921_body_measurements_table.sql), because row security allows or
+     denies a WHOLE row and honouring share_weigh_ins on fit_entries would have
+     hidden whether somebody trained on every day they also weighed in.
+
+     The fixtures above still AUTHOR a weigh-in on the day row, because that is
+     how a person describes a day, and this splits them afterwards exactly the
+     way the migration does. Run after the scenario has had its say, so a
+     scenario that pushes a day carrying a weight needs to know nothing about
+     the split. */
+  const BODY_KEYS = ["weight", "waist_in", "hips_in", "thigh_in", "arm_in", "chest_in"];
+  function splitBodyReadings(db) {
+    db.body_measurements = db.body_measurements || [];
+    for (const e of db.fit_entries || []) {
+      const has = BODY_KEYS.filter((k) => e[k] != null);
+      if (!has.length) continue;
+      let row = db.body_measurements.find((b) => b.email === e.email && b.entry_date === e.entry_date);
+      if (!row) { row = { email: e.email, entry_date: e.entry_date }; db.body_measurements.push(row); }
+      for (const k of has) { if (row[k] == null) row[k] = e[k]; delete e[k]; }
+    }
+  }
+
   const DB = baseWorld();
   (SCENARIOS[SCENARIO] || SCENARIOS.paired).apply(DB);
+  splitBodyReadings(DB);
 
   window.__SANDBOX = { scenario: SCENARIO, scenarios: SCENARIOS, db: DB, me: ME, them: THEM, paid: PAID };
 
@@ -682,6 +723,18 @@
 
   function builder(table) {
     let rows = clone(DB[table] || []);
+    /* The one policy a screen can walk straight into. body_measurements exists
+       so share_weigh_ins can be enforced by RLS instead of only by the client,
+       and a fixture that handed a partner's weigh-ins over regardless would
+       show the curtain working while the window behind it is still open, which
+       is the exact bug the table was created to end. Mine always (is_me);
+       theirs only while THEIR OWN profile says share_weigh_ins is true, never
+       mine, so a viewer cannot opt themselves in. Writes are unaffected:
+       nothing in the app ever writes a reading onto somebody else's day. */
+    if (table === "body_measurements") {
+      rows = rows.filter((r) => low(r.email) === low(ME)
+        || DB.profiles.some((p) => low(p.email) === low(r.email) && p.share_weigh_ins === true));
+    }
     let pending = null;   // rows to write on await, for insert/upsert/update/delete
     const api = {
       select() { return api; },

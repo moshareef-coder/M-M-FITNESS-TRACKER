@@ -31,6 +31,7 @@ function json(body: unknown, status = 200) {
 const BY_EMAIL: Array<[string, string]> = [
   ["ai_usage_log", "email"],
   ["ai_workouts", "email"],
+  ["body_measurements", "email"],
   ["body_photos", "email"],
   ["challenge_completions", "email"],
   ["exercise_logs", "email"],
