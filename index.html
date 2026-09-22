@@ -579,8 +579,17 @@
   .wkt-next-grid.hid { display: none; }
   .wkt-rest-rec h2 { margin-bottom: 6px; }
   .wkt-rest-rec .wkt-btn-soft { margin-top: 14px; }
-  .wkt-next-acts { grid-area: acts; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .wkt-next-acts .wkt-more { flex-basis: 100%; }
+  /* The same shape as .wkt-week-gen below: one full-width solid action with
+     the quiet lines centred under it. Mo: "make the generate workout or plan
+     your own as big as the generate plan your week... match the second
+     screenshot to the first." It was a small button hugging its own text on
+     the left, over left-aligned quiet lines, which made the primary action on
+     the card the smallest thing on it while the identical decision one card
+     down got a full-width button. */
+  .wkt-next-acts {
+    grid-area: acts; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .wkt-next-acts .wkt-btn-solid, .wkt-next-acts .wkt-btn-soft { width: 100%; }
   .wkt-more {
     font: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted); background: none; border: 0;
     padding: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;
@@ -8091,6 +8100,12 @@
       <div class="partner-sheet" id="trackSheet"></div>
     </div>
 
+    <!-- What your partner sees, in the same shape as the sheet above it. The
+         eye beside the kebab opens this one; the kebab opens that one. -->
+    <div class="sheet-scrim hidden" id="shareScrim">
+      <div class="partner-sheet" id="shareSheet"></div>
+    </div>
+
     <!-- One run, walk or ride: what it was, how far, how long. Opened by Build
          Endurance's Log cardio button. Filled by renderCardioSheet(). -->
     <div class="sheet-scrim hidden" id="cardioScrim">
@@ -8368,26 +8383,12 @@
       </label>
       <p class="muted-note">Off hides the exercise name, muscle figure, sets and up-next from their live view and timeline. They still see that you're training, for how long, and your effort score, so who worked hardest never depends on showing what you did.</p>
     </div>
-    <!-- The scale is a separate question from the gym, so it is a separate
-         switch. Hidden until the column exists (weighInSharingLive): a privacy
-         switch that silently fails to save is worse than no switch. Since
-         20260921_body_measurements_table.sql this switch is enforced by RLS
-         and not only by the client, so off really does mean the rows never
-         leave the account. -->
-    <div class="card hidden" id="shareWeighInsCard">
-      <h2>Your weigh-ins</h2>
-      <label class="gym-toggle" id="shareWeighInsToggleWrap">
-        <span>Share weigh-ins and measurements with <span id="shareWeighPartnerName">your partner</span></span>
-        <input type="checkbox" id="shareWeighInsToggle" />
-      </label>
-      <p class="muted-note">Off, and your weight, your goal weight and your tape are not sent to them at all: not drawn, not hidden behind anything, simply never leave your account. On, and they read the same line you do. This changes nothing about what they see of your workouts, or about the days you trained, which they see either way.</p>
-    </div>
     <!-- The finer layer under "While you train" above: that switch is
          category-wide, this is per card. Same "hidden until the column
          exists" guard as the weigh-ins card next to it, same reason. -->
     <div class="card hidden" id="progressShareCard">
       <h2>What <span id="progressSharePartnerName">your partner</span> sees on Progress</h2>
-      <p class="muted-note" style="margin-top:-4px;">On is shown to them, off holds that one back. Everything here starts on, same as today, except photos, which starts off until you turn it on. A category switched off above stays off no matter what is ticked here.</p>
+      <p class="muted-note" style="margin-top:-4px;">On is shown to them, off holds that one back. Everything starts on except photos, which waits until you turn it on. Weigh-ins covers your weight, your goal weight and your tape together: off, and none of it leaves your account at all.</p>
       <div class="trk-grid" id="progressShareGrid"></div>
     </div>
     <div class="card danger-card hidden" id="leavePartnerCard">
@@ -8985,7 +8986,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.32";
+const APP_VERSION = "2026.09.21.33";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -21749,6 +21750,13 @@ function renderToneHero(on, profile, isPartner) {
   /* One measurement at a time, and the same language as the range pills under
      the chart: the selected one is a raised tile, not a green one. */
   const chips = $("toneChips");
+  /* Mo: "when I just want to show one thing, and it shows me that big tab in
+     the middle that says weight, just remove that. If it's two, then apply
+     it, so then I can click on the different tabs. But if it's just one, just
+     remove it." A row with one option in it is not a picker, it is a
+     full-width slab naming the chart directly underneath it. The card below
+     already says which measurement it is drawing. */
+  chips.classList.toggle("hidden", measures.length < 2);
   chips.innerHTML = !measure ? "" : measures.map((m) =>
     `<button type="button" class="tone-chip${m.key === measure.key ? " on" : ""}" data-key="${escapeHtml(m.key)}">${escapeHtml(m.label)}</button>`).join("");
   chips.querySelectorAll("[data-key]").forEach((b) => {
@@ -22053,7 +22061,8 @@ function renderLiftHero(on, profile, isPartner) {
      lift browser still say the full name, and data-lift carries it here, so
      nothing is looked up by the shortened string. */
   const shortLift = (n) => String(n).replace(/^barbell\s+/i, "");
-  $("liftChips").classList.remove("hidden");
+  // And the lift browser: one lift on file is a title, not a row of tabs.
+  $("liftChips").classList.toggle("hidden", lifts.length < 2);
   $("liftChips").innerHTML = lifts.map((l) =>
     `<button type="button" class="lift-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${
       isPinnedLift(l.name) ? `<span class="lift-star">${icon("star", 12)}</span>` : ""
@@ -22307,6 +22316,8 @@ function renderBulkHero(on, profile, isPartner) {
   $("bulkTitle").textContent = goalTileFor("build-muscle")?.title || "Build muscle";
   paintGoalHeadMark(el.querySelector(".end-head"));
 
+  // Same rule as the recomp strip above: one option is not a choice.
+  $("bulkChips").classList.toggle("hidden", metrics.length < 2);
   $("bulkChips").innerHTML = !m ? "" : metrics.map((x) =>
     `<button type="button" class="bulk-chip${x.key === m.key ? " on" : ""}" data-metric="${escapeHtml(x.key)}">${escapeHtml(x.label)}</button>`).join("");
   $("bulkChips").querySelectorAll("[data-metric]").forEach((b) => {
@@ -35456,10 +35467,10 @@ function renderChooseScreen() {
                 done. A real plan already sitting on tomorrow is reviewed,
                 not started, which is what the next branch is for. */ ""}
           ${p.real && !allDone
-            ? `<button type="button" class="wkt-btn-solid sm" id="chooseBeginBtn">${partway ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>`
+            ? `<button type="button" class="wkt-btn-solid" id="chooseBeginBtn">${partway ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>`
             : tomorrowPlan
-              ? `<button type="button" class="wkt-btn-solid sm" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
-              : `<button type="button" class="wkt-btn-solid sm" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
+              ? `<button type="button" class="wkt-btn-solid" id="chooseSeeTomorrow">See tomorrow&rsquo;s plan</button>`
+              : `<button type="button" class="wkt-btn-solid" id="chooseGenerateBtn">${allDone ? "Generate tomorrow&rsquo;s" : "Generate workout"}</button>`}
           ${/* Mo, 2026-09-21: "stack generate tomorrow's and plan my own...
                 to be like generate this week or plan the week yourself. It
                 should match." One solid primary action, one quiet line under
@@ -42318,7 +42329,26 @@ const isTracked = (key, goalId = null) => trackedMetrics(goalId).includes(key);
 const STRIP_METRICS = [{ key: "weight", label: "Weight", unit: "lb" }].concat(MEASUREMENTS);
 function goalStripMetrics(screenKeys, isPartner, goalId = null) {
   const metric = (k) => STRIP_METRICS.find((m) => m.key === k);
-  if (isPartner) return screenKeys.map(metric).filter(Boolean);
+  if (isPartner) {
+    /* A partner's strip cannot ask what they chose to track, because
+       trackedMetrics reads MY_PROFILE and tracked_by_goal is your column and
+       not theirs. It used to answer that by handing back the screen's own
+       keys and stopping there, and NONE of the screen key lists carry weight
+       (TONE_MEASURE_KEYS and BULK_MEASURE_KEYS are tape only). So somebody
+       sharing their weigh-ins still had no Weight chip on their recomp or
+       bulk screen, and therefore no weight chart, no matter what they had
+       switched on. Mo: "right now she has me being able to see her weigh-ins
+       and everything, but I can't see her weight chart."
+
+       The scale rides at the end here the same way it rides at the end of
+       your own strip, and behind partnerSharesBody, which is the switch that
+       governs their whole body: their weight, their goal weight and their
+       tape are one answer, not three. */
+    const keys = screenKeys.includes("weight") || !partnerSharesBody()
+      ? screenKeys
+      : screenKeys.concat("weight");
+    return keys.map(metric).filter(Boolean);
+  }
   const want = trackedMetrics(goalId);
   return screenKeys.filter((k) => want.includes(k))
     .concat(want.filter((k) => !screenKeys.includes(k)))
@@ -43743,7 +43773,7 @@ function renderGoalChips(profile) {
         aria-label="Change what this goal shows">${icon("more", 18)}</button>
     </span>`);
   const shareBtn = host.querySelector("#progShareBtn");
-  if (shareBtn) shareBtn.onclick = () => { switchTab("setup"); openSettingsPage("partner"); };
+  if (shareBtn) shareBtn.onclick = openShareSheet;
   const keb = host.querySelector("#trackOpen");
   if (keb) keb.onclick = () => openTrackSheet(showing);
 
@@ -45815,40 +45845,6 @@ function trainStylesToSave() {
    and a switch that flips, says nothing, and comes back on the next render is
    the exact shape of a privacy control people stop trusting. Until it exists
    the sharing is off and their tab says so in words. */
-function renderShareWeighIns() {
-  const card = $("shareWeighInsCard");
-  if (!card) return;
-  const offer = !!PARTNER_EMAIL && weighInSharingLive();
-  card.classList.toggle("hidden", !offer);
-  if (!offer) return;
-  $("shareWeighPartnerName").textContent = partnerName();
-  const paint = (on) => {
-    $("shareWeighInsToggle").checked = on;
-    $("shareWeighInsToggleWrap").classList.toggle("checked", on);
-  };
-  paint(MY_PROFILE?.share_weigh_ins === true);
-  /* Same shape as the switch above it, and for the same reason: no Save
-     button, so it writes on the flip, and a label wrapping its own checkbox
-     sees the click twice, so one flip has to be one write. */
-  $("shareWeighInsToggleWrap").onclick = () => {
-    setTimeout(async () => {
-      const on = $("shareWeighInsToggle").checked;
-      $("shareWeighInsToggleWrap").classList.toggle("checked", on);
-      if (on === (MY_PROFILE?.share_weigh_ins === true)) return;
-      const { error } = await sb.from("profiles")
-        .update({ share_weigh_ins: on }).eq("email", MY_EMAIL);
-      if (error) {
-        console.error(error);
-        toast("Could not save");
-        paint(MY_PROFILE?.share_weigh_ins === true);
-        return;
-      }
-      if (MY_PROFILE) MY_PROFILE.share_weigh_ins = on;
-      toast(on ? `${partnerName()} can see your weigh-ins` : `Weigh-ins hidden from ${partnerName()}`);
-    }, 0);
-  };
-}
-
 /* The per-card picker under the two category switches. Reuses trackTilesHTML
    and wireTrackTiles wholesale, the same tiles "Choose what to track" and its
    preferences sheet already use: `on` here means shared, there it means
@@ -45857,17 +45853,35 @@ function renderShareWeighIns() {
    was this exact reuse rather than a new card style. Saved on every tap, no
    Save button, same convention as the tiles have everywhere else and as the
    toggle just above it. */
-function renderProgressSharing() {
-  const card = $("progressShareCard");
-  if (!card) return;
-  const offer = !!PARTNER_EMAIL && progressSharingLive();
-  card.classList.toggle("hidden", !offer);
-  if (!offer) return;
-  $("progressSharePartnerName").textContent = partnerName();
+/* Weigh-ins as one more tile in the same grid. Mo: "share weigh-ins and
+   measurements with Mell... should be like weigh-ins, as its own separate
+   box. And then they can click it off or click it on." It was a sentence-long
+   switch in a card of its own, one screen away from the grid that answers the
+   same question about everything else.
+
+   It is not stored like the others: the eight cards plus photos live in the
+   progress_hidden array, and this one is the share_weigh_ins boolean, which
+   since 20260921_body_measurements_table.sql is enforced by RLS rather than
+   only by the client. So it gets a pseudo key here and the writer below
+   splits on it. Kept first in the grid because it governs the most: their
+   weight, their goal weight and their tape are one answer, not three. */
+const SHARE_WEIGH_KEY = "weigh_ins";
+function shareGridMetrics() {
+  return [{ key: SHARE_WEIGH_KEY, label: "Weigh-ins", ico: "scale", blurb: "Your weight and tape" }]
+    .concat(PROGRESS_SHARE_KEYS.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean));
+}
+function shareGridOn() {
   const on = new Set(PROGRESS_SHARE_KEYS.filter((k) => progressKeyShared(k, MY_PROFILE?.progress_hidden)));
-  const metrics = PROGRESS_SHARE_KEYS.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
-  $("progressShareGrid").innerHTML = trackTilesHTML(metrics, on, null);
-  wireTrackTiles($("progressShareGrid"), on, async (live) => {
+  if (MY_PROFILE?.share_weigh_ins === true) on.add(SHARE_WEIGH_KEY);
+  return on;
+}
+/* One grid, one writer, used by the sheet the eye opens and by the card in
+   Setup, so the two surfaces cannot answer the same question differently. */
+function paintShareGrid(host) {
+  if (!host) return;
+  const on = shareGridOn();
+  host.innerHTML = trackTilesHTML(shareGridMetrics(), on, null);
+  wireTrackTiles(host, on, async (live) => {
     /* One array, two meanings: everything but photos is stored as what is
        HIDDEN (its own default is shared, so only the exceptions need a
        row); photos is stored as the one time it was turned ON (its default
@@ -45875,15 +45889,64 @@ function renderProgressSharing() {
        is what tells this which keys to store, not the "on" state itself. */
     const nowStored = PROGRESS_SHARE_KEYS.filter((k) =>
       PROGRESS_SHARE_OPT_IN.has(k) ? live.has(k) : !live.has(k));
-    const { error } = await sb.from("profiles")
-      .update({ progress_hidden: nowStored }).eq("email", MY_EMAIL);
+    const weigh = live.has(SHARE_WEIGH_KEY);
+    const patch = { progress_hidden: nowStored };
+    if (weighInSharingLive()) patch.share_weigh_ins = weigh;
+    const { error } = await sb.from("profiles").update(patch).eq("email", MY_EMAIL);
     if (error) {
       console.error(error);
       toast("Could not save");
       return;
     }
-    if (MY_PROFILE) MY_PROFILE.progress_hidden = nowStored;
+    if (MY_PROFILE) {
+      MY_PROFILE.progress_hidden = nowStored;
+      if (weighInSharingLive()) MY_PROFILE.share_weigh_ins = weigh;
+    }
+    /* The tab underneath is showing what this just changed. */
+    if (typeof renderProgressTab === "function") renderProgressTab();
   });
+}
+
+function renderProgressSharing() {
+  const card = $("progressShareCard");
+  if (!card) return;
+  const offer = !!PARTNER_EMAIL && progressSharingLive();
+  card.classList.toggle("hidden", !offer);
+  if (!offer) return;
+  $("progressSharePartnerName").textContent = partnerName();
+  paintShareGrid($("progressShareGrid"));
+}
+
+/* The sheet the eye on Progress opens. Mo: "when you go to progress and you
+   click on the eye, then it should open up a modal, like a graphic, like how
+   we had it for the three dots, when you go to pick what you want to see.
+   Exactly just like that." So it is the track sheet's own chrome and the
+   track sheet's own tiles, one control over: that one picks what YOU see,
+   this one picks what THEY see. The eye used to throw you into Setup, which
+   is the trip through settings he has been cutting out of everything else. */
+function openShareSheet() {
+  if (PROGRESS_VIEW === "partner") return;
+  renderShareSheet();
+  $("shareScrim").classList.remove("hidden");
+}
+function closeShareSheet() {
+  $("shareScrim").classList.add("hidden");
+  renderProgressTab?.();
+}
+function renderShareSheet() {
+  $("shareSheet").innerHTML = `
+    <div class="ds-grip"></div>
+    <div class="scr-head">
+      <button type="button" class="scr-back" id="shareX" aria-label="Close">${icon("chevronLeft", 18)}</button>
+      <div class="scr-title">What ${escapeHtml(partnerName())} sees</div>
+      <div class="spacer"></div>
+    </div>
+    <p class="trk-any" style="margin:0 0 14px">On is shown to them, off holds that one back. Everything starts on except photos, which waits until you turn it on.</p>
+    <div class="trk-grid" id="shareSheetGrid"></div>
+    <button type="button" class="btn-primary" id="shareDone" style="margin-top:16px">Done</button>`;
+  paintShareGrid($("shareSheetGrid"));
+  $("shareX").onclick = closeShareSheet;
+  $("shareDone").onclick = closeShareSheet;
 }
 
 function renderSetupTab() {
@@ -45957,7 +46020,6 @@ function renderSetupTab() {
       }, 0);
     };
   }
-  renderShareWeighIns();
   renderProgressSharing();
   renderRestChoices();
   renderPushToggle();
