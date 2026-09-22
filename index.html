@@ -2644,6 +2644,28 @@
      read as one family rather than a card that happened to land there. It
      only ever appears with a real pending edit on the page under it, which
      is why it can be this loud. */
+  /* A partner who shares nothing: their week, drawn once, and nothing else.
+     Deliberately quiet furniture. This is the whole screen at that point, so
+     it has to read as a complete answer rather than as the one card that
+     survived something. */
+  .pb-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .pb-who { font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .pb-count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pb-count b { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin-right: 2px; }
+  .pb-week { display: flex; gap: 6px; margin: 14px 0 12px; }
+  .pb-day {
+    flex: 1; min-width: 0; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--panel-2); border: 1px solid transparent;
+  }
+  .pb-day i { font-style: normal; font-size: 12px; font-weight: 800; color: var(--muted); }
+  .pb-day.on { background: var(--accent); border-color: transparent; }
+  .pb-day.on i { color: var(--on-accent); }
+  .pb-day.rest { border-style: dashed; border-color: var(--border); background: none; }
+  .pb-day.ahead { opacity: .45; }
+  .pb-day.now { border-color: var(--accent); }
+  .pb-line { margin: 0; font-size: 13.5px; color: var(--muted); }
+
   .set-savebar {
     position: fixed; z-index: 10;
     left: max(14px, calc((100% - 452px) / 2));
@@ -7851,6 +7873,13 @@
     <!-- What their view is not showing, and the door to your own half of it.
          Filled by renderProgressWithheld() and moved to the end of the tab on
          every render, because everything above it gets re-ordered by goal. -->
+    <!-- What a partner who shares nothing still shows: the week they turned
+         up for, and nothing else. Mo: "let's say they have nothing clicked,
+         then the only thing they'd be able to see is the consistency... some
+         sort of streak, or a graphic showing that. That's it. Otherwise it
+         shouldn't show anything." Filled by renderPartnerBare(). -->
+    <div class="card hidden" id="progBare"></div>
+
     <div class="card quiet prog-withheld hidden" id="progWithheld"></div>
 
     <!-- The Tone Up screen (renderToneHero), for the recomp goal only. Not a
@@ -9036,7 +9065,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.38";
+const APP_VERSION = "2026.09.21.39";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -44778,7 +44807,23 @@ function renderProgressTab() {
   if (live.has("cardVolume")) { renderVolumeChart(); renderVolumeStats(); }
   if (live.has("cardPhotos")) renderBodyPhotos();
   for (const spec of WEEK_CARDS) if (live.has(spec.card)) renderWeekCard(spec);
-  renderProgressWithheld(isPartner, sharing, bodyShared);
+  /* Nothing of theirs survived the gates, so the tab is the week and nothing
+     else: the headline, the withheld box and every card stand down together.
+     Measured off what the screen actually drew rather than re-deriving the
+     switches, so it cannot disagree with the screen it is replacing.
+
+     `shown` being empty is not enough on its own: a goal hero (weight, tone,
+     bulk, lift, endurance) deliberately empties the folded card list and
+     draws itself instead, so a partner on Get stronger who shares their
+     workouts has no cards AND a full screen. Testing only the list put the
+     bare week card underneath that hero. */
+  const bare = isPartner && !shown.length && !own && !weightScreen;
+  renderPartnerBare(bare, name, email);
+  if (bare) {
+    $("progHeadline")?.classList.add("hidden");
+    $("progGoalChips")?.classList.remove("hidden");
+  }
+  renderProgressWithheld(isPartner && !bare, sharing, bodyShared);
 }
 
 /* What their screen is NOT showing, ONLY where it is an active choice.
@@ -44796,6 +44841,51 @@ function renderProgressTab() {
    of a privacy switch is how one of them ends up wrong. As of the "one
    button" pass, the same link is also one tap away from your OWN view, next
    to the kebab in renderGoalChips, so this copy is no longer the only door. */
+/* A partner who shares nothing, which until now was a headline card over a
+   box explaining what was missing. Mo: "the only thing that they'd be able to
+   see is the consistency for how long they've been there, that's it... some
+   sort of streak, or just a graphic showing that. Otherwise it shouldn't show
+   anything like that."
+
+   Showing up is the one thing a partnership never hides: it is what the pair
+   IS, and every privacy switch in the app is about the detail underneath it,
+   never about whether the day happened. So there is always something honest
+   to draw here, and it is the only thing drawn: no explanation, no door, no
+   heading naming what is absent. A screen that lists what it will not show
+   you is still talking about the thing it will not show you. */
+function renderPartnerBare(on, name, email) {
+  const box = $("progBare");
+  if (!box) return;
+  box.classList.toggle("hidden", !on);
+  if (!on) { box.innerHTML = ""; return; }
+  const dates = currentWeekDates();
+  const today = todayStr();
+  const days = gymDaysThisWeek(name);
+  const target = weeklyGoalFor(email);
+  /* Their own week, counted the same way their own ring counts it. */
+  const strip = dates.map((d, i) => {
+    const e = entryOn(name, d);
+    const cls = ["pb-day", e?.gym ? "on" : "", e?.rest_day ? "rest" : "", d === today ? "now" : "", d > today ? "ahead" : ""]
+      .filter(Boolean).join(" ");
+    return `<span class="${cls}"><i>${DAY_LETTERS[i]}</i></span>`;
+  }).join("");
+  box.innerHTML = `
+    <div class="pb-top">
+      <span class="pb-who">${escapeHtml(name)} this week</span>
+      <span class="pb-count"><b>${days}</b> of ${target}</span>
+    </div>
+    <div class="pb-week">${strip}</div>
+    <p class="pb-line">${escapeHtml(bareWeekLine(name, days, target))}</p>`;
+}
+
+/* One sentence about the week, and never about what is hidden. */
+function bareWeekLine(name, days, target) {
+  if (!days) return `Nothing logged yet this week.`;
+  if (days >= target) return `${name} hit the target this week.`;
+  const left = target - days;
+  return `${left} more day${left === 1 ? "" : "s"} and ${name} hits the target.`;
+}
+
 function renderProgressWithheld(isPartner, sharing, bodyShared) {
   const box = $("progWithheld");
   if (!box) return;
