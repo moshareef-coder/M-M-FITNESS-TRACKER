@@ -7098,6 +7098,7 @@
   .sc-proof-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .sc-proof-body { min-width: 0; }
   .sc-proof-body .muted-note { margin: 0; }
+  .sc-proof-ttl { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.35; }
   .sc-proof-body .link-btn { margin-top: 3px; }
 
   /* The strength card's lift picker: tap a pill and the chart above switches
@@ -8975,7 +8976,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.28";
+const APP_VERSION = "2026.09.21.29";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -15622,11 +15623,45 @@ async function deleteMyAccount() {
    sessions, clips, timezone, photos, today's workout, finished workouts, saved
    workouts. Seven waits stacked end to end, and since loadAll runs after
    almost every write, that latency was on every action, not just startup. */
+/* Who this account can ever mean to fetch here: me, and my partner if I have
+   one. Every read below sends this rather than an unfiltered select and
+   trusting RLS to throw the rest away after the fact.
+
+   Measured on the live database, 2026-09-21: can_see() is SECURITY DEFINER
+   with a pinned search_path, so Postgres can never inline it, and a select
+   with no WHERE calls it once per row in the WHOLE TABLE regardless of how
+   few rows it lets through: 0.35ms per row on exercise_logs, 380ms at 1,082
+   rows today, and PostgREST's statement timeout is 8s, which a table this
+   shape reaches at roughly 23,000 rows. At the rate people actually log
+   workouts that is about a week and a half at 1,000 active users, and past
+   it loadAll starts reporting "Could not refresh everything" for everyone.
+   Sending the email filter the RLS check was always going to apply anyway
+   measured at 0.07ms, about 5,000 times faster, with no migration and no
+   change to what anybody is allowed to see: can_see() still runs, it just
+   has a handful of rows to check instead of the whole table.
+
+   No date window on top of this, on purpose, even though one would cut the
+   row count further: renderProfileHeader counts LIFETIME workouts and
+   lifetime PRs straight off ALL_EXERCISE_LOGS, and 75 places in this file
+   read ALL_ENTRIES or ALL_EXERCISE_LOGS. Auditing every one of them for
+   whether it wants full history was more risk than this fix is worth
+   tonight, and the email filter alone is what removes the seq scan: two
+   people's history, however many years of it, is a few hundred to a few
+   thousand rows served straight off the (email, entry_date) index, nowhere
+   near the row count that made the unfiltered table slow. */
 async function loadAll() {
+  /* Computed fresh on every call, not hoisted to module scope: loadAll runs
+     again after auth resolves and after almost every write, and MY_EMAIL is
+     "" until sign-in sets it. A module-level const here evaluates once, at
+     parse time, before either email exists, and freezes at [""] forever,
+     which is a query that matches nothing and looks like an empty account
+     rather than an error. Caught by the sandbox walk returning zero rows for
+     a fixture that has 77. */
+  const LOAD_EMAILS = PARTNER_EMAIL ? [MY_EMAIL, PARTNER_EMAIL] : [MY_EMAIL];
   const [entriesRes, exLogRes, profilesRes, plansRes, theirPlansRes, goalsRes, reactRes, badgesRes, swapsRes] = await Promise.all([
-    sb.from("fit_entries").select("*").order("entry_date", { ascending: true }),
-    sb.from("exercise_logs").select("*").order("entry_date", { ascending: true }),
-    sb.from("profiles").select("*"),
+    sb.from("fit_entries").select("*").in("email", LOAD_EMAILS).order("entry_date", { ascending: true }),
+    sb.from("exercise_logs").select("*").in("email", LOAD_EMAILS).order("entry_date", { ascending: true }),
+    sb.from("profiles").select("*").in("email", LOAD_EMAILS),
     /* Mine and everybody else's as two reads, each with its own ceiling. One
        read with one limit of 60 over every row RLS let through meant the cut
        fell on the pair together: a couple both training five or six days a
@@ -15635,13 +15670,25 @@ async function loadAll() {
        out at about five weeks of the two of us and went dark for me on the
        days my partner had planned more. The ceiling is now 60 of my own rows,
        which at one row a day (the upsert key is email plus date) is two
-       months of daily training, and 60 of theirs on the same terms. */
+       months of daily training, and 60 of theirs on the same terms.
+
+       Partner's half reads .eq(PARTNER_EMAIL) rather than .neq(MY_EMAIL):
+       a NOT EQUAL cannot be answered from the (email, entry_date) index the
+       way an EQUAL can once can_see() is in the mix, and measured the same
+       way as above it plans as a sequential scan. An empty string when there
+       is no partner matches nothing, which is what .neq used to return here
+       by a different route. */
     sb.from("ai_workouts").select("*").eq("email", MY_EMAIL).order("entry_date", { ascending: false }).limit(60),
-    sb.from("ai_workouts").select("*").neq("email", MY_EMAIL).order("entry_date", { ascending: false }).limit(60),
+    sb.from("ai_workouts").select("*").eq("email", PARTNER_EMAIL || "").order("entry_date", { ascending: false }).limit(60),
     /* Goals are readable by partner and coach, so this returns theirs too. */
-    sb.from("user_goals").select("*").eq("status", "active"),
-    sb.from("session_reactions").select("*").order("created_at", { ascending: false }),
-    sb.from("milestone_badges").select("*"),
+    sb.from("user_goals").select("*").in("email", LOAD_EMAILS).eq("status", "active"),
+    /* from_email alone catches both directions: every reaction I can ever be
+       shown is either one I sent or one my partner sent, and both of us are
+       already in LOAD_EMAILS, so there is no reaction to_email could add that
+       from_email has not already covered. */
+    sb.from("session_reactions").select("*").in("from_email", LOAD_EMAILS)
+      .order("created_at", { ascending: false }),
+    sb.from("milestone_badges").select("*").in("email", LOAD_EMAILS),
     /* What has been swapped away from, over the same 90 days the generator is
        sent logs for. Self only under RLS, so this is always just my rows. */
     sb.from("exercise_swaps").select("*").eq("email", MY_EMAIL)
@@ -32524,6 +32571,16 @@ async function renderSessionComplete() {
              <div class="sc-proof-thumb">${proofUrl ? `<img src="${proofUrl}" alt="Your proof photo" />` : icon("camera", 22)}</div>
              <div class="sc-proof-body">
                <p class="muted-note">${icon("check", 14)} Proof saved. ${escapeHtml(partnerName())} can see it.</p>
+               ${/* Mo, 2026-09-21: "let's just warn them that images do delete
+                     after a certain while, every day, but the initial image
+                     does stay." A proof photo genuinely does delete itself,
+                     30 days later, and privacy.html has said so all along; it
+                     is just not somewhere anyone reading this line would ever
+                     find it. Said once, quietly, where the photo actually is,
+                     not as a popup: this is a fact about it, not a warning
+                     that needs a response. A progress photo, the other kind
+                     this app takes, is never on this timer. */ ""}
+               <p class="sc-proof-ttl">Deletes automatically after 30 days. Progress photos in your Body tab do not.</p>
                <button type="button" class="link-btn" id="sessionProofChangeBtn">Change photo</button>
              </div>
            </div>`
