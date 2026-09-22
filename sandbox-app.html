@@ -8986,7 +8986,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.31";
+const APP_VERSION = "2026.09.21.32";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -21095,7 +21095,12 @@ function sessionEntryFor(email) {
    it went through, because nothing he could see changed. This redraws
    whichever screen is really visible. */
 function refreshAfterProofChange() {
-  if (SESSION?.finished && document.body.classList.contains("session-open")) {
+  /* The cardio receipt is on top of everything when a photo is taken from it,
+     and it is the screen the toast is describing, so it repaints first. Same
+     bug the paragraph above is about, one screen over. */
+  if (CSN_DONE && !$("csnScrim")?.classList.contains("hidden")) {
+    renderCardioStage();
+  } else if (SESSION?.finished && document.body.classList.contains("session-open")) {
     renderSessionComplete();
   } else {
     renderWorkoutTab();
@@ -24093,9 +24098,20 @@ function renderActivityPaused(stage) {
   wirePausedScreen({ overlay: true, root: stage });
 }
 
+/* The receipt for a session that has just been written. Deliberately NOT a
+   state on CARDIO_SES: csnHasClock() reads "any state that is not one of the
+   choosing ones" as a session with a clock on it, so a "saved" state there
+   would put a running-session bar on the tabs and offer to resume a run that
+   is already in the log. A session that is saved is over; this is only what
+   is still on screen about it. Not persisted either: if the app dies here the
+   session is safely in the database and there is nothing to restore. */
+let CSN_DONE = null;
+
 function renderCardioStage() {
   const stage = $("csnStage");
-  if (!stage || !CARDIO_SES) return;
+  if (!stage) return;
+  if (CSN_DONE) { renderCardioSaved(stage); return; }
+  if (!CARDIO_SES) return;
   const a = csnAct();
   clearInterval(csnTick); csnTick = null;
   /* Only the running session wears the lift screen's stage and sheet. Setup,
@@ -24572,10 +24588,7 @@ function renderCardioStage() {
       <h2>Nice work</h2>
       <button type="button" class="csn-x" id="csnX" aria-label="Back">${icon("chevronLeft", 18)}</button>
     </div>
-    <div class="csn-live" style="justify-content:flex-start;gap:4px">
-      <div class="csn-live-k">${escapeHtml(a.label)}</div>
-      <div class="csn-time">${mins}<i style="font-size:20px;font-weight:600;color:var(--muted);margin-left:6px;font-style:normal">min</i></div>
-    </div>
+    ${csnCompleteHTML(a, mins, null)}
     ${a.dist ? `<div class="csn-field">
       <div class="wt-log-head">Distance, if you know it</div>
       <div class="weigh-row">
@@ -24590,12 +24603,93 @@ function renderCardioStage() {
       <button type="button" class="btn-primary" id="csnSave">Save it</button>
       <button type="button" class="btn-secondary" id="csnBin">Discard</button>
     </div>`;
+  csnPaintRing(stage);
   $("csnX").onclick = () => { CARDIO_SES.state = "live"; CARDIO_SES.since = Date.now(); csnSave(); renderCardioStage(); };
   $("csnSave").onclick = () => saveCardioSession(mins);
-  $("csnBin").onclick = () => {
+  $("csnBin").onclick = async () => {
     if (!confirm("Throw this session away?")) return;
     CARDIO_SES = null; csnSave(); closeCardioSession();
+    /* Saving reloads and repaints what is behind the overlay; discarding used
+       to just hide it, which left whatever the tab was showing before the
+       session still on screen. Mo: "even when I press discard, it takes me to
+       that like basic generalized black icon." Same landing either way now. */
+    await loadAll();
+    renderWorkoutTab();
+    if (typeof renderProgressTab === "function") renderProgressTab();
   };
+}
+
+/* The middle of a finished activity, built out of the lifting completion
+   screen's own parts. Mo: "this is super ugly... we could still do the take a
+   picture for proof, the same concept that we do for weightlifting. Remember,
+   everything should match, everything should look the same, even though it's
+   a different activity."
+
+   So this is not a lookalike: .session-complete, .sc-ring, .sc-stats and
+   .sc-team are the classes renderSessionComplete uses, and every one of them
+   is a global rule rather than scoped to the lifting overlay, so the two
+   screens cannot drift apart without both moving. What it replaced was a
+   label, one enormous minute count, and a column of empty black between them
+   and the buttons.
+
+   The ring reads the same thing it reads on a lift: how much of what was
+   planned actually happened. A session is the minutes, so that is
+   elapsed against the minutes picked at the start, and a session run past
+   its target fills it and stops there.
+
+   `saved` is the receipt (CSN_DONE) when this is drawn after the write, and
+   null while the buttons still say Save it. Distance comes off the receipt
+   then, because the input it was typed into is gone by that point. */
+function csnCompleteHTML(a, mins, saved) {
+  const planned = Math.max(1, Number(CARDIO_SES?.minutes) || Number(saved?.planned) || mins);
+  const pct = Math.max(0, Math.min(1, mins / planned));
+  const r = 58, circ = 2 * Math.PI * r;
+  const miles = saved ? saved.miles : null;
+  const cal = typeof activityCalories === "function" ? activityCalories(ME, a, mins) : null;
+  const myDays = typeof gymDaysThisWeek === "function" ? gymDaysThisWeek(ME) : 0;
+  const myTarget = typeof weeklyGoalFor === "function" ? weeklyGoalFor(MY_EMAIL) : 0;
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const theirDays = partner && typeof gymDaysThisWeek === "function" ? gymDaysThisWeek(partner) : 0;
+  const theirTarget = partner && typeof weeklyGoalFor === "function" ? weeklyGoalFor(PARTNER_EMAIL) : 0;
+  return `
+    <div class="session-complete">
+      <button type="button" class="sc-ring" id="csnRingBtn" aria-label="See everything you logged today">
+        <svg viewBox="0 0 128 128" aria-hidden="true">
+          <circle class="sc-track" cx="64" cy="64" r="${r}"/>
+          <circle class="sc-fill" id="csnRingFill" cx="64" cy="64" r="${r}"
+            stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${circ.toFixed(2)}"
+            data-off="${(circ * (1 - pct)).toFixed(2)}"/>
+        </svg>
+        <div class="sc-ring-mid">${icon("check", 38)}</div>
+      </button>
+      ${/* a.label, not actTitle: the title is "Run outside", which is the
+             right thing on a tile you are choosing from and reads as
+             "Run outside Complete" here. */ ""}
+      <h3>${escapeHtml(a.label)} Complete</h3>
+      <p>${mins} of ${planned} min${miles ? ` · ${Number(miles).toFixed(1)} mi` : ""}</p>
+      <div class="sc-stats">
+        <div class="sc-stat"><b>${mins}m</b><span>Time</span></div>
+        ${miles ? `<div class="sc-stat"><b>${Number(miles).toFixed(1)}</b><span>Miles</span></div>` : ""}
+        ${cal ? `<div class="sc-stat"><b>${Math.round(cal)}</b><span>Calories</span></div>` : ""}
+      </div>
+      ${partner ? `<div class="sc-team">
+        <span class="sc-team-avs">
+          <span class="sc-team-av" style="background:var(--me);" data-av-email="${escapeHtml(MY_EMAIL)}">${escapeHtml(initials(ME))}</span>
+          <span class="sc-team-av" style="background:var(--partner);" data-av-email="${escapeHtml(PARTNER_EMAIL)}">${escapeHtml(initials(partner))}</span>
+        </span>
+        You + ${escapeHtml(partner)}: ${myDays + theirDays} of ${myTarget + theirTarget} this week
+      </div>` : `<div class="sc-team">${myDays} of ${myTarget} workouts this week</div>`}
+    </div>`;
+}
+
+/* Two frames before the offset counts as a change worth transitioning, the
+   same reason renderSessionComplete and the hero both do it. */
+function csnPaintRing(stage) {
+  hydrateAvatars(stage);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const fill = document.getElementById("csnRingFill");
+    if (fill) fill.style.strokeDashoffset = fill.dataset.off;
+  }));
 }
 
 /* What the session actually held, captured here because this is the last
@@ -24696,12 +24790,74 @@ async function saveCardioSession(mins) {
     if (error) { console.error("could not close off the cardio day", error); toast("Couldn't close off today's plan"); }
     else dropTodayPlan(fromPlan.planId);
   }
+  /* The receipt is built BEFORE the session is dropped, because it is the
+     only thing that still knows what was just run. */
+  CSN_DONE = { act: a.key, mins, miles, planned: Number(CARDIO_SES?.minutes) || mins, date: CARDIO_SES?.date || todayStr() };
   CARDIO_SES = null; csnSave();
-  closeCardioSession();
+  /* Reload first, then repaint: the week line on the receipt counts the day
+     this session just banked, so it has to read the reloaded rows and not
+     the ones from before the write. The overlay deliberately stays open,
+     which is the whole point of the receipt: a lift ends on a screen that
+     offers the proof photo, and Mo wants a run to end on the same one. */
   await loadAll();
   renderWorkoutTab();
   if (typeof renderProgressTab === "function") renderProgressTab();
+  renderCardioStage();
   toast(`${a.label} logged`);
+}
+
+/* The saved screen: the same middle as the moment before it, with the proof
+   photo offer where Save it and Discard used to be. Straight off
+   renderSessionComplete's own markup, down to the 30 day line, because Mo's
+   rule for this screen is that a run and a lift end the same way. */
+function renderCardioSaved(stage) {
+  const a = CARDIO_ACTS.find((x) => x.key === CSN_DONE.act) || CARDIO_ACTS[0];
+  /* sessionDate() rather than CSN_DONE.date, because that is the date
+     uploadProof actually files under, and a lookup on the other one would
+     leave the thumbnail empty for a session that began before midnight even
+     though the photo saved fine. CSN_DONE.date still drives the recap link,
+     since that is the day the session itself was logged to. */
+  const entry = ALL_ENTRIES.find((e) => e.email === MY_EMAIL && e.entry_date === sessionDate()) || null;
+  const hasProof = !!entry?.proof_path;
+  stage.innerHTML = `
+    <div class="csn-head">
+      <h2>Nice work</h2>
+      <button type="button" class="csn-x" id="csnX" aria-label="Close">${icon("close", 18)}</button>
+    </div>
+    ${csnCompleteHTML(a, CSN_DONE.mins, CSN_DONE)}
+    <div class="csn-foot">
+      ${hasProof
+        ? `<div class="sc-proof">
+             <div class="sc-proof-thumb" id="csnProofThumb">${icon("camera", 22)}</div>
+             <div class="sc-proof-body">
+               <p class="muted-note">${icon("check", 14)} Proof saved.${PARTNER_EMAIL ? ` ${escapeHtml(partnerName())} can see it.` : ""}</p>
+               <p class="sc-proof-ttl">Deletes automatically after 30 days. Progress photos in your Body tab do not.</p>
+               <button type="button" class="link-btn" id="csnProofChange">Change photo</button>
+             </div>
+           </div>`
+        : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
+           <button type="button" class="btn-primary" id="csnProofBtn">Take proof photo</button>`}
+      ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="csnNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
+      <button type="button" class="${hasProof ? "btn-primary" : "btn-ghost"}" id="csnDoneBtn">Done</button>
+    </div>`;
+  csnPaintRing(stage);
+  /* The thumbnail is filled after the signed URL lands rather than pointed at
+     one that is still in flight, so the square is the icon or the photo and
+     never a broken-image glyph. */
+  if (hasProof) {
+    signedProofUrl(entry.proof_path).then((url) => {
+      const box = document.getElementById("csnProofThumb");
+      if (url && box) box.innerHTML = `<img src="${url}" alt="Your proof photo" />`;
+    }).catch((e) => console.warn("could not sign the proof photo", e));
+    $("csnProofChange").onclick = () => $("proofInput").click();
+  } else {
+    $("csnProofBtn").onclick = () => $("proofInput").click();
+  }
+  if (PARTNER_EMAIL) $("csnNoteBtn").onclick = () => openNoteComposer("workout");
+  $("csnRingBtn").onclick = () => openRecap(MY_EMAIL, ME, CSN_DONE.date);
+  const leave = () => { CSN_DONE = null; closeCardioSession(); };
+  $("csnX").onclick = leave;
+  $("csnDoneBtn").onclick = leave;
 }
 
 /* A session that was running when the app was closed. Loaded into memory and
