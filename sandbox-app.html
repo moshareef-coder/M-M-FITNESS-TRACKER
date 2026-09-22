@@ -8964,7 +8964,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.21";
+const APP_VERSION = "2026.09.21.22";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -43749,6 +43749,19 @@ function renderTrackSheet() {
   /* Same chrome as the measurements sheet next door: grip, back chevron,
      centred title. Two sheets on one tab that open differently is the kind of
      small inconsistency people feel without being able to name. */
+  /* What your partner sees, in the same sheet the three dots already open.
+     Mo: "I want it to be in the same three bubble... I want everything to
+     be very minimal, very quick... I believe in the concept of everything
+     staying around the same area." It was a trip to Setup before this,
+     exactly the extra trip he is naming. Not per goal, unlike the grid
+     above it: the concepts page's own recommendation was a flat list, so it
+     renders once regardless of which goal chip is showing, under its own
+     heading, so nobody reads it as governed by the goal above it. */
+  const shareOffer = !!PARTNER_EMAIL && progressSharingLive();
+  const shareHidden = new Set(Array.isArray(MY_PROFILE?.progress_hidden) ? MY_PROFILE.progress_hidden : []);
+  const shareOn = new Set(PROGRESS_SHARE_KEYS.filter((k) => !shareHidden.has(k)));
+  const shareMetrics = PROGRESS_SHARE_KEYS.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
+
   $("trackSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="scr-head">
@@ -43758,7 +43771,20 @@ function renderTrackSheet() {
     </div>
     <p class="trk-any" style="margin:0 0 14px">What this goal shows you. Your other goals keep their own. Everything logs either way, so turning one back on shows its whole history.</p>
     <div class="trk-grid" id="trackSheetGrid">${trackTilesHTML(shown, on, keptSet)}</div>
+    ${shareOffer ? `
+    <p class="trk-any" style="margin:22px 0 14px">What ${escapeHtml(partnerName())} sees, every goal, not just this one. On is shown to them today. Off holds that one back.</p>
+    <div class="trk-grid" id="shareSheetGrid">${trackTilesHTML(shareMetrics, shareOn, null)}</div>` : ""}
     <button type="button" class="btn-primary" id="trackDone" style="margin-top:16px">Done</button>`;
+
+  if (shareOffer) {
+    wireTrackTiles($("shareSheetGrid"), shareOn, async (live) => {
+      const nowHidden = PROGRESS_SHARE_KEYS.filter((k) => !live.has(k));
+      const { error } = await sb.from("profiles")
+        .update({ progress_hidden: nowHidden }).eq("email", MY_EMAIL);
+      if (error) { console.error(error); toast("Could not save"); return; }
+      if (MY_PROFILE) MY_PROFILE.progress_hidden = nowHidden;
+    });
+  }
 
   /* Saved on every tap rather than on the way out, which is what this sheet has
      always done: nobody expects to have to confirm a preference. Through the
