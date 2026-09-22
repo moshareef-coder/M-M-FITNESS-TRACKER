@@ -8361,6 +8361,14 @@
       </label>
       <p class="muted-note">Off, and nothing on their Progress tab shows your weight, your goal weight or your tape: the switch on the right of their title simply has no weight trend behind it. On, and they read the same line you do. Body photos are never shared either way, and this changes nothing about what they see of your workouts.</p>
     </div>
+    <!-- The finer layer under "While you train" above: that switch is
+         category-wide, this is per card. Same "hidden until the column
+         exists" guard as the weigh-ins card next to it, same reason. -->
+    <div class="card hidden" id="progressShareCard">
+      <h2>What <span id="progressSharePartnerName">your partner</span> sees on Progress</h2>
+      <p class="muted-note" style="margin-top:-4px;">On is shown to them, same as today. Off holds that one card back, whatever else above is on. This only covers cards they could see anyway; a category switched off above stays off no matter what is ticked here.</p>
+      <div class="trk-grid" id="progressShareGrid"></div>
+    </div>
     <div class="card danger-card hidden" id="leavePartnerCard">
       <h2>Leave this partnership</h2>
       <p class="muted-note" style="margin-top:-6px;">
@@ -8956,7 +8964,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.20";
+const APP_VERSION = "2026.09.21.21";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -11684,7 +11692,7 @@ function renderGoalPage() {
 
    It reports what it dropped rather than swallowing it, because "saved" when
    half of it was not saved is the kind of quiet lie this app does not tell. */
-const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency"];
+const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency", "progress_hidden"];
 
 async function upsertGoalFields(patch) {
   const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
@@ -41409,6 +41417,21 @@ function partnerSharesBody() {
 function weighInSharingLive() {
   return !!MY_PROFILE && "share_weigh_ins" in MY_PROFILE;
 }
+
+/* Same feature detect, same reason, for progress_hidden. "in" rather than a
+   truthiness check: an account that has picked nothing to hide still has the
+   column, holding null, and null has to read as "the picker is real, nothing
+   is hidden" rather than "the picker does not exist yet". */
+function progressSharingLive() {
+  return !!MY_PROFILE && "progress_hidden" in MY_PROFILE;
+}
+
+/* The eight workout-activity cards this picker covers. Deliberately not
+   weight or the tape (share_weigh_ins is that question) and not photos
+   (never shared, unconditionally, see renderProgressTab). Built off
+   TRACK_ALL rather than a second list of labels, so a card added there is
+   offered here for free and the two can never describe a key differently. */
+const PROGRESS_SHARE_KEYS = ["lifts", "volume", "workouts_wk", "cardio_wk", "cardio_min", "distance_wk", "mobility_wk", "walk_wk"];
 function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME; }
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
 
@@ -44034,7 +44057,16 @@ function renderProgressTab() {
   /* One card, but the chart, the one line answer, the range pills, the goal
      weight row and the full list of weigh-ins are all inside it. */
   if (!bodyShared) barred.add("cardWeight");
-
+  /* The finer layer under share_workout_details, 2026-09-21: Mo wants to
+     share Best Lifts without sharing Weekly Volume, which a single category
+     switch cannot say. progress_hidden only ever narrows what `sharing`
+     above already allowed through; it is read from the profile being
+     VIEWED, same as the category switches, so a partner's own picks never
+     touch what they see of you. */
+  if (isPartner) for (const key of (profile?.progress_hidden || [])) {
+    const card = TRACK_ALL.find((m) => m.key === key)?.card;
+    if (card) barred.add(card);
+  }
   const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
   /* The cards somebody asked for by name. The picker is the only thing that
      decides these: they are not in any goal's card order and they are not in
@@ -45346,6 +45378,38 @@ function renderShareWeighIns() {
   };
 }
 
+/* The per-card picker under the two category switches. Reuses trackTilesHTML
+   and wireTrackTiles wholesale, the same tiles "Choose what to track" and its
+   preferences sheet already use: `on` here means shared, there it means
+   tracked, but a checked tile answering "is this included" is the same
+   question asked in the same shape either way, and Mo's own recommendation
+   was this exact reuse rather than a new card style. Saved on every tap, no
+   Save button, same convention as the tiles have everywhere else and as the
+   toggle just above it. */
+function renderProgressSharing() {
+  const card = $("progressShareCard");
+  if (!card) return;
+  const offer = !!PARTNER_EMAIL && progressSharingLive();
+  card.classList.toggle("hidden", !offer);
+  if (!offer) return;
+  $("progressSharePartnerName").textContent = partnerName();
+  const hidden = new Set(Array.isArray(MY_PROFILE?.progress_hidden) ? MY_PROFILE.progress_hidden : []);
+  const on = new Set(PROGRESS_SHARE_KEYS.filter((k) => !hidden.has(k)));
+  const metrics = PROGRESS_SHARE_KEYS.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
+  $("progressShareGrid").innerHTML = trackTilesHTML(metrics, on, null);
+  wireTrackTiles($("progressShareGrid"), on, async (live) => {
+    const nowHidden = PROGRESS_SHARE_KEYS.filter((k) => !live.has(k));
+    const { error } = await sb.from("profiles")
+      .update({ progress_hidden: nowHidden }).eq("email", MY_EMAIL);
+    if (error) {
+      console.error(error);
+      toast("Could not save");
+      return;
+    }
+    if (MY_PROFILE) MY_PROFILE.progress_hidden = nowHidden;
+  });
+}
+
 function renderSetupTab() {
   $("setupDisplayName").value = ME || "";
   if ($("setupBio")) {
@@ -45418,6 +45482,7 @@ function renderSetupTab() {
     };
   }
   renderShareWeighIns();
+  renderProgressSharing();
   renderRestChoices();
   renderPushToggle();
   renderSetupPhoto();
