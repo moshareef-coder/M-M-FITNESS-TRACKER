@@ -8971,7 +8971,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.26";
+const APP_VERSION = "2026.09.21.27";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -41804,28 +41804,61 @@ const TRACK_ALL = [{ key: "weight", label: "Weight", unit: "lb", card: "cardWeig
    it. The tape (waist, hips, chest, thighs, arms) is evidence about fat and
    size, so it appears on the three goals about fat and size and nowhere else.
    Get stronger gets the bar. Endurance and Move better get the sessions. */
+/* One owner per training metric, 2026-09-21. Mo: "can't have duplicates in
+   certain stuff. Like for get stronger, bulk up, I can see weekly volume and
+   best lifts. That's only should be for the get stronger, not for the bulk
+   up. Go and check every single duplicate, fix all of them."
+
+   The rule this settles on: anything that measures the TRAINING (best lifts,
+   tonnage, session counts, minutes, distance, mobility, walks) belongs to
+   exactly one goal, the one it actually answers the question for. Two goals
+   offering the same training number is two goals claiming to be measured the
+   same way, which is what made Bulk Up read as Get Stronger wearing a
+   different title.
+
+   Body evidence (the scale, the tape, photos) is the deliberate exception:
+   several goals genuinely read the same body, and Mo's own call an hour
+   before this one was "always, always, always weight up top" on BOTH Lose
+   Weight and Build Muscle. "consistent" is the second exception, on purpose:
+   it is the Not-sure-yet goal, so borrowing the basics is the whole of what
+   it is for, and it keeps showing up plus the body metrics while losing the
+   two signature ones (Weekly Volume, Mobility sessions) that belong to a
+   goal with a name. */
 const TRACK_OFFERS = {
   /* Mo, editing the Track Menu artifact 2026-09-18: dropped Workouts a week
      and Hips from this one. What is left still covers what the goal is
      measured by (the scale, the waist) plus the two things worth keeping in
      view (Body Photos, Cardio sessions). */
   "lose-weight": ["weight", "waist_in", "photos", "cardio_wk"],
-  "tone-lean-abs": ["waist_in", "hips_in", "photos", "weight", "arm_in", "workouts_wk"],
-  "build-muscle": ["weight", "chest_in", "arm_in", "photos", "volume", "lifts"],
-  /* Weight is offered and not pre-ticked: somebody adding size wants to see
-     it, somebody holding a weight class needs it, and neither of them is what
-     this goal is measured by. Cardio sessions dropped the same day. */
-  "get-stronger": ["lifts", "volume", "workouts_wk", "photos", "weight"],
+  /* Arms went to Build Muscle, which is the goal a growing arm is evidence
+     for, and Workouts a week to the goal that IS showing up. What is left is
+     what a recomp is actually read on: the tape, the photos, and the scale
+     that is meant to hold still. */
+  "tone-lean-abs": ["waist_in", "hips_in", "photos", "weight"],
+  /* Weekly Volume and Best Lifts both went to Get Stronger, Mo's own
+     example: "that's only should be for the get stronger, not for the bulk
+     up." Size is read on the scale going up and the tape going with it, and
+     that is the whole of this list now. */
+  "build-muscle": ["weight", "chest_in", "arm_in", "photos"],
+  /* Nothing but the bar. Body Photos and the scale came off here rather than
+     off the three body goals: this file already conceded the scale was "not
+     what this goal is measured by" while offering it anyway, and strength is
+     the one goal with no visual claim at all. */
+  "get-stronger": ["lifts", "volume", "workouts_wk"],
   /* Weight, Body Photos and Weekly Volume dropped: none of the three answer
-     "did I go further, more often", which is the whole question here. */
+     "did I go further, more often", which is the whole question here. Cardio
+     minutes and Distance are owned here too, so Move Better lost the minutes
+     and kept the sessions. */
   "build-endurance": ["cardio_wk", "cardio_min", "distance_wk"],
   /* No tape and no scale in this one at all. Neither answers the question
      "am I moving better", and offering them here is what made the old screen
      read as a form somebody had to fill in rather than a choice. Workouts a
      week and Body Photos dropped too, for the same reason: the sessions this
-     goal actually runs on (mobility, walking) are what is left. */
-  "move-better": ["mobility_wk", "walk_wk", "cardio_wk", "cardio_min"],
-  "consistent": ["workouts_wk", "weight", "photos", "volume", "cardio_wk", "mobility_wk"],
+     goal actually runs on (mobility, walking) are what is left. Mo, naming
+     the whole list out loud: "just mobility sessions, cardio sessions,
+     walks, and that's it." */
+  "move-better": ["mobility_wk", "walk_wk", "cardio_wk"],
+  "consistent": ["workouts_wk", "weight", "photos", "cardio_wk"],
 };
 
 /* The keys this person wants, in the order they should appear. Falls through
