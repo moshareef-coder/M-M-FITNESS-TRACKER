@@ -509,7 +509,15 @@
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
     transition: transform .12s ease, filter .12s ease;
   }
-  .wkt-btn-solid { background: var(--accent-ink); color: var(--bg); }
+  /* Mo: "the CTA colour card doesn't match the same as all the other CTAs."
+     It did not: this was the one primary in the app filled with --accent-ink,
+     a dark green, while .btn-primary everywhere else is the bright accent
+     with its glow. Same fill and same glow now, so Start today's plan, Save
+     changes and every other primary read as one button. */
+  .wkt-btn-solid {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, #fff) 0%, var(--accent) 100%);
+    color: var(--on-accent); box-shadow: var(--glow-accent);
+  }
   .wkt-btn-soft { background: var(--panel-2); color: var(--text); }
   .wkt-btn-solid:active, .wkt-btn-soft:active { transform: translateY(1px); filter: brightness(.96); }
   .wkt-btn-solid.sm, .wkt-btn-soft.sm { font-size: 13px; height: 36px; padding: 0 12px; border-radius: 10px; }
@@ -527,10 +535,15 @@
      directly in the middle, put that to the right, make it big." Beside the
      title rather than under it, which is also where the plan overview puts it,
      so the two screens that carry this number now carry it the same way. */
+  /* Mo: "the match progress let it be the top, and then the title, and then
+     the CTA, all centered." It was a two column row, title left and ring
+     right, with the buttons underneath: three things on two axes. One column
+     down the middle instead, in the order he read out, so the eye goes match,
+     name, go. */
   .wkt-next-grid {
-    display: grid; column-gap: 10px; row-gap: 12px; align-items: center;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "words arc" "acts acts";
+    display: grid; row-gap: 10px; justify-items: center; text-align: center;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "arc" "words" "acts";
   }
   .wkt-next-words { grid-area: words; min-width: 0; }
   /* Not hired: the ring and the muscle list are the reading he does for you,
@@ -547,12 +560,15 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "words" "acts";
   }
+  /* The buttons already stack and centre themselves; this only stops the
+     column stretching them to the grid's full track. */
+  .wkt-next-acts { width: 100%; }
   .wkt-next-sub { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
   /* A button, because the figure is a claim and tapping it shows the working.
      Sized and pressed like the other cards on this tab rather than like a
      control: it is the number that is tappable, not a widget around it. */
   .wkt-arc {
-    grid-area: arc; position: relative; width: 136px; height: 104px; justify-self: end;
+    grid-area: arc; position: relative; width: 136px; height: 104px; justify-self: center;
     margin: 2px 0; padding: 0; border: 0; background: none; cursor: pointer;
     transition: transform .12s ease;
   }
@@ -607,11 +623,6 @@
   .wkt-rest p { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
   .wkt-scene { position: absolute; inset: 0 0 0 auto; width: 58%; pointer-events: none; }
   .wkt-scene svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .wkt-scene-words {
-    position: absolute; right: 16px; top: 14px; text-align: center;
-    font-family: "Caveat", "Segoe Script", "Bradley Hand", cursive; font-weight: 500; font-size: 19px; line-height: 1.02;
-    color: color-mix(in srgb, var(--text) 62%, var(--muted)); transform: rotate(-4deg); letter-spacing: .01em;
-  }
 
   /* The card opens a screen now, so it has to read as pressable: the whole
      card is the button, a chevron says there is somewhere to go, and the press
@@ -9083,7 +9094,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.21.40";
+const APP_VERSION = "2026.09.21.41";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -13807,27 +13818,73 @@ function obChrome(step, data) {
  * `size` is a CSS length for the box. Everything else scales off the viewBox,
  * so he is the same drawing at 40 and at 96.
  */
-/* The horizon on the recovery card. Three ridges and a soft sky, fading to
-   the card on the left so the words have somewhere to sit. Drawn rather than
-   photographed: it is the same hill for everybody and it costs no bytes. */
+/* The recovery card's picture: him, having a drink. Mo: "I don't like the
+   background image of this, just make it the robot drinking water."
+
+   It was three grey ridges and a line of handwriting, which is a stock mood
+   rather than anything this app has to say, and the one drawing on the card
+   was of nobody. Recovery is stretch, eat and DRINK, so the card now shows
+   the character doing the third one.
+
+   His head, ear pods and face mark are robotFaceSVG's own path data at its
+   own coordinates, lifted verbatim and scaled as a group, so this is the same
+   robot as Home and onboarding rather than a second one drawn to match. The
+   only new geometry is the bottle and the arm holding it. The left fade
+   stays: the words sit over that side and always did. */
 function restSceneSVG() {
   return `<svg viewBox="0 0 220 140" preserveAspectRatio="xMaxYMid slice">
     <defs>
       <linearGradient id="rsSky" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="var(--panel)"/>
-        <stop offset="1" stop-color="color-mix(in srgb, var(--muted) 22%, var(--panel))"/>
+        <stop offset="1" stop-color="color-mix(in srgb, var(--accent) 13%, var(--panel))"/>
       </linearGradient>
       <linearGradient id="rsFade" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0" stop-color="#fff" stop-opacity="0"/>
-        <stop offset=".45" stop-color="#fff" stop-opacity="1"/>
+        <stop offset=".42" stop-color="#fff" stop-opacity="1"/>
       </linearGradient>
       <mask id="rsMask"><rect width="220" height="140" fill="url(#rsFade)"/></mask>
     </defs>
     <g mask="url(#rsMask)">
       <rect width="220" height="140" fill="url(#rsSky)"/>
-      <path d="M0 110 L40 78 L70 96 L110 58 L150 92 L185 70 L220 90 V140 H0z" fill="color-mix(in srgb, var(--muted) 34%, var(--panel))"/>
-      <path d="M0 122 L30 104 L64 118 L96 96 L130 116 L170 100 L220 118 V140 H0z" fill="color-mix(in srgb, var(--muted) 52%, var(--panel))"/>
-      <path d="M0 134 L50 124 L100 132 L150 122 L220 130 V140 H0z" fill="color-mix(in srgb, var(--muted) 66%, var(--panel))"/>
+      ${/* Him, 1.34x the bust's own scale and dropped so the viewBox cuts him
+            at the chest the way every other bust of him is cut. */ ""}
+      <g transform="translate(86 17) scale(1.34)">
+        ${/* Torso and the two arms, straight off robotFaceSVG's bust. */ ""}
+        <path d="M48 53C41 53 35.5 53.8 31.6 55.2 28.5 56.2 24 58.4 21.6 59.7 19 61.1 16.6 62.8 15.4 64.8V88H80.6V64.8C79.4 62.8 77 61.1 74.4 59.7 72 58.4 67.5 56.2 64.4 55.2 60.5 53.8 55 53 48 53z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M31 50.5C32.2 55.4 34.4 58.6 37.2 60.2 40.4 61.4 44 61.6 48 61.6 52 61.6 55.6 61.4 58.8 60.2 61.6 58.6 63.8 55.4 65 50.5z" fill="var(--rb-shade)" opacity=".42"/>
+        <path d="M79.4 65C82.8 65 85.7 65.8 87.6 67 89.4 68.2 90.6 70 91.3 72.2 92 74.4 92.6 77 93 88H75C75 78 75.6 71.5 77.4 68 78 66.4 78.6 65.5 79.4 65z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+        ${/* Ear pods, head, and the face mark: his own numbers, untouched. */ ""}
+        <rect x="22.4" y="25.2" width="10" height="16.3" rx="4.6" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.5"/>
+        <rect x="63.6" y="25.2" width="10" height="16.3" rx="4.6" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.5"/>
+        <path d="M48 4.8C44.5 4.8 39.8 5.4 36.5 7 32 9.7 25.5 15 25.5 27 25.5 34.5 26.5 40 28.4 44.6 30.6 50 33.6 53.4 37 55.2 40.2 56.4 44 56.6 48 56.6 52 56.6 55.8 56.4 59 55.2 62.4 53.4 65.4 50 67.6 44.6 69.5 40 70.5 34.5 70.5 27 70.5 15 64 9.7 59.5 7 56.2 5.4 51.5 4.8 48 4.8z" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round"/>
+        <g transform="translate(48 34.75) scale(0.05186) translate(-512 -512)">
+          <rect x="184.21" y="384.33" width="114.01" height="255.34" rx="38" fill="var(--rb-visor)"/>
+          <rect x="725.78" y="384.33" width="114.01" height="255.34" rx="38" fill="var(--rb-visor)"/>
+          <rect x="346.92" y="444.90" width="330.17" height="134.20" rx="26.13" fill="var(--rb-visor)"/>
+          <rect x="273.28" y="324.35" width="147.27" height="375.30" rx="47.51" fill="var(--rb-visor)"/>
+          <rect class="rb-eye" x="315.44" y="418.77" width="62.95" height="186.46" rx="31.47" fill="var(--accent)"/>
+          <rect x="603.45" y="324.35" width="147.27" height="375.30" rx="47.51" fill="var(--rb-visor)"/>
+          <rect class="rb-eye" x="645.61" y="418.77" width="62.95" height="186.46" rx="31.47" fill="var(--accent)"/>
+        </g>
+        ${/* The arm that does the drinking, drawn AFTER the head so it passes
+              in front of the chin the way a raised arm does. */ ""}
+        <path d="M16.6 65C13.2 65 10.3 65.8 8.4 67 6.6 68.2 5.4 70 4.7 72.2 4 74.4 3.4 77 3 88H21C21 78 22.4 70 26 63.5 28.4 59.2 30.6 56.6 32 55.2" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      </g>
+      ${/* The bottle, tilted to his mark. Drawn in the scene's own units so
+            the tilt reads at the size the card actually shows. */ ""}
+      <g transform="translate(112 104) rotate(-34)">
+        <rect x="-15" y="-46" width="30" height="58" rx="9" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="2.2" stroke-linejoin="round"/>
+        ${/* The water, sitting flat inside the bottle rather than tilting with
+              it, which is what makes it read as liquid and not as a stripe. */ ""}
+        <clipPath id="rsBottle"><rect x="-15" y="-46" width="30" height="58" rx="9"/></clipPath>
+        <g clip-path="url(#rsBottle)">
+          <g transform="rotate(34)">
+            <rect x="-40" y="-8" width="80" height="60" fill="var(--accent)" opacity=".55"/>
+          </g>
+        </g>
+        <rect x="-5.5" y="-55" width="11" height="10" fill="var(--rb-body)" stroke="var(--rb-line)" stroke-width="2.2" stroke-linejoin="round"/>
+        <rect x="-8" y="-62" width="16" height="8" rx="2.5" fill="var(--rb-visor)"/>
+      </g>
     </g>
   </svg>`;
 }
@@ -35650,10 +35707,10 @@ function renderChooseScreen() {
         <p>Progress happens between workouts. Here is what to stretch, eat and drink today.</p>
       </div>
       <span class="wkt-rest-go" aria-hidden="true">${icon("chevronRight", 18)}</span>
-      <div class="wkt-scene" aria-hidden="true">
-        ${restSceneSVG()}
-        <div class="wkt-scene-words">Same<br>Goals<br>Brighter<br>Days<br><span style="font-size:15px">&#9825;</span></div>
-      </div>
+      ${/* The handwriting went with the mountains: "Same Goals Brighter Days"
+            over a stock horizon was a mood board, and the drawing is the
+            character doing the thing the card is about now. */ ""}
+      <div class="wkt-scene" aria-hidden="true">${restSceneSVG()}</div>
     </button>`;
 
   $("workoutContent").innerHTML = `
