@@ -104,7 +104,16 @@ const KNOWLEDGE_FILES = [
   "knowledge/motion/moves/weight-training-upper.mjs",
   "knowledge/motion/moves/yoga.mjs",
 ];
-const DIRS = ["vendor", "badges"];
+/* knowledge/motion ships as a whole directory, not as a hand-listed set of
+   files. The list above missed moves/cardio.mjs when it was added, index.mjs
+   imports it statically, and one unresolvable static import fails the entire
+   module graph: every figure in the app went blank on the phone on 2026-09-24
+   with a single console.error nobody on a device could see. The props/*.svg
+   the machine moves draw had never been in the list at all. A directory copy
+   cannot drift when the next move file lands. body3d/ stays out (BODY3D is
+   false and it pulls three.js in) and reference/ is 9.6 MB of concept art. */
+const DIRS = ["vendor", "badges", "knowledge/motion"];
+const DIR_SKIP = /\/(body3d|reference)(\/|$)|\.md$/;
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
@@ -140,7 +149,7 @@ for (const dir of DIRS) {
     console.warn(`skip (missing): ${dir}/`);
     continue;
   }
-  cpSync(src, join(out, dir), { recursive: true });
+  cpSync(src, join(out, dir), { recursive: true, filter: (p) => !DIR_SKIP.test(p) });
   dirsCopied++;
 }
 
@@ -167,13 +176,47 @@ const html = readFileSync(join(root, "index.html"), "utf8");
    "all present" while absent from the bundle: generate, the goal maths, the
    yoga builder and the no-equipment switch all threw on the phone. */
 const imported = [...html.matchAll(/import\("(?:\.\/|\/)((?:mo-)?knowledge\/[^"]+)"\)/g)].map((m) => m[1]);
-const missing = [...new Set(imported)]
-  .filter((rel) => !NOT_SHIPPED.has(rel) && !existsSync(join(out, rel)));
 
-if (missing.length) {
-  console.warn("\n  WARNING: index.html imports these at runtime and they are not in www/:");
-  for (const rel of missing) console.warn(`    ${rel}`);
-  console.warn("  Add them to ASSETS or KNOWLEDGE_FILES, or the native app throws on load.\n");
+/* Transitive. index.html importing knowledge/motion/index.mjs is only the
+   first hop; index.mjs then imports ./moves/cardio.mjs, and a check that stops
+   at the first hop reported "all present" while the phone drew no figure.
+   Follow every static and dynamic import inside each shipped module until the
+   set stops growing, and report a missing file with the module that wanted it,
+   which is the thing you actually need to know to fix it. */
+/* Three shapes, each kept on one statement: `import x from "./a"`,
+   `import("./a")`, `export { x } from "./a"`. The static form forbids quotes
+   and semicolons between import and from so it cannot run from one import
+   keyword across a comment into the next string literal, which is how the
+   first cut of this reported knowledge/motion/knowledge/motion/index.mjs. */
+const IMPORT_RE = /(?:^|[^\w.$])import\s+(?:[^;'"`]*?\bfrom\s*)?["']([^"']+)["']|import\(\s*["']([^"']+)["']\s*\)|(?:^|[^\w.$])export\s+[^;'"`]*?\bfrom\s*["']([^"']+)["']/gm;
+const seen = new Set();
+const missingBy = new Map();   // rel -> importer
+const queue = [...new Set(imported)].map((rel) => ({ rel, by: "index.html" }));
+while (queue.length) {
+  const { rel, by } = queue.shift();
+  if (seen.has(rel) || NOT_SHIPPED.has(rel)) continue;
+  seen.add(rel);
+  const abs = join(out, rel);
+  if (!existsSync(abs)) { missingBy.set(rel, by); continue; }
+  if (!/\.m?js$/.test(rel)) continue;
+  /* Comments off first. index.mjs documents its own usage on line 3 as
+     `import { mountMove } from "./knowledge/motion/index.mjs"`, which read as
+     a real import resolves to knowledge/motion/knowledge/motion/index.mjs. */
+  const code = readFileSync(abs, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:\\])\/\/.*$/gm, "$1");
+  for (const m of code.matchAll(IMPORT_RE)) {
+    const spec = m[1] || m[2] || m[3];
+    if (!spec || !/^[./]/.test(spec)) continue;          // bare specifiers go through the importmap
+    const next = spec.startsWith("/")
+      ? spec.slice(1)
+      : join(dirname(rel), spec).replace(/\\/g, "/");
+    queue.push({ rel: next, by: rel });
+  }
+}
+if (missingBy.size) {
+  console.warn("\n  WARNING: imported at runtime but not in www/ (the native app throws on load):");
+  for (const [rel, by] of missingBy) console.warn(`    ${rel}   <- imported by ${by}`);
+  console.warn("  Add the file to ASSETS, KNOWLEDGE_FILES or DIRS.\n");
+  process.exitCode = 1;
 } else {
-  console.log(`checked ${new Set(imported).size} runtime imports, all present`);
+  console.log(`checked ${seen.size} runtime imports (transitive), all present`);
 }
