@@ -13,18 +13,13 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Unio" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Loaded without blocking the first paint. A stylesheet in the head holds
-     the whole page back until it lands, which on a phone was most of a second
-     of nothing, and the one thing this app wants on screen early is the boot
-     mark. media="print" makes it a non blocking fetch and the onload promotes
-     it the moment it arrives; the URL already carries display=swap, so text
-     draws in the fallback and swaps. Measured: the fonts land during boot, so
-     nobody sees the swap. -->
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Caveat:wght@500&display=swap"
-      rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Caveat:wght@500&display=swap" rel="stylesheet"></noscript>
+<!-- Served from the bundle, not from Google. The media="print" dance this
+     used to do was there because the stylesheet came over the network and
+     blocked first paint; a local file parses in under a millisecond, so it can
+     just be a stylesheet again. Vendoring it also stops the app announcing
+     every cold start to a third party, which privacy.html implies it does not.
+     Files and the @font-face rules live in vendor/fonts.css. -->
+<link rel="stylesheet" href="vendor/fonts.css">
 <script type="importmap">
 { "imports": { "three": "/vendor/three/three-0.160.1.module.js" } }
 </script>
@@ -7715,9 +7710,7 @@
      If you bump this, recompute the hash:
      curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A
      and update CDN in scripts/make-sandbox.mjs to match. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0"
-        integrity="sha384-JBR+x8blGwjDRO63aHCGiZMD4VNiTR4ZUGA+N6ZKLf3zNt1fK8IBpcgPaMrxqWBp"
-        crossorigin="anonymous"></script>
+<script src="vendor/lib/supabase-js-2.116.0.js"></script>
 <!-- body3d: the procedural muscle body under knowledge/motion/body3d is copied
      in from the anatomy workspace byte for byte, and those files import the bare
      specifier "three". This pins it to the vendored, tree-shaken build. It has to
@@ -22058,7 +22051,7 @@ function renderToneChart(series, isPartner, unit = "in") {
      nobody can see. */
   if (!hired()) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner, unit); })
       .catch(() => chartUnavailable("toneChart"));
     return;
@@ -22659,7 +22652,7 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
      nobody can see. */
   if (!hired()) return null;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       /* Whichever goal screen asked for it: the tab redraws and whoever is on
          screen gets their line. Checking one screen's id here meant the other
          two silently never came back from a cold library load. */
@@ -25401,7 +25394,7 @@ function renderEnduranceChart(buckets, isPartner) {
      nobody can see. */
   if (!hired()) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => { if (!$("endHero")?.classList.contains("hidden")) renderEnduranceChart(buckets, isPartner); })
       .catch(() => chartUnavailable("endChart"));
     return;
@@ -25700,7 +25693,7 @@ let consistencyChart = null;
 
 function renderConsistencyChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26028,7 +26021,7 @@ let strengthChart = null;
 
 function renderStrengthChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26386,7 +26379,7 @@ function openLiftDetail(exerciseName) {
       },
     });
   };
-  if (window.Chart) draw(); else loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(draw).catch(() => {});
+  if (window.Chart) draw(); else loadScriptOnce("vendor/lib/chart-4.5.1.js").then(draw).catch(() => {});
 }
 
 /* ---------- Volume card ----------
@@ -26461,7 +26454,7 @@ let volumeChart = null;
 
 function renderVolumeChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26664,7 +26657,7 @@ function renderWeekCard(spec) {
   const card = $(spec.card);
   if (!card) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => renderWeekCard(spec)).catch(() => chartUnavailable(spec.id + "Chart"));
     return;
   }
@@ -26746,7 +26739,7 @@ function renderWeightChart() {
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
     return;
   }
   /* ONE person per chart. Both lines shared a y axis, and with forty five
@@ -40709,7 +40702,7 @@ function loadScriptOnce(src) {
 let riveRuntimePromise = null;
 function ensureRiveRuntime() {
   if (!riveRuntimePromise) {
-    riveRuntimePromise = loadScriptOnce("https://cdn.jsdelivr.net/npm/@rive-app/webgl2@2.42.0/rive.min.js")
+    riveRuntimePromise = loadScriptOnce("vendor/lib/rive-2.42.0.js")
       .then(() => {
         try { window.rive?.RuntimeLoader?.setWasmUrl("/vendor/rive-2.42.0.wasm"); }
         catch (e) { console.warn("rive wasm url", e); }

@@ -18,9 +18,12 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const src = readFileSync(join(root, "index.html"), "utf8");
 
-/* Matched by its closing tag rather than the whole thing, so pinning the
-   version or changing the integrity hash in index.html does not break this. */
-const CDN = /<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@[^"]*"[\s\S]*?<\/script>/;
+/* Matched by its closing tag rather than the whole thing, so bumping the
+   vendored version in index.html does not break this. supabase-js moved from
+   the jsdelivr CDN into vendor/lib on 2026-09-25 because a render blocking
+   script tag pointing at a CDN meant the native app could not boot until the
+   network answered, so this matches the local path now. */
+const CDN = /<script src="vendor\/lib\/supabase-js@?[^"]*"[\s\S]*?<\/script>/;
 if (!CDN.test(src)) throw new Error("make-sandbox: could not find the Supabase script tag to inject after");
 
 let out = src.replace(CDN, (tag) => tag + '\n<script src="/sandbox-data.js"></script>');
