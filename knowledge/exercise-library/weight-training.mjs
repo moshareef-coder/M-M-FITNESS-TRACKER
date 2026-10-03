@@ -120,8 +120,8 @@ export const WEIGHT_TRAINING = {
         { name: "Reverse Wrist Curl", primary: ["forearms"], secondary: [], equipment: "dumbbell", level: "beginner" },
         { name: "Reverse Curl", primary: ["forearms"], secondary: ["biceps"], equipment: "barbell", level: "beginner" },
         { name: "Plate Pinch", primary: ["forearms"], secondary: [], equipment: "bodyweight", level: "beginner" },
-        { name: "Farmer's Carry", primary: ["forearms"], secondary: ["traps", "abs"], equipment: "dumbbell", level: "intermediate" },
-        { name: "Dead Hang", primary: ["forearms"], secondary: ["lats"], equipment: "bodyweight", level: "intermediate" },
+        { name: "Farmer's Carry", primary: ["forearms"], secondary: ["traps", "abs"], equipment: "dumbbell", level: "intermediate", isHold: true },
+        { name: "Dead Hang", primary: ["forearms"], secondary: ["lats"], equipment: "bodyweight", level: "intermediate", isHold: true },
       ],
     },
     {
@@ -183,7 +183,7 @@ export const WEIGHT_TRAINING = {
       key: "abs",
       label: "Abs",
       exercises: [
-        { name: "Plank", primary: ["abs"], secondary: ["obliques"], equipment: "bodyweight", level: "beginner" },
+        { name: "Plank", primary: ["abs"], secondary: ["obliques"], equipment: "bodyweight", level: "beginner", isHold: true },
         { name: "Crunch", primary: ["abs"], secondary: [], equipment: "bodyweight", level: "beginner" },
         { name: "Sit-Up", primary: ["abs"], secondary: [], equipment: "bodyweight", level: "beginner" },
         { name: "Reverse Crunch", primary: ["abs"], secondary: [], equipment: "bodyweight", level: "beginner" },
@@ -200,7 +200,7 @@ export const WEIGHT_TRAINING = {
       exercises: [
         { name: "Russian Twist", primary: ["obliques"], secondary: ["abs"], equipment: "bodyweight", level: "beginner" },
         { name: "Side Bend", primary: ["obliques"], secondary: [], equipment: "dumbbell", level: "beginner" },
-        { name: "Side Plank", primary: ["obliques"], secondary: ["abs"], equipment: "bodyweight", level: "beginner" },
+        { name: "Side Plank", primary: ["obliques"], secondary: ["abs"], equipment: "bodyweight", level: "beginner", isHold: true },
         { name: "Pallof Press", primary: ["obliques"], secondary: ["abs"], equipment: "cable", level: "intermediate" },
         { name: "Woodchopper", primary: ["obliques"], secondary: ["abs"], equipment: "cable", level: "intermediate" },
         { name: "Hanging Windshield Wiper", primary: ["obliques"], secondary: ["abs", "forearms"], equipment: "bodyweight", level: "advanced" },

@@ -18,7 +18,7 @@ export const PILATES = {
       label: "Core / abs",
       exercises: [
         { name: "The Hundred", primary: ["abs"], secondary: [], level: "beginner" },
-        { name: "Plank", primary: ["abs"], secondary: ["shoulders", "obliques"], level: "beginner" },
+        { name: "Plank", primary: ["abs"], secondary: ["shoulders", "obliques"], level: "beginner", isHold: true },
         { name: "Double Leg Stretch", primary: ["abs"], secondary: [], level: "beginner" },
         { name: "Single Leg Stretch", primary: ["abs"], secondary: [], level: "beginner" },
         { name: "Roll-Up", primary: ["abs"], secondary: ["lowerback"], level: "intermediate" },
