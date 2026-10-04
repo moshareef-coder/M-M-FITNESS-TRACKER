@@ -5434,11 +5434,13 @@
   .tg-cheers button.sent { background: var(--partner); color: #fff; transform: scale(.96); }
   .tg-mine { margin: 0; font-size: 13px; color: var(--muted); }
 
-  .wkt-together { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px;
-    padding: 13px 16px; border-radius: 999px; font: inherit; font-size: 15.5px; font-weight: 800; cursor: pointer; color: var(--text);
-    border: 2px solid transparent;
-    background: linear-gradient(var(--panel), var(--panel)) padding-box, linear-gradient(90deg, var(--me), var(--partner)) border-box; }
-  .wkt-together:active { transform: scale(.98); }
+  .wkt-acts-row { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; }
+  .wkt-acts-row.two { grid-template-columns: 1fr 1fr; }
+  .wkt-acts-row .wkt-btn-soft { width: 100%; font-size: 14.5px; }
+  /* Train together's half of the row: the same button, tinted with your two
+     colours so it is findable without being louder than Start. */
+  .wkt-with { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 14%, var(--panel-2)), color-mix(in srgb, var(--partner) 16%, var(--panel-2))); }
+  .wkt-with svg { color: var(--partner); }
   /* The one line he says that does something when tapped: the whole card takes your two colours, so it reads as a button without growing a second one. */
   .home-quip.act .home-quip-say { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 12%, var(--panel)), color-mix(in srgb, var(--partner) 14%, var(--panel))); }
   .lw-join { text-align: center; }
@@ -37232,13 +37234,19 @@ function renderChooseScreen() {
                 should match." One solid primary action, one quiet line under
                 it, the same shape wkt-week-gen already uses below: not two
                 buttons of near-equal weight side by side. */ ""}
-          ${/* Mo, 2026-10-04: Train together, where you decide how to train, as
-                a real button rather than a link: hiding it behind their profile
-                was the complaint. Today only, and not while one is being made. */ ""}
-          ${PARTNER_EMAIL && !coached && !TG_MAKING && !allDone
-            ? `<button type="button" class="wkt-together" id="chooseTogetherBtn">${icon("people", 18)} Work out with ${escapeHtml(partnerName().split(" ")[0])}</button>`
-            : ""}
-          ${tomorrowPlan ? "" : `<button type="button" class="wkt-more" id="choosePlanBtn">or plan it yourself ${icon("chevronRight", 13)}</button>`}
+          ${/* Mo, 2026-10-04: "plan it yourself" was a small grey link that read
+                as an afterthought, and a second full width button for Train
+                together under the primary was one button too many. So: the one
+                primary, then one row of two equal buttons, the same height as
+                it, with the same gap all the way down. Train together only for
+                today and not while one is being made. */ ""}
+          ${tomorrowPlan ? "" : (() => {
+            const together = PARTNER_EMAIL && !coached && !TG_MAKING && !allDone;
+            return `<div class="wkt-acts-row${together ? " two" : ""}">
+              <button type="button" class="wkt-btn-soft" id="choosePlanBtn">${icon("pencil", 16)} Plan my own</button>
+              ${together ? `<button type="button" class="wkt-btn-soft wkt-with" id="chooseTogetherBtn">${icon("people", 16)} With ${escapeHtml(partnerName().split(" ")[0])}</button>` : ""}
+            </div>`;
+          })()}
           ${/* Ahead of the generate, not after it: the plan screen's own time
                 control (planTimeBtn) only exists once a plan does, and this is
                 the moment "how long have you got" actually matters, before
