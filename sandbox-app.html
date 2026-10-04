@@ -5446,6 +5446,8 @@
   [data-theme="light"] .wkt-with { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 24%, var(--panel-2)), color-mix(in srgb, var(--partner) 26%, var(--panel-2))); }
   /* The one line he says that does something when tapped: the whole card takes your two colours, so it reads as a button without growing a second one. */
   .home-quip.act .home-quip-say { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 12%, var(--panel)), color-mix(in srgb, var(--partner) 14%, var(--panel))); }
+  .tg-pause-invite { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; }
+  .tg-pause-invite svg { color: var(--partner); }
   .lw-join { text-align: center; }
   .lw-join-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 
@@ -18350,6 +18352,13 @@ async function tgShowInvite() {
 
 async function tgShowLobby() {
   if (TG_MAKING) { tgRenderMakeBar(); return; }
+  /* Asked from inside your own running workout: there is nothing to choose,
+     they join that one. Stay on the workout; its strip says you are waiting. */
+  if (TG.workout?.joinRunning && !TG.workout?.request && TG.status === "invited" && tgAmHost()) {
+    tgCloseOverlay("lobby");
+    tgRenderHud();
+    return;
+  }
   if (TG.workout?.request && TG.status === "invited") {
     const token = ++TG_RENDER;
     const faces = await tgFaces("here", "waiting");
@@ -18452,16 +18461,16 @@ async function tgRenderHud() {
      redraw that the same set triggers wiped it the moment it appeared. */
   if (!root.querySelector(".tg-hud-body")) root.innerHTML = `<div class="tg-hud-body"></div><div class="tg-callout" id="tgCallout" aria-live="polite"></div>`;
   const hud = root.querySelector(".tg-hud-body");
-  const on = !!(SESSION && !SESSION.finished && SESSION.together && TG && TG.id === SESSION.together.id);
+  /* Only once they are actually in: an invite they have not answered is not
+     somebody "warming up" on your strip. */
+  const on = !!(SESSION && !SESSION.finished && SESSION.together && TG && TG.id === SESSION.together.id && ["active", "done"].includes(TG.status));
   $("sessionCard")?.classList.toggle("together", on);
   if (!on) {
-    const canAsk = SESSION && !SESSION.finished && PARTNER_EMAIL && !(TG && TG_OPEN.includes(TG.status));
+    /* The invite itself is in the pause menu now; all the strip says outside a
+       together session is that one you sent is still waiting. */
     const waiting = SESSION?.together && TG && TG.status === "invited";
-    root.classList.toggle("hidden", !(canAsk || waiting));
-    hud.innerHTML = waiting
-      ? `<div class="tg-ask waiting"><span class="tg-dot"></span>Waiting for ${tgPartnerFirst()} to join</div>`
-      : canAsk ? `<button type="button" class="tg-ask" id="tgAskBtn">Invite ${tgPartnerFirst()} to do this with you</button>` : "";
-    if ($("tgAskBtn")) $("tgAskBtn").onclick = () => tgInvite({ fromSession: true });
+    root.classList.toggle("hidden", !waiting);
+    hud.innerHTML = waiting ? `<div class="tg-ask waiting"><span class="tg-dot"></span>Waiting for ${tgPartnerFirst()} to join</div>` : "";
     return;
   }
   const token = ++TG_RENDER;
@@ -31541,7 +31550,7 @@ function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going" }) {
    Both session kinds ask it now, so the noun is passed in: a run is not a
    workout, and "End treadmill session here" is already what the Finish button
    on that same screen calls it. */
-function askPauseOrEnd({ noun = "workout" } = {}) {
+function askPauseOrEnd({ noun = "workout", invite = null } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "pop-scrim";
@@ -31553,6 +31562,9 @@ function askPauseOrEnd({ noun = "workout" } = {}) {
             <button type="button" class="ds-x" data-choice="" aria-label="Close">&times;</button>
           </div>
           <button type="button" class="btn-primary" data-choice="" style="margin-top:8px;">Keep going</button>
+          ${/* Train together from inside a workout lives here now, not in a strip
+                across the top of the session (Mo, 2026-10-04). */ ""}
+          ${invite ? `<button type="button" class="btn-ghost tg-pause-invite" data-choice="invite">${icon("people", 16)} ${escapeHtml(invite)}</button>` : ""}
           <button type="button" class="btn-ghost" data-choice="pause">Pause ${escapeHtml(noun)}</button>
           <button type="button" class="btn-ghost" data-choice="end" style="color:var(--danger, #ff5c5c);">End ${escapeHtml(noun)} here</button>
         </div>
@@ -35201,9 +35213,11 @@ function openSessionUI() {
        and holding to end a workout, standing in front of a stretch. */
     if (SESSION.standaloneStretch) { endStretchSession(); return; }
     if (SESSION.pausedAt) { togglePause(); return; }   // the play icon just resumes
-    const choice = await askPauseOrEnd();
+    const canInvite = PARTNER_EMAIL && !SESSION.together && !(TG && TG_OPEN.includes(TG.status) && !tgStale(TG));
+    const choice = await askPauseOrEnd({ invite: canInvite ? `Invite ${partnerName().split(" ")[0]} to join` : null });
     if (choice === "pause") togglePause();
     else if (choice === "end") endWorkoutNow();
+    else if (choice === "invite") tgInvite({ fromSession: true });
   };
   $("sessionMinBtn").innerHTML = icon("chevronDown", 20);
   $("sessionMinBtn").onclick = minimiseSession;
