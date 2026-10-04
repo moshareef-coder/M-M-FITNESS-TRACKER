@@ -5446,6 +5446,10 @@
   [data-theme="light"] .wkt-with { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 24%, var(--panel-2)), color-mix(in srgb, var(--partner) 26%, var(--panel-2))); }
   /* The one line he says that does something when tapped: the whole card takes your two colours, so it reads as a button without growing a second one. */
   .home-quip.act .home-quip-say { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 12%, var(--panel)), color-mix(in srgb, var(--partner) 14%, var(--panel))); }
+  .sv-row-fig { align-items: center; }
+  .sv-fig { flex: none; width: 72px; height: 72px; display: grid; place-items: center; border-radius: 14px; background: var(--panel-2); overflow: hidden; }
+  /* Sized like the picker's card figures, or the canvas draws at its own tiny default. */
+  .sv-fig canvas { width: 78px; height: 78px; }
   .tg-pause-invite { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; }
   .tg-pause-invite svg { color: var(--partner); }
   .lw-join { text-align: center; }
@@ -29815,10 +29819,53 @@ function closeSwapSheet() {
   pinSheets();
 }
 
-function renderSwapSheet() {
+/* Mo, 2026-10-04: "sometimes it doesn't have another option, which is a
+   mistake". Only plans the engine built carry `alternatives`; anything built
+   by hand, by Plan my own or before the engine attached them has none, and the
+   sheet said there was nothing close. The same ranked matcher No equipment
+   today uses works them out here instead, from the lifting library, keeping
+   out what is already on the plan. Remembered per name for the sitting so
+   reopening the sheet is instant. */
+const SWAP_ALTS = new Map();
+async function swapAlternativesFor(ex) {
+  const own = (ex.alternatives || []).filter((a) => a && a.name && a.name !== ex.name);
+  if (own.length) return own.slice(0, 3);
+  const key = (ex.name || "").toLowerCase();
+  if (SWAP_ALTS.has(key)) return SWAP_ALTS.get(key);
+  const onPlan = (SWAP_CTX?.list?.() || []).map((e) => e.name);
+  const pool = strengthLibraryPool();
+  let out = [];
+  const libEx = findStrengthLibraryExercise(ex.name);
+  const mod = libEx ? await ensureAlternativesMatcher() : null;
+  if (mod && libEx) {
+    out = mod.scoreAlternatives({ exercise: libEx, pool, exclude: onPlan, count: 3 })
+      .map((a) => ({ name: a.name, why: a.why }));
+  }
+  /* A name the library does not know (typed by hand): fall back to anything
+     that works the same main muscle, so there is always something to offer. */
+  if (!out.length) {
+    const prim = classifyMuscles(ex.name || "")?.primary || [];
+    out = pool.filter((p) => p.name !== ex.name && !onPlan.includes(p.name) && (p.primary || []).some((g) => prim.includes(g)))
+      .slice(0, 3).map((p) => ({ name: p.name, why: `Also works your ${(p.primary || [])[0] || "same muscles"}` }));
+  }
+  SWAP_ALTS.set(key, out);
+  return out;
+}
+
+/* Which picker area an exercise belongs to, so Browse opens on its section. */
+function swapGroupFor(ex) {
+  const libEx = findStrengthLibraryExercise(ex.name);
+  const prim = libEx?.primary || classifyMuscles(ex.name || "")?.primary || [];
+  const g = CB_GROUPS.find((x) => x.cats && x.cats.some((c) => prim.includes(c)));
+  return g ? g.key : "all";
+}
+
+async function renderSwapSheet() {
   const ex = swapTarget();
   if (!ex) { closeSwapSheet(); return; }
-  const alts = (ex.alternatives || []).filter((a) => a && a.name && a.name !== ex.name).slice(0, 3);
+  const alts = await swapAlternativesFor(ex);
+  if (swapTarget() !== ex) return;   // the sheet moved on while that was being worked out
+  const group = CB_GROUPS.find((g) => g.key === swapGroupFor(ex));
   $("swapSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="scr-head">
@@ -29828,24 +29875,27 @@ function renderSwapSheet() {
     </div>
     <p class="muted-note" style="margin:-6px 0 14px;">${alts.length
       ? "Same job, a different movement. Sets and reps stay where they are."
-      : "Nothing close enough to suggest for this one. Search the library instead."}</p>
+      : "Nothing close enough to suggest for this one. Browse the library instead."}</p>
     <div class="sv-rows">
-      ${alts.map((a, i) => `<button type="button" class="sv-row" data-alt="${i}">
-        <span class="sv-row-ico">${icon("swap", 18)}</span>
+      ${alts.map((a, i) => `<button type="button" class="sv-row sv-row-fig" data-alt="${i}">
+        <span class="sv-fig" data-fig="${escapeHtml(a.name)}" data-fig-static></span>
         <span class="sv-row-txt">
           <span class="sv-row-name">${escapeHtml(a.name)}</span>
           <span class="sv-row-meta">${escapeHtml(a.why || "")}</span>
         </span>
         <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
       </button>`).join("")}
-      ${SWAP_SEARCHING ? "" : `<button type="button" class="sv-row" id="swSearchRow">
-        <span class="sv-row-ico">${icon("plus", 18)}</span>
+      ${/* Browse opens the same picker Add exercise uses, on this exercise's
+            own section (Mo: swapping an upper body lift browses upper body),
+            with the other sections one tap away in its chips. */ ""}
+      <button type="button" class="sv-row" id="swBrowseRow">
+        <span class="sv-row-ico">${icon("dumbbell", 18)}</span>
         <span class="sv-row-txt">
-          <span class="sv-row-name">Search all exercises</span>
-          <span class="sv-row-meta">Anything in the library, not just these</span>
+          <span class="sv-row-name">Browse ${group && group.key !== "all" ? `${escapeHtml(group.label.toLowerCase())} ` : ""}exercises</span>
+          <span class="sv-row-meta">With pictures. Switch sections any time.</span>
         </span>
         <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
-      </button>`}
+      </button>
     </div>
     ${SWAP_SEARCHING ? `
     <div class="ex-search-wrap" style="margin-top:12px">
@@ -29858,7 +29908,8 @@ function renderSwapSheet() {
     const a = alts[Number(b.dataset.alt)];
     b.onclick = () => applySwap(a.name, "suggested");
   });
-  if ($("swSearchRow")) $("swSearchRow").onclick = () => { SWAP_SEARCHING = true; renderSwapSheet(); };
+  if ($("swBrowseRow")) $("swBrowseRow").onclick = () => { CB_GROUP = swapGroupFor(ex); cbOpenPicker("swap"); };
+  mountMotionFigures($("swapSheet"));
   if ($("swSearch")) {
     // The same catalog and the same normaliser the manual builder searches, so
     // "push up" finds "Push-Up" here for the same reason it does there.
@@ -40050,7 +40101,8 @@ let CB_PENDING = null;   // the exercise waiting on its sets and reps
 let CB_TARGET = "draft";
 /* "plan" is whichever plan the screen behind this sheet is showing, which is
    today's unless somebody is reviewing another day. */
-const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || []) : MANUAL_DRAFT);
+const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || [])
+  : CB_TARGET === "swap" ? (SWAP_CTX?.list?.() || []) : MANUAL_DRAFT);
 
 async function cbCommit() {
   if (CB_TARGET === "plan") { await savePlanExercises(); rerenderPlanScreen(); return; }
@@ -40060,6 +40112,8 @@ async function cbCommit() {
 
 function cbOpenPicker(target = "draft") {
   CB_TARGET = target;
+  /* Above the swap sheet it was opened from (#swapScrim is 96). */
+  $("cbPickScrim").style.zIndex = target === "swap" ? "98" : "";
   $("cbPickScrim").classList.remove("hidden");
   $("cbPickScrim").onclick = (e) => { if (e.target === $("cbPickScrim")) cbClosePicker(); };
   cbRenderPicker();
@@ -40069,6 +40123,7 @@ function cbClosePicker() {
   CB_PENDING = null;
   CB_TARGET = "draft";
   $("cbPickScrim").classList.add("hidden");
+  $("cbPickScrim").style.zIndex = "";
   pinSheets();
 }
 
@@ -40079,8 +40134,8 @@ function cbRenderPicker() {
     <div class="ds-grip"></div>
     <div class="cb-sheet-head">
       <div>
-        <div class="cb-sheet-title">Add an exercise</div>
-        <div class="cb-sheet-count">${n ? `${n} in your workout so far` : "Nothing added yet"}</div>
+        <div class="cb-sheet-title">${CB_TARGET === "swap" ? `Swap ${escapeHtml(swapTarget()?.name || "")}` : "Add an exercise"}</div>
+        <div class="cb-sheet-count">${CB_TARGET === "swap" ? "Pick one to put in its place" : n ? `${n} in your workout so far` : "Nothing added yet"}</div>
       </div>
     </div>
     <div class="cb-pick-top">
@@ -40144,6 +40199,9 @@ function cbRenderGrid() {
   grid.querySelectorAll("[data-pick]").forEach((b) => {
     const ex = list.find((e) => e.name === b.dataset.pick);
     b.onclick = () => {
+      /* Swapping: the tap IS the choice. Sets and reps stay with the slot,
+         exactly as a suggested swap keeps them. */
+      if (CB_TARGET === "swap") { const name = ex.name; cbClosePicker(); applySwap(name, "searched"); return; }
       // The tick means it is already in there, so this tap changes that entry
       // rather than quietly making a second identical one.
       const at = cbList().findIndex((e) => e.name === ex.name);
@@ -41214,17 +41272,8 @@ function renderPlanPreview(opts) {
      they come off the row, so this screen says the same thing tomorrow morning
      as it said when the plan was built. */
   const planSays = warningsForPlan(plan);
-  /* The one unprompted offer in the app, and it is here rather than in
-     onboarding because a limit is a constraint on how a goal gets trained for,
-     not a goal: asking up front turns "what do you want" into "what is wrong
-     with you" and can block somebody from ever getting a plan. By here the plan
-     exists, so the answer can only make it safer. null means never asked. Only
-     on a plan that was just built, because that is the moment it is about. */
-  /* Never on a day with no lifts on it. "Anything that hurts, or gear you
-     don't have" is a question about how a LIFTING day gets built, and asking
-     it under a yoga class is the app not reading its own screen. It comes
-     round again on the next day that has lifts on it. */
-  const askLimits = !!justMade && !isCoachedClient() && MY_PROFILE?.limits == null && !activityDay;
+  /* The after-plan "anything to work around?" offer that sat here is gone
+     (Mo, 2026-10-04). Limits are asked in Setup and on the day review. */
 
   /* A plan made moments ago is untouched even when it happens to name something
      already logged this morning, so it keeps its grips, its remove buttons and
@@ -41473,10 +41522,8 @@ function renderPlanPreview(opts) {
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished, plan)}
     ${finished || activityDay ? "" : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
-    ${askLimits ? `
-    <p class="ef-note">Anything that hurts, or gear you don&rsquo;t have? Tell me once and every plan after this one will respect it.</p>
-    <button type="button" class="btn-ghost" id="planLimitsAskBtn">Tell me what to work around</button>
-    <button type="button" class="btn-ghost" id="planLimitsNoneBtn">Nothing to work around</button>` : ""}
+    ${/* The two work-around buttons that sat here are gone (Mo, 2026-10-04).
+          Limits are still asked in setup and on the day review. */ ""}
     ${review ? reviewActions : finished
       ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
          <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
@@ -41659,32 +41706,6 @@ function renderPlanPreview(opts) {
      that was the last one. */
   if ($("planRemoveSessionBtn")) {
     $("planRemoveSessionBtn").onclick = () => removePlannedSession(plan, plan.entry_date || todayStr());
-  }
-
-  /* The limits offer, which the reveal screen used to make and dismiss for
-     you: tapping Let's go there quietly wrote the empty answer, which is how
-     "offered once" stayed true. Nothing on this screen can stand in for that,
-     so the dismissal is its own button and says what it means. Either tap
-     writes the row, which is what stops this being asked after every plan;
-     walking away without answering leaves the question open, and it is asked
-     again the next time a plan is built. That is the honest version. */
-  if ($("planLimitsAskBtn")) {
-    $("planLimitsAskBtn").onclick = () => {
-      switchTab("setup");
-      openSettingsPage("limits");
-      // After openSettingsPage, which renders the page: Skip there should now
-      // record the answer rather than leaving it null.
-      LIMITS_ASKED_AFTER_PLAN = true;
-    };
-  }
-  if ($("planLimitsNoneBtn")) {
-    $("planLimitsNoneBtn").onclick = async () => {
-      /* saveLimits answers rather than throws. An unchecked failure here is a
-         question that looks answered and comes back tomorrow. */
-      const ok = await saveLimits(emptyLimits(), { quiet: true });
-      if (ok === false) { toast("Couldn't save that. Try again."); return; }
-      rerenderPlanScreen();
-    };
   }
 
   /* The review doors. Each one hands the day to the sheet that already does
