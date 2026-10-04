@@ -5407,6 +5407,33 @@
   .tg-mb-use { border: 0; border-radius: 999px; padding: 10px 16px; background: var(--text); color: var(--bg); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
   .tg-mb-use:disabled { opacity: .4; }
 
+  /* Watching your partner finish */
+  .tg-card.watch { gap: 12px; }
+  .tg-live { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--partner); font-variant-numeric: tabular-nums; }
+  .tg-wface { position: relative; width: 112px; height: 112px; display: grid; place-items: center; }
+  .tg-wface svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .tg-wface circle { fill: none; stroke: var(--border); stroke-width: 5; }
+  .tg-wface circle.fill { stroke: var(--partner); stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+  .tg-wface .av { width: 88px; height: 88px; font-size: 28px; margin: 0; border-width: 0; cursor: default; }
+  .tg-now { width: 100%; display: grid; gap: 8px; padding: 14px; border-radius: 16px; text-align: left;
+    background: color-mix(in srgb, var(--partner) 10%, var(--panel-2)); }
+  .tg-now h3 { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+  .tg-now .tg-wk-who { color: var(--partner); }
+  .tg-wchips { display: grid; grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); gap: 6px; }
+  .tg-wchip { display: grid; place-items: center; padding: 8px 4px; border-radius: 12px; border: 1.5px dashed color-mix(in srgb, var(--partner) 45%, var(--border)); font-variant-numeric: tabular-nums; }
+  .tg-wchip small { font-size: 11.5px; color: var(--muted); }
+  .tg-wchip b { font-size: 17px; }
+  .tg-wchip.done { border-style: solid; border-color: var(--partner); background: var(--partner); color: #fff; animation: tgChip .35s cubic-bezier(.34,1.56,.64,1); }
+  .tg-wchip.done small { color: rgba(255,255,255,.85); }
+  .tg-wlist { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 4px; text-align: left; }
+  .tg-wlist li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 10px; font-size: 14px; color: var(--muted); }
+  .tg-wlist li.done { color: var(--text); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--partner) 60%, transparent); }
+  .tg-wlist li.now { color: var(--text); font-weight: 700; background: var(--panel-2); }
+  .tg-cheers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
+  .tg-cheers button { border: 1.5px solid color-mix(in srgb, var(--partner) 45%, var(--border)); background: var(--panel); color: var(--text); border-radius: 999px; padding: 10px 6px; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: transform .15s, background .2s; }
+  .tg-cheers button.sent { background: var(--partner); color: #fff; transform: scale(.96); }
+  .tg-mine { margin: 0; font-size: 13px; color: var(--muted); }
+
   /* Finish */
   .tg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
   .tg-col { display: grid; justify-items: center; gap: 4px; padding: 14px 8px; border-radius: 16px; background: var(--panel-2); min-width: 0; }
@@ -15839,6 +15866,9 @@ function switchTab(tab) {
      destroyBodyFigures. */
   if (tab !== "body") destroyBodyFigures();
   tgRenderMakeBar();
+  /* Your half of a joint workout is done and theirs is not: the Workout tab
+     is where you watch them. */
+  if (tab === "workout" && tgWatching()) setTimeout(tgShowWatch, 0);
   if (tab === "home") renderHome(true);
   if (tab === "progress") { renderProgressTab(); maybeStartPartnerTour(); }
   if (tab === "body") renderBodyTab(true);
@@ -17811,6 +17841,7 @@ function tgOnSet(row) {
   if (theirs && row.done && !before?.done) tgCallout(row);
   tgRenderHud();
   if (document.querySelector(".tg-scrim.finish")) tgShowFinish();
+  if (document.querySelector(".tg-scrim.watch")) tgShowWatch();
 }
 
 async function tgUpdate(patch) {
@@ -18183,10 +18214,13 @@ function renderTogether(prev = null) {
     if (prev && prev.status !== "active") { sfxPlay("paired"); buzz([14, 50, 22]); }
     /* Your half already finished: nothing to start, you are waiting for them. */
     if (!TG[tgAmHost() ? "host_done_at" : "guest_done_at"]) tgStartMySession();
+    else if (document.querySelector(".tg-scrim.watch")) tgShowWatch();
     tgRenderHud();
     return;
   }
   if (s === "done") {
+    clearInterval(TG_WATCH_TICK);
+    if (document.querySelector(".tg-scrim.watch")) { tgShowFinish(); return; }
     tgRenderHud();
     if (document.querySelector(".tg-scrim.finish") || (prev && prev.status !== "done" && SESSION?.finished)) tgShowFinish();
   }
@@ -18438,14 +18472,111 @@ async function tgShowFinish() {
         ${col("them", theirAv, them, !!(tgAmHost() ? TG.guest_done_at : TG.host_done_at))}
       </div>
       ${both ? `<div class="tg-bonus"><span>Together bonus</span><b>1.5x XP · +${bonus}</b></div>` : ""}
-      <div class="tg-actions"><button type="button" class="btn-primary" id="tgDone">${both ? "Done" : "Close"}</button></div>
+      <div class="tg-actions">
+        ${both ? `<button type="button" class="btn-primary" id="tgDone">Done</button>`
+          : `<button type="button" class="btn-primary" id="tgWatchGo">Watch ${first}</button><button type="button" class="tg-ghost" id="tgDone">Close</button>`}
+      </div>
     </div>`;
   $("tgDone").onclick = () => { el.remove(); if (TG?.status === "done") { TG = null; renderTogetherHome(); } };
+  if ($("tgWatchGo")) $("tgWatchGo").onclick = () => tgShowWatch();
   if (both && !wasBoth) {
     sfxPlay("pr");
     buzz([20, 60, 30]);
     setTimeout(() => { const c = el.querySelector(".tg-bonus"); if (c && el.isConnected) confettiBurst(c, 40); }, 250);
   }
+}
+
+/* ---- Watching them finish ----
+   Mo, 2026-10-04: in a joint workout, finishing first should not throw you out.
+   Your half is done, theirs is not, so the workout becomes something you
+   watch: where they are, every set landing with its weight and reps, how far
+   through they are, the clock, and a cheer you can send. It is what the
+   Workout tab shows until they finish, and the finish card and Home both lead
+   here. When they finish it turns into the shared finish. */
+function tgWatching() {
+  if (!TG || TG.status !== "active") return false;
+  const mine = TG[tgAmHost() ? "host_done_at" : "guest_done_at"];
+  const theirs = TG[tgAmHost() ? "guest_done_at" : "host_done_at"];
+  return !!mine && !theirs;
+}
+
+let TG_WATCH_TICK = 0;
+let TG_CHEER_AT = 0;
+async function tgShowWatch() {
+  if (!tgWatching()) { clearInterval(TG_WATCH_TICK); return; }
+  const token = ++TG_RENDER;
+  const partner = tgPartnerEmail();
+  const first = tgPartnerFirst();
+  const list = tgListFor(partner);
+  const sets = TG_SETS.filter((x) => x.session_id === TG.id && tgSame(x.email, partner) && x.done);
+  const doneOn = (ex) => sets.filter((x) => tgSame(x.exercise_name, ex.name));
+  const total = list.reduce((n, e) => n + (e.sets || 3), 0) || 1;
+  const currentIdx = Math.max(0, list.findIndex((ex) => doneOn(ex).length < (ex.sets || 3)));
+  const cur = list[currentIdx];
+  const last = sets.slice().sort((a, b) => Date.parse(b.updated_at || 0) - Date.parse(a.updated_at || 0))[0];
+  const theirAv = await avatarHTML(partner, partnerName(), "them", "div");
+  if (token !== TG_RENDER || !tgWatching()) return;
+  const c = 2 * Math.PI * 46;
+  const frac = Math.min(1, sets.length / total);
+  const chips = cur ? Array.from({ length: cur.sets || 3 }, (_, i) => {
+    const s2 = doneOn(cur).find((x) => x.set_idx === i);
+    return s2 ? `<span class="tg-wchip done"><b>${s2.weight != null ? Number(s2.weight) : "-"}</b><small>× ${s2.reps ?? ""}</small></span>` : `<span class="tg-wchip"><small>Set ${i + 1}</small></span>`;
+  }).join("") : "";
+  const me = tgStatsFor(MY_EMAIL);
+  const el = tgOverlay("watch");
+  el.setAttribute("aria-label", `Watching ${first} train`);
+  el.innerHTML = `
+    <div class="tg-card watch">
+      <button type="button" class="tg-x" id="tgWatchX" aria-label="Close">&times;</button>
+      <div class="tg-live"><span class="tg-dot"></span>LIVE · <span id="tgWatchClock">0:00</span></div>
+      <div class="tg-wface">
+        <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46"/><circle class="fill" cx="50" cy="50" r="46" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(1)}"/></svg>
+        ${theirAv}
+      </div>
+      <h2 class="tg-h">${first} is still going</h2>
+      <p class="tg-sub">${sets.length} of ${total} sets${last ? ` · last: ${escapeHtml(last.exercise_name)} ${last.weight != null ? `${Number(last.weight)} × ${last.reps ?? ""}` : ""}` : ""}</p>
+      ${cur ? `<section class="tg-now">
+        <span class="tg-wk-who">Now</span>
+        <h3>${escapeHtml(cur.name)}</h3>
+        <div class="tg-wchips">${chips}</div>
+      </section>` : ""}
+      <ol class="tg-wlist">
+        ${list.map((ex, i) => {
+          const n = doneOn(ex).length, of = ex.sets || 3;
+          const st = n >= of ? "done" : i === currentIdx ? "now" : "";
+          return `<li class="${st}"><span>${escapeHtml(ex.name)}</span><span class="tg-sr">${n}/${of}</span></li>`;
+        }).join("")}
+      </ol>
+      <div class="tg-cheers" role="group" aria-label="Cheer ${first} on">
+        ${["Let's go", "Almost there", "Beast"].map((t) => `<button type="button" data-tg-cheer="${t}">${t}</button>`).join("")}
+      </div>
+      <p class="tg-mine">You finished · ${me.sets} ${me.sets === 1 ? "set" : "sets"}${me.volume ? ` · ${me.volume.toLocaleString()} lb` : ""}</p>
+    </div>`;
+  $("tgWatchX").onclick = () => { clearInterval(TG_WATCH_TICK); el.remove(); };
+  el.querySelectorAll("[data-tg-cheer]").forEach((b) => {
+    b.onclick = async () => {
+      /* One every few seconds: a cheer is a tap, not a stream. */
+      if (Date.now() - TG_CHEER_AT < 3000) return;
+      TG_CHEER_AT = Date.now();
+      b.classList.add("sent");
+      const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: partner, message: b.dataset.tgCheer });
+      if (error) { console.error("cheer not sent", error); toast("Couldn't send it"); b.classList.remove("sent"); return; }
+      buzz(10);
+      toast(`Sent to ${first}`);
+      setTimeout(() => b.classList.remove("sent"), 1200);
+    };
+  });
+  /* The clock is theirs: time since the session started. */
+  const start = Date.parse(TG.started_at || TG.created_at || Date.now());
+  const tick = () => {
+    const box = $("tgWatchClock");
+    if (!box) { clearInterval(TG_WATCH_TICK); return; }
+    const sec = Math.max(0, Math.round((Date.now() - start) / 1000));
+    box.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  };
+  tick();
+  clearInterval(TG_WATCH_TICK);
+  TG_WATCH_TICK = setInterval(tick, 1000);
 }
 
 /* Home: the way in when nobody is training, and the way back while it runs. */
@@ -18455,9 +18586,12 @@ function renderTogetherHome() {
   if (!PARTNER_EMAIL || isCoachedClient?.()) { slot.innerHTML = ""; return; }
   const first = tgPartnerFirst();
   if (TG && TG_OPEN.includes(TG.status) && !tgStale(TG)) {
-    const label = TG.status === "active" ? `You're training with ${first}` : TG.status === "lobby" ? `${first}'s in the lobby` : tgAmHost() ? `Waiting for ${first}` : `${first} wants to train together`;
-    slot.innerHTML = `<button type="button" class="tg-home live" id="tgHomeBtn"><span class="tg-dot"></span><span class="tg-home-txt"><b>${label}</b><span>Tap to open</span></span><span class="tg-home-go">Open</span></button>`;
-    $("tgHomeBtn").onclick = () => { if (TG.status === "active") { switchTab("workout"); if (SESSION) openSessionUI?.(); renderSession?.(); } else renderTogether(); };
+    const label = tgWatching() ? `${first} is still going` : TG.status === "active" ? `You're training with ${first}` : TG.status === "lobby" ? `${first}'s in the lobby` : tgAmHost() ? `Waiting for ${first}` : `${first} wants to train together`;
+    slot.innerHTML = `<button type="button" class="tg-home live" id="tgHomeBtn"><span class="tg-dot"></span><span class="tg-home-txt"><b>${label}</b><span>${tgWatching() ? "Watch them finish" : "Tap to open"}</span></span><span class="tg-home-go">${tgWatching() ? "Watch" : "Open"}</span></button>`;
+    $("tgHomeBtn").onclick = () => {
+      if (tgWatching()) { tgShowWatch(); return; }
+      if (TG.status === "active") { switchTab("workout"); if (SESSION) openSessionUI?.(); renderSession?.(); } else renderTogether();
+    };
     return;
   }
   /* Nothing when nobody is training together: the way in is their profile
