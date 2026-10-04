@@ -7639,10 +7639,9 @@
 
   /* Workout tab */
   .workout-progress-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
-  /* The app's green the way the app's buttons carry it, as a fill with dark
-     text on it. Green text on white was unreadable and the darker ink green
-     did not match (Mo, 2026-10-04), so these two are badges instead. */
-  .workout-progress-count { background: var(--accent); color: var(--on-accent); font-weight: 800; font-size: 13px; padding: 2px 9px; border-radius: 999px; }
+  /* No colour on these two (Mo, 2026-10-04): green text on white was
+     unreadable, the darker ink green did not match, and a badge was too much. */
+  .workout-progress-count { color: var(--text); font-weight: 800; }
   .workout-progress-track { height: 5px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 4px; }
   .workout-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
   /* The session estimate, which is a control rather than a label. It used to
@@ -7651,6 +7650,12 @@
      the app's other small controls, with the 44px target coming from the pill
      itself rather than from invisible padding. */
   .plan-time-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 10px; }
+  /* Back on the left, the session length on the right, one row. */
+  .plan-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .plan-head .back-bar { margin: 0; }
+  /* The same pill as Back, so the row reads as one pair. */
+  .plan-head .plan-time { min-height: 0; padding: 0 10px 0 11px; font-size: 12.5px; gap: 5px; box-shadow: none; }
+  .plan-head .back-bar, .plan-head .plan-time { height: 34px; box-sizing: border-box; }
   .plan-time {
     display: inline-flex; align-items: center; gap: 7px; min-height: 40px;
     padding: 8px 12px 8px 12px; border-radius: 999px; cursor: pointer;
@@ -7661,14 +7666,14 @@
   }
   .plan-time svg:first-child { color: var(--muted); }
   .plan-time svg:last-child { color: var(--muted); margin-left: 1px; }
-  .plan-time b { background: var(--accent); color: var(--on-accent); font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+  .plan-time b { color: var(--text); font-weight: 800; }
   .plan-time:active { transform: scale(.97); }
   .gen-scrim .plan-time-row { justify-content: center; }
   /* The reveal is white on a dark scrim whatever the theme is, so the same
      control needs its own two colours there rather than the card's. */
   .gen-scrim .plan-time { color: rgba(255,255,255,.85); background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); box-shadow: none; }
   .gen-scrim .plan-time svg { color: rgba(255,255,255,.6); }
-  .gen-scrim .plan-time b { color: var(--on-accent); }
+  .gen-scrim .plan-time b { color: #fff; }
   /* What a budget change did, under the control that did it. */
   .plan-time-change { margin: -2px 0 10px; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
   /* The over-budget line reads as the clock's, not the card's: same muted
@@ -41251,13 +41256,16 @@ function renderPlanPreview(opts) {
   const askedMin = oneOff?.minutes ?? (Number(MY_PROFILE?.session_minutes) || null);
   const overMin = estMin && askedMin ? estMin - askedMin : 0;
   const overLine = overMin > 2 ? `${overMin} min over the ${askedMin} you asked for. Tap the time to fit it.` : "";
-  const timeRow = (reviewingOtherDay || started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
-    <div class="plan-time-row">
+  /* Mo, 2026-10-04: the time sits on the Back row, on the right, rather than
+     on a line of its own under an empty gap. The pill is drawn into that row;
+     what a time change did, and the way back from it, stay under it. */
+  const showTime = !(reviewingOtherDay || started || finished || SESSION || isCoachedClient() || !estMin);
+  const timePill = showTime ? `
       <button type="button" class="plan-time" id="planTimeBtn" aria-label="About ${estMin} minutes.${overLine ? " " + overLine : ""} Change how long you have today.">
         ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
-      </button>
-      ${oneOff?.from?.minutes ? `<button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button>` : ""}
-    </div>
+      </button>` : "";
+  const timeRow = !showTime ? "" : `
+    ${oneOff?.from?.minutes ? `<div class="plan-time-row"><span></span><button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button></div>` : ""}
     ${overLine ? `<p class="plan-time-change plan-time-over" id="planTimeOver">${escapeHtml(overLine)}</p>` : ""}
     ${oneOff?.changed ? `<p class="plan-time-change" id="planTimeChange">${escapeHtml(oneOff.changed)}</p>` : ""}`;
 
@@ -41404,7 +41412,10 @@ function renderPlanPreview(opts) {
     </div>` : "";
 
   $("workoutContent").innerHTML = `
-    ${backBar("Back", () => goWorkoutScreen(review ? PLAN_VIEW_RETURN : "choose", { back: true }))}
+    <div class="plan-head">
+      ${backBar("Back", () => goWorkoutScreen(review ? PLAN_VIEW_RETURN : "choose", { back: true }))}
+      ${timePill}
+    </div>
     ${dayList}
     ${overview}
     ${/* Not on an activity day: "0/0" over a class is a progress bar for a
