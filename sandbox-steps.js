@@ -198,6 +198,23 @@
     ]},
 
     { group: "The other person", note: "Everything that only matters because someone else is there.", steps: [
+      /* Three versions of one moment while Mo picks. Delete the two losers here
+         and in index.html once he has. */
+      { t: "Partner joins: A, the robot hosts", scenario: "paired",
+        s: "Playful: robot, confetti, sound",
+        note: "What both of you see the moment you become a pair, once, ever. The robot bounces up between your two faces and the confetti is in your two colours. Turn sound on in the phone frame first to hear it. Tap See Mell's progress to land on Mell's side of Progress, or Later to close.",
+        run: (w) => w.showPairCelebration({ style: "robot" }) },
+
+      { t: "Partner joins: B, the rings close", scenario: "paired",
+        s: "Calm: two arcs meet as one ring",
+        note: "The same moment, quieter. Your two faces glide together and your blue arc and their orange arc draw in from either side until they close into one ring, which then glows. No confetti: a promise rather than a party.",
+        run: (w) => w.showPairCelebration({ style: "rings" }) },
+
+      { t: "Partner joins: C, the high five", scenario: "paired",
+        s: "Cute: faces bump, hearts pop",
+        note: "The same moment, cuter. Both faces hop up from the bottom, bump in the middle with a little squash, hearts in your two colours pop out of the bump, and a Day 1 together tag lands on top.",
+        run: (w) => w.showPairCelebration({ style: "five" }) },
+
       { t: "They are training now", scenario: "live",
         s: "Live card on home",
         note: "Mell is nineteen minutes into leg day. The live card is on home; tap it for the sheet with what she is on and the cheer buttons. This is the state that fires the push notification we added.",
