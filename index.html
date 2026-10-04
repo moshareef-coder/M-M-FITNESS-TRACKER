@@ -5272,7 +5272,10 @@
   .tg-face .av { width: 64px; height: 64px; font-size: 22px; border-width: 3px; margin: 0; cursor: default; }
   .tg-face .av:active { transform: none; }
   .tg-face.waiting { opacity: .45; animation: tgBreathe 1.6s ease-in-out infinite; }
-  .tg-face.here::after { content: ""; position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px; border-radius: 50%;
+  /* The partner's face carries z-index 1 and a negative margin from the
+     avatar pair in the header, which put it on top of its own online dot. */
+  .tg-face .av.them { margin-left: 0; }
+  .tg-face.here::after { content: ""; position: absolute; right: 2px; bottom: 2px; z-index: 3; width: 14px; height: 14px; border-radius: 50%;
     background: var(--accent); border: 2.5px solid var(--panel); }
   @keyframes tgBreathe { 50% { opacity: .8 } }
   .tg-link { width: 46px; height: 12px; }
@@ -5365,6 +5368,8 @@
   .tg-modecard b { font-size: 16px; }
   .tg-modecard span { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
   .tg-modecard.on { border-color: var(--text); background: var(--panel-2); }
+  .tg-modecard:disabled { cursor: default; color: var(--text); }
+  .tg-modecard:disabled:not(.on) { opacity: .55; }
   .tg-ghost.small { font-size: 14px; padding: 4px; }
   .tg-wk { width: 100%; text-align: left; display: grid; gap: 8px; padding: 14px; border-radius: 18px; background: var(--panel-2); border-left: 4px solid var(--me); }
   .tg-wk.them { border-left-color: var(--partner); }
@@ -17895,7 +17900,9 @@ function tgMaybePerfect() {
 }
 
 async function tgSetMode(mode) {
-  if (!TG || (TG.mode || "same") === mode) return;
+  /* Whoever invited decides, how you train as well as what, until they hand
+     it over (Mo, 2026-10-04). */
+  if (!TG || (TG.mode || "same") === mode || !tgAmLeader()) return;
   const patch = { mode };
   /* Switching to joint from two matching lists keeps that list, so nobody
      loses what they just built. Only the person in charge writes the shared
@@ -18043,7 +18050,12 @@ function tgWorkoutCard({ who, title, exs, focus, editable, compat, waiting }) {
    beside one already finished. Then it is an ordinary startWorkout. */
 async function tgStartMySession() {
   if (TG_STARTING || !TG) return;
-  if (SESSION?.together?.id === TG.id && !SESSION.finished) { tgRenderHud(); return; }
+  /* This person's session for this together session already exists, running
+     or finished. Finishing your half while your partner is still going leaves
+     the session active, and treating that as "start my workout" again started
+     a second workout on top of the finish screen, which froze it (Mo,
+     2026-10-04). Once is all anyone gets. */
+  if (SESSION?.together?.id === TG.id) { if (!SESSION.finished) tgRenderHud(); return; }
   if (SESSION && !SESSION.finished) {
     /* The host who invited from a running workout: that workout IS the one.
        Brought back on screen, because it may have been minimised. */
@@ -18168,7 +18180,8 @@ function renderTogether(prev = null) {
     tgStopMaking();
     tgCloseOverlay("lobby"); tgCloseOverlay("invite");
     if (prev && prev.status !== "active") { sfxPlay("paired"); buzz([14, 50, 22]); }
-    tgStartMySession();
+    /* Your half already finished: nothing to start, you are waiting for them. */
+    if (!TG[tgAmHost() ? "host_done_at" : "guest_done_at"]) tgStartMySession();
     tgRenderHud();
     return;
   }
@@ -18258,12 +18271,12 @@ async function tgShowLobby() {
   if (!reviewing) {
     /* Step one: how you are training. Then into the app's own flow. */
     body = `
-      <p class="tg-q">How do you want to train?</p>
+      <p class="tg-q">${leader ? "How do you want to train?" : `${first} is choosing how you train`}</p>
       <div class="tg-modes">
-        <button type="button" class="tg-modecard ${same ? "on" : ""}" data-tg-mode="same">
+        <button type="button" class="tg-modecard ${same ? "on" : ""}" data-tg-mode="same" ${leader ? "" : "disabled"}>
           <b>Same workout</b><span>One workout for both of you, done at the same time. 1.5x XP.</span>
         </button>
-        <button type="button" class="tg-modecard ${!same ? "on" : ""}" data-tg-mode="own">
+        <button type="button" class="tg-modecard ${!same ? "on" : ""}" data-tg-mode="own" ${leader ? "" : "disabled"}>
           <b>Each our own</b><span>Your own workouts, side by side, watching each other live.</span>
         </button>
       </div>
@@ -18278,16 +18291,16 @@ async function tgShowLobby() {
       <div class="tg-banner same"><b>Joint workout</b><span>The same exercises for both of you, at the same time. 1.5x XP.</span></div>
       ${tgWorkoutCard({ who: "both", title: `${leaderFirst === "You" ? "You" : first} made this`, exs: shared, focus: TG.workout?.focus,
         editable: leader, compat: [["You", tgMatchFor(shared, ME), "me"], [first, tgMatchFor(shared, partner), "them"]] })}
-      <button type="button" class="tg-ghost small" data-tg-mode="own">Do our own workouts instead</button>`;
+      ${leader ? `<button type="button" class="tg-ghost small" data-tg-mode="own">Do our own workouts instead</button>` : ""}`;
   } else {
     const matching = tgSameNames(mine, theirs);
     body = `
       <div class="tg-banner own"><b>Side by side</b><span>You each do your own workout and watch each other live. 1.5x XP.</span></div>
-      ${matching ? `<div class="tg-perfect"><b>You picked the same workout.</b><button type="button" class="tg-link-btn" data-tg-mode="same">Make it a joint workout</button></div>` : ""}
+      ${matching ? `<div class="tg-perfect"><b>You picked the same workout.</b>${leader ? `<button type="button" class="tg-link-btn" data-tg-mode="same">Make it a joint workout</button>` : ""}</div>` : ""}
       ${tgWorkoutCard({ who: "me", title: "Your workout", exs: mine, focus: TG[tgMySide()]?.focus, editable: true, compat: [["You", tgMatchFor(mine, ME), "me"]] })}
       ${tgWorkoutCard({ who: "them", title: `${first}'s workout`, exs: theirs, focus: TG[tgTheirSide()]?.focus, editable: false,
         compat: [[first, tgMatchFor(theirs, partner), "them"]], waiting: here ? `${first} is making theirs` : `${first} makes theirs once they join` })}
-      <button type="button" class="tg-ghost small" data-tg-mode="same">Do the same workout instead</button>`;
+      ${leader ? `<button type="button" class="tg-ghost small" data-tg-mode="same">Do the same workout instead</button>` : ""}`;
   }
 
   el.innerHTML = `

@@ -27,7 +27,7 @@ create table if not exists together_sessions (
   status        text not null default 'invited'
                 check (status in ('invited', 'lobby', 'active', 'done', 'declined', 'cancelled')),
   -- same: one workout for both, the joint workout. own: each does their own,
-  -- side by side, watching each other. Either of them can switch it.
+  -- side by side, watching each other. The person in charge chooses.
   mode          text not null default 'same' check (mode in ('same', 'own')),
   -- The shared list for mode 'same': { exercises: [...], focus, joinRunning }.
   -- Only the person in charge changes it.
@@ -84,8 +84,10 @@ begin
   if lower(new.leader_email) not in (lower(old.host_email), lower(old.guest_email)) then
     raise exception 'the leader has to be one of the two of them';
   end if;
-  -- Only the person in charge changes the shared workout or hands over the lead.
-  if (new.workout is distinct from old.workout or new.leader_email is distinct from old.leader_email)
+  -- Only the person in charge changes the shared workout, how you train, or
+  -- hands over the lead. The inviter starts in charge.
+  if (new.workout is distinct from old.workout or new.leader_email is distinct from old.leader_email
+      or new.mode is distinct from old.mode)
      and lower(old.leader_email) <> my_email() then
     raise exception 'only the person in charge can change the workout';
   end if;
