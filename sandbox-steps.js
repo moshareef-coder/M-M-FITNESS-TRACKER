@@ -196,8 +196,8 @@
         } },
 
       { t: "Build one yourself", scenario: "paired",
-        s: "Tap the body, then one area at a time",
-        note: "Plan my own is guided now. It opens on the body: tap muscles on the front or back figure (or Chest, Back, Shoulders, Arms, Legs, Core under it, or Whole body). Continue walks those areas one at a time with only that area's exercises (eight, and Show all), each with a search; the pills at the top jump to any area. It ends on the review: the figure lit with what you picked, sets and reps, Add another area, Start. Back always goes one step back. This step clears any saved draft so it opens on the body.",
+        s: "Tap the body, then pick from those areas",
+        note: "Plan my own starts on the body: tap muscles on the front or back figure (or Chest, Back, Shoulders, Arms, Legs, Core under it, or Whole body). Continue opens one page with every area you picked as its own section (eight each, and Show all), and one search above them that finds any exercise. Review your workout leads to the review: the figure lit with what you picked, sets and reps, Add another area, Start. Back always goes one step back. This step clears any saved draft so it opens on the body.",
         run: (w) => { w.clearDraft(); w.eval("MANUAL_DRAFT = []; pmoReset()"); w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
 
       { t: "Plan the week", scenario: "paired",
