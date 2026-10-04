@@ -3863,6 +3863,31 @@
   .cb-confirm-fig canvas { width: 124px; height: 124px; margin-bottom: 2px; }
   .cb-confirm-fig.fig-none { display: none; }
   .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  /* Plan my own, guided: the area question and one area at a time. */
+  /* The card's own h2 rule is a small grey eyebrow; this is the screen's
+     question, so it is spelled out in full at higher specificity. */
+  #workoutContent h2.pmo-h { margin: 4px 0 4px; font-size: 24px; line-height: 1.15; letter-spacing: -.025em; font-weight: 800; text-wrap: balance;
+    text-transform: none; color: var(--text); }
+  .pmo-sub { margin: 0 0 16px; color: var(--muted); font-size: 14.5px; }
+  .pmo-areas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .pmo-areas.wide { grid-template-columns: 1fr; }
+  .pmo-tile { position: relative; display: grid; gap: 2px; text-align: left; padding: 14px; border-radius: 16px; cursor: pointer; font: inherit; color: var(--text);
+    background: var(--panel); border: 1.5px solid var(--border); min-height: 54px; align-content: center; transition: border-color .15s, background .15s; }
+  .pmo-tile b { font-size: 15.5px; }
+  .pmo-tile span { font-size: 13px; color: var(--muted); }
+  .pmo-areas:not(.wide) .pmo-tile { text-align: center; justify-items: center; padding: 14px 6px; }
+  .pmo-tile.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .pmo-check { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--accent); color: var(--on-accent); opacity: 0; transform: scale(.6); transition: opacity .15s, transform .15s; font-style: normal; }
+  .pmo-tile.on .pmo-check { opacity: 1; transform: none; }
+  .pmo-or { text-align: center; font-size: 12.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 8px 0 10px; }
+  .pmo-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
+  .pmo-steps span { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); }
+  .pmo-steps span.now { background: var(--text); color: var(--bg); }
+  .pmo-steps span.done { color: var(--text); }
+  .pmo-more { margin: -4px 0 12px; }
+  .pmo-foot { display: grid; gap: 6px; margin: 4px 0 8px; }
+  .pmo-skip { background: none; border: 0; color: var(--muted); font: inherit; font-size: 14.5px; font-weight: 600; padding: 10px; cursor: pointer; width: 100%; }
   .cb-card {
     position: relative; overflow: hidden; text-align: left; cursor: pointer; font: inherit;
     padding: 12px 12px 11px; border-radius: 14px; min-height: 74px;
@@ -40039,9 +40064,136 @@ function cbExercisesFor(groupKey, query) {
   return out;
 }
 
-function renderManualBuildScreen() {
+/* ---------- Plan my own, guided ----------
+   Mo, 2026-10-04: picking from the whole library at once was being bombarded
+   with options. So Plan my own starts with one question, what do you want to
+   hit today, takes the areas picked one at a time with only that area's
+   exercises on screen, and lands on the review this screen always had (the
+   list, the figure, sets and reps, Start). Taps go straight into the same
+   MANUAL_DRAFT the picker writes, so nothing downstream changed. */
+const PMO_AREAS = [
+  { key: "full",  label: "Full body",  sub: "A bit of everything", groups: ["legs", "chest", "back", "shoulders", "core"], wide: true },
+  { key: "upper", label: "Upper body", sub: "Chest, back, shoulders, arms", groups: ["chest", "back", "shoulders", "arms"], wide: true },
+  { key: "lower", label: "Lower body", sub: "Legs, glutes and core", groups: ["legs", "core"], wide: true },
+  { key: "chest", label: "Chest", groups: ["chest"] },
+  { key: "back", label: "Back", groups: ["back"] },
+  { key: "shoulders", label: "Shoulders", groups: ["shoulders"] },
+  { key: "arms", label: "Arms", groups: ["arms"] },
+  { key: "legs", label: "Legs", groups: ["legs"] },
+  { key: "core", label: "Core", groups: ["core"] },
+];
+const PMO_ORDER = ["legs", "chest", "back", "shoulders", "arms", "core"];
+const PMO_SHOWN = 8;   // per area before "Show all": a handful, not the library
+let PMO = { stage: "areas", picked: [], step: 0, all: false };
+function pmoReset() { PMO = { stage: "areas", picked: [], step: 0, all: false }; }
+function pmoSections() {
+  const want = new Set(PMO.picked.flatMap((k) => PMO_AREAS.find((a) => a.key === k)?.groups || []));
+  return PMO_ORDER.filter((g) => want.has(g));
+}
+
+function renderPlanMyOwn() {
+  if (PMO.stage === "pick") { renderPmoPick(); return; }
+  const picked = new Set(PMO.picked);
+  const tile = (a) => `<button type="button" class="pmo-tile${a.wide ? " wide" : ""}${picked.has(a.key) ? " on" : ""}" data-pmo-area="${a.key}" aria-pressed="${picked.has(a.key)}">
+      <b>${escapeHtml(a.label)}</b>${a.sub ? `<span>${escapeHtml(a.sub)}</span>` : ""}
+      <i class="pmo-check">${icon("check", 16)}</i>
+    </button>`;
   $("workoutContent").innerHTML = `
-    ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { saveDraft(); cbTeardown(); } }))}
+    ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { pmoReset(); saveDraft(); } }))}
+    <h2 class="pmo-h">What do you want to hit today?</h2>
+    <p class="pmo-sub">Pick one or more. We'll go through them one at a time.</p>
+    <div class="pmo-areas wide">${PMO_AREAS.filter((a) => a.wide).map(tile).join("")}</div>
+    <div class="pmo-or">or pick the parts</div>
+    <div class="pmo-areas">${PMO_AREAS.filter((a) => !a.wide).map(tile).join("")}</div>
+    <div class="pmo-foot">
+      <button type="button" class="btn-primary" id="pmoGo" ${PMO.picked.length ? "" : "disabled"}>${PMO.picked.length ? `Continue with ${pmoSections().length} ${pmoSections().length === 1 ? "area" : "areas"}` : "Pick something to work on"}</button>
+    </div>`;
+  $("workoutContent").querySelectorAll("[data-pmo-area]").forEach((b) => {
+    b.onclick = () => {
+      const k = b.dataset.pmoArea;
+      PMO.picked = PMO.picked.includes(k) ? PMO.picked.filter((x) => x !== k) : [...PMO.picked, k];
+      renderPlanMyOwn();
+    };
+  });
+  $("pmoGo").onclick = () => {
+    if (!PMO.picked.length) return;
+    PMO.stage = "pick"; PMO.step = 0; PMO.all = false;
+    renderPlanMyOwn();
+    window.scrollTo(0, 0);
+  };
+}
+
+function renderPmoPick() {
+  const sections = pmoSections();
+  if (!sections.length) { PMO.stage = "areas"; renderPlanMyOwn(); return; }
+  const g = sections[Math.min(PMO.step, sections.length - 1)];
+  const group = CB_GROUPS.find((x) => x.key === g);
+  const all = EXERCISE_TRAININGS.length ? cbExercisesFor(g, "") : [];
+  const list = PMO.all ? all : all.slice(0, PMO_SHOWN);
+  const chosen = new Set(MANUAL_DRAFT.map((e) => e.name));
+  const inThis = all.filter((e) => chosen.has(e.name)).length;
+  const last = PMO.step >= sections.length - 1;
+  const nextLabel = last ? `Review your workout (${MANUAL_DRAFT.length})` : `Next: ${CB_GROUPS.find((x) => x.key === sections[PMO.step + 1])?.label}`;
+  $("workoutContent").innerHTML = `
+    ${backBar("Back", () => { if (PMO.step > 0) PMO.step--; else PMO.stage = "areas"; PMO.all = false; renderPlanMyOwn(); window.scrollTo(0, 0); })}
+    <div class="pmo-steps" aria-label="Area ${PMO.step + 1} of ${sections.length}">
+      ${sections.map((s2, i) => `<span class="${i < PMO.step ? "done" : i === PMO.step ? "now" : ""}">${escapeHtml(CB_GROUPS.find((x) => x.key === s2)?.label || s2)}</span>`).join("")}
+    </div>
+    <h2 class="pmo-h">${escapeHtml(group?.label || g)}</h2>
+    <p class="pmo-sub" id="pmoCount">${inThis ? `${inThis} picked. ` : ""}Tap the ones you want. Two or three is plenty.</p>
+    <div class="cb-grid" id="pmoGrid">
+      ${!list.length ? `<div class="cb-none">Loading the exercise library…</div>` : list.map((ex, i) => `
+        <button type="button" class="cb-card${chosen.has(ex.name) ? " picked" : ""}" data-pmo-pick="${escapeHtml(ex.name)}" style="--d:${Math.min(i, 12) * 22}ms">
+          <span class="cb-fig" data-fig="${escapeHtml(ex.name)}" data-fig-static></span>
+          <span class="cb-card-name">${escapeHtml(ex.name)}</span>
+          <span class="cb-card-meta">${escapeHtml(ex.equipment || "")}${ex.level ? ` · ${escapeHtml(ex.level)}` : ""}</span>
+          <span class="cb-tick">${icon("check", 26)}</span>
+        </button>`).join("")}
+    </div>
+    ${!PMO.all && all.length > PMO_SHOWN ? `<button type="button" class="btn-ghost pmo-more" id="pmoMore">Show all ${all.length} ${escapeHtml((group?.label || "").toLowerCase())} exercises</button>` : ""}
+    <div class="pmo-foot">
+      <button type="button" class="btn-primary" id="pmoNext">${escapeHtml(nextLabel)}</button>
+      ${inThis ? "" : `<button type="button" class="pmo-skip" id="pmoSkip">Skip ${escapeHtml((group?.label || "").toLowerCase())}</button>`}
+    </div>`;
+  const grid = $("pmoGrid");
+  grid.querySelectorAll("[data-pmo-pick]").forEach((b) => {
+    b.onclick = () => {
+      const name = b.dataset.pmoPick;
+      const at = MANUAL_DRAFT.findIndex((e) => e.name === name);
+      if (at >= 0) MANUAL_DRAFT.splice(at, 1);
+      else MANUAL_DRAFT.push({ name, sets: 3, reps: 10, targetWeight: 0 });
+      saveDraft();
+      b.classList.toggle("picked", at < 0);
+      buzz(8);
+      /* In place, so the figures already drawn are not thrown away per tap. */
+      const n = all.filter((e) => MANUAL_DRAFT.some((d) => d.name === e.name)).length;
+      $("pmoCount").textContent = `${n ? `${n} picked. ` : ""}Tap the ones you want. Two or three is plenty.`;
+      if (last) $("pmoNext").textContent = `Review your workout (${MANUAL_DRAFT.length})`;
+      $("pmoSkip")?.remove();
+    };
+  });
+  mountMotionFigures(grid);
+  if ($("pmoMore")) $("pmoMore").onclick = () => { PMO.all = true; renderPmoPick(); };
+  const advance = () => {
+    PMO.all = false;
+    if (last) {
+      if (!MANUAL_DRAFT.length) { toast("Pick at least one exercise"); return; }
+      PMO.stage = "done";
+      renderManualBuildScreen();
+    } else { PMO.step++; renderPmoPick(); }
+    window.scrollTo(0, 0);
+  };
+  $("pmoNext").onclick = advance;
+  if ($("pmoSkip")) $("pmoSkip").onclick = advance;
+}
+
+function renderManualBuildScreen() {
+  /* A fresh Plan my own starts with the question, not the library. A draft
+     already holding exercises goes straight to its review. */
+  if (PMO.stage !== "done" && !MANUAL_DRAFT.length) { renderPlanMyOwn(); return; }
+  if (PMO.stage !== "done") PMO.stage = "done";
+  $("workoutContent").innerHTML = `
+    ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { saveDraft(); cbTeardown(); pmoReset(); } }))}
     <div class="cb-hero">
       <div class="cb-figs">
         <canvas class="cb-fig" id="cbFigure"></canvas>
@@ -40058,6 +40210,7 @@ function renderManualBuildScreen() {
       <div class="reorder-list" id="draftRows"></div>
     </div>
     <button type="button" class="cb-add" id="cbAddBtn">${icon("plus", 18)} Add an exercise</button>
+    <button type="button" class="pmo-skip" id="pmoAgain">Pick another area</button>
     <!-- Start comes before Cancel now that the bar is in the flow, so the thing
          you actually want is the first one you reach at the end of the list. -->
     <div class="cb-go hidden" id="cbGo">
@@ -40066,6 +40219,7 @@ function renderManualBuildScreen() {
     <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
 
   $("cbAddBtn").onclick = () => cbOpenPicker();
+  $("pmoAgain").onclick = () => { cbTeardown(); PMO = { stage: "areas", picked: [], step: 0, all: false }; renderPlanMyOwn(); window.scrollTo(0, 0); };
 
   cbRenderLineup();
   cbUpdateCharacter();
@@ -40074,11 +40228,13 @@ function renderManualBuildScreen() {
   $("manualStartBtn").onclick = () => {
     if (!MANUAL_DRAFT.length) { toast("Pick at least one exercise"); return; }
     cbTeardown();
+    pmoReset();
     saveManualWorkout();
   };
   $("manualCancelBtn").onclick = () => {
     if (MANUAL_DRAFT.length && !confirm(`Discard ${MANUAL_DRAFT.length} exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} you added?`)) return;
     cbTeardown();
+    pmoReset();
     const wasFor = PLAN_FOR_DATE;
     PLAN_FOR_DATE = null;
     WORKOUT_MODE = wasFor ? "week" : null;
