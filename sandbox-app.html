@@ -3880,6 +3880,13 @@
   .pmo-whole { display: block; margin: 4px auto 6px; border: 1.5px solid var(--border); background: var(--panel); color: var(--text);
     border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
   .pmo-foot { display: grid; gap: 6px; margin: 4px 0 8px; }
+  .pmo-actions { display: grid; gap: 10px; margin-top: 16px; }
+  /* Picker, then Whole body, then Continue, at even steps. The note's two-line
+     reserve is onboarding's; here it left a blank line above Whole body. */
+  #pmoBody .bp-note { margin-bottom: 14px; min-height: 0; }
+  #pmoBody .pmo-whole { margin: 0 auto 20px; }
+  .pmo-actions .cb-go { margin-top: 0; }
+  .pmo-actions .btn-ghost, .pmo-actions .cb-add { margin: 0; }
   .pmo-skip { background: none; border: 0; color: var(--muted); font: inherit; font-size: 14.5px; font-weight: 600; padding: 10px; cursor: pointer; width: 100%; }
   .cb-card {
     position: relative; overflow: hidden; text-align: left; cursor: pointer; font: inherit;
@@ -7709,6 +7716,11 @@
   .gen-scrim .plan-time-change { margin: 0 0 12px; text-align: center; color: rgba(255,255,255,.72); }
   .exercise-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .exercise-row:last-child { border-bottom: none; padding-bottom: 0; }
+  /* The workout builder's rows are cards, not a ruled list. They carry the
+     exercise-row class for the drag code, and these two rules, later in the
+     file, were stripping their side padding and taking the last card's bottom
+     edge off, which read as the last row being cut in half. */
+  .cb-row.exercise-row, .cb-row.exercise-row:last-child { padding: 11px 10px; border-bottom: 1px solid var(--border); }
   .exercise-row .ex-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; color: var(--muted); }
   .exercise-row .ex-body { flex: 1; min-width: 0; }
   .exercise-row .ex-name { font-weight: 600; font-size: 15.5px; }
@@ -12765,8 +12777,8 @@ function bodyPickSex(sex) {
    groups is in exactly one region, which is what makes a tap on the figure
    always mean something: the Rive click hands back a group, and this is the
    whole distance between that and a pick. */
-function bodyRegionIdForGroup(group) {
-  return BODY_REGIONS.find((r) => r.groups.includes(group))?.id || null;
+function bodyRegionIdForGroup(group, regions = BODY_REGIONS) {
+  return regions.find((r) => r.groups.includes(group))?.id || null;
 }
 
 /* Mounts both artboards and keeps them painted. `o.isRegionOn` is read on every
@@ -12793,6 +12805,7 @@ async function initBodyRegionFigures(wrap, o) {
   if (!front || !back || !front.isConnected) return; // navigated away while loading
 
   const sex = o.sexKey === "female" ? "Female" : "Male";
+  const regions = o.regions || BODY_REGIONS;
   const make = (canvas, view) => mod.createBodyHeatmap({
     canvas,
     artboardName: `${sex}-${view}`,
@@ -12830,7 +12843,7 @@ async function initBodyRegionFigures(wrap, o) {
        was picked, and with its intensity back at zero that renders black. The
        focus page hit this and the fix is the same: put an unpicked group
        explicitly back to base. */
-    for (const region of BODY_REGIONS) {
+    for (const region of regions) {
       const pal = o.isRegionOn(region.id) ? lit : dim;
       for (const g of region.groups) {
         for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) {
@@ -12850,7 +12863,11 @@ async function initBodyRegionFigures(wrap, o) {
    than trusted, because this is seeded off a stored answer. */
 function bodyRegionPickerHTML(opts = {}) {
   const sexKey = bodyPickSex(opts.sex);
-  const selected = (Array.isArray(opts.selected) ? opts.selected : []).filter((id) => BODY_REGION_IDS.includes(id));
+  /* `regions` lets a screen ask a finer question on the same body: Plan my own
+     splits arms from shoulders and legs from core, because those are different
+     workouts. Onboarding keeps the four, which its focus budget is built on. */
+  const regions = opts.regions || BODY_REGIONS;
+  const selected = (Array.isArray(opts.selected) ? opts.selected : []).filter((id) => regions.some((r) => r.id === id));
   const chip = (r) => `<button type="button" class="bp-chip${selected.includes(r.id) ? " on" : ""}"
       data-region="${r.id}" aria-pressed="${selected.includes(r.id)}">
       <span class="bp-tick" aria-hidden="true">${icon("check", 14)}</span>${escapeHtml(r.label)}</button>`;
@@ -12869,7 +12886,7 @@ function bodyRegionPickerHTML(opts = {}) {
         <div class="bi-fig" data-view="Front"><canvas class="bi-canvas bp-fig-front"></canvas></div>
         <div class="bi-fig" data-view="Back"><canvas class="bi-canvas bp-fig-back"></canvas></div>
       </div>
-      <div class="bp-chips">${BODY_REGIONS.map(chip).join("")}</div>
+      <div class="bp-chips">${regions.map(chip).join("")}</div>
       <p class="bp-note" aria-live="polite"></p>
     </div>`;
 }
@@ -12877,10 +12894,12 @@ function bodyRegionPickerHTML(opts = {}) {
 /* What the picker says out loud. Written for the ear, because every one of
    these lines is going through a voice later: short, no brackets, nothing that
    only works as text. */
-function bodyPickNote(ids) {
+function bodyPickNote(ids, regions) {
   if (!ids.length) return "Tap a muscle on either body, or tap a name below.";
-  if (bodyRegionsAreWholeBody(ids)) return "You picked everything. Nothing stands out, so nothing gets extra.";
-  const said = BODY_REGIONS.filter((r) => ids.includes(r.id)).map((r) => r.say);
+  if (regions) {
+    if (regions.every((r) => ids.includes(r.id))) return "You picked everything.";
+  } else if (bodyRegionsAreWholeBody(ids)) return "You picked everything. Nothing stands out, so nothing gets extra.";
+  const said = (regions || BODY_REGIONS).filter((r) => ids.includes(r.id)).map((r) => r.say);
   /* "Your arms and shoulders and your chest" is two ands in a row, which trips
      over itself read aloud. A comma before the last one fixes it, and it is
      only needed when a region's own name already has an and inside it. */
@@ -12902,8 +12921,9 @@ function wireBodyRegionPicker(root, opts = {}) {
      told bodyRegionPickerHTML which question this is and a second answer here
      could only ever disagree with the chips it painted. */
   const sore = wrap.classList.contains("sore");
+  const regions = opts.regions || BODY_REGIONS;
   const selected = new Set((wrap.dataset.selected || "").split(",").filter(Boolean));
-  const ordered = () => BODY_REGION_IDS.filter((id) => selected.has(id));
+  const ordered = () => regions.map((r) => r.id).filter((id) => selected.has(id));
 
   const paint = () => {
     const ids = ordered();
@@ -12913,12 +12933,12 @@ function wireBodyRegionPicker(root, opts = {}) {
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", String(on));
     });
-    wrap.querySelector(".bp-note").textContent = bodyPickNote(ids);
+    wrap.querySelector(".bp-note").textContent = bodyPickNote(ids, opts.regions);
     BODY_PICK_REPAINT?.();
     opts.onChange?.(ids);
   };
   const toggle = (id) => {
-    if (!bodyRegionFor(id)) return;
+    if (!regions.some((r) => r.id === id)) return;
     selected.has(id) ? selected.delete(id) : selected.add(id);
     paint();
   };
@@ -12929,9 +12949,9 @@ function wireBodyRegionPicker(root, opts = {}) {
      are the answer to the question and they must be right on the frame the step
      appears, while the figure is a (cached, but still async) module away. */
   initBodyRegionFigures(wrap, {
-    sexKey, sore,
+    sexKey, sore, regions: opts.regions,
     isRegionOn: (id) => selected.has(id),
-    onGroupTap: (group) => { const id = bodyRegionIdForGroup(group); if (id) toggle(id); },
+    onGroupTap: (group) => { const id = bodyRegionIdForGroup(group, regions); if (id) toggle(id); },
   });
   return ordered;
 }
@@ -40066,19 +40086,20 @@ function cbExercisesFor(groupKey, query) {
    MANUAL_DRAFT the picker writes, so nothing downstream changed. */
 /* The areas come off the body: the same tappable figure onboarding uses
    (Mo, 2026-10-04: "I want to be able to see the body itself and be able to
-   click it"), its four regions mapped onto the picker's sections. */
-const PMO_REGION_GROUPS = {
-  arms: ["shoulders", "arms"],
-  chest: ["chest"],
-  back: ["back"],
-  legscore: ["legs", "core"],
-};
+   click it"), but with the picker's own six sections as the regions, one chip
+   one page. Arms and shoulders were one region at first; Mo split them the
+   same day because they are completely different workouts, and legs and core
+   come apart for the same reason. */
+const PMO_REGIONS = ["chest", "back", "shoulders", "arms", "legs", "core"].map((key) => {
+  const g = CB_GROUPS.find((x) => x.key === key);
+  return { id: key, label: g.label, say: `your ${g.label.toLowerCase()}`, groups: g.cats };
+});
 const PMO_ORDER = ["legs", "chest", "back", "shoulders", "arms", "core"];
 const PMO_SHOWN = 8;   // per area before "Show all": a handful, not the library
-let PMO = { stage: "areas", regions: [], step: 0, all: false, q: "", free: false };
-function pmoReset() { closeBodyRegionPicker(); PMO = { stage: "areas", regions: [], step: 0, all: false, q: "", free: false }; }
+let PMO = { stage: "areas", regions: [], step: 0, all: false, q: "" };
+function pmoReset() { closeBodyRegionPicker(); PMO = { stage: "areas", regions: [], step: 0, all: false, q: "" }; }
 function pmoSections() {
-  const want = new Set(PMO.regions.flatMap((id) => PMO_REGION_GROUPS[id] || []));
+  const want = new Set(PMO.regions);
   return PMO_ORDER.filter((g) => want.has(g));
 }
 
@@ -40137,15 +40158,13 @@ function renderPlanMyOwn() {
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { pmoReset(); saveDraft(); } }))}
     <h2 class="pmo-h">What do you want to hit today?</h2>
-    <p class="pmo-sub">Tap the body, or a name under it. Pick as many as you like.</p>
     <div id="pmoBody">
-      <div id="pmoBodyPick">${bodyRegionPickerHTML({ sex, selected: PMO.regions })}</div>
+      <div id="pmoBodyPick">${bodyRegionPickerHTML({ sex, selected: PMO.regions, regions: PMO_REGIONS })}</div>
       <button type="button" class="pmo-whole" id="pmoWhole">Whole body</button>
     </div>
     <div class="pmo-foot">
       <button type="button" class="btn-primary" id="pmoGo"></button>
       <button type="button" class="pmo-skip" id="pmoReview" hidden></button>
-      <button type="button" class="pmo-skip" id="pmoFree">Or skip this and pick from everything</button>
     </div>`;
   const syncFoot = () => {
     const n = pmoSections().length;
@@ -40156,7 +40175,7 @@ function renderPlanMyOwn() {
     r.hidden = !MANUAL_DRAFT.length;
     r.textContent = pmoReviewLabel();
   };
-  wireBodyRegionPicker($("pmoBodyPick"), { sex, onChange: (ids) => { PMO.regions = ids; syncFoot(); } });
+  wireBodyRegionPicker($("pmoBodyPick"), { sex, regions: PMO_REGIONS, onChange: (ids) => { PMO.regions = ids; syncFoot(); } });
   $("pmoWhole").onclick = () => {
     /* Every region on, through the chips, so the figure and the sentence
        follow exactly as if each had been tapped. */
@@ -40170,17 +40189,6 @@ function renderPlanMyOwn() {
     window.scrollTo(0, 0);
   };
   $("pmoReview").onclick = () => { closeBodyRegionPicker(); PMO.stage = "done"; PMO.q = ""; renderManualBuildScreen(); window.scrollTo(0, 0); };
-  /* Freestyle: Mo, 2026-10-04, some days you know exactly what you want and
-     being walked through areas is in the way. It lands on the same review
-     with the whole library already open, and Back there returns here. */
-  $("pmoFree").onclick = () => {
-    closeBodyRegionPicker();
-    PMO.stage = "done"; PMO.free = true; PMO.regions = []; PMO.q = "";
-    renderManualBuildScreen(); window.scrollTo(0, 0);
-    cbOpenPicker();
-  };
-  /* Hidden once there is a draft: Review already goes to the same place. */
-  $("pmoFree").hidden = !!MANUAL_DRAFT.length;
   syncFoot();
 }
 
@@ -40257,11 +40265,11 @@ function renderPmoPick() {
 }
 
 /* Back from the review goes one screen back, not out of Plan my own: to the
-   last area you were on if you were guided, to the body if you freestyled.
+   last area you were on, or to the body for a draft reopened from earlier.
    Mo, 2026-10-04: "I can't go back." The draft rides along either way. */
 function pmoReviewBack() {
   saveDraft(); cbTeardown();
-  if (PMO.free || !PMO.regions.length) { PMO.stage = "areas"; PMO.free = false; renderPlanMyOwn(); }
+  if (!PMO.regions.length) { PMO.stage = "areas"; renderPlanMyOwn(); }
   else { PMO.stage = "pick"; PMO.step = Math.max(0, pmoSections().length - 1); PMO.all = false; PMO.q = ""; renderPmoPick(); }
   window.scrollTo(0, 0);
 }
@@ -40288,17 +40296,18 @@ function renderManualBuildScreen() {
       <p class="muted-note">Tap a row to change its sets, reps or weight. Drag the handle to reorder.</p>
       <div class="reorder-list" id="draftRows"></div>
     </div>
-    <button type="button" class="cb-add" id="cbAddBtn">${icon("plus", 18)} Add an exercise</button>
-    <button type="button" class="pmo-skip" id="pmoAgain">Pick another area</button>
-    <!-- Start comes before Cancel now that the bar is in the flow, so the thing
-         you actually want is the first one you reach at the end of the list. -->
-    <div class="cb-go hidden" id="cbGo">
-      <button type="button" class="btn-primary" id="manualStartBtn">${PLAN_FOR_DATE && PLAN_FOR_DATE !== todayStr() ? "Put it on that day" : "Start Workout"}</button>
-    </div>
-    <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
+    <!-- One way to add, by body part: Mo, 2026-10-04, the whole library is not
+         a way in any more, so "Add an exercise" became another area. One even
+         stack below the list, so nothing sits at its own odd distance. -->
+    <div class="pmo-actions">
+      <button type="button" class="cb-add" id="pmoAgain">${icon("plus", 18)} Add another area</button>
+      <div class="cb-go hidden" id="cbGo">
+        <button type="button" class="btn-primary" id="manualStartBtn">${PLAN_FOR_DATE && PLAN_FOR_DATE !== todayStr() ? "Put it on that day" : "Start Workout"}</button>
+      </div>
+      <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>
+    </div>`;
 
-  $("cbAddBtn").onclick = () => cbOpenPicker();
-  $("pmoAgain").onclick = () => { cbTeardown(); PMO = { stage: "areas", regions: [], step: 0, all: false, q: "", free: false }; renderPlanMyOwn(); window.scrollTo(0, 0); };
+  $("pmoAgain").onclick = () => { cbTeardown(); PMO = { stage: "areas", regions: [], step: 0, all: false, q: "" }; renderPlanMyOwn(); window.scrollTo(0, 0); };
 
   cbRenderLineup();
   cbUpdateCharacter();
@@ -40693,12 +40702,13 @@ function cbUpdateCharacter() {
   if (facts) {
     if (!MANUAL_DRAFT.length) {
       facts.innerHTML = `<div class="cb-count">Build it<span></span></div>
-        <div class="cb-empty">Tap an exercise below. The body fills in as you go, so you can see what you are actually training.</div>`;
+        <div class="cb-empty">Add an area below. The body fills in as you go, so you can see what you are actually training.</div>`;
     } else {
       const groups = cbGroupsHit();
-      /* Number on its own line, words under it. Inline, "4 exercises · 14
-         sets" broke after "14" and left "sets" stranded. */
-      facts.innerHTML = `<div class="cb-count">${MANUAL_DRAFT.length}<span>exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} · ${total} sets</span></div>
+      /* "4 exercises" as the headline and the sets under it. The number alone
+         on a line read as a stray digit; the full "4 exercises · 14 sets"
+         broke after "14" and stranded "sets". */
+      facts.innerHTML = `<div class="cb-count">${MANUAL_DRAFT.length} exercise${MANUAL_DRAFT.length === 1 ? "" : "s"}<span>${total} sets</span></div>
         <div class="cb-groups">${groups.length ? escapeHtml(bodyGroupsPhrase(groups)) : "Nothing recognised yet"}</div>`;
     }
   }
