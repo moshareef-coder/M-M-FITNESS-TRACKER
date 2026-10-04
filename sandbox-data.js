@@ -12,7 +12,11 @@
  */
 (function () {
   const qs = new URLSearchParams(location.search);
-  const SCENARIO = qs.get("scenario") || "paired";
+  /* ?onboard=a opens the long onboarding cold, ?onboard=b opens it as the
+     person who arrived on Mell's invite link. Both start from a brand new
+     account with no draft, so every load walks from the first screen. */
+  const OB = qs.get("onboard");
+  const SCENARIO = qs.get("scenario") || (OB === "b" ? "freshInvited" : OB ? "fresh" : "paired");
   /* Paid and unpaid are a second axis, not a scenario of their own: whether
      the account can reach the generator, the week planner, the progress
      analysis and the accent colours is a question that applies to Mo just as
@@ -327,6 +331,22 @@
         db.partnerships = [];
         db.fit_entries = []; db.exercise_logs = []; db.ai_workouts = [];
         db.saved_workouts = []; db.session_reactions = []; db.user_goals = [];
+      },
+    },
+
+    /* A brand new account arriving on Mell's link, for Path B of the long
+       onboarding. Mell has a goal, a week and a length on file, and three
+       sessions planned this week, because Path B opens its days and minutes
+       on hers and puts the two weeks side by side. */
+    freshInvited: {
+      label: "Brand new, arrived on an invite",
+      apply: (db) => {
+        SCENARIOS.fresh.apply(db);
+        db.profiles = db.profiles.map((p) => p.email === THEM
+          ? { ...p, goal_bubble: "get-stronger", challenge_target: 3, session_minutes: 45 } : p);
+        const mell = (n, id, focus) => ({ id, email: THEM, user_name: "Mell", entry_date: day(n), archived: false, slot: 0,
+          focus, exercises: pushWorkout, created_at: day(0) + "T05:00:00Z", completed_at: null });
+        db.ai_workouts.push(mell(1, "mw1", "Push Day"), mell(3, "mw2", "Leg Day"), mell(5, "mw3", "Pull Day"));
       },
     },
 
@@ -802,7 +822,7 @@
            tomorrow's plan overwrote today's and the sandbox showed a day
            losing a workout that production keeps. A composite key has to be
            composite or it is testing a different database. */
-        const on = (opts && opts.onConflict ? opts.onConflict : (list[0]?.id != null ? "id" : table === "profiles" ? "email" : "id"))
+        const on = (opts && opts.onConflict ? opts.onConflict : (list[0]?.id != null ? "id" : table === "profiles" || table === "profile_limits" ? "email" : "id"))
           .split(",").map((c) => c.trim()).filter(Boolean);
         rows = list.map((p) => {
           const keyed = on.every((c) => p[c] != null);
@@ -816,7 +836,7 @@
             ...(table === "profiles" && !p.invite_code
               ? { invite_code: Math.random().toString(36).slice(2, 8).toUpperCase() } : {}),
             ...p };
-          DB[table].push(row);
+          (DB[table] ??= []).push(row);
           return row;
         });
         return api;
@@ -929,6 +949,13 @@
      too: load the app with ?j=sandboxinvitefrommell1 and peek answers for it. */
   const DEMO_TOKEN = "sandboxinvitefrommell1";
   const LINKS = [{ token: DEMO_TOKEN, owner_email: THEM, revoked_at: null, claimed_at: null }];
+  if (OB) {
+    try {
+      localStorage.removeItem("ft_ob_draft_" + ME);
+      if (OB === "b") localStorage.setItem("ft_pending_invite_token", DEMO_TOKEN);
+      else localStorage.removeItem("ft_pending_invite_token");
+    } catch { /* private mode */ }
+  }
   const liveLink = (token) => LINKS.find((l) => l.token === token && !l.revoked_at && !l.claimed_at);
 
   function rpcCreateLink() {
