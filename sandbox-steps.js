@@ -198,22 +198,15 @@
     ]},
 
     { group: "The other person", note: "Everything that only matters because someone else is there.", steps: [
-      /* Three versions of one moment while Mo picks. Delete the two losers here
-         and in index.html once he has. */
-      { t: "Partner joins: A, the robot hosts", scenario: "paired",
-        s: "Playful: robot, confetti, sound",
-        note: "What both of you see the moment you become a pair, once, ever. The robot bounces up between your two faces and the confetti is in your two colours. Turn sound on in the phone frame first to hear it. Tap See Mell's progress to land on Mell's side of Progress, or Later to close.",
-        run: (w) => w.showPairCelebration({ style: "robot" }) },
+      { t: "Partner joins", scenario: "paired",
+        s: "Rings close, robot pops up, once ever",
+        note: "What both of you see the moment you become a pair, once. Your two faces glide together, your blue arc and their orange arc close into one ring, then the robot pops up on top with confetti in your two colours. Turn sound on in the phone frame to hear it. Congratulate Mell sends Mell a 'We're a team now' note and takes you to Progress, where the tour below starts. Later skips the note and goes to the same place.",
+        run: (w) => { try { w.localStorage.removeItem("unio.tourPartnerFace"); } catch {} w.showPairCelebration(); } },
 
-      { t: "Partner joins: B, the rings close", scenario: "paired",
-        s: "Calm: two arcs meet as one ring",
-        note: "The same moment, quieter. Your two faces glide together and your blue arc and their orange arc draw in from either side until they close into one ring, which then glows. No confetti: a promise rather than a party.",
-        run: (w) => w.showPairCelebration({ style: "rings" }) },
-
-      { t: "Partner joins: C, the high five", scenario: "paired",
-        s: "Cute: faces bump, hearts pop",
-        note: "The same moment, cuter. Both faces hop up from the bottom, bump in the middle with a little squash, hearts in your two colours pop out of the bump, and a Day 1 together tag lands on top.",
-        run: (w) => w.showPairCelebration({ style: "five" }) },
+      { t: "Progress tour: tap your partner", scenario: "paired",
+        s: "Dim, spotlight their face, one tap",
+        note: "The first time anyone with a partner lands on Progress. Everything dims except Mell's face in the top corner, which pulses, and a tip says to tap it. Only the face works; tap it and you are on Mell's side of Progress. Skip ends it. It never shows again on that phone, so this step resets it each time.",
+        run: (w) => { try { w.localStorage.removeItem("unio.tourPartnerFace"); } catch {} w.switchTab("progress"); } },
 
       { t: "They are training now", scenario: "live",
         s: "Live card on home",
