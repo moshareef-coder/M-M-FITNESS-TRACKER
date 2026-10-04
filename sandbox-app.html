@@ -5200,18 +5200,19 @@
   .cm-hole {
     position: fixed; border-radius: 50%; pointer-events: none;
     box-shadow: 0 0 0 9999px rgba(8, 10, 14, .68);
-    transition: left .25s, top .25s, width .25s, height .25s;
+    transition: left .25s, top .25s, width .25s, height .25s, opacity .2s;
     animation: fadeIn .3s ease;
   }
   .cm-hole::after {
     content: ""; position: absolute; inset: -6px; border-radius: 50%;
-    border: 2.5px solid var(--partner); animation: cmPulse 1.4s ease-out infinite;
+    border: 2.5px solid var(--cm-ring, var(--partner)); animation: cmPulse 1.4s ease-out infinite;
   }
   @keyframes cmPulse { 0% { transform: scale(.9); opacity: 1 } 100% { transform: scale(1.35); opacity: 0 } }
   .cm-tip {
     position: fixed; right: 16px; width: min(300px, calc(100vw - 32px));
     background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 18px;
     padding: 16px 16px 12px; box-shadow: var(--shadow-lift); display: grid; gap: 6px;
+    transition: opacity .2s;
     animation: popIn .35s .1s both cubic-bezier(.22,1,.36,1);
   }
   .cm-tip::before {
@@ -17384,36 +17385,54 @@ function maybeStartPartnerTour() {
 }
 
 function startPartnerTour() {
-  const face = document.querySelector("#avatarPair .av.them");
-  if (!face || document.querySelector(".cm-scrim")) return;
-  const first = (partnerName() || "your partner").split(" ")[0];
+  if (document.querySelector(".cm-scrim")) return;
+  const first = escapeHtml((partnerName() || "your partner").split(" ")[0]);
+  /* Two taps, the two the faces are for: over to them, then back to you. Mo,
+     2026-10-04: once they have looked at their partner's side, show them the
+     way home too, or the first visit strands them on someone else's numbers. */
+  const steps = [
+    { face: ".av.them", ring: "var(--partner)", title: `See ${first}'s progress`, text: `Tap ${first}'s face up here any time.` },
+    { face: ".av.me", ring: "var(--me)", title: `This is ${first}'s side`, text: "Tap your face to switch back to yours." },
+  ];
 
   const scrim = document.createElement("div");
   scrim.className = "cm-scrim";
   scrim.setAttribute("role", "dialog");
   scrim.setAttribute("aria-modal", "true");
-  scrim.setAttribute("aria-label", `Tap ${first} to see their progress`);
   scrim.innerHTML = `
     <div class="cm-hole"></div>
     <div class="cm-tip">
-      <b>See ${escapeHtml(first)}'s progress</b>
-      <p>Tap ${escapeHtml(first)}'s face up here any time. Tap yours to come back.</p>
+      <b id="cmTitle"></b>
+      <p id="cmText"></p>
       <button type="button" class="cm-skip" id="cmSkip">Skip</button>
     </div>`;
   document.body.appendChild(scrim);
-
   const hole = scrim.querySelector(".cm-hole");
   const tip = scrim.querySelector(".cm-tip");
+
+  let i = 0;
+  /* Looked up fresh every time: Progress redraws the pair of faces when it
+     switches sides, so a node held from step one is gone by step two. */
+  const face = () => document.querySelector(`#avatarPair ${steps[i].face}`);
   const place = () => {
-    const r = face.getBoundingClientRect();
+    const el = face();
+    if (!el) return;
+    const r = el.getBoundingClientRect();
     const pad = 6;
     Object.assign(hole.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
     tip.style.top = `${r.bottom + 16}px`;
-    /* The arrow points at the middle of the face, wherever the tip ends up. */
-    const tipRight = 16;
-    tip.style.setProperty("--arrow-right", `${Math.max(14, innerWidth - tipRight - (r.left + r.width / 2) - 7)}px`);
+    /* The arrow points at the middle of whichever face this step is about. */
+    tip.style.setProperty("--arrow-right", `${Math.max(14, innerWidth - 16 - (r.left + r.width / 2) - 7)}px`);
   };
-  place();
+  const show = () => {
+    $("cmTitle").innerHTML = steps[i].title;
+    $("cmText").innerHTML = steps[i].text;
+    scrim.setAttribute("aria-label", `${steps[i].title}. ${steps[i].text}`);
+    /* Pulses in the colour of the face it is on: theirs, then yours. */
+    hole.style.setProperty("--cm-ring", steps[i].ring);
+    place();
+  };
+  show();
   addEventListener("resize", place);
 
   const end = () => {
@@ -17422,15 +17441,20 @@ function startPartnerTour() {
     markPartnerTourDone();
   };
   $("cmSkip").onclick = (e) => { e.stopPropagation(); end(); };
-  /* Only the face works: a tap inside the hole is passed to it, anything else
-     is swallowed so nobody wanders off mid-tip. */
+  /* Only the face for this step works: a tap inside the hole is passed to it,
+     anything else is swallowed so nobody wanders off mid-tip. */
   scrim.addEventListener("click", (e) => {
     if (e.target.closest(".cm-tip")) return;
-    const r = face.getBoundingClientRect();
+    const el = face();
+    if (!el) { end(); return; }
+    const r = el.getBoundingClientRect();
     const inside = e.clientX >= r.left - 8 && e.clientX <= r.right + 8 && e.clientY >= r.top - 8 && e.clientY <= r.bottom + 8;
     if (!inside) return;
-    end();
-    face.click();
+    el.click();
+    if (++i >= steps.length) { end(); return; }
+    /* Let the other side draw before moving the spotlight onto it. */
+    hole.style.opacity = "0"; tip.style.opacity = "0";
+    setTimeout(() => { show(); hole.style.opacity = ""; tip.style.opacity = ""; }, 380);
   });
 }
 
