@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- No zoom. The iOS web view honours maximum-scale and user-scalable, so a pinch,
+     a double tap or a tap into a small text box can no longer leave the app
+     zoomed in and bigger than the phone, which is what made it read as a web
+     page. Safari on the website still lets people pinch, by its own rule. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<!-- Capacitor injects window.Capacitor before the page runs, so the app can mark
+     itself here, before first paint, and the native-only CSS never flashes. -->
+<script data-role="native-flag">if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native");</script>
 <title>Unio</title>
 <meta name="description" content="Train with your partner. Rank up together." />
 <meta name="theme-color" content="#0c0e13" />
@@ -255,6 +262,26 @@
   html {
     overflow-x: hidden;
     overscroll-behavior: none;
+    /* manipulation keeps scrolling and drops double-tap-to-zoom, which also
+       removes the wait iOS adds after a tap while it checks for a second one.
+       No grey flash on tap and no font inflation on rotate: neither happens
+       in a native app. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* In the app, words on buttons and cards are not selectable and a long press
+     does not pop the copy / look up menu, as in any native app. Fields people
+     type in, and anything marked .selectable, keep normal text selection. The
+     website keeps selection everywhere. */
+  html.native body {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+  }
+  html.native input, html.native textarea, html.native [contenteditable="true"], html.native .selectable {
+    -webkit-user-select: text; user-select: text;
+    -webkit-touch-callout: default;
   }
   /* An overlay is up: the page behind it must not move at all. overflow:hidden
      alone does not stop a finger in an iOS web view, and this ships as one, so
@@ -7240,7 +7267,9 @@
   label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 4px; }
   input[type="number"], input[type="date"], input[type="text"], textarea, select {
     width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--panel-2); color: var(--text); font-size: 15.5px; font-family: inherit;
+    /* 16px, not 15.5: iOS zooms into any field under 16px when it is tapped
+       and never zooms back out. */
+    background: var(--panel-2); color: var(--text); font-size: 16px; font-family: inherit;
   }
   textarea { resize: vertical; min-height: 44px; }
   .gym-toggle {
