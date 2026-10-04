@@ -5296,8 +5296,6 @@
   .tg-ex { font-weight: 650; font-size: 15px; min-width: 0; }
   .tg-sr { color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .tg-rm { width: 28px; height: 28px; border-radius: 50%; border: 0; background: transparent; color: var(--muted); font-size: 18px; cursor: pointer; }
-  .tg-adds { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; font-size: 13px; color: var(--muted); align-items: center; }
-  .tg-add { border: 1px dashed var(--border); background: transparent; color: var(--text); border-radius: 999px; padding: 6px 11px; font: inherit; font-size: 13px; cursor: pointer; }
   .tg-actions { display: grid; gap: 8px; width: 100%; margin-top: 4px; }
   .tg-actions .btn-primary:disabled { opacity: .5; }
   .tg-ghost { background: none; border: 0; color: var(--muted); font: inherit; font-size: 15px; padding: 10px; cursor: pointer; }
@@ -5351,10 +5349,12 @@
     background: color-mix(in srgb, var(--accent) 18%, var(--panel)); font-size: 14px; text-align: left; animation: tgIn .3s ease both; }
   .tg-sub-h { width: 100%; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--me); margin-top: 4px; }
   .tg-sub-h.them { color: var(--partner); }
-  .tg-addbox { width: 100%; display: grid; gap: 8px; }
-  .tg-addbox input { width: 100%; padding: 11px 12px; border-radius: 12px; border: 1px dashed var(--border); background: transparent; color: var(--text); font: inherit; font-size: 16px; }
-  .tg-results { display: grid; gap: 4px; }
-  .tg-results button { text-align: left; border: 0; border-radius: 10px; padding: 10px 12px; background: var(--panel-2); color: var(--text); font: inherit; font-size: 14.5px; cursor: pointer; }
+  .tg-hits { width: 100%; text-align: left; font-size: 13.5px; color: var(--muted); padding: 0 2px; margin-bottom: -6px; }
+  .tg-hits b { color: var(--me); font-weight: 700; }
+  .tg-hits.them b { color: var(--partner); }
+  .tg-list li.edit { cursor: pointer; }
+  .tg-list li.edit:active { transform: scale(.99); }
+  .tg-addbtn { width: 100%; border: 1.5px dashed var(--border); background: transparent; color: var(--text); border-radius: 12px; padding: 12px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
   .ps-actions { display: grid; gap: 8px; }
   .ps-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .ps-secondary { border: 1px solid var(--border); background: var(--panel-2); color: var(--text); border-radius: 14px; padding: 12px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
@@ -17948,31 +17948,30 @@ async function tgRemoveExercise(i) {
   tgMaybePerfect();
 }
 
-/* Quick adds: the lifts on either of your plans today that are not already on
-   the list, so folding in the one your partner wanted is a single tap. */
-function tgAddCandidates() {
-  const key = tgEditable();
-  const have = new Set((TG?.[key]?.exercises || []).map((e) => e.name.toLowerCase()));
-  const pool = [];
-  for (const email of [tgPartnerEmail(), MY_EMAIL]) {
-    for (const p of plansOnDate(todayStr(), email)) for (const ex of p.exercises || []) pool.push(ex);
-  }
-  return pool.filter((ex) => ex?.name && !have.has(ex.name.toLowerCase()) && (have.add(ex.name.toLowerCase()), true));
-}
-
-async function tgAddExercise(name) {
+/* Adds and edits come from the same picker the plan screen uses (categories,
+   search, sets and reps), pointed at this lobby's list with target
+   "together". These two write its result back to the session row. */
+async function tgAddFromPicker(ex) {
   const key = tgEditable();
   if (!key) return;
-  const planned = tgAddCandidates().find((e) => e.name === name);
-  /* Anything from the library search arrives as a bare name: three sets of
-     ten, which each phone then loads off its own owner's history. */
-  const ex = planned ? tgCleanExercises([planned])[0] : { name, sets: 3, reps: 10 };
-  const exercises = [...(TG[key]?.exercises || []), ex];
-  TG_SEARCH = "";
+  const exercises = [...(TG[key]?.exercises || []), { name: ex.name, sets: ex.sets || 3, reps: ex.reps || 10 }];
   await tgUpdate({ [key]: { ...TG[key], exercises } });
   tgMaybePerfect();
 }
-let TG_SEARCH = "";
+async function tgCommitEditable() {
+  const key = tgEditable();
+  if (!key) return;
+  await tgUpdate({ [key]: { ...TG[key], exercises: (TG[key]?.exercises || []).slice() } });
+  tgMaybePerfect();
+}
+function tgEditRow(i) {
+  const key = tgEditable();
+  const ex = TG?.[key]?.exercises?.[i];
+  if (!ex) return;
+  cbOpenPicker("together");
+  cbConfirmStep(ex, { editIndex: i });
+}
+
 
 function tgReady() {
   if (!TG || TG.status !== "lobby") return false;
@@ -18189,29 +18188,27 @@ async function tgShowLobby() {
   const mode = TG.mode || "same";
   const leader = tgAmLeader();
   const leaderName = leader ? "You" : first;
-  const searchHad = document.activeElement?.id === "tgSearch";
   const el = tgOverlay("lobby");
   el.setAttribute("aria-label", "Train together");
 
-  const listHTML = (exs, editable, emptyText) => `
+  /* What a list works, in the words the builder uses, so the two of you can
+     see at a glance whether you are hitting the same things. */
+  const hitsHTML = (exs, who) => {
+    const groups = groupsHitFor(exs);
+    return groups.length ? `<div class="tg-hits ${who}">Hits <b>${escapeHtml(bodyGroupsPhrase(groups))}</b></div>` : "";
+  };
+  const listHTML = (exs, editable, emptyText, who = "me") => `
+    ${hitsHTML(exs, who)}
     <ul class="tg-list">
       ${exs.length ? exs.map((ex, i) => `
-        <li><span class="tg-ex">${escapeHtml(ex.name)}</span>
+        <li class="${editable ? "edit" : ""}" ${editable ? `data-tg-edit="${i}" role="button" tabindex="0" aria-label="Change sets and reps for ${escapeHtml(ex.name)}"` : ""}>
+          <span class="tg-ex">${escapeHtml(ex.name)}</span>
           <span class="tg-sr">${ex.sets || 3} × ${escapeHtml(String(ex.reps ?? ""))}</span>
           ${editable ? `<button type="button" class="tg-rm" data-tg-rm="${i}" aria-label="Remove ${escapeHtml(ex.name)}">&times;</button>` : ""}
         </li>`).join("")
       : `<li class="tg-empty">${emptyText}</li>`}
-    </ul>`;
-  /* The same lift lives in more than one training, so the catalogue can name
-     it twice; a list of six that says Bulgarian Split Squat twice is five. */
-  const results = TG_SEARCH ? [...new Map(searchExerciseCatalog(TG_SEARCH, 12).map((r) => [r.name.toLowerCase(), r])).values()].slice(0, 6) : [];
-  const adds = tgAddCandidates().slice(0, 6);
-  const addHTML = `
-    <div class="tg-addbox">
-      <input type="text" id="tgSearch" placeholder="Add an exercise" autocomplete="off" value="${escapeHtml(TG_SEARCH)}" />
-      ${results.length ? `<div class="tg-results">${results.map((r) => `<button type="button" data-tg-add="${escapeHtml(r.name)}">${escapeHtml(r.name)}</button>`).join("")}</div>` : ""}
-      ${!TG_SEARCH && adds.length ? `<div class="tg-adds">${adds.map((a) => `<button type="button" class="tg-add" data-tg-add="${escapeHtml(a.name)}">+ ${escapeHtml(a.name)}</button>`).join("")}</div>` : ""}
-    </div>`;
+    </ul>
+    ${editable ? `<button type="button" class="tg-addbtn" data-tg-addbtn>+ Add exercise</button>` : ""}`;
   const srcTabs = (opts, on, enabled) => `
     <div class="tg-src" role="group" aria-label="Which workout" style="grid-template-columns: repeat(${opts.length}, 1fr)">
       ${opts.map(([key, label, src]) => `<button type="button" data-tg-src="${key}" class="${on === src ? "on" : ""}" ${enabled ? "" : "disabled"}>${label}</button>`).join("")}
@@ -18227,8 +18224,7 @@ async function tgShowLobby() {
         ${leader && here ? `<button type="button" class="tg-link-btn" id="tgHand">Let ${first} pick</button>` : ""}
       </div>
       ${srcTabs([["me", "Mine", tgSourceFor("me")], ["them", `${first}'s`, tgSourceFor("them")], ["new", "New", "new"]], TG.source, leader)}
-      ${listHTML(exs, leader, leader ? "Pick a workout above, or add exercises." : `${first} is picking.`)}
-      ${leader ? addHTML : ""}`;
+      ${listHTML(exs, leader, leader ? "Pick a workout above, or add exercises." : `${first} is picking.`)}`;
   } else {
     const mine = TG[tgMySide()]?.exercises || [];
     const theirs = TG[tgTheirSide()]?.exercises || [];
@@ -18239,9 +18235,8 @@ async function tgShowLobby() {
       <div class="tg-sub-h">Your workout</div>
       ${srcTabs([["me", "Mine", "me"], ["new", "New", "new"]], TG[tgMySide()]?.source || "me", true)}
       ${listHTML(mine, true, "Pick yours above, or add exercises.")}
-      ${addHTML}
       <div class="tg-sub-h them">${first}'s workout</div>
-      ${listHTML(theirs, false, here ? `${first} is picking.` : `${first} picks once they join.`)}`;
+      ${listHTML(theirs, false, here ? `${first} is picking.` : `${first} picks once they join.`, "them")}`;
   }
 
   el.innerHTML = `
@@ -18263,15 +18258,12 @@ async function tgShowLobby() {
     </div>`;
   el.querySelectorAll("[data-tg-mode]").forEach((b) => { b.onclick = () => tgSetMode(b.dataset.tgMode); });
   el.querySelectorAll("[data-tg-src]").forEach((b) => { b.onclick = () => tgPick(b.dataset.tgSrc); });
-  el.querySelectorAll("[data-tg-rm]").forEach((b) => { b.onclick = () => tgRemoveExercise(Number(b.dataset.tgRm)); });
-  el.querySelectorAll("[data-tg-add]").forEach((b) => { b.onclick = () => tgAddExercise(b.dataset.tgAdd); });
-  const search = $("tgSearch");
-  if (search) {
-    search.oninput = () => { TG_SEARCH = search.value; tgShowLobby(); };
-    /* The lobby redraws on every change from either phone, which would throw
-       a half typed search out of the box mid-word. Put the cursor back. */
-    if (searchHad || TG_SEARCH) { search.focus({ preventScroll: true }); const n = search.value.length; search.setSelectionRange(n, n); }
-  }
+  el.querySelectorAll("[data-tg-addbtn]").forEach((b) => { b.onclick = () => cbOpenPicker("together"); });
+  el.querySelectorAll("[data-tg-edit]").forEach((row) => {
+    row.onclick = (e) => { if (!e.target.closest("[data-tg-rm]")) tgEditRow(Number(row.dataset.tgEdit)); };
+    row.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tgEditRow(Number(row.dataset.tgEdit)); } };
+  });
+  el.querySelectorAll("[data-tg-rm]").forEach((b) => { b.onclick = (e) => { e.stopPropagation(); tgRemoveExercise(Number(b.dataset.tgRm)); }; });
   $("tgLeave").onclick = tgLeave;
   if ($("tgHand")) $("tgHand").onclick = () => tgUpdate({ leader_email: tgPartnerEmail() });
   if ($("tgMakeJoint")) $("tgMakeJoint").onclick = () => tgSetMode("same");
@@ -39731,16 +39723,24 @@ let CB_PENDING = null;   // the exercise waiting on its sets and reps
 let CB_TARGET = "draft";
 /* "plan" is whichever plan the screen behind this sheet is showing, which is
    today's unless somebody is reviewing another day. */
-const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || []) : MANUAL_DRAFT);
+/* Three lists this picker adds to: your own workout being built, a plan on the
+   plan screen, and the Train together lobby, which is the same picker on
+   purpose (Mo: adding has to follow the same flow wherever you are). */
+const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || [])
+  : CB_TARGET === "together" ? (TG?.[tgEditable()]?.exercises || []) : MANUAL_DRAFT);
 
 async function cbCommit() {
   if (CB_TARGET === "plan") { await savePlanExercises(); rerenderPlanScreen(); return; }
+  if (CB_TARGET === "together") { await tgCommitEditable(); return; }
   saveDraft();
   cbUpdateCharacter();
 }
 
 function cbOpenPicker(target = "draft") {
   CB_TARGET = target;
+  /* The lobby is a full screen layer of its own, so the picker has to sit
+     above it while it is open from there. */
+  $("cbPickScrim").style.zIndex = target === "together" ? "2590" : "";
   $("cbPickScrim").classList.remove("hidden");
   $("cbPickScrim").onclick = (e) => { if (e.target === $("cbPickScrim")) cbClosePicker(); };
   cbRenderPicker();
@@ -39748,8 +39748,11 @@ function cbOpenPicker(target = "draft") {
 
 function cbClosePicker() {
   CB_PENDING = null;
+  const wasTogether = CB_TARGET === "together";
   CB_TARGET = "draft";
   $("cbPickScrim").classList.add("hidden");
+  $("cbPickScrim").style.zIndex = "";
+  if (wasTogether && TG) tgShowLobby();
   pinSheets();
 }
 
@@ -39933,6 +39936,7 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
         const row = cbList()[at];
         const toPlan = CB_TARGET === "plan";
         if (row) { row.sets = sets; row.reps = reps; row.targetWeight = weight; }
+        if (CB_TARGET === "together") { if (row) delete row.targetWeight; cbClosePicker(); tgCommitEditable(); return; }
         if (toPlan) { cbClosePicker(); savePlanExercises().then(rerenderPlanScreen); return; }
         saveDraft();
         cbClosePicker();
@@ -39953,6 +39957,14 @@ function cbAdd(name, sets, reps, weight = 0) {
      to add a second identical row without a word. */
   if (cbList().some((e) => e.name === name)) {
     toast(`${name} is already in your workout`);
+    return;
+  }
+  /* The lobby's list belongs to the session row, and the other phone has to
+     see it change, so it is written there rather than pushed in place. No
+     weight: each phone loads every lift off its own owner's history. */
+  if (CB_TARGET === "together") {
+    tgAddFromPicker({ name, sets, reps });
+    toast(`${name} added`);
     return;
   }
   cbList().push({ name, sets, reps, targetWeight: weight || 0 });
