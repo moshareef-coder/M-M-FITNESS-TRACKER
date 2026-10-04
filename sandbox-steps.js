@@ -196,9 +196,9 @@
         } },
 
       { t: "Build one yourself", scenario: "paired",
-        s: "Search, categories, sets and reps",
-        note: "The screen with the keyboard bug we fixed: type in the search box and the sheet should stay put rather than sliding under the keyboard. Categories should clear the search field.",
-        run: (w) => { w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
+        s: "Pick areas, then one area at a time",
+        note: "Plan my own is guided now. First: what do you want to hit today, Full body, Upper body or Lower body, or the parts (Chest, Back, Shoulders, Arms, Legs, Core), one or more. Then one area at a time with only that area's exercises (eight, and Show all for the rest), tap the ones you want, Next or Skip. It ends on the review this screen always had: the figure lit with what you picked, the list with sets and reps, Pick another area, Start. This step clears any saved draft so it opens on the question.",
+        run: (w) => { w.clearDraft(); w.eval("MANUAL_DRAFT = []; pmoReset()"); w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
 
       { t: "Plan the week", scenario: "paired",
         s: "Assign workouts to days",
