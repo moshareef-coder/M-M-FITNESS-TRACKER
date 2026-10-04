@@ -197,7 +197,7 @@
 
       { t: "Build one yourself", scenario: "paired",
         s: "Tap the body, then one area at a time",
-        note: "Plan my own is guided now. It opens on the body: tap muscles on the front or back figure (or the names under it, or Whole body) and the areas light up. Or search any exercise from the box at the top. Continue then walks the areas one at a time with only that area's exercises (eight, and Show all), each page with its own search across the whole library. It ends on the review this screen always had: the figure lit with what you picked, sets and reps, Pick another area, Start. This step clears any saved draft so it opens on the body.",
+        note: "Plan my own is guided now. It opens on the body: tap muscles on the front or back figure (or the names under it, or Whole body) and the areas light up. Or, under Continue, the skip this and pick from everything line goes straight to the whole library. Continue walks the areas one at a time (tap any area pill to jump back to it) with only that area's exercises (eight, and Show all), each page with its own search across the whole library. It ends on the review (Back there returns to the last area) this screen always had: the figure lit with what you picked, sets and reps, Pick another area, Start. This step clears any saved draft so it opens on the body.",
         run: (w) => { w.clearDraft(); w.eval("MANUAL_DRAFT = []; pmoReset()"); w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
 
       { t: "Plan the week", scenario: "paired",
