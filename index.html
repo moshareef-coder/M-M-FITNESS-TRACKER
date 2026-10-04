@@ -5359,6 +5359,49 @@
   .ps-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .ps-secondary { border: 1px solid var(--border); background: var(--panel-2); color: var(--text); border-radius: 14px; padding: 12px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
 
+  .tg-q { margin: 2px 0 0; font-weight: 700; font-size: 15px; }
+  .tg-modes { display: grid; gap: 8px; width: 100%; }
+  .tg-modecard { display: grid; gap: 3px; text-align: left; padding: 14px 16px; border-radius: 16px; border: 1.5px solid var(--border); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+  .tg-modecard b { font-size: 16px; }
+  .tg-modecard span { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+  .tg-modecard.on { border-color: var(--text); background: var(--panel-2); }
+  .tg-ghost.small { font-size: 14px; padding: 4px; }
+  .tg-wk { width: 100%; text-align: left; display: grid; gap: 8px; padding: 14px; border-radius: 18px; background: var(--panel-2); border-left: 4px solid var(--me); }
+  .tg-wk.them { border-left-color: var(--partner); }
+  .tg-wk.both { border-left: 0; background: linear-gradient(var(--panel-2), var(--panel-2)) padding-box, linear-gradient(90deg, var(--me), var(--partner)) border-box; border: 2px solid transparent; }
+  .tg-wk.empty { min-height: 72px; align-content: center; }
+  .tg-wk-head { display: flex; justify-content: space-between; align-items: center; }
+  .tg-wk-who { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--me); }
+  .tg-wk.them .tg-wk-who { color: var(--partner); }
+  .tg-wk.both .tg-wk-who { color: var(--muted); }
+  .tg-wk-focus { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+  .tg-wk-meta { font-size: 13px; color: var(--muted); margin-top: -6px; }
+  .tg-wk-wait { margin: 0; color: var(--muted); font-size: 14px; }
+  .tg-wk .tg-hits { margin: 0; }
+  .tg-list.compact li { padding: 8px 10px; background: var(--panel); }
+  .tg-list.compact .tg-ex { font-size: 14px; font-weight: 600; }
+  .tg-compat { display: grid; gap: 6px; padding-top: 2px; }
+  .tg-cp { display: grid; grid-template-columns: 52px 1fr 40px; align-items: center; gap: 8px; font-size: 13px; }
+  .tg-cp b { text-align: right; font-variant-numeric: tabular-nums; }
+  .tg-cp-bar { height: 7px; border-radius: 99px; background: var(--border); overflow: hidden; }
+  .tg-cp-bar i { display: block; height: 100%; border-radius: 99px; background: var(--me); }
+  .tg-cp.them .tg-cp-bar i { background: var(--partner); }
+  .tg-cp-note { margin: 0; font-size: 12px; color: var(--muted); }
+  /* The bar along the bottom of the Workout tab while a workout is being made
+     for the session: who it is for, Back, and Use this. Above the tab bar. */
+  .tg-makebar { position: fixed; left: 12px; right: 12px; z-index: 900;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px;
+    padding: 10px 10px 10px 14px; border-radius: 18px; color: var(--text);
+    background: linear-gradient(100deg, color-mix(in srgb, var(--me) 16%, var(--panel)), color-mix(in srgb, var(--partner) 16%, var(--panel)));
+    border: 1px solid var(--border); box-shadow: var(--shadow-lift); animation: popIn .3s ease; }
+  .tg-mb-txt { display: grid; min-width: 0; }
+  .tg-mb-txt b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tg-mb-txt span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tg-mb-back { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; padding: 8px; cursor: pointer; }
+  .tg-mb-use { border: 0; border-radius: 999px; padding: 10px 16px; background: var(--text); color: var(--bg); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+  .tg-mb-use:disabled { opacity: .4; }
+
   /* Finish */
   .tg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
   .tg-col { display: grid; justify-items: center; gap: 4px; padding: 14px 8px; border-radius: 16px; background: var(--panel-2); min-width: 0; }
@@ -15789,6 +15832,7 @@ function switchTab(tab) {
      and leaving them up is what made every other tab slow. See
      destroyBodyFigures. */
   if (tab !== "body") destroyBodyFigures();
+  tgRenderMakeBar();
   if (tab === "home") renderHome(true);
   if (tab === "progress") { renderProgressTab(); maybeStartPartnerTour(); }
   if (tab === "body") renderBodyTab(true);
@@ -17790,8 +17834,9 @@ async function tgInvite({ fromSession = false } = {}) {
      strip inside it, or from the profile with the session minimised. Starting
      a second one from the lobby would leave the first one open underneath. */
   const running = SESSION && !SESSION.finished ? (TODAY_WORKOUT?.exercises || []) : null;
-  const mineToday = (plansOnDate(todayStr()).find((p) => (p.exercises || []).length && !p.completed_at) || {}).exercises;
-  const exercises = running || mineToday || [];
+  /* Nothing else is preloaded: the workout is made through the app's own flow
+     (Mo, 2026-10-04), so the lists start empty and fill from the plan screen. */
+  const exercises = running || [];
   const row = {
     id: (crypto.randomUUID && crypto.randomUUID()) || `tg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     host_email: MY_EMAIL, guest_email: PARTNER_EMAIL, leader_email: MY_EMAIL,
@@ -17799,10 +17844,10 @@ async function tgInvite({ fromSession = false } = {}) {
     source: exercises.length ? "host" : null,
     workout: {
       exercises: tgCleanExercises(exercises),
-      focus: running ? (TODAY_WORKOUT?.focus || "") : (plansOnDate(todayStr()).find((p) => (p.exercises || []).length && !p.completed_at)?.focus || ""),
+      focus: running ? (TODAY_WORKOUT?.focus || "") : "",
       joinRunning: !!running,
     },
-    host_workout: { exercises: tgCleanExercises(exercises), focus: "" },
+    host_workout: { exercises: running ? tgCleanExercises(exercises) : [], focus: "" },
     guest_workout: { exercises: [], focus: "" },
     created_at: tgNow(), updated_at: tgNow(),
   };
@@ -17841,37 +17886,6 @@ async function tgLeave() {
   renderTogetherHome();
 }
 
-/* ---- The lobby: whose workout ---- */
-function tgSourceFor(who) {
-  if (who === "new") return "new";
-  return (who === "me") === tgAmHost() ? "host" : "guest";
-}
-
-async function tgPick(who) {
-  if (!TG) return;
-  const own = (TG.mode || "same") === "own";
-  if (!own && !tgAmLeader()) return;
-  let exercises = [], focus = "";
-  if (who === "me" || who === "them") {
-    const email = who === "me" ? MY_EMAIL : tgPartnerEmail();
-    const plans = plansOnDate(todayStr(), email).filter((p) => (p.exercises || []).length);
-    const plan = plans.find((p) => !p.completed_at) || plans[0];
-    if (!plan) {
-      toast(who === "me" ? "You have nothing planned today. Try New." : `${tgPartnerFirst()} has nothing planned today. Try New.`);
-      return;
-    }
-    exercises = plan.exercises; focus = plan.focus || "";
-  } else {
-    const w = await tgGenerate();
-    if (!w) return;
-    exercises = w.exercises; focus = w.focus || "";
-  }
-  const list = { exercises: tgCleanExercises(exercises), focus, source: who };
-  if (own) await tgUpdate({ [tgMySide()]: list });
-  else await tgUpdate({ source: tgSourceFor(who), workout: { ...TG.workout, ...list } });
-  tgMaybePerfect();
-}
-
 /* Two people who pick the same workout on their own are doing the joint
    workout whether they meant to or not, so the app says so and offers it. */
 function tgMaybePerfect() {
@@ -17895,83 +17909,8 @@ async function tgSetMode(mode) {
       patch.workout = { ...TG.workout, exercises: mine, focus: TG[tgMySide()]?.focus || TG.workout?.focus || "" };
     }
   }
-  /* Your own list starts as what you would have done anyway, so the side by
-     side option is one tap rather than an empty screen. */
-  if (mode === "own" && !(TG[tgMySide()]?.exercises || []).length) {
-    const plans = plansOnDate(todayStr()).filter((p) => (p.exercises || []).length);
-    const plan = plans.find((p) => !p.completed_at) || plans[0];
-    if (plan) patch[tgMySide()] = { exercises: tgCleanExercises(plan.exercises), focus: plan.focus || "" };
-  }
   if (await tgUpdate(patch) && mode === "same") toast("Perfect, joint workout. Same exercises, same time, 1.5x XP.");
 }
-
-/* A new workout for the two of them, asked of the same engine the Generate
-   button uses, but only asked: nothing is written to anybody's plan until the
-   session starts, so trying three of these in the lobby costs nobody their
-   day. */
-async function tgGenerate() {
-  if (!await requirePremium()) return null;
-  const btn = document.querySelector('[data-tg-src="new"]');
-  if (btn) { btn.disabled = true; btn.textContent = "Building"; }
-  try {
-    const payload = workoutEnginePayload({ forDate: todayStr(), avoid: (TG?.workout?.exercises || []).map((e) => e.name) });
-    const { data: { session } } = await sb.auth.getSession();
-    const resp = await fetch(FUNCTION_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-      body: JSON.stringify(payload),
-    });
-    const data = JSON.parse(await resp.text());
-    if (!resp.ok || data.error || !data.workout?.exercises?.length) throw new Error(data.error || "No workout came back");
-    return data.workout;
-  } catch (err) {
-    console.error("together generate failed", err);
-    toast("Couldn't build a new workout. Try again.");
-    return null;
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "New"; }
-  }
-}
-
-function tgEditable() {
-  if (!TG) return null;
-  if ((TG.mode || "same") === "own") return tgMySide();
-  return tgAmLeader() ? "workout" : null;
-}
-
-async function tgRemoveExercise(i) {
-  const key = tgEditable();
-  if (!key) return;
-  const exercises = (TG[key]?.exercises || []).slice();
-  exercises.splice(i, 1);
-  await tgUpdate({ [key]: { ...TG[key], exercises } });
-  tgMaybePerfect();
-}
-
-/* Adds and edits come from the same picker the plan screen uses (categories,
-   search, sets and reps), pointed at this lobby's list with target
-   "together". These two write its result back to the session row. */
-async function tgAddFromPicker(ex) {
-  const key = tgEditable();
-  if (!key) return;
-  const exercises = [...(TG[key]?.exercises || []), { name: ex.name, sets: ex.sets || 3, reps: ex.reps || 10 }];
-  await tgUpdate({ [key]: { ...TG[key], exercises } });
-  tgMaybePerfect();
-}
-async function tgCommitEditable() {
-  const key = tgEditable();
-  if (!key) return;
-  await tgUpdate({ [key]: { ...TG[key], exercises: (TG[key]?.exercises || []).slice() } });
-  tgMaybePerfect();
-}
-function tgEditRow(i) {
-  const key = tgEditable();
-  const ex = TG?.[key]?.exercises?.[i];
-  if (!ex) return;
-  cbOpenPicker("together");
-  cbConfirmStep(ex, { editIndex: i });
-}
-
 
 function tgReady() {
   if (!TG || TG.status !== "lobby") return false;
@@ -17980,8 +17919,122 @@ function tgReady() {
 }
 async function tgStart() {
   if (!TG || !tgAmLeader() || TG.status !== "lobby") return;
-  if (!tgReady()) { toast((TG.mode || "same") === "same" ? "Pick a workout first" : "You each need a workout first"); return; }
+  if (!tgReady()) { toast((TG.mode || "same") === "same" ? "Make the workout first" : "You each need a workout first"); return; }
   await tgUpdate({ status: "active", started_at: tgNow() });
+}
+
+/* ---- Making the workout: the app's own flow ----
+   Mo, 2026-10-04: no separate builder in the lobby. Making the workout is the
+   same flow as making any workout: the Workout tab's Generate for me, I'll plan
+   my own or today's plan, the plan screen with its match ring, its swaps and
+   its add exercise. While that is going on a bar sits along the bottom saying
+   who it is for, and Use this hands the plan back to the session, which opens
+   the review. Edit from the review goes back into the same plan screen. */
+let TG_MAKING = false;
+
+function tgMakingPlan() {
+  return plansOnDate(todayStr()).find((p) => (p.exercises || []).length && !p.completed_at) || null;
+}
+
+function tgBeginMaking({ edit = false } = {}) {
+  if (!TG) return;
+  if ((TG.mode || "same") === "same" && !tgAmLeader()) return;
+  TG_MAKING = true;
+  tgCloseOverlay();
+  if (edit && tgMakingPlan()) showPlanScreen(todayStr());
+  else { switchTab("workout"); goWorkoutScreen("choose"); }
+  tgRenderMakeBar();
+}
+
+function tgStopMaking() {
+  TG_MAKING = false;
+  tgRenderMakeBar();
+}
+
+function tgRenderMakeBar() {
+  let bar = $("tgMakeBar");
+  const show = TG_MAKING && TG && TG_OPEN.includes(TG.status)
+    && !document.body.classList.contains("session-open")
+    && !$("tab-workout")?.classList.contains("hidden");
+  if (!show) { bar?.remove(); return; }
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "tgMakeBar";
+    bar.className = "tg-makebar";
+    document.body.appendChild(bar);
+  }
+  const first = tgPartnerFirst();
+  const plan = tgMakingPlan();
+  const same = (TG.mode || "same") === "same";
+  bar.innerHTML = `
+    <div class="tg-mb-txt">
+      <b>${same ? `For you and ${first}` : `Yours, beside ${first}`}</b>
+      <span>${plan ? `${escapeHtml(displayFocus(plan.focus, plan.exercises) || "Your plan")} · ${plan.exercises.length} exercises` : "Generate one, or plan your own"}</span>
+    </div>
+    <button type="button" class="tg-mb-back" id="tgMbBack">Back</button>
+    <button type="button" class="tg-mb-use" id="tgMbUse" ${plan ? "" : "disabled"}>Use this</button>`;
+  $("tgMbBack").onclick = () => { tgStopMaking(); renderTogether(); };
+  $("tgMbUse").onclick = tgUseTodayPlan;
+}
+
+async function tgUseTodayPlan() {
+  const plan = tgMakingPlan();
+  if (!plan || !TG) return;
+  const list = { exercises: tgCleanExercises(plan.exercises), focus: plan.focus || "" };
+  tgStopMaking();
+  if ((TG.mode || "same") === "same") await tgUpdate({ workout: { ...TG.workout, ...list } });
+  else await tgUpdate({ [tgMySide()]: list });
+  tgMaybePerfect();
+  renderTogether();
+}
+
+/* Compatibility: the plan screen's own match, asked of each person. How much
+   of this workout lands on what that person has trained least this week,
+   scored per muscle against their own most worked one, exactly as
+   matchDetail scores yours. One workout, two numbers, which is what makes the
+   joint workout an honest choice rather than one person's plan with a guest. */
+function tgMatchFor(exs, name) {
+  const counts = {};
+  for (const ex of exs || []) {
+    const rule = classifyMuscles(ex.name || "");
+    if (!rule) continue;
+    for (const g of rule.primary) counts[g] = (counts[g] || 0) + 2;
+    for (const g of rule.secondary) counts[g] = (counts[g] || 0) + 1;
+  }
+  const trained = Object.keys(counts);
+  if (!trained.length || !name) return null;
+  const vols = computeMuscleVolume(name, 0, todayStr());
+  const peak = Math.max(...Object.values(vols), 0);
+  const fresh = trained.map((m) => (peak > 0 ? Math.max(0, Math.min(100, Math.round((1 - (vols[m] || 0) / peak) * 100))) : 100));
+  return Math.max(35, Math.min(99, Math.round(fresh.reduce((a, b) => a + b, 0) / fresh.length)));
+}
+
+function tgWorkoutCard({ who, title, exs, focus, editable, compat, waiting }) {
+  if (!exs.length) {
+    return `<section class="tg-wk ${who} empty">
+      <div class="tg-wk-head"><span class="tg-wk-who">${title}</span></div>
+      <p class="tg-wk-wait">${waiting}</p>
+    </section>`;
+  }
+  const groups = groupsHitFor(exs);
+  const mins = sessionEstimateMinutes(exs, null);
+  return `<section class="tg-wk ${who}">
+    <div class="tg-wk-head">
+      <span class="tg-wk-who">${title}</span>
+      ${editable ? `<button type="button" class="tg-link-btn" data-tg-edit>Edit</button>` : ""}
+    </div>
+    <h3 class="tg-wk-focus">${escapeHtml(displayFocus(focus, exs) || "Workout")}</h3>
+    <div class="tg-wk-meta">${exs.length} exercises · ${Math.max(10, mins - 5)}-${mins + 5} min</div>
+    ${groups.length ? `<div class="tg-hits ${who}">Hits <b>${escapeHtml(bodyGroupsPhrase(groups))}</b></div>` : ""}
+    <ul class="tg-list compact">
+      ${exs.map((ex) => `<li><span class="tg-ex">${escapeHtml(ex.name)}</span><span class="tg-sr">${ex.sets || 3} × ${escapeHtml(String(ex.reps ?? ""))}</span></li>`).join("")}
+    </ul>
+    ${compat.length ? `<div class="tg-compat">
+      ${compat.map(([label, pct, side]) => pct == null ? "" : `
+        <div class="tg-cp ${side}"><span>${label}</span><span class="tg-cp-bar"><i style="width:${pct}%"></i></span><b>${pct}%</b></div>`).join("")}
+      <p class="tg-cp-note">Fit: how much of it lands on what ${compat.length > 1 ? "each of you has" : `${compat[0][0] === "You" ? "you have" : `${compat[0][0]} has`}`} trained least this week.</p>
+    </div>` : ""}
+  </section>`;
 }
 
 /* ---- Into the workout ----
@@ -18097,6 +18150,8 @@ function renderTogether(prev = null) {
   if (!TG) { tgCloseOverlay("lobby"); tgCloseOverlay("invite"); tgRenderHud(); return; }
   const s = TG.status;
   if (s === "declined" || s === "cancelled") {
+    TG_MAKING = false;
+    tgRenderMakeBar();
     const wasOpen = prev && TG_OPEN.includes(prev.status);
     if (wasOpen && s === "declined" && tgAmHost()) toast(`${tgPartnerFirst()} can't train right now`);
     if (wasOpen && s === "cancelled" && !tgSame(TG.cancelled_by, MY_EMAIL)) toast(`${tgPartnerFirst()} left the session`);
@@ -18110,6 +18165,7 @@ function renderTogether(prev = null) {
   if (s === "invited") { if (tgAmHost()) tgShowLobby(); else tgShowInvite(); return; }
   if (s === "lobby") { tgShowLobby(); return; }
   if (s === "active") {
+    tgStopMaking();
     tgCloseOverlay("lobby"); tgCloseOverlay("invite");
     if (prev && prev.status !== "active") { sfxPlay("paired"); buzz([14, 50, 22]); }
     tgStartMySession();
@@ -18180,93 +18236,78 @@ async function tgShowInvite() {
 }
 
 async function tgShowLobby() {
+  if (TG_MAKING) { tgRenderMakeBar(); return; }
   const token = ++TG_RENDER;
   const here = TG.status === "lobby";
   const faces = await tgFaces("here", here ? "here" : "waiting");
-  if (token !== TG_RENDER || !TG || !["invited", "lobby"].includes(TG.status)) return;
+  if (token !== TG_RENDER || !TG || !["invited", "lobby"].includes(TG.status) || TG_MAKING) return;
   const first = tgPartnerFirst();
   const mode = TG.mode || "same";
+  const same = mode === "same";
   const leader = tgAmLeader();
-  const leaderName = leader ? "You" : first;
+  const shared = TG.workout?.exercises || [];
+  const mine = TG[tgMySide()]?.exercises || [];
+  const theirs = TG[tgTheirSide()]?.exercises || [];
+  const reviewing = same ? shared.length > 0 : mine.length > 0;
+  const partner = partnerName();
+  const leaderFirst = leader ? "You" : first;
   const el = tgOverlay("lobby");
-  el.setAttribute("aria-label", "Train together");
-
-  /* What a list works, in the words the builder uses, so the two of you can
-     see at a glance whether you are hitting the same things. */
-  const hitsHTML = (exs, who) => {
-    const groups = groupsHitFor(exs);
-    return groups.length ? `<div class="tg-hits ${who}">Hits <b>${escapeHtml(bodyGroupsPhrase(groups))}</b></div>` : "";
-  };
-  const listHTML = (exs, editable, emptyText, who = "me") => `
-    ${hitsHTML(exs, who)}
-    <ul class="tg-list">
-      ${exs.length ? exs.map((ex, i) => `
-        <li class="${editable ? "edit" : ""}" ${editable ? `data-tg-edit="${i}" role="button" tabindex="0" aria-label="Change sets and reps for ${escapeHtml(ex.name)}"` : ""}>
-          <span class="tg-ex">${escapeHtml(ex.name)}</span>
-          <span class="tg-sr">${ex.sets || 3} × ${escapeHtml(String(ex.reps ?? ""))}</span>
-          ${editable ? `<button type="button" class="tg-rm" data-tg-rm="${i}" aria-label="Remove ${escapeHtml(ex.name)}">&times;</button>` : ""}
-        </li>`).join("")
-      : `<li class="tg-empty">${emptyText}</li>`}
-    </ul>
-    ${editable ? `<button type="button" class="tg-addbtn" data-tg-addbtn>+ Add exercise</button>` : ""}`;
-  const srcTabs = (opts, on, enabled) => `
-    <div class="tg-src" role="group" aria-label="Which workout" style="grid-template-columns: repeat(${opts.length}, 1fr)">
-      ${opts.map(([key, label, src]) => `<button type="button" data-tg-src="${key}" class="${on === src ? "on" : ""}" ${enabled ? "" : "disabled"}>${label}</button>`).join("")}
-    </div>`;
+  el.setAttribute("aria-label", `Work out with ${first}`);
 
   let body;
-  if (mode === "same") {
-    const exs = TG.workout?.exercises || [];
+  if (!reviewing) {
+    /* Step one: how you are training. Then into the app's own flow. */
+    body = `
+      <p class="tg-q">How do you want to train?</p>
+      <div class="tg-modes">
+        <button type="button" class="tg-modecard ${same ? "on" : ""}" data-tg-mode="same">
+          <b>Same workout</b><span>One workout for both of you, done at the same time. 1.5x XP.</span>
+        </button>
+        <button type="button" class="tg-modecard ${!same ? "on" : ""}" data-tg-mode="own">
+          <b>Each our own</b><span>Your own workouts, side by side, watching each other live.</span>
+        </button>
+      </div>
+      <div class="tg-actions">
+        ${same && !leader
+          ? `<p class="tg-wait"><span class="tg-dot"></span> ${first} is making the workout</p>`
+          : `<button type="button" class="btn-primary" id="tgMake">${same ? "Make the workout" : "Make your workout"}</button>`}
+        ${same && leader && here ? `<button type="button" class="tg-ghost" id="tgHand">Let ${first} make it</button>` : ""}
+      </div>`;
+  } else if (same) {
     body = `
       <div class="tg-banner same"><b>Joint workout</b><span>The same exercises for both of you, at the same time. 1.5x XP.</span></div>
-      <div class="tg-lead">
-        <span><b>${leaderName}</b> ${leader ? "are" : "is"} picking it</span>
-        ${leader && here ? `<button type="button" class="tg-link-btn" id="tgHand">Let ${first} pick</button>` : ""}
-      </div>
-      ${srcTabs([["me", "Mine", tgSourceFor("me")], ["them", `${first}'s`, tgSourceFor("them")], ["new", "New", "new"]], TG.source, leader)}
-      ${listHTML(exs, leader, leader ? "Pick a workout above, or add exercises." : `${first} is picking.`)}`;
+      ${tgWorkoutCard({ who: "both", title: `${leaderFirst === "You" ? "You" : first} made this`, exs: shared, focus: TG.workout?.focus,
+        editable: leader, compat: [["You", tgMatchFor(shared, ME), "me"], [first, tgMatchFor(shared, partner), "them"]] })}
+      <button type="button" class="tg-ghost small" data-tg-mode="own">Do our own workouts instead</button>`;
   } else {
-    const mine = TG[tgMySide()]?.exercises || [];
-    const theirs = TG[tgTheirSide()]?.exercises || [];
     const matching = tgSameNames(mine, theirs);
     body = `
       <div class="tg-banner own"><b>Side by side</b><span>You each do your own workout and watch each other live. 1.5x XP.</span></div>
-      ${matching ? `<div class="tg-perfect"><b>You picked the same workout.</b><button type="button" class="tg-link-btn" id="tgMakeJoint">Make it a joint workout</button></div>` : ""}
-      <div class="tg-sub-h">Your workout</div>
-      ${srcTabs([["me", "Mine", "me"], ["new", "New", "new"]], TG[tgMySide()]?.source || "me", true)}
-      ${listHTML(mine, true, "Pick yours above, or add exercises.")}
-      <div class="tg-sub-h them">${first}'s workout</div>
-      ${listHTML(theirs, false, here ? `${first} is picking.` : `${first} picks once they join.`, "them")}`;
+      ${matching ? `<div class="tg-perfect"><b>You picked the same workout.</b><button type="button" class="tg-link-btn" data-tg-mode="same">Make it a joint workout</button></div>` : ""}
+      ${tgWorkoutCard({ who: "me", title: "Your workout", exs: mine, focus: TG[tgMySide()]?.focus, editable: true, compat: [["You", tgMatchFor(mine, ME), "me"]] })}
+      ${tgWorkoutCard({ who: "them", title: `${first}'s workout`, exs: theirs, focus: TG[tgTheirSide()]?.focus, editable: false,
+        compat: [[first, tgMatchFor(theirs, partner), "them"]], waiting: here ? `${first} is making theirs` : `${first} makes theirs once they join` })}
+      <button type="button" class="tg-ghost small" data-tg-mode="same">Do the same workout instead</button>`;
   }
 
   el.innerHTML = `
     <div class="tg-card lobby">
       <button type="button" class="tg-x" id="tgLeave" aria-label="Leave">&times;</button>
       ${faces}
-      <h2 class="tg-h">Work out with ${first}</h2>
+      <h2 class="tg-h">${reviewing ? "Your workouts" : `Work out with ${first}`}</h2>
       <p class="tg-status ${here ? "on" : ""}">${here ? `${first}'s here` : `Waiting for ${first} to join`}</p>
-      <div class="tg-mode" role="group" aria-label="How you are training">
-        <button type="button" data-tg-mode="same" class="${mode === "same" ? "on" : ""}">Same workout</button>
-        <button type="button" data-tg-mode="own" class="${mode === "own" ? "on" : ""}">Each our own</button>
-      </div>
       ${body}
-      <div class="tg-actions">
+      ${reviewing ? `<div class="tg-actions">
         ${leader
-          ? `<button type="button" class="btn-primary" id="tgGo" ${here && tgReady() ? "" : "disabled"}>${here ? "Start together" : `Waiting for ${first}`}</button>`
+          ? `<button type="button" class="btn-primary" id="tgGo" ${here && tgReady() ? "" : "disabled"}>${!here ? `Waiting for ${first}` : tgReady() ? "Start together" : `Waiting for ${first}'s workout`}</button>`
           : `<p class="tg-wait">${first} starts it when you're both ready</p>`}
-      </div>
+      </div>` : ""}
     </div>`;
   el.querySelectorAll("[data-tg-mode]").forEach((b) => { b.onclick = () => tgSetMode(b.dataset.tgMode); });
-  el.querySelectorAll("[data-tg-src]").forEach((b) => { b.onclick = () => tgPick(b.dataset.tgSrc); });
-  el.querySelectorAll("[data-tg-addbtn]").forEach((b) => { b.onclick = () => cbOpenPicker("together"); });
-  el.querySelectorAll("[data-tg-edit]").forEach((row) => {
-    row.onclick = (e) => { if (!e.target.closest("[data-tg-rm]")) tgEditRow(Number(row.dataset.tgEdit)); };
-    row.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tgEditRow(Number(row.dataset.tgEdit)); } };
-  });
-  el.querySelectorAll("[data-tg-rm]").forEach((b) => { b.onclick = (e) => { e.stopPropagation(); tgRemoveExercise(Number(b.dataset.tgRm)); }; });
+  el.querySelectorAll("[data-tg-edit]").forEach((b) => { b.onclick = () => tgBeginMaking({ edit: true }); });
   $("tgLeave").onclick = tgLeave;
+  if ($("tgMake")) $("tgMake").onclick = () => tgBeginMaking();
   if ($("tgHand")) $("tgHand").onclick = () => tgUpdate({ leader_email: tgPartnerEmail() });
-  if ($("tgMakeJoint")) $("tgMakeJoint").onclick = () => tgSetMode("same");
   if ($("tgGo")) $("tgGo").onclick = tgStart;
 }
 
@@ -31318,6 +31359,9 @@ function todaysLoggedExerciseNames() {
 }
 
 function startWorkout() {
+  /* Making a workout for Train together, Start means "this one": it goes back
+     to the session's review rather than starting a workout on your own. */
+  if (TG_MAKING) { tgUseTodayPlan(); return; }
   if (!TODAY_WORKOUT) return;
   /* A run or a class is not a list of sets, and this screen opens on an
      exercise. Every Begin in the app comes through here, so the one branch
@@ -35494,6 +35538,7 @@ function closeAllWorkouts() { $("allWorkoutsScrim").classList.add("hidden"); }
 
 function renderWorkoutTab({ respectMode = false } = {}) {
   renderFab();
+  tgRenderMakeBar();   // the Train together bar rides on this tab while a workout is being made for it
   resumeSessionIfAny();          // loads a saved session, does not take over
   restoreCardioSession();        // and the same for a run left going
   if (SESSION) FRESH_PLAN_ID = null;   // once it is being lifted it is not untouched any more
@@ -39723,24 +39768,16 @@ let CB_PENDING = null;   // the exercise waiting on its sets and reps
 let CB_TARGET = "draft";
 /* "plan" is whichever plan the screen behind this sheet is showing, which is
    today's unless somebody is reviewing another day. */
-/* Three lists this picker adds to: your own workout being built, a plan on the
-   plan screen, and the Train together lobby, which is the same picker on
-   purpose (Mo: adding has to follow the same flow wherever you are). */
-const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || [])
-  : CB_TARGET === "together" ? (TG?.[tgEditable()]?.exercises || []) : MANUAL_DRAFT);
+const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || []) : MANUAL_DRAFT);
 
 async function cbCommit() {
   if (CB_TARGET === "plan") { await savePlanExercises(); rerenderPlanScreen(); return; }
-  if (CB_TARGET === "together") { await tgCommitEditable(); return; }
   saveDraft();
   cbUpdateCharacter();
 }
 
 function cbOpenPicker(target = "draft") {
   CB_TARGET = target;
-  /* The lobby is a full screen layer of its own, so the picker has to sit
-     above it while it is open from there. */
-  $("cbPickScrim").style.zIndex = target === "together" ? "2590" : "";
   $("cbPickScrim").classList.remove("hidden");
   $("cbPickScrim").onclick = (e) => { if (e.target === $("cbPickScrim")) cbClosePicker(); };
   cbRenderPicker();
@@ -39748,11 +39785,8 @@ function cbOpenPicker(target = "draft") {
 
 function cbClosePicker() {
   CB_PENDING = null;
-  const wasTogether = CB_TARGET === "together";
   CB_TARGET = "draft";
   $("cbPickScrim").classList.add("hidden");
-  $("cbPickScrim").style.zIndex = "";
-  if (wasTogether && TG) tgShowLobby();
   pinSheets();
 }
 
@@ -39936,7 +39970,6 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
         const row = cbList()[at];
         const toPlan = CB_TARGET === "plan";
         if (row) { row.sets = sets; row.reps = reps; row.targetWeight = weight; }
-        if (CB_TARGET === "together") { if (row) delete row.targetWeight; cbClosePicker(); tgCommitEditable(); return; }
         if (toPlan) { cbClosePicker(); savePlanExercises().then(rerenderPlanScreen); return; }
         saveDraft();
         cbClosePicker();
@@ -39957,14 +39990,6 @@ function cbAdd(name, sets, reps, weight = 0) {
      to add a second identical row without a word. */
   if (cbList().some((e) => e.name === name)) {
     toast(`${name} is already in your workout`);
-    return;
-  }
-  /* The lobby's list belongs to the session row, and the other phone has to
-     see it change, so it is written there rather than pushed in place. No
-     weight: each phone loads every lift off its own owner's history. */
-  if (CB_TARGET === "together") {
-    tgAddFromPicker({ name, sets, reps });
-    toast(`${name} added`);
     return;
   }
   cbList().push({ name, sets, reps, targetWeight: weight || 0 });
@@ -41185,7 +41210,7 @@ function renderPlanPreview(opts) {
              <span class="wp-open-txt"><b>Advanced</b><i>${escapeHtml(privacySummary())}</i></span>
              <span class="wp-open-go">${icon("chevronRight", 16)}</span>
            </button>` : ""}
-         <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>
+         <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${TG_MAKING ? `Use this with ${tgPartnerFirst()}` : started ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>
          ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}
     ${review ? addSessionFootHTML(date, review) : ""}
     ${delToday}`;
