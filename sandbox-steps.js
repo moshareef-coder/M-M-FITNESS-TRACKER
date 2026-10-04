@@ -196,8 +196,8 @@
         } },
 
       { t: "Build one yourself", scenario: "paired",
-        s: "Pick areas, then one area at a time",
-        note: "Plan my own is guided now. First: what do you want to hit today, Full body, Upper body or Lower body, or the parts (Chest, Back, Shoulders, Arms, Legs, Core), one or more. Then one area at a time with only that area's exercises (eight, and Show all for the rest), tap the ones you want, Next or Skip. It ends on the review this screen always had: the figure lit with what you picked, the list with sets and reps, Pick another area, Start. This step clears any saved draft so it opens on the question.",
+        s: "Tap the body, then one area at a time",
+        note: "Plan my own is guided now. It opens on the body: tap muscles on the front or back figure (or the names under it, or Whole body) and the areas light up. Or search any exercise from the box at the top. Continue then walks the areas one at a time with only that area's exercises (eight, and Show all), each page with its own search across the whole library. It ends on the review this screen always had: the figure lit with what you picked, sets and reps, Pick another area, Start. This step clears any saved draft so it opens on the body.",
         run: (w) => { w.clearDraft(); w.eval("MANUAL_DRAFT = []; pmoReset()"); w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
 
       { t: "Plan the week", scenario: "paired",
