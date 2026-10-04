@@ -21,6 +21,77 @@
     el.dispatchEvent(new w.Event("input", { bubbles: true }));
   }
 
+  /* ---------- a pretend Mell, for Train together ----------
+     Mell does on the fake database what Mell's phone would do on the real one,
+     then hands the same row to the app the way realtime would. So the lobby,
+     the live strip and the finish react exactly as they will with a real
+     partner on the other end. One timer at a time; a new step stops the last. */
+  const sim = { timer: null, watch: null };
+  function simStop() { clearInterval(sim.timer); clearInterval(sim.watch); sim.timer = sim.watch = null; }
+  const nowIso = () => new Date().toISOString();
+  function tgRow(w) { const rows = w.__SANDBOX.db.together_sessions || []; return rows[rows.length - 1] || null; }
+  function mellIsHost(w, r) { return (r.host_email || "").toLowerCase() === (w.__SANDBOX.them || "").toLowerCase(); }
+  function mellUpdate(w, patch) {
+    const row = tgRow(w);
+    if (!row) return null;
+    Object.assign(row, patch, { updated_at: nowIso() });
+    w.tgOnSession(JSON.parse(JSON.stringify(row)));
+    return row;
+  }
+  function mellPlan(w) {
+    const them = (w.__SANDBOX.them || "").toLowerCase(), today = w.todayStr();
+    const plans = (w.__SANDBOX.db.ai_workouts || []).filter((p) => (p.email || "").toLowerCase() === them && (p.exercises || []).length);
+    const p = plans.find((x) => x.entry_date === today) || plans[plans.length - 1];
+    return p ? { exercises: JSON.parse(JSON.stringify(p.exercises)).slice(0, 5), focus: p.focus || "" } : null;
+  }
+  /* Mell trains at a steady clip, one set every few seconds, and finishes. */
+  function mellTrains(w, pace = 4500) {
+    clearInterval(sim.timer);
+    let ei = 0, si = 0;
+    sim.timer = setInterval(() => {
+      const r = tgRow(w);
+      if (!r || !["active", "done"].includes(r.status)) return;
+      const exs = r.workout?.exercises || [];
+      if (ei >= exs.length) {
+        clearInterval(sim.timer);
+        const mine = mellIsHost(w, r) ? "host_done_at" : "guest_done_at";
+        const other = mellIsHost(w, r) ? r.guest_done_at : r.host_done_at;
+        mellUpdate(w, other ? { [mine]: nowIso(), status: "done", ended_at: nowIso() } : { [mine]: nowIso() });
+        return;
+      }
+      const ex = exs[ei];
+      const set = { session_id: r.id, email: w.__SANDBOX.them, exercise_name: ex.name, set_idx: si,
+        weight: 35 + ei * 15 + si * 5, reps: Number(String(ex.reps).split("-")[0]) || 10, done: true, updated_at: nowIso() };
+      (w.__SANDBOX.db.together_sets ??= []).push(set);
+      w.tgOnSet(JSON.parse(JSON.stringify(set)));
+      if (++si >= (ex.sets || 3)) { ei++; si = 0; }
+    }, pace);
+  }
+  /* Starts Mell training the moment the session goes active, whoever started it. */
+  function whenActive(w, then) {
+    clearInterval(sim.watch);
+    sim.watch = setInterval(() => {
+      const r = tgRow(w);
+      if (r && r.status === "active") { clearInterval(sim.watch); then(); }
+    }, 400);
+  }
+  function quietTours(w) {
+    try { w.localStorage.setItem("unio.tourPartnerFace", "1"); } catch {}
+    w.document.querySelector(".pc-scrim")?.remove();
+  }
+  function mellInvites(w, { running = false } = {}) {
+    const plan = mellPlan(w) || { exercises: [], focus: "" };
+    const row = {
+      id: "tg-sim-" + Date.now(), host_email: w.__SANDBOX.them, guest_email: w.__SANDBOX.me, leader_email: w.__SANDBOX.them,
+      status: "invited", source: running ? "host" : null,
+      workout: { exercises: running ? plan.exercises : [], focus: running ? plan.focus : "", joinRunning: running },
+      created_at: nowIso(), updated_at: nowIso(),
+    };
+    (w.__SANDBOX.db.together_sessions ??= []).push(row);
+    w.tgOnSession(JSON.parse(JSON.stringify(row)));
+    return row;
+  }
+
   /* ---------- the journey ----------
      Grouped the way a person meets the app, not the way the code is laid out.
      `scenario` says which world the step needs; the phone only reloads when
@@ -195,6 +266,36 @@
         s: "The screen after the last rep",
         note: "Every exercise on today's plan already logged, so the app's own route lands here: the ring fills, time, volume and the record land under it, and the last line is the pair rather than a solo total. End a workout early instead and the same layout drops the PR tile and the confetti, because that is not the same event.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
+    ]},
+
+    { group: "Train together", note: "Two players, one workout, anywhere, each at their own pace. Mell is simulated: Mell joins, picks, trains and finishes on a timer, through the same code a real partner's phone would hit.", steps: [
+      { t: "Invite Mell", scenario: "paired",
+        s: "You ask, Mell joins, you pick and start",
+        note: "Tap Train together on Home, or this step does it for you. The lobby opens with you in charge and Mell's face breathing while Mell is on the way; about three seconds later Mell joins. Pick Mine, Mell's or New, take exercises off with the x, add one from the chips, or hand the pick to Mell. Start together drops you both into the same workout: the strip at the top shows both of you in progress rings, what Mell is on, and Mell's weight and reps on your current lift filling in as they land, with a callout each time. Log your own sets and finish to see the shared finish and the 1.5x bonus.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => w.tgInvite(), 300);
+          setTimeout(() => mellUpdate(w, { status: "lobby" }), 3200);
+          whenActive(w, () => mellTrains(w)); } },
+
+      { t: "Mell invites you", scenario: "paired",
+        s: "Join, Mell picks, Mell starts",
+        note: "The invite as the person receiving it: a full screen ask with Join and Not now. Join takes you into the lobby, where Mell is in charge, so the picker is read only and you watch it change: about two seconds later Mell picks Mell's own workout, and two after that Mell starts it and you are both in.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => mellInvites(w), 300);
+          clearInterval(sim.watch);
+          sim.watch = setInterval(() => {
+            const r = tgRow(w);
+            if (r && r.status === "lobby") {
+              clearInterval(sim.watch);
+              const plan = mellPlan(w) || { exercises: [], focus: "" };
+              setTimeout(() => mellUpdate(w, { source: "host", workout: { ...r.workout, exercises: plan.exercises, focus: plan.focus } }), 2000);
+              setTimeout(() => { mellUpdate(w, { status: "active", started_at: nowIso() }); mellTrains(w); }, 4200);
+            }
+          }, 400); } },
+
+      { t: "Join Mell's workout mid-way", scenario: "paired",
+        s: "\"I'm doing this, come in\"",
+        note: "Mell is already training and asks you in. No lobby this time: the workout is the one Mell is on, so Join puts you straight into it, each at your own pace, with Mell's sets landing on your strip as you go.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => mellInvites(w, { running: true }), 300);
+          whenActive(w, () => mellTrains(w)); } },
     ]},
 
     { group: "The other person", note: "Everything that only matters because someone else is there.", steps: [
