@@ -9139,6 +9139,7 @@
    resolves, so this stays until there is a real domain, and then it is one line
    rather than a hunt. */
 const PUBLIC_SITE = "https://m-m-fitness-tracker.vercel.app";
+const APP_STORE_URL = "https://apps.apple.com/app/id6812201708";
 
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
@@ -10902,11 +10903,18 @@ function inviteMessage(data, code) {
   const goal = (data.goalLabel || goalTileFor(data.goal_bubble)?.title || "").toLowerCase();
   const who = data.name || ME || "Someone";
   const line = goal ? `${who} is starting on Unio: ${goal}.` : `${who} is starting on Unio.`;
+  /* Never location.origin. In the App Store build that is capacitor://localhost,
+     so every invite sent from 1.0 was a link nobody else could open, under a
+     line telling them there was nothing to install (found by Saif,
+     2026-10-04). The code is what survives an App Store install, so it is the
+     instruction, and the store link is how they get there. */
   return `${line}
 They asked you to keep them honest. The app does not celebrate when only one of you finishes.
 
-Nothing to install, it opens in your browser:
-${location.origin}/?invite=${code}`;
+1. Get Unio on iPhone: ${APP_STORE_URL}
+2. Open it and enter ${who}'s code: ${code}
+
+No iPhone? Use it in your browser instead: ${PUBLIC_SITE}`;
 }
 
 /* The partner step, asked inside the wizard instead of after it.
