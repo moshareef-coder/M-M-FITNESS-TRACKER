@@ -3870,9 +3870,9 @@
     text-transform: none; color: var(--text); }
   .pmo-sub { margin: 0 0 16px; color: var(--muted); font-size: 14.5px; }
   .pmo-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 10px; }
-  .pmo-steps span { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); }
-  .pmo-steps span.now { background: var(--text); color: var(--bg); }
-  .pmo-steps span.done { color: var(--text); }
+  .pmo-steps button { border: 0; font-family: inherit; cursor: pointer; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); }
+  .pmo-steps button.now { background: var(--text); color: var(--bg); }
+  .pmo-steps button.done { color: var(--text); }
   .pmo-more { margin: -4px 0 12px; }
   .pmo-search { position: relative; margin: 0 0 14px; }
   .pmo-search input { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border);
@@ -40075,8 +40075,8 @@ const PMO_REGION_GROUPS = {
 };
 const PMO_ORDER = ["legs", "chest", "back", "shoulders", "arms", "core"];
 const PMO_SHOWN = 8;   // per area before "Show all": a handful, not the library
-let PMO = { stage: "areas", regions: [], step: 0, all: false, q: "" };
-function pmoReset() { closeBodyRegionPicker(); PMO = { stage: "areas", regions: [], step: 0, all: false, q: "" }; }
+let PMO = { stage: "areas", regions: [], step: 0, all: false, q: "", free: false };
+function pmoReset() { closeBodyRegionPicker(); PMO = { stage: "areas", regions: [], step: 0, all: false, q: "", free: false }; }
 function pmoSections() {
   const want = new Set(PMO.regions.flatMap((id) => PMO_REGION_GROUPS[id] || []));
   return PMO_ORDER.filter((g) => want.has(g));
@@ -40145,6 +40145,7 @@ function renderPlanMyOwn() {
     <div class="pmo-foot">
       <button type="button" class="btn-primary" id="pmoGo"></button>
       <button type="button" class="pmo-skip" id="pmoReview" hidden></button>
+      <button type="button" class="pmo-skip" id="pmoFree">Or skip this and pick from everything</button>
     </div>`;
   const syncFoot = () => {
     const n = pmoSections().length;
@@ -40169,6 +40170,17 @@ function renderPlanMyOwn() {
     window.scrollTo(0, 0);
   };
   $("pmoReview").onclick = () => { closeBodyRegionPicker(); PMO.stage = "done"; PMO.q = ""; renderManualBuildScreen(); window.scrollTo(0, 0); };
+  /* Freestyle: Mo, 2026-10-04, some days you know exactly what you want and
+     being walked through areas is in the way. It lands on the same review
+     with the whole library already open, and Back there returns here. */
+  $("pmoFree").onclick = () => {
+    closeBodyRegionPicker();
+    PMO.stage = "done"; PMO.free = true; PMO.regions = []; PMO.q = "";
+    renderManualBuildScreen(); window.scrollTo(0, 0);
+    cbOpenPicker();
+  };
+  /* Hidden once there is a draft: Review already goes to the same place. */
+  $("pmoFree").hidden = !!MANUAL_DRAFT.length;
   syncFoot();
 }
 
@@ -40188,7 +40200,7 @@ function renderPmoPick() {
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => { if (PMO.step > 0) PMO.step--; else PMO.stage = "areas"; PMO.all = false; PMO.q = ""; renderPlanMyOwn(); window.scrollTo(0, 0); })}
     <div class="pmo-steps" aria-label="Area ${PMO.step + 1} of ${sections.length}">
-      ${sections.map((s2, i) => `<span class="${i < PMO.step ? "done" : i === PMO.step ? "now" : ""}">${escapeHtml(CB_GROUPS.find((x) => x.key === s2)?.label || s2)}</span>`).join("")}
+      ${sections.map((s2, i) => `<button type="button" data-step="${i}" class="${i < PMO.step ? "done" : i === PMO.step ? "now" : ""}">${escapeHtml(CB_GROUPS.find((x) => x.key === s2)?.label || s2)}</button>`).join("")}
     </div>
     <h2 class="pmo-h" id="pmoTitle">${escapeHtml(label)}</h2>
     <p class="pmo-sub" id="pmoCount">${countLine()}</p>
@@ -40237,6 +40249,21 @@ function renderPmoPick() {
   };
   $("pmoNext").onclick = advance;
   $("pmoSkip").onclick = advance;
+  /* Any area is one tap away, so going back to fix chest does not mean
+     walking back through everything after it. */
+  $("workoutContent").querySelectorAll(".pmo-steps [data-step]").forEach((b) => {
+    b.onclick = () => { PMO.step = +b.dataset.step; PMO.all = false; PMO.q = ""; renderPmoPick(); window.scrollTo(0, 0); };
+  });
+}
+
+/* Back from the review goes one screen back, not out of Plan my own: to the
+   last area you were on if you were guided, to the body if you freestyled.
+   Mo, 2026-10-04: "I can't go back." The draft rides along either way. */
+function pmoReviewBack() {
+  saveDraft(); cbTeardown();
+  if (PMO.free || !PMO.regions.length) { PMO.stage = "areas"; PMO.free = false; renderPlanMyOwn(); }
+  else { PMO.stage = "pick"; PMO.step = Math.max(0, pmoSections().length - 1); PMO.all = false; PMO.q = ""; renderPmoPick(); }
+  window.scrollTo(0, 0);
 }
 
 function renderManualBuildScreen() {
@@ -40245,7 +40272,7 @@ function renderManualBuildScreen() {
   if (PMO.stage !== "done" && !MANUAL_DRAFT.length) { renderPlanMyOwn(); return; }
   if (PMO.stage !== "done") PMO.stage = "done";
   $("workoutContent").innerHTML = `
-    ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { saveDraft(); cbTeardown(); pmoReset(); } }))}
+    ${backBar("Back", pmoReviewBack)}
     <div class="cb-hero">
       <div class="cb-figs">
         <canvas class="cb-fig" id="cbFigure"></canvas>
@@ -40271,7 +40298,7 @@ function renderManualBuildScreen() {
     <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
 
   $("cbAddBtn").onclick = () => cbOpenPicker();
-  $("pmoAgain").onclick = () => { cbTeardown(); PMO = { stage: "areas", regions: [], step: 0, all: false, q: "" }; renderPlanMyOwn(); window.scrollTo(0, 0); };
+  $("pmoAgain").onclick = () => { cbTeardown(); PMO = { stage: "areas", regions: [], step: 0, all: false, q: "", free: false }; renderPlanMyOwn(); window.scrollTo(0, 0); };
 
   cbRenderLineup();
   cbUpdateCharacter();
