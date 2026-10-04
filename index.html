@@ -7639,9 +7639,10 @@
 
   /* Workout tab */
   .workout-progress-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
-  /* The app's green, not the darker ink green: Mo, 2026-10-04, these two
-     should match the green on the buttons and the ring everywhere else. */
-  .workout-progress-count { color: var(--accent); font-weight: 800; }
+  /* The app's green the way the app's buttons carry it, as a fill with dark
+     text on it. Green text on white was unreadable and the darker ink green
+     did not match (Mo, 2026-10-04), so these two are badges instead. */
+  .workout-progress-count { background: var(--accent); color: var(--on-accent); font-weight: 800; font-size: 13px; padding: 2px 9px; border-radius: 999px; }
   .workout-progress-track { height: 5px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 4px; }
   .workout-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
   /* The session estimate, which is a control rather than a label. It used to
@@ -7660,14 +7661,14 @@
   }
   .plan-time svg:first-child { color: var(--muted); }
   .plan-time svg:last-child { color: var(--muted); margin-left: 1px; }
-  .plan-time b { color: var(--accent); font-weight: 800; }
+  .plan-time b { background: var(--accent); color: var(--on-accent); font-weight: 800; padding: 2px 8px; border-radius: 999px; }
   .plan-time:active { transform: scale(.97); }
   .gen-scrim .plan-time-row { justify-content: center; }
   /* The reveal is white on a dark scrim whatever the theme is, so the same
      control needs its own two colours there rather than the card's. */
   .gen-scrim .plan-time { color: rgba(255,255,255,.85); background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); box-shadow: none; }
   .gen-scrim .plan-time svg { color: rgba(255,255,255,.6); }
-  .gen-scrim .plan-time b { color: #fff; }
+  .gen-scrim .plan-time b { color: var(--on-accent); }
   /* What a budget change did, under the control that did it. */
   .plan-time-change { margin: -2px 0 10px; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
   /* The over-budget line reads as the clock's, not the card's: same muted
@@ -41408,7 +41409,10 @@ function renderPlanPreview(opts) {
     ${overview}
     ${/* Not on an activity day: "0/0" over a class is a progress bar for a
           list that does not exist, and the clock is what measures this one. */ ""}
-    ${review || activityDay ? "" : `
+    ${/* Mo, 2026-10-04: before anything is done a progress bar at 0 says
+          nothing, so it only appears once a lift is logged and you are back
+          on the plan partway through. */ ""}
+    ${review || activityDay || !doneCount ? "" : `
     <div class="workout-progress-row">
       <span>Progress</span>
       <span class="workout-progress-count">${doneCount}/${total}</span>
