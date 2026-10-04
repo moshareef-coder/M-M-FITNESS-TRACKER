@@ -3879,7 +3879,6 @@
     background: var(--panel-2); color: var(--text); font: inherit; font-size: 16px; }
   .pmo-whole { display: block; margin: 4px auto 6px; border: 1.5px solid var(--border); background: var(--panel); color: var(--text);
     border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
-  .pmo-found { margin-bottom: 8px; }
   .pmo-foot { display: grid; gap: 6px; margin: 4px 0 8px; }
   .pmo-skip { background: none; border: 0; color: var(--muted); font: inherit; font-size: 14.5px; font-weight: 600; padding: 10px; cursor: pointer; width: 100%; }
   .cb-card {
@@ -40138,8 +40137,6 @@ function renderPlanMyOwn() {
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { pmoReset(); saveDraft(); } }))}
     <h2 class="pmo-h">What do you want to hit today?</h2>
     <p class="pmo-sub">Tap the body, or a name under it. Pick as many as you like.</p>
-    ${pmoSearchHTML("Or search any exercise")}
-    <div id="pmoFound" class="pmo-found" hidden></div>
     <div id="pmoBody">
       <div id="pmoBodyPick">${bodyRegionPickerHTML({ sex, selected: PMO.regions })}</div>
       <button type="button" class="pmo-whole" id="pmoWhole">Whole body</button>
@@ -40163,19 +40160,6 @@ function renderPlanMyOwn() {
        follow exactly as if each had been tapped. */
     $("pmoBodyPick").querySelectorAll(".bp-chip:not(.on)").forEach((c) => c.click());
   };
-  const showFound = () => {
-    const q = PMO.q.trim();
-    const found = $("pmoFound");
-    $("pmoBody").hidden = !!q;
-    found.hidden = !q;
-    if (!q) { found.innerHTML = ""; return; }
-    const res = pmoSearchResults(q);
-    found.innerHTML = res.length
-      ? `<div class="cb-grid">${pmoCardsHTML(res)}</div>`
-      : `<div class="cb-none">Nothing matches "${escapeHtml(q)}".</div>`;
-    pmoWireCards(found, syncFoot);
-  };
-  $("pmoSearch").oninput = (e) => { PMO.q = e.target.value; showFound(); };
   $("pmoGo").onclick = () => {
     if (!pmoSections().length) return;
     closeBodyRegionPicker();
@@ -40185,7 +40169,6 @@ function renderPlanMyOwn() {
   };
   $("pmoReview").onclick = () => { closeBodyRegionPicker(); PMO.stage = "done"; PMO.q = ""; renderManualBuildScreen(); window.scrollTo(0, 0); };
   syncFoot();
-  if (PMO.q) showFound();
 }
 
 function renderPmoPick() {
