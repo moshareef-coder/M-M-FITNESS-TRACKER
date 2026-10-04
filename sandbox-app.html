@@ -5434,6 +5434,16 @@
   .tg-cheers button.sent { background: var(--partner); color: #fff; transform: scale(.96); }
   .tg-mine { margin: 0; font-size: 13px; color: var(--muted); }
 
+  .wkt-together { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px;
+    padding: 13px 16px; border-radius: 999px; font: inherit; font-size: 15.5px; font-weight: 800; cursor: pointer; color: var(--text);
+    border: 2px solid transparent;
+    background: linear-gradient(var(--panel), var(--panel)) padding-box, linear-gradient(90deg, var(--me), var(--partner)) border-box; }
+  .wkt-together:active { transform: scale(.98); }
+  /* The one line he says that does something when tapped: the whole card takes your two colours, so it reads as a button without growing a second one. */
+  .home-quip.act .home-quip-say { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 12%, var(--panel)), color-mix(in srgb, var(--partner) 14%, var(--panel))); }
+  .lw-join { text-align: center; }
+  .lw-join-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+
   /* Finish */
   .tg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
   .tg-col { display: grid; justify-items: center; gap: 4px; padding: 14px 8px; border-radius: 16px; background: var(--panel-2); min-width: 0; }
@@ -17901,9 +17911,42 @@ async function tgInvite({ fromSession = false } = {}) {
   renderTogether();
 }
 
+/* Joining a workout they have just started. Mo, 2026-10-04: only while they
+   are still setting up; once the sets are going, the workout has started and
+   that is that. So: live, details shared, nothing logged, and inside the first
+   ten minutes. It asks rather than walks in, and they are in charge, because
+   it is their workout. */
+function tgCanJoinLive(row = LIVE_PARTNER) {
+  if (!row || !PARTNER_EMAIL || (SESSION && !SESSION.finished)) return false;
+  if (TG && TG_OPEN.includes(TG.status) && !tgStale(TG)) return false;
+  if (!liveDetailsShared(row)) return false;
+  const fresh = (row.elapsed_sec || 0) < 10 * 60;
+  return fresh && !(row.set_done > 0) && !((row.exercise_index || 0) > 0);
+}
+
+async function tgRequestJoin() {
+  if (!tgCanJoinLive()) { toast(`${tgPartnerFirst()} has already started`); return; }
+  const plans = plansOnDate(todayStr(), PARTNER_EMAIL).filter((p) => (p.exercises || []).length && !p.completed_at);
+  const plan = plans[0];
+  if (!plan) { toast(`Couldn't see ${tgPartnerFirst()}'s workout`); return; }
+  const row = {
+    id: (crypto.randomUUID && crypto.randomUUID()) || `tg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    host_email: MY_EMAIL, guest_email: PARTNER_EMAIL, leader_email: PARTNER_EMAIL,
+    status: "invited", mode: "same", source: "guest",
+    workout: { exercises: tgCleanExercises(plan.exercises), focus: plan.focus || "", joinRunning: true, request: true },
+    host_workout: { exercises: [], focus: "" }, guest_workout: { exercises: [], focus: "" },
+    created_at: tgNow(), updated_at: tgNow(),
+  };
+  const { error } = await sb.from("together_sessions").insert(row);
+  if (error) { console.error("join request not sent", error); toast("Couldn't ask to join"); return; }
+  TG = row;
+  sfxPlay("set");
+  renderTogether();
+}
+
 async function tgRespond(accept) {
   if (!TG) return;
-  if (accept && SESSION && !SESSION.finished && !SESSION.together) {
+  if (accept && SESSION && !SESSION.finished && !SESSION.together && !TG.workout?.request) {
     toast("Finish or end the workout you have going first, then join");
     return;
   }
@@ -18269,12 +18312,14 @@ async function tgShowInvite() {
   el.innerHTML = `
     <div class="tg-card">
       ${faces}
-      <h2 class="tg-h">${who} wants to train together</h2>
-      <p class="tg-sub">${running
+      <h2 class="tg-h">${TG.workout?.request ? `${who} wants to join your workout` : `${who} wants to train together`}</h2>
+      <p class="tg-sub">${TG.workout?.request
+        ? `${who} does your workout alongside you, at their own pace, and you watch each other's sets land. 1.5x XP.`
+        : running
         ? `${who} is already on ${focus || "a workout"}. Join and do the same one, each at your own pace, and watch each other's sets land.`
         : "Pick a workout together and do it at the same time, wherever you both are. Finish it together for 1.5x XP."}</p>
       <div class="tg-actions">
-        <button type="button" class="btn-primary" id="tgJoin">Join</button>
+        <button type="button" class="btn-primary" id="tgJoin">${TG.workout?.request ? "Let them join" : "Join"}</button>
         <button type="button" class="tg-ghost" id="tgNo">Not now</button>
       </div>
     </div>`;
@@ -18285,6 +18330,22 @@ async function tgShowInvite() {
 
 async function tgShowLobby() {
   if (TG_MAKING) { tgRenderMakeBar(); return; }
+  if (TG.workout?.request && TG.status === "invited") {
+    const token = ++TG_RENDER;
+    const faces = await tgFaces("here", "waiting");
+    if (token !== TG_RENDER || !TG || TG.status !== "invited") return;
+    const first = tgPartnerFirst();
+    const el = tgOverlay("lobby");
+    el.innerHTML = `
+      <div class="tg-card">
+        ${faces}
+        <h2 class="tg-h">Asking ${first}</h2>
+        <p class="tg-sub">You'll do ${escapeHtml(displayFocus(TG.workout.focus, TG.workout.exercises) || "their workout")} alongside ${first}, at your own pace.</p>
+        <div class="tg-actions"><button type="button" class="tg-ghost" id="tgLeave">Cancel</button></div>
+      </div>`;
+    $("tgLeave").onclick = tgLeave;
+    return;
+  }
   const token = ++TG_RENDER;
   const here = TG.status === "lobby";
   const faces = await tgFaces("here", here ? "here" : "waiting");
@@ -21977,7 +22038,9 @@ async function renderLiveCard() {
   const nameLine = sharing
     ? `${escapeHtml(name)} is on ${escapeHtml(row.focus || "a workout")}`
     : `${escapeHtml(name)} is training`;
-  const what = sharing
+  const what = tgCanJoinLive(row)
+    ? "Still setting up · tap to join"
+    : sharing
     ? [row.exercise_name, `${mins} min in`, liveStateLabel(row)].filter(Boolean).join(" · ")
     : [`${mins} min in`, liveStateLabel(row), `${todaysEffortXP(name)} XP today`].join(" · ");
 
@@ -22060,6 +22123,11 @@ async function renderLiveSheet() {
     ${!sharing ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>` : ""}
     ${sharing && nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
     ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
+    ${tgCanJoinLive(row) ? `<div class="lw-card lw-join">
+      <div class="lw-card-label">They have not started yet</div>
+      <button type="button" class="btn-primary" id="lwJoin" style="margin-top:6px">Ask to join ${escapeHtml(name.split(" ")[0])}'s workout</button>
+      <p class="lw-join-note">Same workout, each at your own pace. 1.5x XP.</p>
+    </div>` : ""}
     ${canCheer ? `<div class="lw-card">
       <div class="lw-card-label">Cheer them on</div>
       <div class="lw-send">
@@ -22076,6 +22144,7 @@ async function renderLiveSheet() {
   if ($("lwWhy")) $("lwWhy").onclick = () => { closeLiveSheet(); openEffortInfo(); };
   if ($("lwMsg")) $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
   if ($("lwClip")) $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
+  if ($("lwJoin")) $("lwJoin").onclick = () => { closeLiveSheet(); tgRequestJoin(); };
 }
 
 /* ---------- Together timeline ----------
@@ -32582,6 +32651,13 @@ function homeBotLine() {
   if (partner && !mineToday && theirsToday) {
     return { text: `${partner} already trained today. Your move.` };
   }
+  /* Mo, 2026-10-04: he suggests training together. Only when it is true that
+     neither of you has, and only when nothing together is already open. The
+     card is still one button (Mo did not want a second CTA under him): for
+     this line, tapping him is the invite. */
+  if (partner && !mineToday && !theirsToday && !iAmIn && !(TG && TG_OPEN.includes(TG.status) && !tgStale(TG))) {
+    return { text: `Neither of you has trained yet today. Tap me and we will do one together.`, action: "together" };
+  }
   if (!mineToday) {
     const habit = weekdayHabit(ME);
     if (habit) {
@@ -32635,8 +32711,10 @@ function sayHomeQuip() {
      session bubble does it: nobody should have to wait out an animation before
      their screen reader will tell them what it said. */
   const say = el.querySelector(".home-quip-say");
-  say.setAttribute("aria-label", `He says: ${said}. Tap to dismiss`);
-  say.onclick = () => hideHomeQuip();
+  const spoken = said.replace(/[.!?]+$/, "");
+  say.setAttribute("aria-label", real?.action === "together" ? `He says: ${spoken}. Tap to train together` : `He says: ${spoken}. Tap to dismiss`);
+  say.onclick = real?.action === "together" ? () => { hideHomeQuip(); tgInvite(); } : () => hideHomeQuip();
+  if (real?.action === "together") el.classList.add("act");
   slot.replaceChildren(el);
   document.getElementById("tab-home")?.classList.add("bot-between");
   /* He stays. There is no set coming to push him off, and a line that vanishes
@@ -36899,7 +36977,14 @@ function renderChooseScreen() {
       ? optionCard("chooseActivityBtn", "play", `Resume ${csnAct().label.toLowerCase()}`,
           `Running for ${csnClock(csnElapsedMs())}.`, false)
       : optionCard("chooseActivityBtn", "run", "Start an activity",
-          "Run, cycle, Pilates, and the rest.", false)}`;
+          "Run, cycle, Pilates, and the rest.", false)}
+    ${/* Mo, 2026-10-04: Train together was hidden behind their profile. This is
+          where you decide how to train, so it is one of the ways. Not while
+          a Train together workout is being made: you are already in it. */ ""}
+    ${PARTNER_EMAIL && !coached && !TG_MAKING
+      ? optionCard("chooseTogetherBtn", "people", `Work out with ${partnerName().split(" ")[0]}`,
+          "Same workout or side by side, live, anywhere. 1.5x XP.", false)
+      : ""}`;
 
   const preview = coached ? "" : `
     <div class="spp">
@@ -37147,6 +37232,12 @@ function renderChooseScreen() {
                 should match." One solid primary action, one quiet line under
                 it, the same shape wkt-week-gen already uses below: not two
                 buttons of near-equal weight side by side. */ ""}
+          ${/* Mo, 2026-10-04: Train together, where you decide how to train, as
+                a real button rather than a link: hiding it behind their profile
+                was the complaint. Today only, and not while one is being made. */ ""}
+          ${PARTNER_EMAIL && !coached && !TG_MAKING && !allDone
+            ? `<button type="button" class="wkt-together" id="chooseTogetherBtn">${icon("people", 18)} Work out with ${escapeHtml(partnerName().split(" ")[0])}</button>`
+            : ""}
           ${tomorrowPlan ? "" : `<button type="button" class="wkt-more" id="choosePlanBtn">or plan it yourself ${icon("chevronRight", 13)}</button>`}
           ${/* Ahead of the generate, not after it: the plan screen's own time
                 control (planTimeBtn) only exists once a plan does, and this is
@@ -37295,6 +37386,9 @@ function renderChooseScreen() {
      card, which IS its preview, and Start the clock is one tap further: one
      preview, not two. */
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = () => goWorkoutScreen(null);
+  if ($("chooseTogetherBtn")) $("chooseTogetherBtn").onclick = () => {
+    if (TG && TG_OPEN.includes(TG.status) && !tgStale(TG)) renderTogether(); else tgInvite();
+  };
   /* One door for both days. It used to hand a finished day to the day planner,
      whose first offer is Generate one, so "Plan my own" answered with the
      question it had just been told no to. The builder writes to whatever
