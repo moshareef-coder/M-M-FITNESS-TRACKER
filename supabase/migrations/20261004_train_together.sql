@@ -56,13 +56,15 @@ drop policy if exists "together sessions are seen by the two of them" on togethe
 create policy "together sessions are seen by the two of them" on together_sessions
   for select using (is_me(host_email) or is_me(guest_email));
 
--- You can only invite your own partner, and only as yourself.
+-- You can only invite your own partner, and only as yourself. The inviter is
+-- in charge, except when you ask to join a workout they have already started:
+-- then it is their workout and they are.
 drop policy if exists "together sessions are started by the host" on together_sessions;
 create policy "together sessions are started by the host" on together_sessions
   for insert with check (
     is_me(host_email)
     and lower(guest_email) = my_partner_email()
-    and lower(leader_email) = lower(host_email)
+    and lower(leader_email) in (lower(host_email), lower(guest_email))
   );
 
 drop policy if exists "together sessions are moved on by either of them" on together_sessions;

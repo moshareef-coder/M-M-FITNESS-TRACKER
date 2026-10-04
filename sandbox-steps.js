@@ -295,6 +295,36 @@
         note: "Tap Mell's face at the top right (this step opens it for you), then Work out together. Mell joins about three seconds later. Pick how you train (Same workout or Each our own), then Make the workout: that takes you through the app's own flow on the Workout tab, Generate for me, I'll plan my own or today's plan, with a bar along the bottom saying who it is for. On the plan screen the button reads Use this with Mell. That lands you on the review: the workout (or both workouts), what each one hits, and the fit for each of you. Edit goes back into the plan screen. Start together drops you both in, with Mell's sets landing live on your strip; finish for the shared finish and the 1.5x bonus.",
         run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => w.openPartnerSheet(), 300); mellInLobby(w); } },
 
+      { t: "From Pick how to train", scenario: "paired",
+        s: "Work out with Mell, under Start",
+        note: "The other way in, where you decide how to train: Work out with Mell sits right under Start today's plan on the Workout tab. Tap it and you are in the lobby, Mell joining a few seconds later.",
+        run: (w) => { simStop(); quietTours(w); mellInLobby(w); w.switchTab("workout"); w.goWorkoutScreen("choose"); } },
+
+      { t: "The robot suggests it", scenario: "paired",
+        s: "Neither of you has trained today",
+        note: "When neither of you has trained yet today, the robot on Home says so and the card takes your two colours: tapping him is the invite. This step clears today's sessions on the fake data so that is true.",
+        run: (w) => { simStop(); quietTours(w); mellInLobby(w);
+          w.eval("ALL_ENTRIES = ALL_ENTRIES.filter((e) => e.entry_date !== todayStr())");
+          w.switchTab("home");
+          setTimeout(() => { try { w.eval("HOME_QUIP_AT = 0"); } catch {} w.document.getElementById("homeQuipSlot")?.replaceChildren(); w.sayHomeQuip(); }, 400); } },
+
+      { t: "Join Mell while Mell sets up", scenario: "live",
+        s: "Ask to join, before the first set",
+        note: "Mell has started but not logged a set yet, so Mell's live card says Still setting up and the sheet offers Ask to join. Once the sets are going it disappears: the workout has started. Asking waits on Mell, who is in charge because it is Mell's workout; about three seconds later Mell lets you in and you are on the same workout.",
+        run: (w) => { simStop(); quietTours(w);
+          const mp = { user_name: "Mell", email: w.__SANDBOX.them, entry_date: w.todayStr(), slot: 0, focus: "Leg Day",
+            exercises: [{ name: "Barbell Back Squat", sets: 4, reps: 6 }, { name: "Romanian Deadlift", sets: 3, reps: 8 }, { name: "Leg Press", sets: 3, reps: 10 }] };
+          (w.__SANDBOX.db.ai_workouts ??= []).push(mp);
+          w.eval(`ALL_PLANS.push(${JSON.stringify(mp)}); LIVE_PARTNER = { ...LIVE_PARTNER, set_done: 0, exercise_index: 0, elapsed_sec: 90 }`);
+          w.switchTab("home"); w.renderLiveCard(); setTimeout(() => w.openLiveSheet(), 400);
+          clearInterval(sim.watch);
+          sim.watch = setInterval(() => {
+            const r = tgRow(w);
+            if (r && r.status === "invited" && r.workout?.request && !sim.joining) {
+              sim.joining = setTimeout(() => { mellUpdate(w, { status: "active", started_at: nowIso() }); sim.joining = null; mellTrains(w); clearInterval(sim.watch); }, 3000);
+            }
+          }, 400); } },
+
       { t: "Each our own, side by side", scenario: "paired",
         s: "Different workouts, live together",
         note: "The second way to train together: you on your workout, Mell on a different one, at the same time. Mell picks legs while you keep yours; the strip then shows Mell's ring against Mell's own list and the chips follow whatever lift Mell is on. Switch to Same workout to make it joint instead.",
