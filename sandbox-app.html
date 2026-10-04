@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- No zoom. The iOS web view honours maximum-scale and user-scalable, so a pinch,
+     a double tap or a tap into a small text box can no longer leave the app
+     zoomed in and bigger than the phone, which is what made it read as a web
+     page. Safari on the website still lets people pinch, by its own rule. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<!-- Capacitor injects window.Capacitor before the page runs, so the app can mark
+     itself here, before first paint, and the native-only CSS never flashes. -->
+<script data-role="native-flag">if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native");</script>
 <title>Unio (sandbox)</title>
 <meta name="description" content="Train with your partner. Rank up together." />
 <meta name="theme-color" content="#0c0e13" />
@@ -13,18 +20,13 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Unio" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Loaded without blocking the first paint. A stylesheet in the head holds
-     the whole page back until it lands, which on a phone was most of a second
-     of nothing, and the one thing this app wants on screen early is the boot
-     mark. media="print" makes it a non blocking fetch and the onload promotes
-     it the moment it arrives; the URL already carries display=swap, so text
-     draws in the fallback and swaps. Measured: the fonts land during boot, so
-     nobody sees the swap. -->
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Caveat:wght@500&display=swap"
-      rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Caveat:wght@500&display=swap" rel="stylesheet"></noscript>
+<!-- Served from the bundle, not from Google. The media="print" dance this
+     used to do was there because the stylesheet came over the network and
+     blocked first paint; a local file parses in under a millisecond, so it can
+     just be a stylesheet again. Vendoring it also stops the app announcing
+     every cold start to a third party, which privacy.html implies it does not.
+     Files and the @font-face rules live in vendor/fonts.css. -->
+<link rel="stylesheet" href="vendor/fonts.css">
 <script type="importmap">
 { "imports": { "three": "/vendor/three/three-0.160.1.module.js" } }
 </script>
@@ -260,6 +262,26 @@
   html {
     overflow-x: hidden;
     overscroll-behavior: none;
+    /* manipulation keeps scrolling and drops double-tap-to-zoom, which also
+       removes the wait iOS adds after a tap while it checks for a second one.
+       No grey flash on tap and no font inflation on rotate: neither happens
+       in a native app. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* In the app, words on buttons and cards are not selectable and a long press
+     does not pop the copy / look up menu, as in any native app. Fields people
+     type in, and anything marked .selectable, keep normal text selection. The
+     website keeps selection everywhere. */
+  html.native body {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+  }
+  html.native input, html.native textarea, html.native [contenteditable="true"], html.native .selectable {
+    -webkit-user-select: text; user-select: text;
+    -webkit-touch-callout: default;
   }
   /* An overlay is up: the page behind it must not move at all. overflow:hidden
      alone does not stop a finger in an iOS web view, and this ships as one, so
@@ -5121,6 +5143,78 @@
   }
   @keyframes popIn { from { transform: translateY(14px) scale(.97); opacity: 0 } to { transform: none; opacity: 1 } }
 
+  /* ---- Partner joined ----
+     The moment two accounts become a pair. Full screen and above everything,
+     pops included (2500), because it is the one thing that happens once and
+     the whole app exists for. Three versions while Mo picks one; the losers
+     get deleted once he has. Every version ends at a still frame that reads
+     on its own, so reduced motion loses the movement and nothing else. */
+  .pc-scrim {
+    position: fixed; inset: 0; z-index: 2600;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+    padding: calc(28px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px));
+    background:
+      radial-gradient(60% 45% at 30% 38%, color-mix(in srgb, var(--me) 16%, transparent), transparent 70%),
+      radial-gradient(60% 45% at 70% 38%, color-mix(in srgb, var(--partner) 16%, transparent), transparent 70%),
+      var(--bg);
+    text-align: center; animation: fadeIn .25s ease; overflow: hidden;
+  }
+  .pc-stage { position: relative; width: 260px; height: 190px; display: flex; align-items: center; justify-content: center; }
+  .pc-stage .av { width: 84px; height: 84px; font-size: 28px; border-width: 3px; margin: 0; cursor: default; }
+  .pc-stage .av:active { transform: none; }
+  .pc-h { font-size: 30px; line-height: 1.08; letter-spacing: -.03em; font-weight: 800; margin: 0; text-wrap: balance; max-width: 15ch; }
+  .pc-sub { font-size: 16px; line-height: 1.5; color: var(--muted); margin: 0; max-width: 30ch; text-wrap: balance; }
+  .pc-actions { display: grid; gap: 10px; width: 100%; max-width: 320px; margin-top: 6px; }
+  .pc-later { background: none; border: 0; color: var(--muted); font: inherit; font-size: 15px; padding: 10px; cursor: pointer; }
+  .pc-copy { display: grid; gap: 10px; justify-items: center; animation: pcUp .5s .55s both cubic-bezier(.22,1,.36,1); }
+  .pc-actions { animation: pcUp .5s .8s both cubic-bezier(.22,1,.36,1); }
+  @keyframes pcUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+
+  /* A: the robot hosts. He bounces up between the two of you, waves you both
+     in, and the confetti is in your two colours. */
+  .pc-robot .rb-face { position: relative; z-index: 2; animation: pcBounce .7s cubic-bezier(.34,1.56,.64,1) both; }
+  .pc-robot .av { position: absolute; bottom: 6px; z-index: 3; }
+  .pc-robot .av.me { left: 6px; animation: pcInL .55s .3s both cubic-bezier(.34,1.56,.64,1); }
+  .pc-robot .av.them { right: 6px; animation: pcInR .55s .42s both cubic-bezier(.34,1.56,.64,1); }
+  @keyframes pcBounce { 0% { transform: translateY(60px) scale(.6); opacity: 0 } 60% { transform: translateY(-8px) scale(1.04); opacity: 1 } 100% { transform: none } }
+  @keyframes pcInL { from { transform: translate(-50px, 10px) rotate(-18deg) scale(.6); opacity: 0 } to { transform: rotate(-6deg); opacity: 1 } }
+  @keyframes pcInR { from { transform: translate(50px, 10px) rotate(18deg) scale(.6); opacity: 0 } to { transform: rotate(6deg); opacity: 1 } }
+
+  /* B: the rings close. Your arc and theirs draw in from either side and meet
+     as one ring around both faces. No confetti: this one is meant to feel
+     like a promise, not a party. */
+  .pc-rings svg { position: absolute; inset: 0; margin: auto; width: 190px; height: 190px; overflow: visible; }
+  .pc-rings .arc { fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 139; stroke-dashoffset: 139; animation: pcDraw 1s .35s forwards cubic-bezier(.6,.05,.3,1); }
+  .pc-rings .arc.me { stroke: var(--me); }
+  .pc-rings .arc.them { stroke: var(--partner); }
+  .pc-rings .glow { fill: none; stroke: color-mix(in srgb, var(--accent) 55%, transparent); stroke-width: 18; opacity: 0; filter: blur(8px); animation: pcGlow 1.6s 1.25s ease-in-out both; }
+  .pc-rings .av { position: relative; z-index: 2; }
+  .pc-rings .av.me { animation: pcGlideL .9s .1s both cubic-bezier(.22,1,.36,1); margin-right: -8px; }
+  .pc-rings .av.them { animation: pcGlideR .9s .1s both cubic-bezier(.22,1,.36,1); margin-left: -8px; }
+  @keyframes pcDraw { to { stroke-dashoffset: 0 } }
+  @keyframes pcGlow { 0% { opacity: 0 } 40% { opacity: .9 } 100% { opacity: .35 } }
+  @keyframes pcGlideL { from { transform: translateX(-120px); opacity: 0 } to { transform: none; opacity: 1 } }
+  @keyframes pcGlideR { from { transform: translateX(120px); opacity: 0 } to { transform: none; opacity: 1 } }
+
+  /* C: the high five. Both faces hop in from the bottom, bump in the middle
+     with a squash, and a ring of little hearts pops out of the bump. */
+  .pc-five .av { position: relative; z-index: 2; }
+  .pc-five .av.me { animation: pcHopL 1s both cubic-bezier(.3,.7,.4,1); }
+  .pc-five .av.them { animation: pcHopR 1s both cubic-bezier(.3,.7,.4,1); }
+  @keyframes pcHopL { 0% { transform: translate(-90px, 120px); opacity: 0 } 45% { transform: translate(-40px, -30px); opacity: 1 } 70% { transform: translate(4px, 0) scale(1.08, .9) } 85% { transform: translate(-6px, 0) } 100% { transform: none } }
+  @keyframes pcHopR { 0% { transform: translate(90px, 120px); opacity: 0 } 45% { transform: translate(40px, -30px); opacity: 1 } 70% { transform: translate(-4px, 0) scale(1.08, .9) } 85% { transform: translate(6px, 0) } 100% { transform: none } }
+  .pc-five .heart { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px; opacity: 0; animation: pcHeart .9s .7s both ease-out; }
+  .pc-five .heart svg { width: 100%; height: 100%; display: block; }
+  @keyframes pcHeart { 0% { opacity: 0; transform: translate(0,0) scale(.4) } 25% { opacity: 1 } 100% { opacity: 0; transform: translate(var(--hx), var(--hy)) scale(1.1) } }
+  .pc-five .day1 { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 3; font-size: 12.5px; font-weight: 800; letter-spacing: .02em;
+    padding: 5px 12px; border-radius: 999px; background: var(--accent); color: #0b0d11; animation: pcPop .45s 1.05s both cubic-bezier(.34,1.56,.64,1); white-space: nowrap; }
+  @keyframes pcPop { from { transform: translateX(-50%) scale(.3); opacity: 0 } to { transform: translateX(-50%) scale(1); opacity: 1 } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pc-scrim, .pc-scrim * { animation-duration: 1ms !important; animation-delay: 0s !important; }
+    .pc-five .heart { display: none; }
+  }
+
   /* ---- Milestone badges ---- */
   .msb-section { margin-top: 18px; }
   .msb-section:first-child { margin-top: 4px; }
@@ -7245,7 +7339,9 @@
   label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 4px; }
   input[type="number"], input[type="date"], input[type="text"], textarea, select {
     width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--panel-2); color: var(--text); font-size: 15.5px; font-family: inherit;
+    /* 16px, not 15.5: iOS zooms into any field under 16px when it is tapped
+       and never zooms back out. */
+    background: var(--panel-2); color: var(--text); font-size: 16px; font-family: inherit;
   }
   textarea { resize: vertical; min-height: 44px; }
   .gym-toggle {
@@ -7715,9 +7811,7 @@
      If you bump this, recompute the hash:
      curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A
      and update CDN in scripts/make-sandbox.mjs to match. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0"
-        integrity="sha384-JBR+x8blGwjDRO63aHCGiZMD4VNiTR4ZUGA+N6ZKLf3zNt1fK8IBpcgPaMrxqWBp"
-        crossorigin="anonymous"></script>
+<script src="vendor/lib/supabase-js-2.116.0.js"></script>
 <script src="/sandbox-data.js"></script>
 <!-- body3d: the procedural muscle body under knowledge/motion/body3d is copied
      in from the anatomy workspace byte for byte, and those files import the bare
@@ -8767,7 +8861,7 @@
         <p class="muted-note" id="reportNoPartner">You are not paired with anyone right now.</p>
         <p class="muted-note" style="margin-top:12px;">
           To report one video in particular, tap the flag while it is playing. You can
-          also email <a href="mailto:mo.shareef@creativelab1.com">mo.shareef@creativelab1.com</a>.
+          also email <a href="mailto:trainwithunio@gmail.com">trainwithunio@gmail.com</a>.
         </p>
       </div>
       <div class="card">
@@ -9098,7 +9192,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.22.2";
+const APP_VERSION = "2026.09.25.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -10991,7 +11085,10 @@ async function claimHeldInviteToken() {
 
   clearSolo();
   clearPendingInvite();
-  toast(`You are paired with ${res.partner_name}`);
+  /* The celebration takes it from here, on the load that brings the partner
+     in. Recorded as "none" so even a phone that has never run 1.1 before
+     treats the partner who is about to appear as news. */
+  pairSeenSet("none");
   return true;
 }
 
@@ -17124,6 +17221,7 @@ async function avatarHTML(email, name, cls, tag = "button") {
 async function renderAvatarPair() {
   const wrap = $("avatarPair");
   if (!wrap) return;
+  maybeCelebratePair();
   const partner = PARTNER_EMAIL ? partnerName() : null;
   const mine = await avatarHTML(MY_EMAIL, ME, "me");
   const theirs = partner ? await avatarHTML(PARTNER_EMAIL, partner, "them") : "";
@@ -17160,6 +17258,101 @@ async function renderAvatarPair() {
     PROGRESS_VIEW = "partner";
     switchTab("progress");
   };
+}
+
+/* ---------- Partner joined ----------
+   Until 1.1 pairing was a two second toast on one phone, and the person who
+   sent the invite was told nothing at all. Now both of them get this, once.
+
+   Who has seen it is remembered per phone as the partner it was shown for.
+   "none" means this phone has watched the account be on its own, so a partner
+   appearing after that is news. A phone with no record yet just records what
+   is there: otherwise everybody already paired would get a party on their
+   first open of 1.1 for something that happened weeks ago. */
+const PAIR_SEEN_KEY = "unio.pairSeen";
+let PAIR_CEL_STYLE = "robot";   // robot | rings | five, while Mo picks one
+
+function pairSeenGet() { try { return localStorage.getItem(PAIR_SEEN_KEY); } catch { return null; } }
+function pairSeenSet(v) { try { localStorage.setItem(PAIR_SEEN_KEY, v); } catch { /* private mode: it shows again, which is harmless */ } }
+
+function maybeCelebratePair() {
+  const now = PARTNER_EMAIL || "none";
+  const seen = pairSeenGet();
+  if (seen === null) { pairSeenSet(now); return; }
+  if (now === "none") { if (seen !== "none") pairSeenSet("none"); return; }
+  if (seen === now) return;
+  /* Not over a workout in progress. Nothing is recorded, so the next redraw
+     after the session ends picks it up. */
+  if (SESSION || document.querySelector(".pc-scrim")) return;
+  pairSeenSet(now);
+  showPairCelebration();
+}
+
+async function showPairCelebration({ style = PAIR_CEL_STYLE } = {}) {
+  document.querySelector(".pc-scrim")?.remove();
+  const name = partnerName() || "Your partner";
+  const first = escapeHtml(name.split(" ")[0]);
+  const mine = await avatarHTML(MY_EMAIL, ME, "me", "div");
+  const theirs = await avatarHTML(PARTNER_EMAIL, name, "them", "div");
+
+  const heart = (c) => `<svg viewBox="0 0 24 24"><path fill="${c}" d="M12 21s-7.5-4.6-9.6-9.3C.9 8.2 3 4.5 6.6 4.5c2.1 0 3.6 1.2 5.4 3.2 1.8-2 3.3-3.2 5.4-3.2 3.6 0 5.7 3.7 4.2 7.2C19.5 16.4 12 21 12 21z"/></svg>`;
+  const versions = {
+    robot: {
+      stage: `${robotFaceSVG(150, "", { bust: true })}${mine}${theirs}`,
+      h: `${first}'s in.`,
+      sub: "Now there are three of us. I'll keep an eye on you both.",
+    },
+    rings: {
+      stage: `<svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="glow" cx="50" cy="50" r="44"/>
+          <path class="arc me" d="M50 94 A44 44 0 0 1 50 6"/>
+          <path class="arc them" d="M50 6 A44 44 0 0 1 50 94"/>
+        </svg>${mine}${theirs}`,
+      h: `You and ${first}.`,
+      sub: "One week, two rings. Everything you do shows up for both of you now.",
+    },
+    five: {
+      stage: `<span class="day1">Day 1 together</span>${mine}${theirs}${
+        Array.from({ length: 10 }, (_, i) => {
+          const a = (i / 10) * Math.PI * 2, r = 70 + (i % 3) * 14;
+          return `<span class="heart" style="--hx:${Math.round(Math.cos(a) * r)}px;--hy:${Math.round(Math.sin(a) * r)}px;animation-delay:${0.68 + (i % 4) * 0.04}s">${heart(i % 2 ? "var(--partner)" : "var(--me)")}</span>`;
+        }).join("")}`,
+      h: "It's official.",
+      sub: `${first} joined. Training together starts today.`,
+    },
+  };
+  const v = versions[style] || versions.robot;
+
+  const el = document.createElement("div");
+  el.className = "pc-scrim";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  el.setAttribute("aria-label", `${name} joined you on Unio`);
+  el.innerHTML = `
+    <div class="pc-stage pc-${style in versions ? style : "robot"}">${v.stage}</div>
+    <div class="pc-copy"><h2 class="pc-h">${v.h}</h2><p class="pc-sub">${escapeHtml(v.sub)}</p></div>
+    <div class="pc-actions">
+      <button type="button" class="btn-primary" id="pcGo">See ${first}'s progress</button>
+      <button type="button" class="pc-later" id="pcLater">Later</button>
+    </div>`;
+  document.body.appendChild(el);
+
+  sfxPlay("paired");
+  buzz([18, 60, 28]);
+  if (style === "robot") setTimeout(() => {
+    const bot = el.querySelector(".rb-face");
+    if (bot && el.isConnected) confettiBurst(bot, 46);
+  }, 520);
+
+  const close = () => el.remove();
+  $("pcLater").onclick = close;
+  $("pcGo").onclick = () => {
+    close();
+    PROGRESS_VIEW = "partner";
+    PROGRESS_GOAL_LENS = null;
+    switchTab("progress");
+  };
+  $("pcGo").focus({ preventScroll: true });
 }
 
 /* ---------- The photo editor ----------
@@ -22059,7 +22252,7 @@ function renderToneChart(series, isPartner, unit = "in") {
      nobody can see. */
   if (!hired()) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner, unit); })
       .catch(() => chartUnavailable("toneChart"));
     return;
@@ -22660,7 +22853,7 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
      nobody can see. */
   if (!hired()) return null;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       /* Whichever goal screen asked for it: the tab redraws and whoever is on
          screen gets their line. Checking one screen's id here meant the other
          two silently never came back from a cold library load. */
@@ -24145,7 +24338,7 @@ function renderActivityLive(a, stage) {
           <div class="sess-quip-slot" id="csnQuipSlot">
             ${said ? `<div class="sess-quip done">
               <span class="sess-quip-bub">
-                <span class="sess-quip-who">Coach</span>
+                <span class="sess-quip-who">Unio</span>
                 <span class="sess-quip-line">${escapeHtml(said)}</span>
               </span>
             </div>` : ""}
@@ -25402,7 +25595,7 @@ function renderEnduranceChart(buckets, isPartner) {
      nobody can see. */
   if (!hired()) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => { if (!$("endHero")?.classList.contains("hidden")) renderEnduranceChart(buckets, isPartner); })
       .catch(() => chartUnavailable("endChart"));
     return;
@@ -25701,7 +25894,7 @@ let consistencyChart = null;
 
 function renderConsistencyChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26029,7 +26222,7 @@ let strengthChart = null;
 
 function renderStrengthChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26387,7 +26580,7 @@ function openLiftDetail(exerciseName) {
       },
     });
   };
-  if (window.Chart) draw(); else loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(draw).catch(() => {});
+  if (window.Chart) draw(); else loadScriptOnce("vendor/lib/chart-4.5.1.js").then(draw).catch(() => {});
 }
 
 /* ---------- Volume card ----------
@@ -26462,7 +26655,7 @@ let volumeChart = null;
 
 function renderVolumeChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26665,7 +26858,7 @@ function renderWeekCard(spec) {
   const card = $(spec.card);
   if (!card) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => renderWeekCard(spec)).catch(() => chartUnavailable(spec.id + "Chart"));
     return;
   }
@@ -26747,7 +26940,7 @@ function renderWeightChart() {
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
     return;
   }
   /* ONE person per chart. Both lines shared a y axis, and with forty five
@@ -30605,6 +30798,13 @@ function sfxNote(ctx, at, n) {
 }
 
 const SFX_KIT = {
+  /* Two people became a pair. Up a sixth, both notes held: the warmest thing
+     in the kit, and it plays once per pair, ever. */
+  paired: [
+    { at: 0, hz: 523, ms: 180, peak: 0.13, type: "sine" },
+    { at: 0.14, hz: 880, ms: 420, peak: 0.13, type: "sine" },
+    { at: 0.16, hz: 1319, ms: 380, peak: 0.05, type: "sine" },
+  ],
   /* Logged. One note, high and short: the sound of a thing landing, not of a
      thing being celebrated. It happens forty times a workout. */
   set: [{ at: 0, hz: 880, ms: 90, peak: 0.16 }],
@@ -30993,7 +31193,7 @@ function sayQuip(key) {
   el.innerHTML = `
     <span class="sess-quip-av">${icon("dumbbell", 15)}</span>
     <span class="sess-quip-bub">
-      <span class="sess-quip-who">Coach</span>
+      <span class="sess-quip-who">Unio</span>
       <span class="sess-quip-line"><span class="sess-quip-txt"></span><i class="sess-quip-cur"></i></span>
     </span>`;
   /* The lines are written with HTML entities (&rsquo;, &ldquo;) because they
@@ -40710,7 +40910,7 @@ function loadScriptOnce(src) {
 let riveRuntimePromise = null;
 function ensureRiveRuntime() {
   if (!riveRuntimePromise) {
-    riveRuntimePromise = loadScriptOnce("https://cdn.jsdelivr.net/npm/@rive-app/webgl2@2.42.0/rive.min.js")
+    riveRuntimePromise = loadScriptOnce("vendor/lib/rive-2.42.0.js")
       .then(() => {
         try { window.rive?.RuntimeLoader?.setWasmUrl("/vendor/rive-2.42.0.wasm"); }
         catch (e) { console.warn("rive wasm url", e); }
