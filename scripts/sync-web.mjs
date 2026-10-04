@@ -14,6 +14,7 @@ const ASSETS = [
      resolves; inside the Capacitor wrap the root is the bundle, so leaving
      them out gives a 404 where App Review expects to find a privacy policy. */
   "privacy.html",
+  "health-data.html",
   "support.html",
   "terms.html",
   "manifest.webmanifest",
