@@ -51,7 +51,8 @@
     sim.timer = setInterval(() => {
       const r = tgRow(w);
       if (!r || !["active", "done"].includes(r.status)) return;
-      const exs = r.workout?.exercises || [];
+      const side = mellIsHost(w, r) ? "host_workout" : "guest_workout";
+      const exs = (r.mode || "same") === "own" ? (r[side]?.exercises || []) : (r.workout?.exercises || []);
       if (ei >= exs.length) {
         clearInterval(sim.timer);
         const mine = mellIsHost(w, r) ? "host_done_at" : "guest_done_at";
@@ -73,6 +74,26 @@
     sim.watch = setInterval(() => {
       const r = tgRow(w);
       if (r && r.status === "active") { clearInterval(sim.watch); then(); }
+    }, 400);
+  }
+  /* Mell's half of the lobby: joins, and in "each our own" picks Mell's own
+     workout a moment later, a different one from yours so the side by side
+     view has something to show. */
+  function mellInLobby(w) {
+    clearInterval(sim.watch);
+    sim.watch = setInterval(() => {
+      const r = tgRow(w);
+      if (!r) return;
+      if (r.status === "invited" && (r.host_email || "").toLowerCase() === (w.__SANDBOX.me || "").toLowerCase() && !sim.joining) {
+        sim.joining = setTimeout(() => { mellUpdate(w, { status: "lobby" }); sim.joining = null; }, 2600);
+      }
+      if (r.status === "lobby" && (r.mode || "same") === "own" && !(r.guest_workout?.exercises || []).length && !sim.picking) {
+        sim.picking = setTimeout(() => {
+          const plan = mellPlan(w) || { exercises: [{ name: "Romanian Deadlift", sets: 3, reps: 8 }, { name: "Leg Press", sets: 3, reps: 10 }, { name: "Hip Thrust", sets: 3, reps: 10 }], focus: "Legs" };
+          mellUpdate(w, { guest_workout: plan }); sim.picking = null;
+        }, 1500);
+      }
+      if (r.status === "active") { clearInterval(sim.watch); mellTrains(w); }
     }, 400);
   }
   function quietTours(w) {
@@ -269,12 +290,16 @@
     ]},
 
     { group: "Train together", note: "Two players, one workout, anywhere, each at their own pace. Mell is simulated: Mell joins, picks, trains and finishes on a timer, through the same code a real partner's phone would hit.", steps: [
-      { t: "Invite Mell", scenario: "paired",
-        s: "You ask, Mell joins, you pick and start",
-        note: "Tap Train together on Home, or this step does it for you. The lobby opens with you in charge and Mell's face breathing while Mell is on the way; about three seconds later Mell joins. Pick Mine, Mell's or New, take exercises off with the x, add one from the chips, or hand the pick to Mell. Start together drops you both into the same workout: the strip at the top shows both of you in progress rings, what Mell is on, and Mell's weight and reps on your current lift filling in as they land, with a callout each time. Log your own sets and finish to see the shared finish and the 1.5x bonus.",
-        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => w.tgInvite(), 300);
-          setTimeout(() => mellUpdate(w, { status: "lobby" }), 3200);
-          whenActive(w, () => mellTrains(w)); } },
+      { t: "Invite Mell from Mell's profile", scenario: "paired",
+        s: "Tap Mell's face, Work out together",
+        note: "Tap Mell's face at the top right (this step opens it for you), then Work out together. The lobby opens with Mell's face breathing while Mell is on the way; about three seconds later Mell joins. Choose Same workout (the joint workout: you pick Mine, Mell's or New, take exercises off with the x, search to add any exercise, or hand the pick to Mell) or Each our own (you build yours, Mell picks Mell's, and if the two match it offers to make it joint). Start together drops you both in: the strip shows both of you in progress rings and Mell's sets landing live. Log yours and finish for the shared finish and the 1.5x bonus.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => w.openPartnerSheet(), 300); mellInLobby(w); } },
+
+      { t: "Each our own, side by side", scenario: "paired",
+        s: "Different workouts, live together",
+        note: "The second way to train together: you on your workout, Mell on a different one, at the same time. Mell picks legs while you keep yours; the strip then shows Mell's ring against Mell's own list and the chips follow whatever lift Mell is on. Switch to Same workout to make it joint instead.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); mellInLobby(w);
+          setTimeout(async () => { await w.tgInvite(); setTimeout(() => w.tgSetMode("own"), 400); }, 300); } },
 
       { t: "Mell invites you", scenario: "paired",
         s: "Join, Mell picks, Mell starts",

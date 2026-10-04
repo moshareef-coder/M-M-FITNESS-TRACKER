@@ -4,7 +4,9 @@
 -- Mo, 2026-10-04: an invitation ("want to work out together?"), a lobby where
 -- one person is in charge of the workout and can add or remove exercises,
 -- the same exact workout for both, everything visible to each other while it
--- runs, and 1.5x XP for finishing it together.
+-- runs, and 1.5x XP for finishing it together. Later the same day: started from
+-- the partner's profile, and with a second way to do it, each doing their own
+-- workout side by side, which becomes the joint workout when they pick the same.
 --
 -- Two tables. together_sessions is the session itself: who, what state, the
 -- workout they agreed on, and when each of them finished. together_sets is one
@@ -24,8 +26,16 @@ create table if not exists together_sessions (
   leader_email  text not null,
   status        text not null default 'invited'
                 check (status in ('invited', 'lobby', 'active', 'done', 'declined', 'cancelled')),
-  -- { exercises: [...], focus: "...", joinRunning: bool }
+  -- same: one workout for both, the joint workout. own: each does their own,
+  -- side by side, watching each other. Either of them can switch it.
+  mode          text not null default 'same' check (mode in ('same', 'own')),
+  -- The shared list for mode 'same': { exercises: [...], focus, joinRunning }.
+  -- Only the person in charge changes it.
   workout       jsonb not null default '{"exercises": []}'::jsonb,
+  -- Each person's own list for mode 'own': { exercises: [...], focus }.
+  -- Only its owner changes it.
+  host_workout  jsonb not null default '{"exercises": []}'::jsonb,
+  guest_workout jsonb not null default '{"exercises": []}'::jsonb,
   -- host | guest | new: whose plan the workout came from.
   source        text,
   cancelled_by  text,
@@ -74,10 +84,17 @@ begin
   if lower(new.leader_email) not in (lower(old.host_email), lower(old.guest_email)) then
     raise exception 'the leader has to be one of the two of them';
   end if;
-  -- Only the person in charge changes the workout or hands over the lead.
+  -- Only the person in charge changes the shared workout or hands over the lead.
   if (new.workout is distinct from old.workout or new.leader_email is distinct from old.leader_email)
      and lower(old.leader_email) <> my_email() then
     raise exception 'only the person in charge can change the workout';
+  end if;
+  -- Your own list is yours: in 'own' mode nobody edits the other person's.
+  if new.host_workout is distinct from old.host_workout and not is_me(old.host_email) then
+    raise exception 'only you can change your own workout';
+  end if;
+  if new.guest_workout is distinct from old.guest_workout and not is_me(old.guest_email) then
+    raise exception 'only you can change your own workout';
   end if;
   -- Each of them stamps only their own finish.
   if new.host_done_at is distinct from old.host_done_at and not is_me(old.host_email) then
