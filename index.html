@@ -31192,7 +31192,7 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
    seven of those in a row is seven overlays over one button press and seven
    round trips fetching a week that is still being written. The caller reloads
    and redraws once at the end, and reads the answer off the return value. */
-async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null, limits = null, focusGroups = null, quiet = false, avoidNames = null, slot: wantSlot = null } = {}) {
+async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null, limits = null, focusGroups = null, quiet = false, avoidNames = null, slot: wantSlot = null, force = false } = {}) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
   /* Mo: "the only way I can go back and generate a new workout or do anything
      is if I end that workout." The workout tab already stands in front of
@@ -31234,6 +31234,35 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
   const wanted = typeof forDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(forDate) ? forDate : null;
   const target = wanted || todayStr();
   const isToday = target === todayStr();
+  /* Red muscles: a rest day, unless they say otherwise. Asked of the local
+     engine with the same inputs the real build gets, so the warning names what
+     THIS generate would train, then checked against the Body tab's reading.
+     Today only (tomorrow's red is not tomorrow's problem), never on a
+     regenerate (they already chose), never for the quiet week builder. */
+  if (!quiet && !force && !sameAgain && isToday) {
+    let red = [];
+    try {
+      const engine = await ensurePlanEngine();
+      if (engine) {
+        const built = engine.generateFromPayload(workoutEnginePayload({
+          focus: keepFocus || MY_PROFILE?.focus, sessionMinutes, limits, focusGroups,
+        }), { includePlan: true });
+        const day = (built.plan?.week || []).find((d) => d?.name === built.meta?.dayName);
+        const groups = day?.mainGroups?.length ? day.mainGroups
+          : (built.workout?.exercises || []).flatMap((e) => classifyMuscles(e.name)?.primary || []);
+        red = redAreasFor(await recoveryAreasNow(), groups);
+      }
+    } catch (e) { console.warn("rest day check skipped", e); }
+    if (red.length) {
+      const go = await askConfirm({
+        heading: "Rest day recommended",
+        body: redAreasSentence(red),
+        ok: "Generate anyway",
+        cancel: "Rest today",
+      });
+      if (!go) return false;
+    }
+  }
   if (!quiet) {
     WORKOUT_MODE = null;
     openGenOverlay(isToday ? "Generating" : "Planning");
@@ -31702,6 +31731,36 @@ function clearSessionStorage() {
 /* `bodyHtml` is for the one caller that needs a list rather than a sentence.
    Everything else still passes `body` and is still escaped; this is markup the
    app wrote about itself, never anything a person typed. */
+/* ---------- Red on the Body tab ----------
+   Mo, 2026-10-04: a muscle worked hard in the last day (red on the Body tab,
+   "give it a day") should not be trained again without being told. Generate
+   recommends a rest day instead and Plan my own warns on the exercise, and
+   both let you go ahead anyway: a recommendation, never a lock. Red only. The
+   Body tab itself calls amber fine to train, and warning on amber would be the
+   app arguing with its own legend. */
+async function recoveryAreasNow() {
+  try {
+    const rec = await ensureRecoveryEngine();
+    if (rec && EXERCISE_TRAININGS.length) {
+      const states = rec.muscleRecoveryStates({
+        logs: workoutEnginePayload().logs,
+        muscleIndex: rec.buildMuscleIndex(EXERCISE_TRAININGS),
+        today: new Date(),
+      });
+      return bodyAreasFromEngine(states);
+    }
+  } catch (e) { console.warn("recovery reading for the warning", e); }
+  return bodyAreaStates();   // the Body tab's own fallback, same as it shows offline
+}
+const redAreasFor = (areas, groups) =>
+  areas.filter((a) => a.state === "hold" && a.members.some((m) => groups.includes(m)));
+/* "Legs was worked hard in the last day. It's fully recovered in about 30 hours." */
+function redAreasSentence(red) {
+  const names = bodyPhraseAnd(red.map((a) => a.label));
+  const hours = Math.max(1, Math.round(Math.max(...red.map((a) => a.hoursLeft))));
+  return `${names} ${red.length === 1 ? "was" : "were"} worked hard in the last day. Fully recovered in about ${hours} hours. We'd give ${red.length === 1 ? "it" : "them"} a rest today.`;
+}
+
 function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going" }) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
@@ -40461,12 +40520,32 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
         cbUpdateCharacter();
         return;
       }
-      cbAdd(name, sets, reps, weight);
-      cbRenderPicker();      // straight back to the grid, ready for the next one
+      /* Red on the Body tab: say so before it goes in, and let them add it
+         anyway. Asked once per area a day, so a leg day built on purpose is
+         one warning, not one per exercise. */
+      const add = () => { cbAdd(name, sets, reps, weight); cbRenderPicker(); };
+      const prim = classifyMuscles(name)?.primary || [];
+      recoveryAreasNow().then(async (areas) => {
+        const red = redAreasFor(areas, prim).filter((a) => !RED_WAIVED.has(`${todayStr()}|${a.key}`));
+        if (!red.length) { add(); return; }
+        const go = await askConfirm({
+          heading: "Still recovering",
+          body: redAreasSentence(red),
+          ok: "Add it anyway",
+          cancel: "Pick something else",
+        });
+        if (!go) { cbRenderPicker(); return; }
+        red.forEach((a) => RED_WAIVED.add(`${todayStr()}|${a.key}`));
+        add();
+      });
     };
   };
   draw();
 }
+
+/* Areas somebody has already been warned about and chose to train anyway,
+   today. Not stored: a new launch asking once more is fine. */
+const RED_WAIVED = new Set();
 
 /* Adding never re-renders the list: the new row is appended and animates in. */
 function cbAdd(name, sets, reps, weight = 0) {
