@@ -30098,7 +30098,7 @@ async function applySwap(chosen, source) {
      whole distinction exists to avoid. */
   const chosenKit = findStrengthLibraryExercise(chosen);
   ex.loadBasis = last != null ? "your last session"
-    : BODYWEIGHT_EQUIPMENT.has(chosenKit?.equipment) ? "bodyweight"
+    : exIsBodyweight({ name: chosen, equipment: chosenKit?.equipment }) ? "bodyweight"
     : "unknown";
 
   const idx = ctx.index;
@@ -30283,7 +30283,13 @@ const BODYWEIGHT_EQUIPMENT = new Set(["bodyweight", "none", "wall", "doorway", "
 const bwOnlyKey = () => `unio.bwOnly.${todayStr()}`;
 function bwOnly() { try { return localStorage.getItem(bwOnlyKey()) === "1"; } catch { return false; } }
 function setBwOnly(on) { try { localStorage.setItem(bwOnlyKey(), on ? "1" : "0"); } catch { /* the switch still works for this screen */ } }
+/* The library files these as bodyweight and each needs kit: plates, a weight
+   belt, an ab wheel, a glute-ham machine. Overridden here until the library
+   is corrected (mo-knowledge/LIBRARY-REQUESTS.md, item 13). A bar is not on
+   this list on purpose: pull-ups and dips are bodyweight training. */
+const NEEDS_KIT_DESPITE_LABEL = new Set(["plate pinch", "weighted dip", "weighted pull-up", "ab wheel rollout", "glute-ham raise"]);
 function exIsBodyweight(ex) {
+  if (NEEDS_KIT_DESPITE_LABEL.has(String(ex?.name || "").toLowerCase())) return false;
   const kit = String(ex?.equipment ?? findStrengthLibraryExercise(ex?.name)?.equipment ?? "").toLowerCase();
   return BODYWEIGHT_EQUIPMENT.has(kit);
 }
@@ -30291,7 +30297,7 @@ function bwFilter(list) { return bwOnly() ? list.filter(exIsBodyweight) : list; 
 function bwToggleHTML() {
   const on = bwOnly();
   return `<label class="gym-toggle bw-toggle${on ? " checked" : ""}">
-      <span><b>Bodyweight only</b><i>No equipment needed</i></span>
+      <span><b>Bodyweight only</b><i>Your body, a bar at most</i></span>
       <input type="checkbox" data-bw${on ? " checked" : ""} />
     </label>`;
 }
