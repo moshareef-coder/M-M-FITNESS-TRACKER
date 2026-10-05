@@ -488,3 +488,59 @@ welcome, but it is not this request.
 **A gap while we are here:** with the switch on, every shoulders option is a
 handstand or planche progression. A beginner has nothing. Pike Push-Up and
 Elevated Pike Push-Up would close it.
+
+## 14. Barbell Shrug draws two barbells, and the belt plates draw a bar between the hips (2026-10-05)
+
+Mo, on the session screen: "It does look like a barbell shrug, but the barbell
+looks odd." It is odd, and it is not the form. The shrug itself is right (the
+girdle lifts the shoulders about 8 units, the arms hang straight, the bar rides
+up with the hands). What is wrong is that **there are two bars**.
+
+**Cause.** `frontBar()` in `knowledge/motion/moves/weight-training-upper.mjs`
+was authored when a `barbell` prop always drew one disc: a zero slack band
+between the hands for the bar, plus a `barbell` prop per hand pushed outboard
+with `dx: ±8` for the plates. Commit 5bcfbdd ("a bar is drawn as a bar") then
+taught `PROPS.barbell` in `rig.mjs` to draw a whole bar with a plate on each end
+whenever the two hands separate on screen. Each of the two props now draws a full
+bar of its own, sixteen units apart. Measured at 600px: two bars, four edge-on
+plates, the left hand gripping the end of one bar, the bar off centre to the
+right by 8 units, plates r 7 against the deadlift's r 9.5 for the same plate.
+
+The same branch fires for a lone plate hung off a paired point: **Weighted
+Pull-Up** (front view) and **Weighted Dip** draw their dip belt plate as a tiny
+barbell between the two hips instead of one disc.
+
+**Affected:** Barbell Shrug, Behind-the-Back Shrug, Weighted Pull-Up, Weighted
+Dip. Checked and fine: every side-view barbell move (Deadlift, Barbell Row, Back
+Squat and the rest, f under 0.15 so one disc), Sumo Deadlift (one prop, turned
+camera, draws a single bar correctly), Plate Pinch (side view, two discs as
+intended).
+
+**Ask** (exact patch in `mo-knowledge/requests/14-barbell-front-view/proposed.patch`,
+`git apply --check` clean against `pair-celebration` f092bad, validate 0 invalid):
+
+1. `frontBar()` becomes ONE prop: `{ type: "barbell", side: "R", point: "hand", r: 9.5, sleeve: 15, front }`.
+   No band, no per-hand props.
+2. `PROPS.barbell` in `rig.mjs` takes `sleeve` (default 9, today's value): how far
+   outside the hands the plates sit. 9 suits a wide bench grip; on a shoulder
+   width grip it crowds the plates onto the hands. 15 puts them roughly where an
+   Olympic bar's collars sit (figure scale is about 1.55 cm a unit: hands about
+   ±20 units, collars about ±42 real, ±35 drawn, kept inside the 140 box).
+3. When broadside, the bar's sleeve pokes 4.5 x f units out of each plate's outer
+   face, so it reads as a barbell rather than two discs on a stick. Each tip is
+   drawn right after its own plate so a turned bar's near plate still covers the
+   far tip. Sumo Deadlift picks this up as a small hub stub; checked, reads fine.
+4. `single: true` on a `barbell` prop skips the bar branch. Set it on the two dip
+   belt plates (Weighted Pull-Up, Weighted Dip).
+
+**Screenshots** in `mo-knowledge/requests/14-barbell-front-view/`: `before-zoom.png`
+/ `after-zoom.png` (600px, bottom and top of the rep), `before-220.png` /
+`after-220.png` (session size, five frames, dark and light), `before-110.png` /
+`after-110.png` (picker card size), `before-others.png` / `after-others.png`
+(Sumo Deadlift, Weighted Pull-Up, Weighted Dip, Plate Pinch). The after images
+were rendered from a scratch copy with the patch applied, not from this tree.
+
+**Why not overridden in `index.html`:** there is no existing override path for
+move props, and building one means the app mutating the library's move objects
+at runtime, which is a second source of truth for a figure. This is a small,
+self-contained data plus rig fix that belongs where the figure lives.
