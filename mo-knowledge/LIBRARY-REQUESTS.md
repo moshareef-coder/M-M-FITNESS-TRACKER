@@ -488,3 +488,32 @@ welcome, but it is not this request.
 **A gap while we are here:** with the switch on, every shoulders option is a
 handstand or planche progression. A beginner has nothing. Pike Push-Up and
 Elevated Pike Push-Up would close it.
+
+## 14. A rest stretch, and the shake-out retired (2026-10-05)
+
+Mo on the rest antics: "The one where 'shake it off' looks so weird. It just
+looks terrible. I think maybe just a stretch." The app no longer picks
+`Rest: Shake-out` (`REST_ANTICS` in `index.html`); it is still in
+`moves/idle.mjs` and nothing else references it.
+
+The stretch he asked for is authored in `mo-knowledge/motion/rest.mjs` as
+`Rest: Stretch`, in your move format: front view, arms sweep out and up until
+the hands meet over the head, reach taller, float back down, `oneway` so the
+last 18% is a beat standing still. The file also carries a small mount
+(`mountRestMove`) because `index.mjs` keeps its move table private and has no
+way to register a move from outside.
+
+**Ask, either of:**
+
+1. Take `STRETCH` into `moves/idle.mjs` as `Rest: Stretch` (it pastes across
+   unchanged) and drop `Rest: Shake-out`. We then delete `rest.mjs` and
+   `REST_HOUSE_MOVES` and the app mounts it like every other antic.
+2. Or export a `registerMoves(map)` from `index.mjs`, so in-house moves go
+   through the one shared rAF loop, `hasMove` and the validator.
+
+**One rig finding worth knowing:** a two-armed overhead side bend does not draw
+in the front view. With the arms overhead the shoulder angle sits on its 180
+degree seam, and tipping the spine pushes one arm across it, so one side folds
+the arms into an X over the face and the other throws them open into a V. We
+tried three ring sizes and both compensations on the shoulder angles. That is
+why the stretch is a straight reach with no lean.
