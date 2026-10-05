@@ -4225,19 +4225,8 @@
     .cb-card:active { transform: none; }
   }
 
-  /* Per workout privacy: the way in from the plan screen, the three switches,
-     and the small chip that reopens them mid workout. */
-  .wp-open {
-    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
-    margin-top: 12px; padding: 12px 13px; border-radius: 14px;
-    background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font: inherit;
-  }
-  .wp-open:active { opacity: .75; }
-  .wp-open-ico { display: flex; color: var(--muted); flex-shrink: 0; }
-  .wp-open-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .wp-open-txt b { font-size: 14px; font-weight: 700; }
-  .wp-open-txt i { font-size: 12.5px; font-style: normal; color: var(--muted); }
-  .wp-open-go { display: flex; color: var(--muted); flex-shrink: 0; }
+  /* Per workout privacy: the three switches, and the small chip that opens
+     them mid workout. */
   .wp-list { display: flex; flex-direction: column; gap: 9px; margin: 2px 0 12px; }
   .wp-row span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .wp-row b { font-size: 14px; font-weight: 700; }
@@ -41804,15 +41793,10 @@ function renderPlanPreview(opts) {
            ? `${icon("play", 17)} Back to your ${escapeHtml(actNounWord)}, ${csnClock(csnElapsedMs())}`
            : `${icon("play", 17)} Start ${escapeHtml(displayFocus(plan.focus, exercises).toLowerCase())}`}</button>
          ${started || isCoachedClient() || handPlanned ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`
-      : `${/* Who can see it is a question about the live lifting session, which
-               hides an exercise name and a set count. An activity has neither:
-               what a watcher sees of it is the minutes, and those are not
-               negotiable per session, so this whole branch is off on one. */ ""}
-         ${PARTNER_EMAIL ? `<button type="button" class="wp-open" id="planPrivacyBtn">
-             <span class="wp-open-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 16)}</span>
-             <span class="wp-open-txt"><b>Advanced</b><i>${escapeHtml(privacySummary())}</i></span>
-             <span class="wp-open-go">${icon("chevronRight", 16)}</span>
-           </button>` : ""}
+      : `${/* The Advanced (who can see this workout) button that sat here is gone
+               (Mo, 2026-10-04): your partner sees what you are training by
+               default. The same switches are still in the menu inside a
+               running workout, for the day you want something off. */ ""}
          <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${TG_MAKING ? `Use this with ${tgPartnerFirst()}` : started ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>
          ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}
     ${review ? addSessionFootHTML(date, review) : ""}
@@ -41938,7 +41922,6 @@ function renderPlanPreview(opts) {
   if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
 
   // These three are mutually exclusive depending on how far the workout got.
-  if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
   if ($("planStartActBtn")) $("planStartActBtn").onclick = () => startPlannedActivity(plan);
   /* Regenerate overwrites today's row outright, so it says what goes with it.
