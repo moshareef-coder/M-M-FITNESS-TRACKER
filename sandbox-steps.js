@@ -249,6 +249,28 @@
           w.toggleSet(0);
         } },
 
+      /* One step per rest antic, so each can be looked at on purpose instead
+         of waiting for the shuffle to land on it. Same route as the step
+         above (log one set under the record), then the antic is set on the
+         session the way pickRestAntic would and the screen redrawn. */
+      ...[
+        ["Rest: Stretch", "Rest animation: stretch", "New. Arms sweep out and up until the hands meet over the head, reach taller and hold for a breath, then float back down and rest a beat. Replaces the shake-out, which is no longer picked. A side bend was tried and dropped: on this figure the lean folds the arms into an X over the face."],
+        ["Rest: Water", "Rest animation: water", "A drink from the bottle: up from the chest to the lips, head tipping back for the sip, and down again. This was already in the set; it is one of five the rest picks from at random."],
+        ["Rest: Towel", "Rest animation: towel", "Kept as it was: the towel across the brow, back over the temple and down to the neck."],
+        ["Rest: Phone", "Rest animation: phone", "Kept: head down over the phone, the free hand flicking up the feed."],
+        ["Rest: Watch", "Rest animation: watch", "Kept: the forearm comes up and he reads the watch."],
+      ].map(([antic, t, note]) => ({ t, scenario: "paired",
+        s: "What he does between sets",
+        note: note + " The rest picks from these five at random and never the same one twice running.",
+        run: (w) => {
+          w.switchTab("workout");
+          w.startWorkout();
+          w.endStretchPhase();
+          setSessionWeight(w, 175);
+          w.toggleSet(0);
+          w.eval(`SESSION.restAntic = ${JSON.stringify(antic)}; saveSessionToStorage(); renderSession();`);
+        } })),
+
       { t: "A record, as it happens", scenario: "paired",
         s: "The banner on the set that broke it",
         note: "Bench Press has been logged at 180 before, so a set at 190 is a real record and says so on the spot instead of turning up later as a tag in Recent Activity. The banner drops in, bursts once and retracts on its own. Log two more sets at the same weight: it should stay quiet, because the record was already announced.",

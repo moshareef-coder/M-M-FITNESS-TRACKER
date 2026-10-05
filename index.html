@@ -32101,8 +32101,14 @@ function restState(ms) {
    synchronously as the set lands and the motion module loads on demand; a
    name the module does not know falls back to the empty-stage mark, never to
    a crash. Never the same one twice running, so it reads as a person between
-   sets rather than a routine. */
-const REST_ANTICS = ["Rest: Water", "Rest: Phone", "Rest: Towel", "Rest: Shake-out", "Rest: Watch"];
+   sets rather than a routine.
+
+   Mo, 2026-10-05: the shake-out "looks so weird", so it is no longer picked
+   (it still exists in knowledge/, which is not ours to edit). The stretch that
+   replaces it is ours, in mo-knowledge/motion/rest.mjs; REST_HOUSE_MOVES says
+   which names mount from there rather than from the library. */
+const REST_ANTICS = ["Rest: Water", "Rest: Stretch", "Rest: Towel", "Rest: Phone", "Rest: Watch"];
+const REST_HOUSE_MOVES = new Set(["Rest: Stretch"]);
 function pickRestAntic() {
   const pool = REST_ANTICS.filter((n) => n !== SESSION?.restAntic);
   return pool[Math.floor(Math.random() * pool.length)];
@@ -34191,7 +34197,9 @@ function renderSession() {
      existed, or a rest begun by addSet) gets one here, and the choice is kept
      on the session so a redraw or a reload mid-rest does not reshuffle the
      figure. */
-  if (resting && !SESSION.restAntic) { SESSION.restAntic = pickRestAntic(); saveSessionToStorage(); }
+  /* A session saved mid-rest before an antic was retired (the shake-out)
+     still names it, so a name no longer in the set is repicked too. */
+  if (resting && !REST_ANTICS.includes(SESSION.restAntic)) { SESSION.restAntic = pickRestAntic(); saveSessionToStorage(); }
   const restNow = resting ? restState(Date.now() - SESSION.restStartedAt) : null;
 
   const lastTime = lastTimeFor(ex.name);
@@ -42607,6 +42615,16 @@ function ensureRiveRuntime() {
    wholesale, so controllers whose canvas has left the document are destroyed
    on the next pass instead of each render leaving one more rAF subscriber. */
 let motionPromise = null;
+/* Our own rest antics. The library's motion module keeps its move table
+   private, so a move that is not in knowledge/ cannot go through mountMove;
+   rest.mjs draws it with the same rig and hands back the same controller. */
+let restMovesPromise = null;
+function ensureRestMoves() {
+  if (!restMovesPromise) {
+    restMovesPromise = import("./mo-knowledge/motion/rest.mjs").catch((e) => { console.error(e); restMovesPromise = null; return null; });
+  }
+  return restMovesPromise;
+}
 function ensureMotionModule() {
   if (!motionPromise) {
     motionPromise = import("./knowledge/motion/index.mjs").catch((e) => { console.error(e); motionPromise = null; return null; });
@@ -42795,7 +42813,8 @@ async function mountMotionFigures(root) {
     if (!el.isConnected || el.hasAttribute("data-fig-done")) continue;
     el.setAttribute("data-fig-done", "1");
     const name = el.dataset.fig;
-    if (!mod.hasMove(name)) { el.classList.add("fig-none"); continue; }
+    const house = REST_HOUSE_MOVES.has(name) ? await ensureRestMoves() : null;
+    if (house ? !house.hasRestMove(name) : !mod.hasMove(name)) { el.classList.add("fig-none"); continue; }
     const canvas = document.createElement("canvas");
     /* Usually the figure follows the app's theme. The session stage is the
        exception: it is a light grey panel in BOTH themes, so the figure
@@ -42812,7 +42831,7 @@ async function mountMotionFigures(root) {
        drops through to the 2D figure below, so a device that cannot do this
        never sees an empty box. */
     let ctl = null;
-    if (BODY3D && el.hasAttribute("data-fig3d")) {
+    if (BODY3D && !house && el.hasAttribute("data-fig3d")) {
       const b3 = await ensureBody3DModule();
       if (b3) {
         /* Sized before the mount, not after: the renderer reads the canvas's
@@ -42840,7 +42859,7 @@ async function mountMotionFigures(root) {
        holds still for everyone. */
     const frozen = el.hasAttribute("data-fig-static");
     const still = frozen || (el.hasAttribute("data-fig-still") && prefersReducedMotion());
-    if (!ctl) ctl = mod.mountMove(canvas, name, {
+    if (!ctl) ctl = (house ? house.mountRestMove : mod.mountMove)(canvas, name, {
       /* Plain figure only. Mo looked at the muscle skin and the lit working
          muscle on real moves and asked for neither: the figure shows the
          movement, the legend under it names the muscles. */
