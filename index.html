@@ -5108,6 +5108,11 @@
      a running session covers the tab bar and every sheet): asking pause or end
      from a run drew the dialog BEHIND the run. The buttons were live and
      nothing was on screen. */
+  .pop-warn { border-color: color-mix(in srgb, var(--danger, #ff5c5c) 45%, var(--border)); }
+  .pop-warn .pop-who { color: var(--danger, #ff5c5c); display: flex; align-items: center; gap: 7px; font-weight: 800; }
+  .pop-warn-body { margin: 4px 0 0; padding: 12px 14px; border-radius: 12px; font-size: 14.5px; line-height: 1.45; color: var(--text);
+    background: color-mix(in srgb, var(--danger, #ff5c5c) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--danger, #ff5c5c) 30%, transparent); }
+  .pop-warn-anyway { color: var(--danger, #ff5c5c); }
   .pop-scrim {
     position: fixed; inset: 0; z-index: 2500;
     padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
@@ -9634,6 +9639,7 @@ const ICON_PATHS = {
       + 'M12.70 1.33Q12.70 3.60 14.96 3.60Q12.70 3.60 12.70 5.87Q12.70 3.60 10.43 3.60Q12.70 3.60 12.70 1.33Z'
       + 'M18.00 15.19Q18.00 17.62 20.42 17.62Q18.00 17.62 18.00 20.04Q18.00 17.62 15.58 17.62Q18.00 17.62 18.00 15.19Z"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.6"/>',
+  alert: '<path d="M10.3 3.9 2.4 17.6a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9.5v4.5"/><path d="M12 17.4v.1"/>',
   grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
   chevronLeft: '<path d="M15 18l-6-6 6-6"/>',
   chevronRight: '<path d="M9 18l6-6-6-6"/>',
@@ -31259,6 +31265,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
         body: redAreasSentence(red),
         ok: "Generate anyway",
         cancel: "Rest today",
+        tone: "warn",
       });
       if (!go) return false;
     }
@@ -31761,20 +31768,28 @@ function redAreasSentence(red) {
   return `${names} ${red.length === 1 ? "was" : "were"} worked hard in the last day. Fully recovered in about ${hours} hours. We'd give ${red.length === 1 ? "it" : "them"} a rest today.`;
 }
 
-function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going" }) {
+/* `tone: "warn"` is for the app advising against the thing being asked (Mo,
+   2026-10-04: "maybe you should have it like red"). Red heading and icon, the
+   reason in a red box, and the buttons swap weight: the safe answer is the big
+   one and going ahead anyway is the quiet one, because that is the advice. */
+function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going", tone = null }) {
   return new Promise((resolve) => {
+    const warn = tone === "warn";
     const scrim = document.createElement("div");
     scrim.className = "pop-scrim";
     scrim.innerHTML = `
-      <div class="pop">
+      <div class="pop${warn ? " pop-warn" : ""}">
         <div class="pop-body">
           <div class="ds-top">
-            <div class="pop-who" style="color:var(--muted)">${escapeHtml(heading.toUpperCase())}</div>
+            <div class="pop-who"${warn ? "" : ` style="color:var(--muted)"`}>${warn ? icon("alert", 16) : ""}${escapeHtml(heading.toUpperCase())}</div>
             <button type="button" class="ds-x" data-confirm="0" aria-label="Close">&times;</button>
           </div>
-          ${bodyHtml || `<p class="muted-note">${escapeHtml(body)}</p>`}
-          <button type="button" class="btn-primary" data-confirm="1" style="margin-top:16px;">${escapeHtml(ok)}</button>
-          <button type="button" class="btn-ghost" data-confirm="0">${escapeHtml(cancel)}</button>
+          ${bodyHtml || `<p class="${warn ? "pop-warn-body" : "muted-note"}">${escapeHtml(body)}</p>`}
+          ${warn
+            ? `<button type="button" class="btn-primary" data-confirm="0" style="margin-top:16px;">${escapeHtml(cancel)}</button>
+               <button type="button" class="btn-ghost pop-warn-anyway" data-confirm="1">${escapeHtml(ok)}</button>`
+            : `<button type="button" class="btn-primary" data-confirm="1" style="margin-top:16px;">${escapeHtml(ok)}</button>
+               <button type="button" class="btn-ghost" data-confirm="0">${escapeHtml(cancel)}</button>`}
         </div>
       </div>`;
     document.body.appendChild(scrim);
@@ -40533,6 +40548,7 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
           body: redAreasSentence(red),
           ok: "Add it anyway",
           cancel: "Pick something else",
+          tone: "warn",
         });
         if (!go) { cbRenderPicker(); return; }
         red.forEach((a) => RED_WAIVED.add(`${todayStr()}|${a.key}`));
