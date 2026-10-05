@@ -2465,6 +2465,38 @@ test("nextDayIndex returns to Push day once the fresh window has genuinely passe
   assert.equal(plan.week[idx].name, "Push day");
 });
 
+/* Mo, 2026-10-05: "it recommended pull day today ... it should have recommended
+   push day." His week, as it sits in ai_workouts: a hand-built "Back & Arms",
+   the engine's Push day, a hand-built "Legs" yesterday. The app names a
+   hand-built plan after its regions, so neither of those two is a day of any
+   week plan.mjs builds, and the rotation skipped them and answered the day
+   after Thursday's push. Yesterday's legs has to count. */
+test("nextDayIndex places a hand-built plan by what was in it, not only by its name", () => {
+  const plan = buildPlan({ goal: { bubble: "build-muscle", child: "build-overall" }, person: { bodyWeightLb: 190, sex: "Male", daysAsked: 5 }, logs: [] });
+  assert.equal(plan.week.map((d) => d.name).join(","), "Push day,Pull day,Leg day,Upper body,Lower body");
+  const row = (d, focus, names) => ({ entry_date: day(d), focus, completed_at: day(d) + "T14:30:00Z", exercises: names.map((name) => ({ name })) });
+  const plans = [
+    row(-6, "Back & Arms", ["Pull-Up", "Lat Pulldown", "Dumbbell Row", "Seated Cable Row", "Triceps Pushdown"]),
+    row(-4, "Push day", ["Incline Dumbbell Press", "Barbell Bench Press"]),
+    row(-1, "Legs", ["Hip abductors", "Leg Extension", "Hamstring curls", "Goblet Squat"]),
+  ];
+  const idx = nextDayIndex(plan, { logs: [], plans, today: new Date() });
+  assert.equal(plan.week[idx].name, "Upper body", "the day after Leg day, not the day after Thursday's push");
+
+  // Read by its lifts, a back-and-arms session is the Pull day, so Leg day comes next.
+  const afterBack = nextDayIndex(plan, { logs: [], plans: plans.slice(0, 1), today: new Date() });
+  assert.equal(plan.week[afterBack].name, "Leg day");
+
+  // No library lift in it at all: the focus words are the last witness.
+  const wordsOnly = nextDayIndex(plan, { logs: [], plans: [row(-1, "Legs", ["Hip abductors"])], today: new Date() });
+  assert.equal(plan.week[wordsOnly].name, "Upper body");
+
+  // An arms-only day and a run stood in for no lifting day, so they move nothing.
+  const arms = [...plans.slice(0, 2), row(-1, "Arms", ["EZ-Bar Curl", "Triceps Pushdown"]), { ...row(-1, "Easy Run", []) }];
+  const after = nextDayIndex(plan, { logs: [], plans: arms, today: new Date() });
+  assert.equal(plan.week[after].name, "Pull day");
+});
+
 test("nextDayIndex with no logs at all behaves exactly as the plain rotation did, nothing to skip", () => {
   const plan = buildPlan({ goal: { bubble: "lose-weight", child: "lose-a-number" }, person: { bodyWeightLb: 180, sex: "Male", daysAsked: 3 }, logs: [] });
   const names = plan.week.map((d) => d.name);
