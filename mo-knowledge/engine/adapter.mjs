@@ -613,6 +613,60 @@ function rowTime(row) {
 }
 
 /**
+ * Which day of the week a plan row stood in for, or -1 when it cannot be said.
+ *
+ * A row the engine wrote carries the day's own name and is matched on it. A
+ * row somebody built with Plan my own does not: the app names those after the
+ * regions in them (deriveFocus in index.html), so they arrive as "Legs",
+ * "Back & Arms" or "Chest & Shoulders", none of which is a day of any week
+ * plan.mjs builds. Until 2026-10-05 such a row was skipped, which made the
+ * session invisible to the rotation. Measured on Mo's own account: Back &
+ * Arms on Tuesday, Push day on Thursday, a hand-built "Legs" on Sunday, and
+ * on Monday the engine answered Pull day, the day after Thursday's push, as
+ * if Sunday had never happened.
+ *
+ * So an unnamed row is read by what was in it: the main muscle groups of its
+ * exercises, from the same library tags recovery reads, against each day's
+ * mainGroups, and the closest day (overlap over union, so a narrow day that
+ * covers the session beats a broad one that merely contains it) is the day it
+ * was. Only groups some day of this week is FOR are counted, so the arm work
+ * in "Back & Arms" does not dilute the back. When none of its exercises is in
+ * the library, the focus words are the last witness, through the same
+ * keywords a requested focus is read with. A tie goes to the earlier day of
+ * the week, which keeps the answer deterministic.
+ *
+ * A row with nothing to go on (a run, a class, an arms-only day) still says
+ * nothing, on purpose: it did not stand in for a lifting day, so it should
+ * not move the lifting rotation.
+ */
+function dayForRow(week, names, row) {
+  const exact = names.indexOf(norm(row.focus));
+  if (exact >= 0) return exact;
+
+  const weekGroups = new Set(week.flatMap((d) => d.mainGroups || []));
+  const did = new Set();
+  for (const ex of Array.isArray(row.exercises) ? row.exercises : []) {
+    const name = typeof ex === "string" ? ex : ex?.name;
+    const tags = MUSCLE_INDEX.get(String(name || "").trim().toLowerCase());
+    for (const g of tags?.primary || []) if (weekGroups.has(g)) did.add(g);
+  }
+  if (did.size) {
+    let best = -1;
+    let bestScore = 0;
+    week.forEach((d, i) => {
+      const groups = new Set(d.mainGroups || []);
+      const shared = [...did].filter((g) => groups.has(g)).length;
+      if (!shared) return;
+      const score = shared / new Set([...did, ...groups]).size;
+      if (score > bestScore) { bestScore = score; best = i; }
+    });
+    if (best >= 0) return best;
+  }
+
+  return focusDayIndex({ week }, row.focus);
+}
+
+/**
  * Which day of plan.week to hand over now.
  *
  * The engine builds a week and the app shows one card, so something has to
@@ -643,7 +697,7 @@ export function nextDayIndex(plan, { logs = [], plans = [], today = new Date() }
     .filter((p) => p && p.focus)
     .sort((a, b) => rowTime(b) - rowTime(a));
   for (const r of rows) {
-    const i = names.indexOf(norm(r.focus));
+    const i = dayForRow(week, names, r);
     if (i >= 0) return rested((i + 1) % week.length);
   }
 

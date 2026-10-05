@@ -733,6 +733,43 @@
           created_at: day(0) + "T08:00:00Z", responded_at: day(0) + "T08:00:00Z" }));
       },
     },
+
+    /* Mo's own week, 2026-10-05, the shape of it copied off his account: a
+       hand-built back day, the engine's push day, a hand-built leg day the app
+       named "Legs", and nothing yet today. The engine used to answer Pull day
+       here, because it could not place "Legs" (or "Back & Arms") in its week
+       and so read Thursday's push as the last thing he did. It should answer
+       the day after Leg day, which in his five-day week is Upper body. */
+    ownLegsYesterday: {
+      label: "Hand-built leg day yesterday",
+      apply: (db) => {
+        db.profiles = db.profiles.map((p) => p.email !== ME ? p : { ...p,
+          goal: "Build muscle", goal_bubble: "build-muscle", focus: "Strength",
+          challenge_target: 5, train_styles: ["lifting"], style_frequency: { lifting: "most" },
+          focus_groups: ["chest:3"], session_minutes: 60 });
+        const at = (d, hh) => day(d) + `T${hh}:00Z`;
+        const log = (id, d, hh, exercise_name, sets, reps, weight) => ({ id, email: ME, user_name: "Mo",
+          entry_date: day(d), exercise_name, sets, reps, weight, created_at: at(d, hh) });
+        db.exercise_logs = db.exercise_logs.filter((e) => e.email !== ME).concat([
+          log("o1", -6, "13:54", "Pull-Up", 2, 7, 70), log("o2", -6, "14:07", "Dumbbell Row", 3, 10, 32.5),
+          log("o3", -6, "14:16", "Seated Cable Row", 3, 7, 50), log("o4", -6, "14:26", "Triceps Pushdown", 3, 12, 32.5),
+          log("o5", -4, "14:18", "Seated Dumbbell Press", 3, 10, 30), log("o6", -4, "14:30", "Barbell Bench Press", 3, 5, 135),
+          log("o7", -4, "14:30", "Incline Dumbbell Press", 3, 10, 37.5),
+          log("o8", -1, "16:00", "Hip abductors", 3, 10, 150), log("o9", -1, "16:11", "Leg Extension", 3, 10, 70),
+          log("o10", -1, "16:26", "Hamstring curls", 3, 10, 75), log("o11", -1, "16:39", "Goblet Squat", 3, 10, 45),
+        ]);
+        db.fit_entries = db.fit_entries.filter((e) => e.email !== ME).concat([-6, -4, -1].map((d) => ({
+          id: `oe${-d}`, email: ME, user_name: "Mo", entry_date: day(d), gym: true, sessions: 1, workout_at: at(d, "14:30") })));
+        const plan = (id, d, focus, names) => ({ id, email: ME, user_name: "Mo", entry_date: day(d), slot: 0,
+          focus, archived: true, completed_at: at(d, "14:30"), created_at: at(d, "13:40"),
+          exercises: names.map((name) => ({ name, sets: 3, reps: 10 })) });
+        db.ai_workouts = db.ai_workouts.filter((w) => w.email !== ME).concat([
+          plan("ow1", -6, "Back & Arms", ["Pull-Up", "Lat Pulldown", "Dumbbell Row", "Seated Cable Row", "Triceps Pushdown"]),
+          plan("ow2", -4, "Push day", ["Incline Dumbbell Press", "Seated Dumbbell Press", "Barbell Bench Press", "Overhead Triceps Extension"]),
+          plan("ow3", -1, "Legs", ["Hip abductors", "Leg Extension", "Hamstring curls", "Goblet Squat"]),
+        ]);
+      },
+    },
   };
 
   /* Weight and the tape left the day row on 2026-09-21
