@@ -6324,10 +6324,23 @@
      navigation: it should be the quietest thing on the screen, not the
      loudest. Underline rather than a filled pill, so it cannot be mistaken
      for the segmented control directly below it. */
-  .goal-chips {
-    display: flex; gap: 16px; margin: 0 0 16px;
+  .goal-chips { margin: 0 0 16px; }
+  .goal-tabs {
+    display: flex; gap: 16px;
     border-bottom: 1px solid var(--border);
   }
+  .prog-who-row + .goal-tabs { margin-top: 14px; }
+  /* Mo | Mell. Each half wears its person's colour when it is the one on
+     screen, the same blue and orange as everywhere else the two of you are
+     told apart. */
+  .prog-who-row { display: flex; align-items: center; gap: 10px; }
+  .prog-who { display: flex; flex: 1; min-width: 0; max-width: 280px; padding: 4px; gap: 4px; border-radius: 999px;
+    background: var(--panel-2); border: 1px solid var(--border); }
+  .prog-who-b { flex: 1; min-width: 0; padding: 9px 12px; border: 0; border-radius: 999px; background: none; cursor: pointer;
+    font: inherit; font-size: 15px; font-weight: 700; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .18s, color .18s; }
+  .prog-who-b.me.on { background: var(--me); color: #fff; }
+  .prog-who-b.partner.on { background: var(--partner); color: #fff; }
   .goal-chip {
     flex: 0 1 auto; min-width: 0; padding: 0 0 9px; cursor: pointer;
     background: none; border: 0; border-bottom: 2px solid transparent;
@@ -17681,8 +17694,11 @@ function startPartnerTour() {
      2026-10-04: once they have looked at their partner's side, show them the
      way home too, or the first visit strands them on someone else's numbers. */
   const steps = [
-    { face: ".av.them", ring: "var(--partner)", title: `See ${first}'s progress`, text: `Tap ${first}'s face up here any time.` },
-    { face: ".av.me", ring: "var(--me)", title: `This is ${first}'s side`, text: "Tap your face to switch back to yours." },
+    /* The Mo | Mell switch at the top of Progress, since 2026-10-04. The
+       header faces still flip it too; the switch is the one worth teaching
+       because it is the one you can see. */
+    { face: "#progGoalChips .prog-who-b.partner", ring: "var(--partner)", title: `See ${first}'s progress`, text: `Tap ${first}'s name here any time.` },
+    { face: "#progGoalChips .prog-who-b.me", ring: "var(--me)", title: `This is ${first}'s side`, text: "Tap your name to switch back to yours." },
   ];
 
   const scrim = document.createElement("div");
@@ -17703,7 +17719,7 @@ function startPartnerTour() {
   let i = 0;
   /* Looked up fresh every time: Progress redraws the pair of faces when it
      switches sides, so a node held from step one is gone by step two. */
-  const face = () => document.querySelector(`#avatarPair ${steps[i].face}`);
+  const face = () => document.querySelector(steps[i].face);
   const place = () => {
     const el = face();
     if (!el) return;
@@ -45770,16 +45786,35 @@ function syncAvatarPairView() {
   wrap.querySelector(".av.them")?.classList.toggle("showing", showingPartner);
 }
 
+/* Whose progress, as the first thing on the tab: Mo | Mell. Mo, 2026-10-04,
+   picked this over the header avatars ("without having to click on the top
+   right"), which still work. It also stands in for the goal tab on a single
+   goal, which only ever repeated the goal name the card under it says. */
+function progWhoSwitchHTML() {
+  if (!PARTNER_EMAIL || !PARTNER_PROFILE) return "";
+  const b = (who, name) => `<button type="button" class="prog-who-b ${who}${PROGRESS_VIEW === who ? " on" : ""}"
+      data-who="${who}" role="tab" aria-selected="${PROGRESS_VIEW === who}">${escapeHtml(name)}</button>`;
+  return `<div class="prog-who" role="tablist" aria-label="Whose progress">${b("me", ME)}${b("partner", partnerName())}</div>`;
+}
+function wireProgWhoSwitch(host) {
+  host.querySelectorAll("[data-who]").forEach((btn) => {
+    btn.onclick = () => {
+      if (PROGRESS_VIEW === btn.dataset.who) return;
+      PROGRESS_VIEW = btn.dataset.who;
+      PROGRESS_GOAL_LENS = null;
+      renderProgressTab();
+    };
+  });
+}
+
 function renderGoalChips(profile) {
   const host = $("progGoalChips");
   if (!host) return;
   host.classList.remove("hidden");
-  /* Their goals are theirs, so the strip has nothing to offer on their view.
-     The row stays because a screen about somebody else should still say whose
-     it is: their name takes the title's place, underlined in their colour.
-     The way back to your own is the header avatar now, not a control here. */
+  /* Their goals are theirs, so their view is the switch and nothing else. */
   if (PROGRESS_VIEW === "partner") {
-    host.innerHTML = `<span class="prog-title-static">${escapeHtml(partnerName())}</span>`;
+    host.innerHTML = `<div class="prog-who-row">${progWhoSwitchHTML()}</div>`;
+    wireProgWhoSwitch(host);
     syncAvatarPairView();
     return;
   }
@@ -45830,13 +45865,21 @@ function renderGoalChips(profile) {
      scattering a toggle on every card, just moved up where it is actually
      seen instead of waiting at the bottom of the tab. */
   const shareOffer = !!PARTNER_EMAIL && progressSharingLive();
-  host.innerHTML = ids.map((id) => chip(goalTileFor(id))).join("")
-    + (PROGRESS_VIEW === "partner" ? "" : `<span class="prog-goal-actions">
+  const actions = `<span class="prog-goal-actions">
       ${shareOffer ? `<button type="button" class="track-kebab" id="progShareBtn"
         aria-label="What ${escapeHtml(partnerName())} sees of you">${icon("eye", 17)}</button>` : ""}
       <button type="button" class="track-kebab" id="trackOpen"
         aria-label="Change what this goal shows">${icon("more", 18)}</button>
-    </span>`);
+    </span>`;
+  const who = progWhoSwitchHTML();
+  const tabs = ids.map((id) => chip(goalTileFor(id))).join("");
+  /* Paired: the switch and the goal's controls share the top row, and goal
+     tabs get a row of their own only when there is more than one goal to
+     choose between. Alone: no switch, so the goal tabs keep the row as before. */
+  host.innerHTML = who
+    ? `<div class="prog-who-row">${who}${actions}</div>${ids.length > 1 ? `<div class="goal-tabs">${tabs}</div>` : ""}`
+    : `<div class="goal-tabs">${tabs}${actions}</div>`;
+  wireProgWhoSwitch(host);
   const shareBtn = host.querySelector("#progShareBtn");
   if (shareBtn) shareBtn.onclick = openShareSheet;
   const keb = host.querySelector("#trackOpen");
