@@ -44191,6 +44191,9 @@ const MEASUREMENTS = [
   { key: "thigh_in", label: "Thighs", unit: "in" },
   { key: "arm_in", label: "Arms", unit: "in" },
 ];
+/* The body readings a partner can be shown, one share tile each, all behind
+   the one share_weigh_ins switch the database enforces. See shareGridMetrics. */
+const BODY_SHARE_KEYS = ["weight", ...MEASUREMENTS.map((m) => m.key)];
 /* One sheet logs all of them; the screens just lead with different ones. Tone
    Up asks about the tape around the middle, Build Muscle about the parts that
    are supposed to grow, and a chest belongs to the second question only, which
@@ -44373,11 +44376,19 @@ function trackedMetrics(goalId = null, prof = trackedProfile()) {
     || (prof !== MY_PROFILE ? null : PROGRESS_GOAL_LENS)
     || prof?.goal_bubble
     || "consistent";
+  /* On a partner's view, a body reading they hold back (Weight, Waist, ...
+     in their progress_hidden) is as good as untracked, so every screen that
+     asks isTracked leaves it out, the same way it leaves out what they never
+     picked. */
+  const theirs = prof !== MY_PROFILE;
+  const shown = (keys) => theirs
+    ? keys.filter((k) => !BODY_SHARE_KEYS.includes(k) || progressKeyShared(k, prof?.progress_hidden))
+    : keys;
   const byGoal = prof?.tracked_by_goal;
   if (byGoal && typeof byGoal === "object" && Array.isArray(byGoal[bubble])) {
     /* An empty list is a real answer, not a missing one: somebody who turned
        every tile off meant it, so it is honoured rather than filled in. */
-    return byGoal[bubble].filter((k) => known.has(k));
+    return shown(byGoal[bubble].filter((k) => known.has(k)));
   }
   /* Before the per goal map existed there was one flat list, and an account
      that set one should keep seeing it rather than being silently reset to a
@@ -44385,9 +44396,9 @@ function trackedMetrics(goalId = null, prof = trackedProfile()) {
      about the other two. */
   const flat = prof?.tracked_metrics;
   if (Array.isArray(flat) && bubble === (prof?.goal_bubble || "consistent")) {
-    return flat.filter((k) => known.has(k));
+    return shown(flat.filter((k) => known.has(k)));
   }
-  return TRACK_DEFAULTS[bubble] || ["weight"];
+  return shown(TRACK_DEFAULTS[bubble] || ["weight"]);
 }
 const isTracked = (key, goalId = null, prof = trackedProfile()) => trackedMetrics(goalId, prof).includes(key);
 
@@ -48135,19 +48146,6 @@ function trainStylesToSave() {
    was this exact reuse rather than a new card style. Saved on every tap, no
    Save button, same convention as the tiles have everywhere else and as the
    toggle just above it. */
-/* Weigh-ins as one more tile in the same grid. Mo: "share weigh-ins and
-   measurements with Mell... should be like weigh-ins, as its own separate
-   box. And then they can click it off or click it on." It was a sentence-long
-   switch in a card of its own, one screen away from the grid that answers the
-   same question about everything else.
-
-   It is not stored like the others: the eight cards plus photos live in the
-   progress_hidden array, and this one is the share_weigh_ins boolean, which
-   since 20260921_body_measurements_table.sql is enforced by RLS rather than
-   only by the client. So it gets a pseudo key here and the writer below
-   splits on it. Kept first in the grid because it governs the most: their
-   weight, their goal weight and their tape are one answer, not three. */
-const SHARE_WEIGH_KEY = "weigh_ins";
 /* Only what you track can be offered to share (Mo, 2026-10-04: "if I have
    only weight selected for me... it should only have weight on there").
    Tracked across every goal you hold, main and extras, since each goal keeps
@@ -48159,15 +48157,24 @@ function myTrackedEverywhere() {
     ...normaliseGoalSecondary(MY_PROFILE?.goal_secondary).map((e) => e.bubble)];
   return new Set(goals.flatMap((g) => trackedMetrics(g, MY_PROFILE)));
 }
+/* Weight and each tape measurement, one tile each, the same tiles the
+   tracking picker shows (Mo, 2026-10-04: tracking Weight and Waist, the eye
+   offered one "Weigh-ins" tile). share_weigh_ins is still the switch the
+   database enforces for all of them together, so it stays the master: on when
+   any of these is on, off when none is. Each one's own answer narrows it in
+   progress_hidden, the way Best Lifts narrows workout details, which means
+   that part is the app honouring it rather than the database. */
 function shareGridMetrics() {
   const mine = myTrackedEverywhere();
-  const weigh = mine.has("weight") || MEASUREMENTS.some((m) => mine.has(m.key));
-  return (weigh ? [{ key: SHARE_WEIGH_KEY, label: "Weigh-ins", ico: "scale", blurb: "Your weight and tape" }] : [])
-    .concat(PROGRESS_SHARE_KEYS.filter((k) => mine.has(k)).map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean));
+  return BODY_SHARE_KEYS.concat(PROGRESS_SHARE_KEYS).filter((k) => mine.has(k))
+    .map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
 }
 function shareGridOn() {
-  const on = new Set(PROGRESS_SHARE_KEYS.filter((k) => progressKeyShared(k, MY_PROFILE?.progress_hidden)));
-  if (MY_PROFILE?.share_weigh_ins === true) on.add(SHARE_WEIGH_KEY);
+  const hidden = MY_PROFILE?.progress_hidden;
+  const on = new Set(PROGRESS_SHARE_KEYS.filter((k) => progressKeyShared(k, hidden)));
+  if (MY_PROFILE?.share_weigh_ins === true) {
+    for (const k of BODY_SHARE_KEYS) if (progressKeyShared(k, hidden)) on.add(k);
+  }
   return on;
 }
 /* One grid, one writer, used by the sheet the eye opens and by the card in
@@ -48185,8 +48192,12 @@ function paintShareGrid(host) {
        is hidden, so the exception runs the other way). PROGRESS_SHARE_OPT_IN
        is what tells this which keys to store, not the "on" state itself. */
     const nowStored = PROGRESS_SHARE_KEYS.filter((k) =>
-      PROGRESS_SHARE_OPT_IN.has(k) ? live.has(k) : !live.has(k));
-    const weigh = live.has(SHARE_WEIGH_KEY);
+      PROGRESS_SHARE_OPT_IN.has(k) ? live.has(k) : !live.has(k))
+      /* Every body key that is off is written down, including ones not on
+         the grid: turning Weight on must not quietly start sharing a waist
+         that was off because the master switch was. */
+      .concat(BODY_SHARE_KEYS.filter((k) => !live.has(k)));
+    const weigh = BODY_SHARE_KEYS.some((k) => live.has(k));
     const patch = { progress_hidden: nowStored };
     if (weighInSharingLive()) patch.share_weigh_ins = weigh;
     const { error } = await sb.from("profiles").update(patch).eq("email", MY_EMAIL);
