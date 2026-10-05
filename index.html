@@ -3528,13 +3528,6 @@
     .sess-quip.go { animation: none; opacity: 0; }
     .sess-quip-cur { animation: none; }
   }
-  /* The one-tap path back while resting: the chip logs the set directly, and
-     this says so, under the Start set button rather than beside it. */
-  .sess-cta-alt {
-    display: block; width: 100%; margin: 6px 0 -6px; padding: 8px; border: 0; background: none;
-    font-family: inherit; font-size: 14.5px; font-weight: 600; color: var(--muted); cursor: pointer;
-    text-decoration: underline; text-underline-offset: 3px;
-  }
 
   /* The sheet: everything you touch, in one place, at the bottom of the phone. */
   .sess-sheet {
@@ -34354,8 +34347,7 @@ function renderSession() {
         <div class="sess-cta">
           <!-- Resting: the one button is Start set, which ends the rest and
                brings the lift back. The chip still logs the next set in one
-               tap for anyone who did the set without announcing it, and the
-               line under the button says so. -->
+               tap for anyone who did the set without announcing it. -->
           <button type="button" class="btn-big btn-primary ${resting ? "" : "hidden"}" id="startSetBtn">Start set ${currentSet + 1} of ${setsDone.length}</button>
           ${/* The big button is whatever you are actually on. While a warm-up
                 is waiting it is the warm-up: saying "Log set 1 of 4" over a
@@ -34366,7 +34358,10 @@ function renderSession() {
           ${rampTicks < rungs.length
             ? `<button type="button" class="btn-big btn-primary warm ${resting ? "hidden" : ""}" id="logWarmBtn">Log warm-up set</button>`
             : `<button type="button" class="btn-big btn-primary ${allDone || resting ? "hidden" : ""}" id="logSetBtn">Log set ${currentSet + 1} of ${setsDone.length}</button>`}
-          ${resting ? `<button type="button" class="sess-cta-alt" id="logNowBtn">Already done it? Log set ${currentSet + 1}</button>` : ""}
+          ${/* Mo, 2026-10-05: "Let's remove the 'already done' log." The line
+                that sat here while resting ("Already done it? Log set 2") did
+                exactly what tapping the next set chip already does, so it was a
+                second way to say one thing under the one button that matters. */ ""}
           <button type="button" class="btn-big btn-primary ${allDone ? "" : "hidden"}" id="nextExBtn">${SESSION.completed.some((c, i) => !c && i !== ei) ? "Next exercise" : "Finish workout"}</button>
         </div>
 
@@ -34424,8 +34419,6 @@ function renderSession() {
   if (warmBtn) warmBtn.onclick = () => tickRampSet(ei, rampTicks, rungs);
   const startBtn = $("startSetBtn");
   if (startBtn) startBtn.onclick = () => { buzz(9); skipRest(); };
-  const logNow = $("logNowBtn");
-  if (logNow) logNow.onclick = () => { if (currentSet >= 0) toggleSet(currentSet); };
 
   $("sessionBody").querySelectorAll("[data-jump]").forEach((b) => {
     b.onclick = () => jumpToExercise(parseInt(b.dataset.jump, 10));
