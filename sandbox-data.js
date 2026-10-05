@@ -35,6 +35,11 @@
   const profile = (email, name, extra = {}) => ({
     email, user_name: name, theme: "light", sex: name === "Mell" ? "Female" : "Male",
     goal: "Get stronger", challenge_target: 5, share_workout_details: true,
+    /* The progress sharing column is applied on the live database (checked
+       2026-10-04), so every real profile carries the key and the sandbox's
+       does too: without it the eye on Progress, which is the way into what
+       your partner sees, never showed here while it did on a phone. */
+    progress_hidden: [],
     /* Six characters, padded, because a real invite code always is and the
        code screen refuses to send anything shorter. "MO" sat in the Your code
        panel for months looking like a bug. */
