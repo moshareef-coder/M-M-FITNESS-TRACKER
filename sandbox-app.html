@@ -7634,6 +7634,18 @@
   }
   /* flex-shrink, or a long label squashes the box into a 13px wide oval. */
   .gym-toggle input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--accent); }
+  .bw-toggle { margin: 0 0 12px; }
+  .bw-toggle span { display: flex; flex-direction: column; gap: 1px; }
+  .bw-toggle b { font-size: 14px; font-weight: 700; color: var(--text); }
+  /* A real on/off switch, the way iOS draws one, rather than a checkbox. */
+  .bw-toggle input { appearance: none; -webkit-appearance: none; width: 46px; height: 28px; border-radius: 999px; margin: 0;
+    background: var(--border); position: relative; cursor: pointer; transition: background .2s; }
+  .bw-toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s cubic-bezier(.22,1,.36,1); }
+  .bw-toggle input:checked { background: var(--accent); }
+  .bw-toggle input:checked::after { transform: translateX(18px); }
+  .bw-toggle i { font-size: 12.5px; font-style: normal; color: var(--muted); }
+  .cb-pick-top .bw-toggle { margin: 0 0 8px; }
   .gym-toggle.checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
   /* A text action inside a row header: Skip today / Put it back on the plan's
      stretch blocks. A button so it is keyboard reachable, styled as a link so
@@ -29896,12 +29908,13 @@ function closeSwapSheet() {
    reopening the sheet is instant. */
 const SWAP_ALTS = new Map();
 async function swapAlternativesFor(ex) {
-  const own = (ex.alternatives || []).filter((a) => a && a.name && a.name !== ex.name);
+  const bw = bwOnly();
+  const own = (ex.alternatives || []).filter((a) => a && a.name && a.name !== ex.name && (!bw || exIsBodyweight(a)));
   if (own.length) return own.slice(0, 3);
-  const key = (ex.name || "").toLowerCase();
+  const key = `${(ex.name || "").toLowerCase()}|${bw ? "bw" : "all"}`;
   if (SWAP_ALTS.has(key)) return SWAP_ALTS.get(key);
   const onPlan = (SWAP_CTX?.list?.() || []).map((e) => e.name);
-  const pool = strengthLibraryPool();
+  const pool = bw ? strengthLibraryPool().filter(exIsBodyweight) : strengthLibraryPool();
   let out = [];
   const libEx = findStrengthLibraryExercise(ex.name);
   const mod = libEx ? await ensureAlternativesMatcher() : null;
@@ -29941,9 +29954,10 @@ async function renderSwapSheet() {
       <div class="scr-title">Swap ${escapeHtml(ex.name || "")}</div>
       <div class="spacer"></div>
     </div>
-    <p class="muted-note" style="margin:-6px 0 14px;">${alts.length
+    <p class="muted-note" style="margin:-6px 0 12px;">${alts.length
       ? "Same job, a different movement. Sets and reps stay where they are."
       : "Nothing close enough to suggest for this one. Browse the library instead."}</p>
+    <div class="bw-toggle-wrap">${bwToggleHTML()}</div>
     <div class="sv-rows">
       ${alts.map((a, i) => `<button type="button" class="sv-row sv-row-fig" data-alt="${i}">
         <span class="sv-fig" data-fig="${escapeHtml(a.name)}" data-fig-static></span>
@@ -29972,6 +29986,7 @@ async function renderSwapSheet() {
     <div class="sv-rows" id="swResults" style="margin-top:8px"></div>` : ""}`;
 
   $("swClose").onclick = closeSwapSheet;
+  wireBwToggle($("swapSheet"), renderSwapSheet);
   $("swapSheet").querySelectorAll("[data-alt]").forEach((b) => {
     const a = alts[Number(b.dataset.alt)];
     b.onclick = () => applySwap(a.name, "suggested");
@@ -29994,7 +30009,7 @@ function renderSwapResults() {
   const query = $("swSearch")?.value.trim() || "";
   if (!query) { wrap.innerHTML = `<div class="cb-none">Type a name to search the library.</div>`; return; }
   const seen = new Set();
-  const found = searchExerciseCatalog(query, 12).filter((ex) => {
+  const found = bwFilter(searchExerciseCatalog(query, 12)).filter((ex) => {
     const key = (ex.name || "").toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
@@ -30174,6 +30189,48 @@ function swapCurrentExercise() {
   });
 }
 
+/* The current movement, taken out of today's workout from inside the
+   session (Mo, 2026-10-04: "if we changed our mind"). Every per-exercise list
+   the session keeps moves with it, including the two keyed by position, and
+   the saved plan is rewritten so the session still matches it on the way
+   back in. */
+async function removeCurrentExercise() {
+  if (!SESSION || !TODAY_WORKOUT?.exercises?.length) return;
+  const exs = TODAY_WORKOUT.exercises;
+  const ei = SESSION.exerciseIndex;
+  if (exs.length <= 1 || (SESSION.setsDone[ei] || []).some(Boolean)) return;
+  const name = exs[ei].name;
+  exs.splice(ei, 1);
+  for (const k of ["setsDone", "setWeights", "weights", "reps", "completed"]) SESSION[k]?.splice(ei, 1);
+  if (SESSION.rampTicks) {
+    const next = {};
+    for (const [k, v] of Object.entries(SESSION.rampTicks)) { const n = Number(k); if (n !== ei) next[n > ei ? n - 1 : n] = v; }
+    SESSION.rampTicks = next;
+  }
+  if (SESSION.restLog) {
+    const next = {};
+    for (const [k, v] of Object.entries(SESSION.restLog)) {
+      const [a, b] = k.split("-").map(Number);
+      if (a !== ei) next[`${a > ei ? a - 1 : a}-${b}`] = v;
+    }
+    SESSION.restLog = next;
+  }
+  /* On to the next thing not yet done, looking forward first. */
+  let to = SESSION.completed.findIndex((c, i) => i >= ei && !c);
+  if (to === -1) to = SESSION.completed.findIndex((c) => !c);
+  SESSION.exerciseIndex = to === -1 ? Math.min(ei, exs.length - 1) : to;
+  SESSION.restStartedAt = null;
+  stopRestTicker();
+  SESSION_LAST_EX = null;
+  saveSessionToStorage();
+  renderSession();
+  toast(`Removed ${name}`);
+  if (TODAY_WORKOUT.id) {
+    const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
+    if (error) console.error("removed exercise not saved to the plan", error);
+  }
+}
+
 /* ---------- No equipment today ----------
    Mo, mo-knowledge/FLOW-DECISIONS-2026-09-17.md, "Do not lock me in the
    workout": "Open rules, not endpoints." Somebody who cannot get to the gym
@@ -30235,6 +30292,39 @@ const NO_GYM_EQUIPMENT = new Set(["barbell", "cable", "machine", "dumbbell"]);
    rather than inferred from NO_GYM_EQUIPMENT's complement: a band, a wall and
    a foam roller are none of them a gym and none of them a weight you pick. */
 const BODYWEIGHT_EQUIPMENT = new Set(["bodyweight", "none", "wall", "doorway", "bench", "foam roller"]);
+
+/* ---------- Bodyweight only ----------
+   Mo, 2026-10-04: one switch, on the swap sheet, the library and Plan my
+   own, that narrows what you are SHOWN to moves you can do anywhere. It never
+   rewrites a workout (that was No equipment today, which this replaces in
+   the session menu); it only changes which options are on screen, and you
+   still choose. Remembered for the day, because a day at home and the next
+   one back at the gym are different answers. */
+const bwOnlyKey = () => `unio.bwOnly.${todayStr()}`;
+function bwOnly() { try { return localStorage.getItem(bwOnlyKey()) === "1"; } catch { return false; } }
+function setBwOnly(on) { try { localStorage.setItem(bwOnlyKey(), on ? "1" : "0"); } catch { /* the switch still works for this screen */ } }
+function exIsBodyweight(ex) {
+  const kit = String(ex?.equipment ?? findStrengthLibraryExercise(ex?.name)?.equipment ?? "").toLowerCase();
+  return BODYWEIGHT_EQUIPMENT.has(kit);
+}
+function bwFilter(list) { return bwOnly() ? list.filter(exIsBodyweight) : list; }
+function bwToggleHTML() {
+  const on = bwOnly();
+  return `<label class="gym-toggle bw-toggle${on ? " checked" : ""}">
+      <span><b>Bodyweight only</b><i>No equipment needed</i></span>
+      <input type="checkbox" data-bw${on ? " checked" : ""} />
+    </label>`;
+}
+/* `redraw` repaints whatever the list is; the switch's own look follows here. */
+function wireBwToggle(root, redraw) {
+  const input = root?.querySelector("[data-bw]");
+  if (!input) return;
+  input.onchange = () => {
+    setBwOnly(input.checked);
+    input.closest(".bw-toggle")?.classList.toggle("checked", input.checked);
+    redraw();
+  };
+}
 
 /* "Already logged" means a set is actually in the log, not that every set is.
    SESSION.completed[i] only flips once the last of them lands, so a plan with
@@ -34496,8 +34586,9 @@ function openExerciseActions() {
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT?.exercises?.[ei];
   if (!ex) return;
-  const nextIdx = TODAY_WORKOUT.exercises.findIndex((x, i) => i !== ei && !SESSION.completed[i]);
-  const canGoBodyweight = remainderNeedsEquipmentSwitch();
+  /* Logged sets are the record of what happened, so a lift with any on it
+     stays; and a workout needs something in it. */
+  const canRemove = TODAY_WORKOUT.exercises.length > 1 && !(SESSION.setsDone[ei] || []).some(Boolean);
 
   const scrim = document.createElement("div");
   scrim.className = "pop-scrim";
@@ -34513,22 +34604,16 @@ function openExerciseActions() {
             <span class="sess-act-ico">${icon("swap", 18)}</span>
             <span>Swap exercise<i>A different movement for the same muscles</i></span>
           </button>
-          <button type="button" class="sess-act" data-act="skip"${nextIdx === -1 ? " disabled" : ""}>
-            <span class="sess-act-ico">${icon("chevronRight", 18)}</span>
-            <span>Skip exercise<i>${nextIdx === -1
-              ? "Nothing else left to move to"
-              : `Move on to ${escapeHtml(TODAY_WORKOUT.exercises[nextIdx].name)}, come back any time`}</i></span>
+          ${/* Mo, 2026-10-04: Swap and Remove, nothing else. Skip already sits
+                at the bottom of the session screen; No equipment today became
+                the Bodyweight only switch on the swap sheet; Who can see this
+                went with the plan screen's Advanced button. */ ""}
+          <button type="button" class="sess-act" data-act="remove"${canRemove ? "" : " disabled"}>
+            <span class="sess-act-ico">${icon("close", 18)}</span>
+            <span>Remove exercise<i>${canRemove
+              ? "Take it out of today's workout"
+              : TODAY_WORKOUT.exercises.length <= 1 ? "It's the only one left" : "You've already logged sets on it"}</i></span>
           </button>
-          <button type="button" class="sess-act" data-act="noequip"${canGoBodyweight ? "" : " disabled"}>
-            <span class="sess-act-ico">${icon("body", 18)}</span>
-            <span>No equipment today<i>${canGoBodyweight
-              ? "Switch what's left of this workout to bodyweight"
-              : "Nothing left needs a barbell, cable, machine or dumbbell"}</i></span>
-          </button>
-          ${PARTNER_EMAIL ? `<button type="button" class="sess-act" data-act="privacy">
-            <span class="sess-act-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 18)}</span>
-            <span>Who can see this<i>${escapeHtml(privacySummary())}</i></span>
-          </button>` : ""}
         </div>
       </div>
     </div>`;
@@ -34540,9 +34625,7 @@ function openExerciseActions() {
       const act = b.dataset.act;
       close();
       if (act === "swap") swapCurrentExercise();
-      else if (act === "skip" && nextIdx !== -1) jumpToExercise(nextIdx);
-      else if (act === "noequip" && canGoBodyweight) noEquipmentToday();
-      else if (act === "privacy") openWorkoutPrivacy();
+      else if (act === "remove" && canRemove) removeCurrentExercise();
     };
   });
 }
@@ -35524,7 +35607,6 @@ function pausedScreenHTML({ overlay }) {
     <div class="pz${overlay ? "" : " pz-inline"}">
       <div class="pz-top">
         <button type="button" class="pz-min" id="pzHome" aria-label="Home, the workout keeps running">${icon("home", 22)}</button>
-        ${f.canGoBodyweight ? `<button type="button" class="pz-min" id="pzKit" aria-label="No equipment today. Switch what's left to bodyweight">${icon("body", 22)}</button>` : ""}
       </div>
 
       <div class="pz-mid">
@@ -35621,7 +35703,6 @@ function wirePausedScreen({ overlay, root: given }) {
      nothing. That was "the buttons don't work on this page". */
   const q = (id) => root.querySelector("#" + id);
   q("pzHome").onclick = () => (SESSION ? goHomeFromSession() : goHomeFromActivity());
-  if (q("pzKit")) q("pzKit").onclick = () => noEquipmentToday({ overlay });
   q("pzResume").onclick = () => resumeFromPaused({ overlay, root });
   mountMotionFigures(root);
   renderPausedLive(root);
@@ -40102,6 +40183,20 @@ function cbExercisesFor(groupKey, query) {
     for (const ex of c.exercises) {
       if (seen.has(ex.name)) continue;
       if (q && !normalizeSearch(ex.name).includes(q)) continue;
+      if (bwOnly() && !exIsBodyweight(ex)) continue;
+      seen.add(ex.name);
+      out.push(ex);
+    }
+  }
+  /* The calisthenics library files its moves by pattern (push, pull, legs),
+     not by muscle, so a Handstand Push-Up was in no section at all and
+     Bodyweight only left Shoulders empty. Each one joins the section of its
+     main muscle, after the section's own. */
+  if (group.cats) {
+    for (const ex of strengthLibraryPool()) {
+      if (seen.has(ex.name) || !(ex.primary || []).some((g) => group.cats.includes(g))) continue;
+      if (q && !normalizeSearch(ex.name).includes(q)) continue;
+      if (bwOnly() && !exIsBodyweight(ex)) continue;
       seen.add(ex.name);
       out.push(ex);
     }
@@ -40168,7 +40263,7 @@ function pmoWireCards(root, after) {
    so the field keeps focus and the figures already on screen stay put. */
 function pmoSearchResults(q) {
   const seen = new Set();
-  return searchExerciseCatalog(q, 30).filter((e) => {
+  return bwFilter(searchExerciseCatalog(q, 30)).filter((e) => {
     const k = e.name.toLowerCase();
     if (seen.has(k)) return false;
     seen.add(k);
@@ -40239,6 +40334,7 @@ function renderPmoPick() {
     <h2 class="pmo-h" id="pmoTitle">${escapeHtml(title)}</h2>
     <p class="pmo-sub" id="pmoCount">${countLine()}</p>
     ${pmoSearchHTML("Search any exercise")}
+    <div class="bw-toggle-wrap">${bwToggleHTML()}</div>
     <div id="pmoGridWrap"></div>
     <div class="pmo-foot">
       <button type="button" class="btn-primary" id="pmoNext"></button>
@@ -40275,6 +40371,7 @@ function renderPmoPick() {
   drawGrid();
   refreshFoot();
   $("pmoSearch").oninput = (e) => { PMO.q = e.target.value; drawGrid(); };
+  wireBwToggle($("workoutContent"), drawGrid);
   $("pmoNext").onclick = () => {
     if (!MANUAL_DRAFT.length) return;
     PMO.q = "";
@@ -40413,10 +40510,12 @@ function cbRenderPicker() {
         ${CB_GROUPS.map((g) => `<button type="button" class="cb-chip${g.key === CB_GROUP ? " on" : ""}" data-group="${g.key}">${escapeHtml(g.label)}</button>`).join("")}
         <button type="button" class="cb-chip${CB_GROUP === "own" ? " on" : ""}" data-group="own">Other</button>
       </div>
+      ${bwToggleHTML()}
     </div>
     <div class="cb-grid" id="cbGrid"></div>`;
 
   $("cbPickX").onclick = cbClosePicker;
+  wireBwToggle($("cbPickSheet"), () => cbRenderGrid());
   $("cbChips").querySelectorAll("[data-group]").forEach((b) => {
     b.onclick = () => {
       CB_GROUP = b.dataset.group;
