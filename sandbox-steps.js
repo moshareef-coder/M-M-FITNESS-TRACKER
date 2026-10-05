@@ -384,8 +384,8 @@
         run: (w) => { try { w.localStorage.removeItem("unio.tourPartnerFace"); } catch {} w.showPairCelebration(); } },
 
       { t: "Progress tour: tap your partner", scenario: "paired",
-        s: "Dim, spotlight their face, one tap",
-        note: "The first time anyone with a partner lands on Progress. Everything dims except Mell's face in the top corner, which pulses, and a tip says to tap it. Tap it and you are on Mell's side, then the spotlight moves to your own face to show the way back; tap that and you are home. Skip ends it at either step. It never shows again on that phone, so this step resets it each time.",
+        s: "Dim, spotlight their name, one tap",
+        note: "The first time anyone with a partner lands on Progress. Everything dims except Mell's half of the Mo | Mell switch at the top, which pulses, and a tip says to tap it. Tap it and you are on Mell's side, then the spotlight moves to your half to show the way back; tap that and you are home. Skip ends it at either step. It never shows again on that phone, so this step resets it each time.",
         run: (w) => { try { w.localStorage.removeItem("unio.tourPartnerFace"); } catch {} w.switchTab("progress"); } },
 
       { t: "They are training now", scenario: "live",
