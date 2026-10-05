@@ -5460,6 +5460,9 @@
   .tg-cheers button { border: 1.5px solid color-mix(in srgb, var(--partner) 45%, var(--border)); background: var(--panel); color: var(--text); border-radius: 999px; padding: 10px 6px; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: transform .15s, background .2s; }
   .tg-cheers button.sent { background: var(--partner); color: #fff; transform: scale(.96); }
   .tg-mine { margin: 0; font-size: 13px; color: var(--muted); }
+  .tg-clip { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1.5px solid color-mix(in srgb, var(--partner) 45%, var(--border)); background: var(--panel); color: var(--text); border-radius: 999px; padding: 11px 14px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .tg-clip:active { transform: scale(.97); }
+  .tg-scrim.tg-hold { display: none; }
 
   .wkt-acts-row { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; }
   .wkt-acts-row.two { grid-template-columns: 1fr 1fr; }
@@ -18683,9 +18686,15 @@ async function tgShowWatch() {
       <div class="tg-cheers" role="group" aria-label="Cheer ${first} on">
         ${["Let's go", "Almost there", "Beast"].map((t) => `<button type="button" data-tg-cheer="${t}">${t}</button>`).join("")}
       </div>
+      <button type="button" class="tg-clip" id="tgWatchClip">${icon("camera", 18)} Send a quick video</button>
       <p class="tg-mine">You finished · ${me.sets} ${me.sets === 1 ? "set" : "sets"}${me.volume ? ` · ${me.volume.toLocaleString()} lb` : ""}</p>
     </div>`;
   $("tgWatchX").onclick = () => { clearInterval(TG_WATCH_TICK); el.remove(); };
+  /* The same one-view clip the live sheet sends (Mo, 2026-10-04). The watch
+     sits above the recorder, so it steps aside rather than closing: set
+     updates keep redrawing it underneath, and closeClipRecorder brings it
+     back exactly where it was. */
+  $("tgWatchClip").onclick = () => { el.classList.add("tg-hold"); openClipRecorder(partner); };
   el.querySelectorAll("[data-tg-cheer]").forEach((b) => {
     b.onclick = async () => {
       /* One every few seconds: a cheer is a tap, not a stream. */
@@ -20828,6 +20837,8 @@ function closeClipRecorder() {
   clipBlob = null;
   $("clipRecScrim").classList.add("hidden");
   $("clipRecStage").innerHTML = "";
+  /* A Train together watch that stepped aside for the recorder comes back. */
+  document.querySelector(".tg-scrim.tg-hold")?.classList.remove("tg-hold");
 }
 
 /* Safari gives MediaRecorder mp4; Chrome gives webm. Ask for what the browser
@@ -21081,7 +21092,14 @@ function showClipReview(toEmail, mime) {
       <div class="clip-note">Two watches, during this workout, then gone.</div>
     </div>`;
   $("clipCancel").onclick = () => { URL.revokeObjectURL(url); closeClipRecorder(); };
-  $("clipRetake").onclick = () => { URL.revokeObjectURL(url); closeClipRecorder(); openClipRecorder(toEmail); };
+  $("clipRetake").onclick = () => {
+    URL.revokeObjectURL(url);
+    /* Keep a held Train together watch held through the retake. */
+    const held = document.querySelector(".tg-scrim.tg-hold");
+    closeClipRecorder();
+    held?.classList.add("tg-hold");
+    openClipRecorder(toEmail);
+  };
   $("clipSend").onclick = async () => {
     $("clipSend").disabled = true;
     await sendClip(toEmail, mime);
