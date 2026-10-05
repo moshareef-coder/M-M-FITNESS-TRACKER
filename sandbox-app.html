@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- No zoom. The iOS web view honours maximum-scale and user-scalable, so a pinch,
+     a double tap or a tap into a small text box can no longer leave the app
+     zoomed in and bigger than the phone, which is what made it read as a web
+     page. Safari on the website still lets people pinch, by its own rule. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<!-- Capacitor injects window.Capacitor before the page runs, so the app can mark
+     itself here, before first paint, and the native-only CSS never flashes. -->
+<script data-role="native-flag">if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native");</script>
 <title>Unio (sandbox)</title>
 <meta name="description" content="Train with your partner. Rank up together." />
 <meta name="theme-color" content="#0c0e13" />
@@ -13,18 +20,13 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Unio" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Loaded without blocking the first paint. A stylesheet in the head holds
-     the whole page back until it lands, which on a phone was most of a second
-     of nothing, and the one thing this app wants on screen early is the boot
-     mark. media="print" makes it a non blocking fetch and the onload promotes
-     it the moment it arrives; the URL already carries display=swap, so text
-     draws in the fallback and swaps. Measured: the fonts land during boot, so
-     nobody sees the swap. -->
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Caveat:wght@500&display=swap"
-      rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Caveat:wght@500&display=swap" rel="stylesheet"></noscript>
+<!-- Served from the bundle, not from Google. The media="print" dance this
+     used to do was there because the stylesheet came over the network and
+     blocked first paint; a local file parses in under a millisecond, so it can
+     just be a stylesheet again. Vendoring it also stops the app announcing
+     every cold start to a third party, which privacy.html implies it does not.
+     Files and the @font-face rules live in vendor/fonts.css. -->
+<link rel="stylesheet" href="vendor/fonts.css">
 <script type="importmap">
 { "imports": { "three": "/vendor/three/three-0.160.1.module.js" } }
 </script>
@@ -260,6 +262,26 @@
   html {
     overflow-x: hidden;
     overscroll-behavior: none;
+    /* manipulation keeps scrolling and drops double-tap-to-zoom, which also
+       removes the wait iOS adds after a tap while it checks for a second one.
+       No grey flash on tap and no font inflation on rotate: neither happens
+       in a native app. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* In the app, words on buttons and cards are not selectable and a long press
+     does not pop the copy / look up menu, as in any native app. Fields people
+     type in, and anything marked .selectable, keep normal text selection. The
+     website keeps selection everywhere. */
+  html.native body {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+  }
+  html.native input, html.native textarea, html.native [contenteditable="true"], html.native .selectable {
+    -webkit-user-select: text; user-select: text;
+    -webkit-touch-callout: default;
   }
   /* An overlay is up: the page behind it must not move at all. overflow:hidden
      alone does not stop a finger in an iOS web view, and this ships as one, so
@@ -1155,40 +1177,12 @@
   #heroCard { box-shadow: var(--shadow-lift); }
   #tab-home #heroCard { padding: 16px 15px 15px; }
 
-  /* Home reads as one card, not three.
-
-     The hero and the week grid stay two elements because renderHero() owns
-     heroCard's innerHTML and would wipe any markup nested inside it. So they
-     are joined at the seam instead: the hero loses its bottom edge and
-     radius, the week card loses its top ones and tucks up under it. The
-     result is a single block with one divider through it, and neither
-     renderer had to learn about the other.
-
-     Worth knowing if you split them again: the shadow has to come off the
-     hero too, or it draws a line across the middle of the merged card. */
-  #tab-home.home-one #heroCard {
-    border-bottom-left-radius: 0; border-bottom-right-radius: 0;
-    border-bottom: none; box-shadow: none; margin-bottom: 0; padding-bottom: 4px;
-  }
-  #tab-home.home-one #weekTogetherCard {
-    border-top-left-radius: 0; border-top-right-radius: 0;
-    border-top: 1px solid var(--border); margin-top: 0;
-  }
-  /* Unless he is sitting between them, which is where Mo asked for him. The
-     merge above is a seam: the hero gives up its bottom edge because the week
-     card continues it, and the week card gives up its top edge because the hero
-     already drew one. Put a third card in that seam and both halves are left
-     mid-sentence, which is what the 0px butt joint and the squared-off corners
-     were. Three cards then, properly finished, evenly spaced. Toggled from
-     sayHomeQuip rather than with :has, so it behaves the same everywhere. */
-  #tab-home.home-one.bot-between #heroCard {
-    border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius);
-    border-bottom: 1px solid var(--border); box-shadow: var(--shadow-lift);
-    margin-bottom: 10px; padding-bottom: 15px;
-  }
-  #tab-home.home-one.bot-between #weekTogetherCard {
-    border-top-left-radius: var(--radius); border-top-right-radius: var(--radius);
-  }
+  /* Two cards, always (Mo, 2026-10-04). The hero and the week grid used to be
+     joined at a seam into one block, and the seam had to be undone whenever he
+     sat between them. Dismissing him snapped them back into one box, and on a
+     slow repaint the undo lost to the join and the Start button ran straight
+     into his bubble. Now each is its own finished card, with him as a third
+     between them when he is talking, all at the same 10px gap. */
   /* The grid is the second half of a card now, not a card of its own, so it
      drops the heading that used to name it. */
   #tab-home.home-one #weekTogetherCard .card-head h2 { font-size: 11px; font-weight: 700;
@@ -2858,7 +2852,10 @@
   /* Momentum, under the rings. Deliberately not an accent colour: Mo's rule is
      that green means shared achievement or an action, and a status line is
      neither. The only loud green left on Home is the button. */
-  .hero-mo { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 9px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  /* Label on its own line, the three numbers under it, and room before the
+     button: run together in one wrapping row, the label landed beside the
+     first number and the button touched the last line. */
+  .hero-mo { display: flex; flex-direction: column; gap: 4px; margin: 16px 0 16px; font-size: 13px; color: var(--muted); }
   .hm-label { font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); opacity: .8; }
   .hm-bits { min-width: 0; }
   .hm-bits b { color: var(--text); font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -2872,6 +2869,21 @@
     color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 15%, transparent);
   }
   .ef-note { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 0 0 14px; }
+  /* The info popups, centred. The heading was a small grey label pinned to the
+     left corner and every paragraph ran ragged left under a full width button,
+     so the card read as lopsided (Mo, 2026-10-04). Now it is a real title on
+     the centre line, the close button floats in the corner without pushing
+     it over, and the text is centred to match. A list of rows stacks each
+     pill over its line, both centred: side by side,
+     pills of different widths left every line starting somewhere else. */
+  .info-pop { text-align: center; }
+  .info-pop .ds-top { position: relative; justify-content: center; padding: 4px 34px 0; margin-bottom: 12px; }
+  .info-pop .ds-x { position: absolute; top: -4px; right: -4px; }
+  .info-title { margin: 0; font-size: 19px; line-height: 1.25; font-weight: 800; letter-spacing: -.015em; color: var(--text); text-wrap: balance; }
+  .info-pop .ef-note { font-size: 14.5px; line-height: 1.5; text-wrap: pretty; max-width: 34ch; margin-inline: auto; }
+  .info-pop .ef-list { gap: 16px; }
+  .info-pop .ef-row { flex-direction: column; align-items: center; gap: 6px; max-width: 32ch; margin-inline: auto; }
+  .info-pop .ef-row > span:last-child { text-wrap: balance; }
 
   /* ---- Building a workout: pick from cards, watch the body fill in ----
      The old screen was a text field and a list that rebuilt itself on every
@@ -3825,7 +3837,14 @@
   .sess-fig[data-fig3d].fig-3d canvas { width: 240px; height: 240px; }
   .cb-confirm-fig canvas { width: 124px; height: 124px; margin-bottom: 2px; }
   .cb-confirm-fig.fig-none { display: none; }
-  .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  /* 136, not 150: inside a card on a 390 phone there is about 300px, and two
+     150s plus the gap missed it by a few pixels, so every list fell to one
+     card per row (Mo, 2026-10-04: "you can fit two in here"). */
+  .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  /* The build screen's buttons under the list: one even stack. */
+  .cb-actions { display: grid; gap: 10px; margin-top: 16px; }
+  .cb-actions .cb-go { margin-top: 0; }
+  .cb-actions .btn-ghost, .cb-actions .cb-add { margin: 0; }
   .cb-card {
     position: relative; overflow: hidden; text-align: left; cursor: pointer; font: inherit;
     padding: 12px 12px 11px; border-radius: 14px; min-height: 74px;
@@ -4161,19 +4180,8 @@
     .cb-card:active { transform: none; }
   }
 
-  /* Per workout privacy: the way in from the plan screen, the three switches,
-     and the small chip that reopens them mid workout. */
-  .wp-open {
-    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
-    margin-top: 12px; padding: 12px 13px; border-radius: 14px;
-    background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font: inherit;
-  }
-  .wp-open:active { opacity: .75; }
-  .wp-open-ico { display: flex; color: var(--muted); flex-shrink: 0; }
-  .wp-open-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .wp-open-txt b { font-size: 14px; font-weight: 700; }
-  .wp-open-txt i { font-size: 12.5px; font-style: normal; color: var(--muted); }
-  .wp-open-go { display: flex; color: var(--muted); flex-shrink: 0; }
+  /* Per workout privacy: the three switches, and the small chip that opens
+     them mid workout. */
   .wp-list { display: flex; flex-direction: column; gap: 9px; margin: 2px 0 12px; }
   .wp-row span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .wp-row b { font-size: 14px; font-weight: 700; }
@@ -5100,6 +5108,11 @@
      a running session covers the tab bar and every sheet): asking pause or end
      from a run drew the dialog BEHIND the run. The buttons were live and
      nothing was on screen. */
+  .pop-warn { border-color: color-mix(in srgb, var(--danger, #ff5c5c) 45%, var(--border)); }
+  .pop-warn .pop-who { color: var(--danger, #ff5c5c); display: flex; align-items: center; gap: 7px; font-weight: 800; }
+  .pop-warn-body { margin: 4px 0 0; padding: 12px 14px; border-radius: 12px; font-size: 14.5px; line-height: 1.45; color: var(--text);
+    background: color-mix(in srgb, var(--danger, #ff5c5c) 12%, var(--panel)); border: 1px solid color-mix(in srgb, var(--danger, #ff5c5c) 30%, transparent); }
+  .pop-warn-anyway { color: var(--danger, #ff5c5c); }
   .pop-scrim {
     position: fixed; inset: 0; z-index: 2500;
     padding: calc(20px + env(safe-area-inset-top, 0px)) 20px calc(20px + env(safe-area-inset-bottom, 0px));
@@ -5120,6 +5133,331 @@
     animation: popIn .3s cubic-bezier(.22,1,.36,1);
   }
   @keyframes popIn { from { transform: translateY(14px) scale(.97); opacity: 0 } to { transform: none; opacity: 1 } }
+
+  /* ---- Partner joined ----
+     The moment two accounts become a pair. Full screen and above everything,
+     pops included (2500), because it happens once and it is what the whole app
+     is for. Mo picked the rings (B) with the robot from A on top, 2026-10-04:
+     your arc and theirs close into one ring around both faces, then he pops up
+     on its rim and the confetti is in your two colours. Every frame ends still
+     and readable, so reduced motion loses the movement and nothing else. */
+  .pc-scrim {
+    position: fixed; inset: 0; z-index: 2600;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+    padding: calc(28px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px));
+    background:
+      radial-gradient(60% 45% at 30% 40%, color-mix(in srgb, var(--me) 16%, transparent), transparent 70%),
+      radial-gradient(60% 45% at 70% 40%, color-mix(in srgb, var(--partner) 16%, transparent), transparent 70%),
+      var(--bg);
+    text-align: center; animation: fadeIn .25s ease; overflow: hidden;
+  }
+  .pc-stage { position: relative; width: 240px; height: 272px; display: flex; align-items: flex-end; justify-content: center; }
+  .pc-ring { position: absolute; left: 25px; bottom: 0; z-index: 1; width: 190px; height: 190px; display: flex; align-items: center; justify-content: center; }
+  .pc-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .pc-ring .arc { fill: none; stroke-width: 7; stroke-linecap: round; stroke-dasharray: 139; stroke-dashoffset: 139; animation: pcDraw 1s .35s forwards cubic-bezier(.6,.05,.3,1); }
+  .pc-ring .arc.me { stroke: var(--me); }
+  .pc-ring .arc.them { stroke: var(--partner); }
+  .pc-ring .glow { fill: none; stroke: color-mix(in srgb, var(--accent) 55%, transparent); stroke-width: 18; opacity: 0; filter: blur(8px); animation: pcGlow 1.6s 1.25s ease-in-out both; }
+  .pc-ring .av { position: relative; z-index: 2; width: 80px; height: 80px; font-size: 27px; border-width: 3px; margin: 0; cursor: default; }
+  .pc-ring .av:active { transform: none; }
+  .pc-ring .av.me { animation: pcGlideL .9s .1s both cubic-bezier(.22,1,.36,1); margin-right: -8px; }
+  .pc-ring .av.them { animation: pcGlideR .9s .1s both cubic-bezier(.22,1,.36,1); margin-left: -8px; }
+  /* He peeks over the top of the ring from BEHIND it: the ring passes in
+     front of his chest and the bottom of the bust fades out, so there is no
+     hard edge. Drawn over the ring, his flat chest cut sat on the arc and read
+     as broken (Mo, 2026-10-04). He only arrives once the ring has closed: the
+     two of you first, then him. */
+  .pc-bot { position: absolute; left: 50%; bottom: 174px; z-index: 0; transform: translateX(-50%); animation: pcBot .7s 1.2s both cubic-bezier(.34,1.56,.64,1);
+    -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%); mask-image: linear-gradient(to bottom, #000 72%, transparent 100%); }
+  .pc-bot .rb-face { display: block; }
+  @keyframes pcDraw { to { stroke-dashoffset: 0 } }
+  @keyframes pcGlow { 0% { opacity: 0 } 40% { opacity: .9 } 100% { opacity: .35 } }
+  @keyframes pcGlideL { from { transform: translateX(-120px); opacity: 0 } to { transform: none; opacity: 1 } }
+  @keyframes pcGlideR { from { transform: translateX(120px); opacity: 0 } to { transform: none; opacity: 1 } }
+  @keyframes pcBot { 0% { transform: translate(-50%, 46px) scale(.5); opacity: 0 } 60% { transform: translate(-50%, -6px) scale(1.05); opacity: 1 } 100% { transform: translateX(-50%) } }
+  .pc-h { font-size: 30px; line-height: 1.08; letter-spacing: -.03em; font-weight: 800; margin: 0; text-wrap: balance; max-width: 15ch; }
+  .pc-sub { font-size: 16px; line-height: 1.5; color: var(--muted); margin: 0; max-width: 30ch; text-wrap: balance; }
+  .pc-copy { display: grid; gap: 10px; justify-items: center; animation: pcUp .5s 1.1s both cubic-bezier(.22,1,.36,1); }
+  .pc-actions { display: grid; gap: 10px; width: 100%; max-width: 320px; margin-top: 6px; animation: pcUp .5s 1.35s both cubic-bezier(.22,1,.36,1); }
+  .pc-later { background: none; border: 0; color: var(--muted); font: inherit; font-size: 15px; padding: 10px; cursor: pointer; }
+  @keyframes pcUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+
+  /* ---- The partner tour ----
+     One step, once. Everything dims except the partner's face in the top
+     corner, which pulses, and the only thing that works is tapping it (or
+     Skip). The hole is a circle whose shadow is the dimming, so it follows
+     the face exactly and needs no second layer to line up. */
+  .cm-scrim { position: fixed; inset: 0; z-index: 2550; cursor: default; }
+  .cm-hole {
+    position: fixed; border-radius: 50%; pointer-events: none;
+    box-shadow: 0 0 0 9999px rgba(8, 10, 14, .68);
+    transition: left .25s, top .25s, width .25s, height .25s, opacity .2s;
+    animation: fadeIn .3s ease;
+  }
+  .cm-hole::after {
+    content: ""; position: absolute; inset: -6px; border-radius: 50%;
+    border: 2.5px solid var(--cm-ring, var(--partner)); animation: cmPulse 1.4s ease-out infinite;
+  }
+  @keyframes cmPulse { 0% { transform: scale(.9); opacity: 1 } 100% { transform: scale(1.35); opacity: 0 } }
+  .cm-tip {
+    position: fixed; right: 16px; width: min(300px, calc(100vw - 32px));
+    background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 18px;
+    padding: 16px 16px 12px; box-shadow: var(--shadow-lift); display: grid; gap: 6px;
+    transition: opacity .2s;
+    animation: popIn .35s .1s both cubic-bezier(.22,1,.36,1);
+  }
+  .cm-tip::before {
+    content: ""; position: absolute; top: -7px; right: var(--arrow-right, 24px); width: 14px; height: 14px;
+    background: var(--panel); border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg);
+  }
+  .cm-tip b { font-size: 17px; letter-spacing: -.01em; }
+  .cm-tip p { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.45; }
+  .cm-skip { justify-self: start; background: none; border: 0; color: var(--muted); font: inherit; font-size: 14px; padding: 6px 0 0; cursor: pointer; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pc-scrim, .pc-scrim *, .cm-hole, .cm-tip { animation-duration: 1ms !important; animation-delay: 0s !important; }
+    .cm-hole::after { animation: none; }
+  }
+  /* ---- Train together ----
+     Its own look on purpose (Mo: "a very different interface"): your blue and
+     their coral run through everything, the session gets a two-player strip
+     across the top, and the lobby and finish are full screen. Above the pops
+     (2500) and below the pair moment (2600). */
+  .tg-scrim {
+    position: fixed; inset: 0; z-index: 2580;
+    display: flex; align-items: center; justify-content: center;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 18px calc(20px + env(safe-area-inset-bottom, 0px));
+    background:
+      radial-gradient(70% 40% at 20% 0%, color-mix(in srgb, var(--me) 22%, transparent), transparent 70%),
+      radial-gradient(70% 40% at 80% 0%, color-mix(in srgb, var(--partner) 22%, transparent), transparent 70%),
+      color-mix(in srgb, var(--bg) 94%, transparent);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    animation: fadeIn .2s ease; overflow-y: auto;
+  }
+  .tg-card {
+    position: relative; width: 100%; max-width: 400px; max-height: 100%; overflow-y: auto;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 26px;
+    box-shadow: var(--shadow-lift); padding: 26px 20px 18px;
+    display: grid; gap: 14px; justify-items: center; text-align: center;
+    animation: popIn .35s cubic-bezier(.22,1,.36,1);
+  }
+  .tg-x { position: absolute; top: 12px; right: 12px; width: 34px; height: 34px; border-radius: 50%;
+    border: 0; background: var(--panel-2); color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
+  .tg-faces { display: flex; align-items: center; gap: 4px; }
+  .tg-face { position: relative; }
+  .tg-face .av { width: 64px; height: 64px; font-size: 22px; border-width: 3px; margin: 0; cursor: default; }
+  .tg-face .av:active { transform: none; }
+  .tg-face.waiting { opacity: .45; animation: tgBreathe 1.6s ease-in-out infinite; }
+  /* The partner's face carries z-index 1 and a negative margin from the
+     avatar pair in the header, which put it on top of its own online dot. */
+  .tg-face .av.them { margin-left: 0; }
+  .tg-face.here::after { content: ""; position: absolute; right: 2px; bottom: 2px; z-index: 3; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: 2.5px solid var(--panel); }
+  @keyframes tgBreathe { 50% { opacity: .8 } }
+  .tg-link { width: 46px; height: 12px; }
+  .tg-link path { stroke: var(--border); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 2 7; animation: tgDash 1s linear infinite; }
+  @keyframes tgDash { to { stroke-dashoffset: -18 } }
+  .tg-h { margin: 0; font-size: 24px; line-height: 1.12; letter-spacing: -.025em; font-weight: 800; text-wrap: balance; }
+  .tg-sub { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; max-width: 32ch; text-wrap: balance; }
+  .tg-status { margin: -6px 0 0; font-size: 14px; color: var(--muted); font-weight: 600; }
+  .tg-status.on { color: var(--accent-ink, var(--accent)); }
+  .tg-lead { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; font-size: 14px; color: var(--muted); }
+  .tg-lead b { color: var(--text); }
+  .tg-link-btn { background: none; border: 0; padding: 0; font: inherit; font-size: 14px; color: var(--partner); font-weight: 700; cursor: pointer; }
+  .tg-src { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; padding: 4px; border-radius: 14px; background: var(--panel-2); }
+  .tg-src button { border: 0; border-radius: 10px; padding: 10px 6px; font: inherit; font-size: 14.5px; font-weight: 700; color: var(--muted); background: transparent; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tg-src button.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .tg-src button:disabled { cursor: default; }
+  .tg-list { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 6px; text-align: left; }
+  .tg-list li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px; background: var(--panel-2); animation: tgIn .3s ease both; }
+  .tg-list li.tg-empty { display: block; text-align: center; color: var(--muted); font-size: 14px; }
+  @keyframes tgIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+  .tg-ex { font-weight: 650; font-size: 15px; min-width: 0; }
+  .tg-sr { color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tg-rm { width: 28px; height: 28px; border-radius: 50%; border: 0; background: transparent; color: var(--muted); font-size: 18px; cursor: pointer; }
+  .tg-actions { display: grid; gap: 8px; width: 100%; margin-top: 4px; }
+  .tg-actions .btn-primary:disabled { opacity: .5; }
+  .tg-ghost { background: none; border: 0; color: var(--muted); font: inherit; font-size: 15px; padding: 10px; cursor: pointer; }
+  .tg-wait { margin: 0; color: var(--muted); font-size: 14px; }
+
+  /* The two-player strip, inside the workout screen. */
+  .tg-hud { margin: 2px 14px 6px; position: relative; }
+  .tg-hud-body { display: grid; gap: 8px; }
+  .session-overlay.together { background-image: linear-gradient(180deg, color-mix(in srgb, var(--me) 10%, transparent) 0%, transparent 140px), linear-gradient(180deg, color-mix(in srgb, var(--partner) 8%, transparent) 0%, transparent 140px); background-size: 50% 100%, 50% 100%; background-position: left top, right top; background-repeat: no-repeat; }
+  .tg-hud-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 18px; background: var(--panel); border: 1px solid var(--border); }
+  .tg-p { display: flex; align-items: center; gap: 9px; min-width: 0; position: relative; }
+  .tg-p.them { justify-content: flex-end; text-align: right; }
+  .tg-p > span { display: grid; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 0; }
+  .tg-p > span b { color: var(--text); font-size: 14.5px; }
+  .tg-p .av { width: 40px; height: 40px; font-size: 13px; margin: 0; border-width: 0; cursor: default; position: relative; z-index: 1; }
+  .tg-ring { width: 50px; height: 50px; position: absolute; top: 50%; transform: translateY(-50%) rotate(-90deg); pointer-events: none; }
+  .tg-p.me .tg-ring { left: -5px; }
+  .tg-p.them .tg-ring { right: -5px; }
+  .tg-p.me .av { margin-left: 0; }
+  .tg-ring circle { fill: none; stroke: var(--border); stroke-width: 3.5; }
+  .tg-ring circle.fill { stroke-linecap: round; transition: stroke-dashoffset .5s ease; }
+  .tg-p.me .tg-ring .fill { stroke: var(--me); }
+  .tg-p.them .tg-ring .fill { stroke: var(--partner); }
+  .tg-vs { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .tg-lane { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 4px; font-size: 13px; color: var(--muted); min-width: 0; }
+  .tg-lane b { color: var(--text); }
+  .tg-lane-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tg-chips { display: flex; gap: 4px; flex: none; }
+  .tg-chip { min-width: 26px; height: 22px; padding: 0 6px; border-radius: 999px; border: 1.5px solid color-mix(in srgb, var(--partner) 45%, var(--border));
+    display: grid; place-items: center; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--partner); }
+  .tg-chip.done { background: var(--partner); border-color: var(--partner); color: #fff; animation: tgChip .35s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes tgChip { from { transform: scale(.6) } to { transform: none } }
+  .tg-callout { position: absolute; left: 50%; top: 100%; transform: translate(-50%, -6px); opacity: 0; pointer-events: none; z-index: 3;
+    white-space: nowrap; max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis;
+    background: var(--partner); color: #fff; font-size: 13px; padding: 7px 12px; border-radius: 999px; box-shadow: var(--shadow-lift);
+    transition: opacity .2s, transform .25s; }
+  .tg-callout.show { opacity: 1; transform: translate(-50%, 4px); }
+  .tg-ask { width: 100%; border: 1.5px dashed color-mix(in srgb, var(--partner) 55%, var(--border)); background: transparent; color: var(--text);
+    border-radius: 14px; padding: 10px 12px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .tg-ask.waiting { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-weight: 600; cursor: default; }
+  .tg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--partner); animation: tgBreathe 1.2s ease-in-out infinite; flex: none; }
+
+  .tg-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; }
+  .tg-mode button { border: 1.5px solid var(--border); background: var(--panel); color: var(--muted); border-radius: 14px; padding: 11px 8px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+  .tg-mode button.on { border-color: var(--text); color: var(--text); }
+  .tg-banner { width: 100%; display: grid; gap: 2px; padding: 11px 14px; border-radius: 14px; text-align: left; font-size: 13.5px; color: var(--muted); }
+  .tg-banner b { color: var(--text); font-size: 15px; }
+  .tg-banner.same { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 14%, var(--panel-2)), color-mix(in srgb, var(--partner) 14%, var(--panel-2))); }
+  .tg-banner.own { background: var(--panel-2); }
+  .tg-perfect { width: 100%; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 10px; padding: 11px 14px; border-radius: 14px;
+    background: color-mix(in srgb, var(--accent) 18%, var(--panel)); font-size: 14px; text-align: left; animation: tgIn .3s ease both; }
+  .tg-sub-h { width: 100%; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--me); margin-top: 4px; }
+  .tg-sub-h.them { color: var(--partner); }
+  .tg-hits { width: 100%; text-align: left; font-size: 13.5px; color: var(--muted); padding: 0 2px; margin-bottom: -6px; }
+  .tg-hits b { color: var(--me); font-weight: 700; }
+  .tg-hits.them b { color: var(--partner); }
+  .tg-list li.edit { cursor: pointer; }
+  .tg-list li.edit:active { transform: scale(.99); }
+  .tg-addbtn { width: 100%; border: 1.5px dashed var(--border); background: transparent; color: var(--text); border-radius: 12px; padding: 12px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .ps-actions { display: grid; gap: 8px; }
+  .ps-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ps-secondary { border: 1px solid var(--border); background: var(--panel-2); color: var(--text); border-radius: 14px; padding: 12px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+
+  .tg-q { margin: 2px 0 0; font-weight: 700; font-size: 15px; }
+  .tg-modes { display: grid; gap: 8px; width: 100%; }
+  .tg-modecard { display: grid; gap: 3px; text-align: left; padding: 14px 16px; border-radius: 16px; border: 1.5px solid var(--border); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+  .tg-modecard b { font-size: 16px; }
+  .tg-modecard span { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+  .tg-modecard.on { border-color: var(--text); background: var(--panel-2); }
+  .tg-modecard:disabled { cursor: default; color: var(--text); }
+  .tg-modecard:disabled:not(.on) { opacity: .55; }
+  .tg-ghost.small { font-size: 14px; padding: 4px; }
+  .tg-wk { width: 100%; text-align: left; display: grid; gap: 8px; padding: 14px; border-radius: 18px; background: var(--panel-2); border-left: 4px solid var(--me); }
+  .tg-wk.them { border-left-color: var(--partner); }
+  .tg-wk.both { border-left: 0; background: linear-gradient(var(--panel-2), var(--panel-2)) padding-box, linear-gradient(90deg, var(--me), var(--partner)) border-box; border: 2px solid transparent; }
+  .tg-wk.empty { min-height: 72px; align-content: center; }
+  .tg-wk-head { display: flex; justify-content: space-between; align-items: center; }
+  .tg-wk-who { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--me); }
+  .tg-wk.them .tg-wk-who { color: var(--partner); }
+  .tg-wk.both .tg-wk-who { color: var(--muted); }
+  .tg-wk-focus { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+  .tg-wk-meta { font-size: 13px; color: var(--muted); margin-top: -6px; }
+  .tg-wk-wait { margin: 0; color: var(--muted); font-size: 14px; }
+  .tg-wk .tg-hits { margin: 0; }
+  .tg-list.compact li { padding: 8px 10px; background: var(--panel); }
+  .tg-list.compact .tg-ex { font-size: 14px; font-weight: 600; }
+  .tg-compat { display: grid; gap: 6px; padding-top: 2px; }
+  .tg-cp { display: grid; grid-template-columns: 52px 1fr 40px; align-items: center; gap: 8px; font-size: 13px; }
+  .tg-cp b { text-align: right; font-variant-numeric: tabular-nums; }
+  .tg-cp-bar { height: 7px; border-radius: 99px; background: var(--border); overflow: hidden; }
+  .tg-cp-bar i { display: block; height: 100%; border-radius: 99px; background: var(--me); }
+  .tg-cp.them .tg-cp-bar i { background: var(--partner); }
+  .tg-cp-note { margin: 0; font-size: 12px; color: var(--muted); }
+  /* The bar along the bottom of the Workout tab while a workout is being made
+     for the session: who it is for, Back, and Use this. Above the tab bar. */
+  .tg-makebar { position: fixed; left: 12px; right: 12px; z-index: 900;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px;
+    padding: 10px 10px 10px 14px; border-radius: 18px; color: var(--text);
+    background: linear-gradient(100deg, color-mix(in srgb, var(--me) 16%, var(--panel)), color-mix(in srgb, var(--partner) 16%, var(--panel)));
+    border: 1px solid var(--border); box-shadow: var(--shadow-lift); animation: popIn .3s ease; }
+  .tg-mb-txt { display: grid; min-width: 0; }
+  .tg-mb-txt b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tg-mb-txt span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tg-mb-back { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; padding: 8px; cursor: pointer; }
+  .tg-mb-use { border: 0; border-radius: 999px; padding: 10px 16px; background: var(--text); color: var(--bg); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+  .tg-mb-use:disabled { opacity: .4; }
+
+  /* Watching your partner finish */
+  .tg-card.watch { gap: 12px; }
+  .tg-live { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--partner); font-variant-numeric: tabular-nums; }
+  .tg-wface { position: relative; width: 112px; height: 112px; display: grid; place-items: center; }
+  .tg-wface svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+  .tg-wface circle { fill: none; stroke: var(--border); stroke-width: 5; }
+  .tg-wface circle.fill { stroke: var(--partner); stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+  .tg-wface .av { width: 88px; height: 88px; font-size: 28px; margin: 0; border-width: 0; cursor: default; }
+  .tg-now { width: 100%; display: grid; gap: 8px; padding: 14px; border-radius: 16px; text-align: left;
+    background: color-mix(in srgb, var(--partner) 10%, var(--panel-2)); }
+  .tg-now h3 { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+  .tg-now .tg-wk-who { color: var(--partner); }
+  .tg-wchips { display: grid; grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); gap: 6px; }
+  .tg-wchip { display: grid; place-items: center; padding: 8px 4px; border-radius: 12px; border: 1.5px dashed color-mix(in srgb, var(--partner) 45%, var(--border)); font-variant-numeric: tabular-nums; }
+  .tg-wchip small { font-size: 11.5px; color: var(--muted); }
+  .tg-wchip b { font-size: 17px; }
+  .tg-wchip.done { border-style: solid; border-color: var(--partner); background: var(--partner); color: #fff; animation: tgChip .35s cubic-bezier(.34,1.56,.64,1); }
+  .tg-wchip.done small { color: rgba(255,255,255,.85); }
+  .tg-wlist { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 4px; text-align: left; }
+  .tg-wlist li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 10px; font-size: 14px; color: var(--muted); }
+  .tg-wlist li.done { color: var(--text); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--partner) 60%, transparent); }
+  .tg-wlist li.now { color: var(--text); font-weight: 700; background: var(--panel-2); }
+  .tg-cheers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
+  .tg-cheers button { border: 1.5px solid color-mix(in srgb, var(--partner) 45%, var(--border)); background: var(--panel); color: var(--text); border-radius: 999px; padding: 10px 6px; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: transform .15s, background .2s; }
+  .tg-cheers button.sent { background: var(--partner); color: #fff; transform: scale(.96); }
+  .tg-mine { margin: 0; font-size: 13px; color: var(--muted); }
+  .tg-clip { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1.5px solid color-mix(in srgb, var(--partner) 45%, var(--border)); background: var(--panel); color: var(--text); border-radius: 999px; padding: 11px 14px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .tg-clip:active { transform: scale(.97); }
+  .tg-scrim.tg-hold { display: none; }
+
+  .wkt-acts-row { display: grid; grid-template-columns: 1fr; gap: 8px; width: 100%; }
+  .wkt-acts-row.two { grid-template-columns: 1fr 1fr; }
+  .wkt-acts-row .wkt-btn-soft { width: 100%; font-size: 14.5px; }
+  /* Train together's half of the row: the same button, tinted with your two
+     colours so it is findable without being louder than Start. */
+  .wkt-with { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 14%, var(--panel-2)), color-mix(in srgb, var(--partner) 16%, var(--panel-2))); }
+  .wkt-with svg { color: var(--partner); }
+  /* On the white card the two tints washed out (Mo, 2026-10-04): a little more
+     of each in light mode only. Dark already reads at the lighter mix. */
+  [data-theme="light"] .wkt-with { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 24%, var(--panel-2)), color-mix(in srgb, var(--partner) 26%, var(--panel-2))); }
+  /* The one line he says that does something when tapped: the whole card takes your two colours, so it reads as a button without growing a second one. */
+  .home-quip.act .home-quip-say { background: linear-gradient(100deg, color-mix(in srgb, var(--me) 12%, var(--panel)), color-mix(in srgb, var(--partner) 14%, var(--panel))); }
+  .sv-row-fig { align-items: center; }
+  .sv-fig { flex: none; width: 72px; height: 72px; display: grid; place-items: center; border-radius: 14px; background: var(--panel-2); overflow: hidden; }
+  /* Sized like the picker's card figures, or the canvas draws at its own tiny default. */
+  .sv-fig canvas { width: 78px; height: 78px; }
+  .tg-pause-invite { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; }
+  .tg-pause-invite svg { color: var(--partner); }
+  .lw-join { text-align: center; }
+  .lw-join-note { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+
+  /* Finish */
+  .tg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+  .tg-col { display: grid; justify-items: center; gap: 4px; padding: 14px 8px; border-radius: 16px; background: var(--panel-2); min-width: 0; }
+  .tg-col .av { width: 52px; height: 52px; font-size: 18px; margin: 0 0 4px; border-width: 3px; cursor: default; }
+  .tg-col b { font-size: 15px; }
+  .tg-col span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tg-col .tg-vol { font-weight: 700; color: var(--text); }
+  .tg-bonus { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 12px 14px; border-radius: 14px;
+    background: color-mix(in srgb, var(--accent) 16%, var(--panel)); font-size: 14px; }
+  .tg-bonus b { font-size: 15px; }
+
+  /* Home */
+  .tg-home { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; padding: 14px 14px; margin: 0 0 12px;
+    border-radius: 18px; border: 1px solid var(--border); cursor: pointer; color: var(--text); font: inherit;
+    background: linear-gradient(100deg, color-mix(in srgb, var(--me) 14%, var(--panel)), color-mix(in srgb, var(--partner) 14%, var(--panel))); }
+  .tg-home-txt { display: grid; gap: 2px; flex: 1; min-width: 0; }
+  .tg-home-txt b { font-size: 16px; }
+  .tg-home-txt span { font-size: 13px; color: var(--muted); }
+  .tg-home-go { flex: none; font-weight: 800; font-size: 14px; padding: 8px 14px; border-radius: 999px; background: var(--text); color: var(--bg); }
+  .tg-home.live { border-color: color-mix(in srgb, var(--partner) 50%, var(--border)); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tg-scrim, .tg-scrim *, .tg-hud * { animation: none !important; transition: none !important; }
+  }
 
   /* ---- Milestone badges ---- */
   .msb-section { margin-top: 18px; }
@@ -7245,7 +7583,9 @@
   label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 4px; }
   input[type="number"], input[type="date"], input[type="text"], textarea, select {
     width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--panel-2); color: var(--text); font-size: 15.5px; font-family: inherit;
+    /* 16px, not 15.5: iOS zooms into any field under 16px when it is tapped
+       and never zooms back out. */
+    background: var(--panel-2); color: var(--text); font-size: 16px; font-family: inherit;
   }
   textarea { resize: vertical; min-height: 44px; }
   .gym-toggle {
@@ -7254,6 +7594,18 @@
   }
   /* flex-shrink, or a long label squashes the box into a 13px wide oval. */
   .gym-toggle input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--accent); }
+  .bw-toggle { margin: 0 0 12px; }
+  .bw-toggle span { display: flex; flex-direction: column; gap: 1px; }
+  .bw-toggle b { font-size: 14px; font-weight: 700; color: var(--text); }
+  /* A real on/off switch, the way iOS draws one, rather than a checkbox. */
+  .bw-toggle input { appearance: none; -webkit-appearance: none; width: 46px; height: 28px; border-radius: 999px; margin: 0;
+    background: var(--border); position: relative; cursor: pointer; transition: background .2s; }
+  .bw-toggle input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s cubic-bezier(.22,1,.36,1); }
+  .bw-toggle input:checked { background: var(--accent); }
+  .bw-toggle input:checked::after { transform: translateX(18px); }
+  .bw-toggle i { font-size: 12.5px; font-style: normal; color: var(--muted); }
+  .cb-pick-top .bw-toggle { margin: 0 0 8px; }
   .gym-toggle.checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); }
   /* A text action inside a row header: Skip today / Put it back on the plan's
      stretch blocks. A button so it is keyboard reachable, styled as a link so
@@ -7284,25 +7636,40 @@
 
   /* Workout tab */
   .workout-progress-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
-  .workout-progress-count { color: var(--accent-ink); font-weight: 700; }
+  /* No colour on these two (Mo, 2026-10-04): green text on white was
+     unreadable, the darker ink green did not match, and a badge was too much. */
+  .workout-progress-count { color: var(--text); font-weight: 800; }
   .workout-progress-track { height: 5px; border-radius: 100px; background: var(--panel-2); overflow: hidden; margin-bottom: 4px; }
   .workout-progress-fill { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
-  /* The session estimate, which is a control rather than a label. It reads as a
-     line of the plan, so no button chrome; the padding and the negative margin
-     buy the 44px target that 12.5px of text does not, the same trick
-     .lw-effort .lw-why uses, and the line sits where it would have anyway. */
-  .plan-time-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 2px 0 6px; }
+  /* The session estimate, which is a control rather than a label. It used to
+     read as a line of the plan with no button chrome; Mo, 2026-10-04: "it
+     doesn't really look like a button". So it is a pill now, the same shape as
+     the app's other small controls, with the 44px target coming from the pill
+     itself rather than from invisible padding. */
+  .plan-time-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 10px; }
+  /* Back on the left, the session length on the right, one row. */
+  .plan-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .plan-head .back-bar { margin: 0; }
+  /* The same pill as Back, so the row reads as one pair. */
+  .plan-head .plan-time { min-height: 0; padding: 0 10px 0 11px; font-size: 12.5px; gap: 5px; box-shadow: none; }
+  .plan-head .back-bar, .plan-head .plan-time { height: 34px; box-sizing: border-box; }
   .plan-time {
-    display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
-    margin: -11px 0; padding: 11px 0; background: none; border: 0; cursor: pointer;
-    color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 7px; min-height: 40px;
+    padding: 8px 12px 8px 12px; border-radius: 999px; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+    transition: transform .12s ease, background .15s ease;
   }
-  .plan-time b { color: var(--accent-ink); font-weight: 700; }
-  .plan-time:active { opacity: .6; }
+  .plan-time svg:first-child { color: var(--muted); }
+  .plan-time svg:last-child { color: var(--muted); margin-left: 1px; }
+  .plan-time b { color: var(--text); font-weight: 800; }
+  .plan-time:active { transform: scale(.97); }
   .gen-scrim .plan-time-row { justify-content: center; }
   /* The reveal is white on a dark scrim whatever the theme is, so the same
      control needs its own two colours there rather than the card's. */
-  .gen-scrim .plan-time { color: rgba(255,255,255,.72); }
+  .gen-scrim .plan-time { color: rgba(255,255,255,.85); background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); box-shadow: none; }
+  .gen-scrim .plan-time svg { color: rgba(255,255,255,.6); }
   .gen-scrim .plan-time b { color: #fff; }
   /* What a budget change did, under the control that did it. */
   .plan-time-change { margin: -2px 0 10px; font-size: 12.5px; line-height: 1.4; color: var(--muted); }
@@ -7315,6 +7682,11 @@
   .gen-scrim .plan-time-change { margin: 0 0 12px; text-align: center; color: rgba(255,255,255,.72); }
   .exercise-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
   .exercise-row:last-child { border-bottom: none; padding-bottom: 0; }
+  /* The workout builder's rows are cards, not a ruled list. They carry the
+     exercise-row class for the drag code, and these two rules, later in the
+     file, were stripping their side padding and taking the last card's bottom
+     edge off, which read as the last row being cut in half. */
+  .cb-row.exercise-row, .cb-row.exercise-row:last-child { padding: 11px 10px; border-bottom: 1px solid var(--border); }
   .exercise-row .ex-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--panel-2); display: flex; align-items: center; justify-content: center; color: var(--muted); }
   .exercise-row .ex-body { flex: 1; min-width: 0; }
   .exercise-row .ex-name { font-weight: 600; font-size: 15.5px; }
@@ -7715,9 +8087,7 @@
      If you bump this, recompute the hash:
      curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A
      and update CDN in scripts/make-sandbox.mjs to match. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0"
-        integrity="sha384-JBR+x8blGwjDRO63aHCGiZMD4VNiTR4ZUGA+N6ZKLf3zNt1fK8IBpcgPaMrxqWBp"
-        crossorigin="anonymous"></script>
+<script src="vendor/lib/supabase-js-2.116.0.js"></script>
 <script src="/sandbox-data.js"></script>
 <!-- body3d: the procedural muscle body under knowledge/motion/body3d is copied
      in from the anatomy workspace byte for byte, and those files import the bare
@@ -7750,6 +8120,7 @@
     <div class="reminder-banner hidden" id="encouragementBanner"></div>
     <div class="rest-banner hidden" id="restDayBanner"></div>
     <button type="button" class="live-card hidden" id="liveCard"></button>
+    <div id="tgHome"></div>
 
     <div class="card" id="heroCard"></div>
 
@@ -7821,6 +8192,8 @@
         <button type="button" class="session-clock" id="sessionClock" aria-label="Workout time"><span class="rec-dot" id="recDot"></span><span class="session-timer" id="sessionTimer">0:00</span></button>
         <button type="button" class="session-pause" id="sessionPauseBtn" aria-label="Pause workout"></button>
       </div>
+      <!-- Train together: the two-player strip, or the invite from a running workout. -->
+      <div class="tg-hud hidden" id="tgHud"></div>
       <!-- The progress hairline moved into the body: see .sess-progress, which
            carries the exercise count, the pips and the set circles. The fill
            element stays because the stretch phases still drive it. -->
@@ -8767,7 +9140,7 @@
         <p class="muted-note" id="reportNoPartner">You are not paired with anyone right now.</p>
         <p class="muted-note" style="margin-top:12px;">
           To report one video in particular, tap the flag while it is playing. You can
-          also email <a href="mailto:mo.shareef@creativelab1.com">mo.shareef@creativelab1.com</a>.
+          also email <a href="mailto:trainwithunio@gmail.com">trainwithunio@gmail.com</a>.
         </p>
       </div>
       <div class="card">
@@ -9018,6 +9391,7 @@
    resolves, so this stays until there is a real domain, and then it is one line
    rather than a hunt. */
 const PUBLIC_SITE = "https://m-m-fitness-tracker.vercel.app";
+const APP_STORE_URL = "https://apps.apple.com/app/id6812201708";
 
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
@@ -9098,7 +9472,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.22.2";
+const APP_VERSION = "2026.09.25.2";
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9266,6 +9640,7 @@ const ICON_PATHS = {
       + 'M12.70 1.33Q12.70 3.60 14.96 3.60Q12.70 3.60 12.70 5.87Q12.70 3.60 10.43 3.60Q12.70 3.60 12.70 1.33Z'
       + 'M18.00 15.19Q18.00 17.62 20.42 17.62Q18.00 17.62 18.00 20.04Q18.00 17.62 15.58 17.62Q18.00 17.62 18.00 15.19Z"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.6v.6"/>',
+  alert: '<path d="M10.3 3.9 2.4 17.6a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9.5v4.5"/><path d="M12 17.4v.1"/>',
   grip: '<circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/>',
   chevronLeft: '<path d="M15 18l-6-6 6-6"/>',
   chevronRight: '<path d="M9 18l6-6-6-6"/>',
@@ -10781,11 +11156,16 @@ function inviteMessage(data, code) {
   const goal = (data.goalLabel || goalTileFor(data.goal_bubble)?.title || "").toLowerCase();
   const who = data.name || ME || "Someone";
   const line = goal ? `${who} is starting on Unio: ${goal}.` : `${who} is starting on Unio.`;
+  /* Never location.origin. In the App Store build that is capacitor://localhost,
+     so every invite sent from 1.0 was a link nobody else could open, under a
+     line telling them there was nothing to install (found by Saif,
+     2026-10-04). The code is what survives an App Store install, so it is the
+     instruction, and the store link is how they get there. */
   return `${line}
 They asked you to keep them honest. The app does not celebrate when only one of you finishes.
 
-Nothing to install, it opens in your browser:
-${location.origin}/?invite=${code}`;
+1. Get Unio on iPhone: ${APP_STORE_URL}
+2. Open it and enter ${who}'s code: ${code}`;
 }
 
 /* The partner step, asked inside the wizard instead of after it.
@@ -10991,7 +11371,10 @@ async function claimHeldInviteToken() {
 
   clearSolo();
   clearPendingInvite();
-  toast(`You are paired with ${res.partner_name}`);
+  /* The celebration takes it from here, on the load that brings the partner
+     in. Recorded as "none" so even a phone that has never run 1.1 before
+     treats the partner who is about to appear as news. */
+  pairSeenSet("none");
   return true;
 }
 
@@ -12361,8 +12744,8 @@ function bodyPickSex(sex) {
    groups is in exactly one region, which is what makes a tap on the figure
    always mean something: the Rive click hands back a group, and this is the
    whole distance between that and a pick. */
-function bodyRegionIdForGroup(group) {
-  return BODY_REGIONS.find((r) => r.groups.includes(group))?.id || null;
+function bodyRegionIdForGroup(group, regions = BODY_REGIONS) {
+  return regions.find((r) => r.groups.includes(group))?.id || null;
 }
 
 /* Mounts both artboards and keeps them painted. `o.isRegionOn` is read on every
@@ -12389,6 +12772,7 @@ async function initBodyRegionFigures(wrap, o) {
   if (!front || !back || !front.isConnected) return; // navigated away while loading
 
   const sex = o.sexKey === "female" ? "Female" : "Male";
+  const regions = o.regions || BODY_REGIONS;
   const make = (canvas, view) => mod.createBodyHeatmap({
     canvas,
     artboardName: `${sex}-${view}`,
@@ -12426,7 +12810,7 @@ async function initBodyRegionFigures(wrap, o) {
        was picked, and with its intensity back at zero that renders black. The
        focus page hit this and the fix is the same: put an unpicked group
        explicitly back to base. */
-    for (const region of BODY_REGIONS) {
+    for (const region of regions) {
       const pal = o.isRegionOn(region.id) ? lit : dim;
       for (const g of region.groups) {
         for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) {
@@ -12446,7 +12830,11 @@ async function initBodyRegionFigures(wrap, o) {
    than trusted, because this is seeded off a stored answer. */
 function bodyRegionPickerHTML(opts = {}) {
   const sexKey = bodyPickSex(opts.sex);
-  const selected = (Array.isArray(opts.selected) ? opts.selected : []).filter((id) => BODY_REGION_IDS.includes(id));
+  /* `regions` lets a screen ask a finer question on the same body: Plan my own
+     splits arms from shoulders and legs from core, because those are different
+     workouts. Onboarding keeps the four, which its focus budget is built on. */
+  const regions = opts.regions || BODY_REGIONS;
+  const selected = (Array.isArray(opts.selected) ? opts.selected : []).filter((id) => regions.some((r) => r.id === id));
   const chip = (r) => `<button type="button" class="bp-chip${selected.includes(r.id) ? " on" : ""}"
       data-region="${r.id}" aria-pressed="${selected.includes(r.id)}">
       <span class="bp-tick" aria-hidden="true">${icon("check", 14)}</span>${escapeHtml(r.label)}</button>`;
@@ -12465,7 +12853,7 @@ function bodyRegionPickerHTML(opts = {}) {
         <div class="bi-fig" data-view="Front"><canvas class="bi-canvas bp-fig-front"></canvas></div>
         <div class="bi-fig" data-view="Back"><canvas class="bi-canvas bp-fig-back"></canvas></div>
       </div>
-      <div class="bp-chips">${BODY_REGIONS.map(chip).join("")}</div>
+      <div class="bp-chips">${regions.map(chip).join("")}</div>
       <p class="bp-note" aria-live="polite"></p>
     </div>`;
 }
@@ -12473,10 +12861,12 @@ function bodyRegionPickerHTML(opts = {}) {
 /* What the picker says out loud. Written for the ear, because every one of
    these lines is going through a voice later: short, no brackets, nothing that
    only works as text. */
-function bodyPickNote(ids) {
+function bodyPickNote(ids, regions) {
   if (!ids.length) return "Tap a muscle on either body, or tap a name below.";
-  if (bodyRegionsAreWholeBody(ids)) return "You picked everything. Nothing stands out, so nothing gets extra.";
-  const said = BODY_REGIONS.filter((r) => ids.includes(r.id)).map((r) => r.say);
+  if (regions) {
+    if (regions.every((r) => ids.includes(r.id))) return "You picked everything.";
+  } else if (bodyRegionsAreWholeBody(ids)) return "You picked everything. Nothing stands out, so nothing gets extra.";
+  const said = (regions || BODY_REGIONS).filter((r) => ids.includes(r.id)).map((r) => r.say);
   /* "Your arms and shoulders and your chest" is two ands in a row, which trips
      over itself read aloud. A comma before the last one fixes it, and it is
      only needed when a region's own name already has an and inside it. */
@@ -12498,8 +12888,9 @@ function wireBodyRegionPicker(root, opts = {}) {
      told bodyRegionPickerHTML which question this is and a second answer here
      could only ever disagree with the chips it painted. */
   const sore = wrap.classList.contains("sore");
+  const regions = opts.regions || BODY_REGIONS;
   const selected = new Set((wrap.dataset.selected || "").split(",").filter(Boolean));
-  const ordered = () => BODY_REGION_IDS.filter((id) => selected.has(id));
+  const ordered = () => regions.map((r) => r.id).filter((id) => selected.has(id));
 
   const paint = () => {
     const ids = ordered();
@@ -12509,12 +12900,12 @@ function wireBodyRegionPicker(root, opts = {}) {
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", String(on));
     });
-    wrap.querySelector(".bp-note").textContent = bodyPickNote(ids);
+    wrap.querySelector(".bp-note").textContent = bodyPickNote(ids, opts.regions);
     BODY_PICK_REPAINT?.();
     opts.onChange?.(ids);
   };
   const toggle = (id) => {
-    if (!bodyRegionFor(id)) return;
+    if (!regions.some((r) => r.id === id)) return;
     selected.has(id) ? selected.delete(id) : selected.add(id);
     paint();
   };
@@ -12525,9 +12916,9 @@ function wireBodyRegionPicker(root, opts = {}) {
      are the answer to the question and they must be right on the frame the step
      appears, while the figure is a (cached, but still async) module away. */
   initBodyRegionFigures(wrap, {
-    sexKey, sore,
+    sexKey, sore, regions: opts.regions,
     isRegionOn: (id) => selected.has(id),
-    onGroupTap: (group) => { const id = bodyRegionIdForGroup(group); if (id) toggle(id); },
+    onGroupTap: (group) => { const id = bodyRegionIdForGroup(group, regions); if (id) toggle(id); },
   });
   return ordered;
 }
@@ -15094,6 +15485,7 @@ function showApp() {
   $("onboard").classList.add("hidden");
   $("app").classList.remove("hidden");
   renderAvatarPair();
+  watchTogether();
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
   $("proofInput").addEventListener("change", (e) => {
     const file = e.target.files?.[0];
@@ -15514,8 +15906,12 @@ function switchTab(tab) {
      and leaving them up is what made every other tab slow. See
      destroyBodyFigures. */
   if (tab !== "body") destroyBodyFigures();
+  tgRenderMakeBar();
+  /* Your half of a joint workout is done and theirs is not: the Workout tab
+     is where you watch them. */
+  if (tab === "workout" && tgWatching()) setTimeout(tgShowWatch, 0);
   if (tab === "home") renderHome(true);
-  if (tab === "progress") renderProgressTab();
+  if (tab === "progress") { renderProgressTab(); maybeStartPartnerTour(); }
   if (tab === "body") renderBodyTab(true);
   if (tab === "workout") {
     /* Reviewing another day is somewhere you went from this tab, not a state
@@ -15987,6 +16383,7 @@ async function loadAll() {
   if (failed.length) toast("Could not refresh everything. Some numbers may be out of date.");
 
   renderAvatarPair();
+  loadTogether();
   /* loadAll runs after nearly every write anywhere in the app, logging a set
      mid-session included, and Home is not on screen for most of those. It
      used to repaint anyway: a full re-render of a tab nobody is looking at,
@@ -16554,7 +16951,7 @@ function computeXPBetween(name, from, to) {
 
   // Admin-granted bonus is not season scoped; it always applies.
   const bonus = profile?.bonus_xp || 0;
-  return gymDays * 10 + exerciseCount * 5 + prCount * 25 + bonus;
+  return gymDays * 10 + exerciseCount * 5 + prCount * 25 + bonus + togetherBonusXPBetween(name, from, to);
 }
 
 /* Rank-facing XP. Seasons are parked for MVP, so this is lifetime. */
@@ -16578,7 +16975,7 @@ function effortXPBetween(name, from, to) {
   const exerciseCount = distinctExerciseCount(countedLogs);
   const { prLogIds } = personalRecords(name);
   const prCount = countedLogs.filter((l) => prLogIds.has(l.id)).length;
-  return gymDays * 10 + exerciseCount * 5 + prCount * 25;
+  return gymDays * 10 + exerciseCount * 5 + prCount * 25 + togetherBonusXPBetween(name, from, to);
 }
 function todaysEffortXP(name) { return effortXPBetween(name, todayStr(), todayStr()); }
 
@@ -16712,9 +17109,9 @@ function openInfo(key) {
   if (!build) return;
   const t = build();
   $("popCard").innerHTML = `
-    <div class="pop-body">
+    <div class="pop-body info-pop">
       <div class="ds-top">
-        <div class="pop-who" style="color:var(--muted)">${escapeHtml(t.eyebrow).toUpperCase()}</div>
+        <h3 class="info-title">${escapeHtml(t.eyebrow)}</h3>
         <button type="button" class="ds-x" id="infoX" aria-label="Close">&times;</button>
       </div>
       ${t.rows ? `<div class="ef-list">${t.rows.map(([pill, text]) =>
@@ -17124,6 +17521,7 @@ async function avatarHTML(email, name, cls, tag = "button") {
 async function renderAvatarPair() {
   const wrap = $("avatarPair");
   if (!wrap) return;
+  maybeCelebratePair();
   const partner = PARTNER_EMAIL ? partnerName() : null;
   const mine = await avatarHTML(MY_EMAIL, ME, "me");
   const theirs = partner ? await avatarHTML(PARTNER_EMAIL, partner, "them") : "";
@@ -17157,9 +17555,1154 @@ async function renderAvatarPair() {
       renderProgressTab();
       return;
     }
-    PROGRESS_VIEW = "partner";
+    /* Off Progress, their face opens their profile, which is where seeing
+       their progress, cheering them on and asking them to train together all
+       live now (Mo, 2026-10-04). On Progress it still flips the view in place,
+       which is what the tour there teaches. */
+    openPartnerSheet();
+  };
+}
+
+/* ---------- Partner joined ----------
+   Until 1.1 pairing was a two second toast on one phone, and the person who
+   sent the invite was told nothing at all. Now both of them get this, once.
+
+   Who has seen it is remembered per phone as the partner it was shown for.
+   "none" means this phone has watched the account be on its own, so a partner
+   appearing after that is news. A phone with no record yet just records what
+   is there: otherwise everybody already paired would get a party on their
+   first open of 1.1 for something that happened weeks ago. */
+const PAIR_SEEN_KEY = "unio.pairSeen";
+function pairSeenGet() { try { return localStorage.getItem(PAIR_SEEN_KEY); } catch { return null; } }
+function pairSeenSet(v) { try { localStorage.setItem(PAIR_SEEN_KEY, v); } catch { /* private mode: it shows again, which is harmless */ } }
+
+function maybeCelebratePair() {
+  const now = PARTNER_EMAIL || "none";
+  const seen = pairSeenGet();
+  if (seen === null) { pairSeenSet(now); return; }
+  if (now === "none") { if (seen !== "none") pairSeenSet("none"); return; }
+  if (seen === now) return;
+  /* Not over a workout in progress. Nothing is recorded, so the next redraw
+     after the session ends picks it up. */
+  if (SESSION || document.querySelector(".pc-scrim")) return;
+  pairSeenSet(now);
+  showPairCelebration();
+}
+
+async function showPairCelebration() {
+  document.querySelector(".pc-scrim")?.remove();
+  const name = partnerName() || "Your partner";
+  const first = name.split(" ")[0];
+  const mine = await avatarHTML(MY_EMAIL, ME, "me", "div");
+  const theirs = await avatarHTML(PARTNER_EMAIL, name, "them", "div");
+
+  const el = document.createElement("div");
+  el.className = "pc-scrim";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  el.setAttribute("aria-label", `${name} joined you on Unio`);
+  el.innerHTML = `
+    <div class="pc-stage">
+      <div class="pc-bot">${robotFaceSVG(104, "", { bust: true })}</div>
+      <div class="pc-ring">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="glow" cx="50" cy="50" r="44"/>
+          <path class="arc me" d="M50 94 A44 44 0 0 1 50 6"/>
+          <path class="arc them" d="M50 6 A44 44 0 0 1 50 94"/>
+        </svg>${mine}${theirs}
+      </div>
+    </div>
+    <div class="pc-copy">
+      <h2 class="pc-h">You and ${escapeHtml(first)}.</h2>
+      <p class="pc-sub">Now there are three of us. Everything you do shows up for both of you, and I'll keep an eye on you both.</p>
+    </div>
+    <div class="pc-actions">
+      <button type="button" class="btn-primary" id="pcGo">Congratulate ${escapeHtml(first)}</button>
+      <button type="button" class="pc-later" id="pcLater">Later</button>
+    </div>`;
+  document.body.appendChild(el);
+
+  sfxPlay("paired");
+  buzz([18, 60, 28]);
+  /* On the beat the robot lands, which is just after the ring closes. */
+  setTimeout(() => {
+    const bot = el.querySelector(".pc-bot");
+    if (bot && el.isConnected) confettiBurst(bot, 46);
+  }, 1500);
+
+  /* Either way out lands on Progress, where the tour shows them the door to
+     their partner's side. Later just skips the message. */
+  const toProgress = () => {
+    el.remove();
+    PROGRESS_VIEW = "me";
+    PROGRESS_GOAL_LENS = null;
     switchTab("progress");
   };
+  $("pcLater").onclick = toProgress;
+  $("pcGo").onclick = async () => {
+    const btn = $("pcGo");
+    btn.disabled = true;
+    /* The same table the cheer buttons write to, so it arrives the way every
+       other encouragement does. A failed send is said, not swallowed, and the
+       way on still works. */
+    const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "We're a team now. Let's go!" });
+    if (error) {
+      console.error("could not send the congratulations", error);
+      toast("Couldn't send it. You can cheer them from Home.");
+    } else {
+      btn.textContent = "Sent";
+      sfxPlay("set");
+      await new Promise((r) => setTimeout(r, 450));
+    }
+    toProgress();
+  };
+  $("pcGo").focus({ preventScroll: true });
+}
+
+/* ---------- The partner tour ----------
+   Shown once, the first time someone with a partner is on Progress: their
+   partner's face in the top corner is the way into the partner's side, and
+   nothing on screen says so. Remembered per phone, like the celebration. */
+const PARTNER_TOUR_KEY = "unio.tourPartnerFace";
+function partnerTourDone() { try { return localStorage.getItem(PARTNER_TOUR_KEY) === "1"; } catch { return true; } }
+function markPartnerTourDone() { try { localStorage.setItem(PARTNER_TOUR_KEY, "1"); } catch { /* shows again, harmless */ } }
+
+function maybeStartPartnerTour() {
+  if (!PARTNER_EMAIL || partnerTourDone() || SESSION) return;
+  if (document.querySelector(".cm-scrim, .pc-scrim")) return;
+  /* After the tab has drawn, so the face is where it will stay. */
+  setTimeout(startPartnerTour, 450);
+}
+
+function startPartnerTour() {
+  if (document.querySelector(".cm-scrim")) return;
+  const first = escapeHtml((partnerName() || "your partner").split(" ")[0]);
+  /* Two taps, the two the faces are for: over to them, then back to you. Mo,
+     2026-10-04: once they have looked at their partner's side, show them the
+     way home too, or the first visit strands them on someone else's numbers. */
+  const steps = [
+    { face: ".av.them", ring: "var(--partner)", title: `See ${first}'s progress`, text: `Tap ${first}'s face up here any time.` },
+    { face: ".av.me", ring: "var(--me)", title: `This is ${first}'s side`, text: "Tap your face to switch back to yours." },
+  ];
+
+  const scrim = document.createElement("div");
+  scrim.className = "cm-scrim";
+  scrim.setAttribute("role", "dialog");
+  scrim.setAttribute("aria-modal", "true");
+  scrim.innerHTML = `
+    <div class="cm-hole"></div>
+    <div class="cm-tip">
+      <b id="cmTitle"></b>
+      <p id="cmText"></p>
+      <button type="button" class="cm-skip" id="cmSkip">Skip</button>
+    </div>`;
+  document.body.appendChild(scrim);
+  const hole = scrim.querySelector(".cm-hole");
+  const tip = scrim.querySelector(".cm-tip");
+
+  let i = 0;
+  /* Looked up fresh every time: Progress redraws the pair of faces when it
+     switches sides, so a node held from step one is gone by step two. */
+  const face = () => document.querySelector(`#avatarPair ${steps[i].face}`);
+  const place = () => {
+    const el = face();
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const pad = 6;
+    Object.assign(hole.style, { left: `${r.left - pad}px`, top: `${r.top - pad}px`, width: `${r.width + pad * 2}px`, height: `${r.height + pad * 2}px` });
+    tip.style.top = `${r.bottom + 16}px`;
+    /* The arrow points at the middle of whichever face this step is about. */
+    tip.style.setProperty("--arrow-right", `${Math.max(14, innerWidth - 16 - (r.left + r.width / 2) - 7)}px`);
+  };
+  const show = () => {
+    $("cmTitle").innerHTML = steps[i].title;
+    $("cmText").innerHTML = steps[i].text;
+    scrim.setAttribute("aria-label", `${steps[i].title}. ${steps[i].text}`);
+    /* Pulses in the colour of the face it is on: theirs, then yours. */
+    hole.style.setProperty("--cm-ring", steps[i].ring);
+    place();
+  };
+  show();
+  addEventListener("resize", place);
+
+  const end = () => {
+    removeEventListener("resize", place);
+    scrim.remove();
+    markPartnerTourDone();
+  };
+  $("cmSkip").onclick = (e) => { e.stopPropagation(); end(); };
+  /* Only the face for this step works: a tap inside the hole is passed to it,
+     anything else is swallowed so nobody wanders off mid-tip. */
+  scrim.addEventListener("click", (e) => {
+    if (e.target.closest(".cm-tip")) return;
+    const el = face();
+    if (!el) { end(); return; }
+    const r = el.getBoundingClientRect();
+    const inside = e.clientX >= r.left - 8 && e.clientX <= r.right + 8 && e.clientY >= r.top - 8 && e.clientY <= r.bottom + 8;
+    if (!inside) return;
+    el.click();
+    if (++i >= steps.length) { end(); return; }
+    /* Let the other side draw before moving the spotlight onto it. */
+    hole.style.opacity = "0"; tip.style.opacity = "0";
+    setTimeout(() => { show(); hole.style.opacity = ""; tip.style.opacity = ""; }, 380);
+  });
+}
+
+/* ---------- Train together ----------
+   Two partners doing the same workout at the same time, wherever each of them
+   is, each at their own pace, watching the other's sets land as they happen.
+   Mo, 2026-10-04: an invitation first ("want to work out together?"), then a
+   lobby where one of them is in charge of the workout (theirs, mine, or a new
+   one) and can add or take away exercises while the other watches it change,
+   then the same exact workout on both phones with everything visible to each
+   other, and 1.5x XP for finishing it together.
+
+   Each phone runs an ordinary session underneath. The agreed workout is saved
+   as that person's plan for today and started with startWorkout, so sets,
+   rests, records, history and the finish all go through the code that already
+   does them. What is new is only what the OTHER phone needs to see: the
+   session row (together_sessions) and each set as it is logged
+   (together_sets), both pushed over realtime.
+
+   Privacy does not apply in here. Being in the session is the consent: you
+   both chose to train together, so both of you see weights and reps. */
+let TG = null;            // the open session this person is in, if any
+let TG_SETS = [];         // every set either of them has logged, for TG and the finished ones
+let TG_HISTORY = [];      // finished sessions, for the 1.5x
+let TG_WATCHING = false;
+let TG_STARTING = false;
+let TG_RENDER = 0;        // newest render wins when avatars resolve out of order
+const TG_OPEN = ["invited", "lobby", "active"];
+/* An invite nobody answered is not still on. Half an hour is a "want to train
+   now?", not an appointment; a session left running all day is not live. */
+const TG_INVITE_TTL = 30 * 60 * 1000;
+const TG_ACTIVE_TTL = 6 * 60 * 60 * 1000;
+
+function tgSame(a, b) { return (a || "").toLowerCase() === (b || "").toLowerCase(); }
+function tgAmHost(row = TG) { return !!row && tgSame(row.host_email, MY_EMAIL); }
+function tgAmLeader(row = TG) { return !!row && tgSame(row.leader_email, MY_EMAIL); }
+function tgPartnerEmail(row = TG) { return row ? (tgAmHost(row) ? row.guest_email : row.host_email) : PARTNER_EMAIL; }
+function tgFirst(name) { return escapeHtml((name || "").split(" ")[0] || "Them"); }
+function tgPartnerFirst() { return tgFirst(partnerName() || "your partner"); }
+function tgNow() { return new Date().toISOString(); }
+function tgStale(row) {
+  const age = Date.now() - Date.parse(row.created_at || 0);
+  if (row.status === "invited") return age > TG_INVITE_TTL;
+  return age > TG_ACTIVE_TTL;
+}
+function tgLocalDay(ts) {
+  const d = new Date(ts);
+  return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+/* The list each phone actually trains. Same: the shared one. Own: your side. */
+function tgMySide(row = TG) { return row ? (tgAmHost(row) ? "host_workout" : "guest_workout") : "host_workout"; }
+function tgTheirSide(row = TG) { return row ? (tgAmHost(row) ? "guest_workout" : "host_workout") : "guest_workout"; }
+function tgListFor(email, row = TG) {
+  if (!row) return [];
+  if ((row.mode || "same") === "same") return row.workout?.exercises || [];
+  const side = tgSame(email, row.host_email) ? "host_workout" : "guest_workout";
+  return row[side]?.exercises || [];
+}
+function tgSameNames(a, b) {
+  if (!a.length || a.length !== b.length) return false;
+  const k = (l) => l.map((e) => (e.name || "").toLowerCase()).sort().join("|");
+  return k(a) === k(b);
+}
+function tgSetKey(s) { return `${s.session_id}|${(s.email || "").toLowerCase()}|${(s.exercise_name || "").toLowerCase()}|${s.set_idx}`; }
+function tgMergeSet(row) {
+  const k = tgSetKey(row);
+  const i = TG_SETS.findIndex((s) => tgSetKey(s) === k);
+  if (i >= 0) TG_SETS[i] = { ...TG_SETS[i], ...row }; else TG_SETS.push(row);
+}
+/* The load on a plan is the person it was written for. Copied across, it is
+   the wrong number for the other one, so it goes, and each phone opens every
+   lift on its own owner's last weight the way a normal session does. */
+function tgCleanExercises(list) {
+  return (list || []).map((ex) => {
+    const c = JSON.parse(JSON.stringify(ex));
+    delete c.targetWeight; delete c.weight; delete c.done; delete c.completed;
+    return c;
+  });
+}
+
+async function loadTogether() {
+  if (!PARTNER_EMAIL) { TG = null; TG_SETS = []; TG_HISTORY = []; renderTogetherHome(); return; }
+  const { data, error } = await sb.from("together_sessions").select("*")
+    .order("created_at", { ascending: false }).limit(60);
+  /* Until the migration is applied the table is not there. Quiet: the feature
+     is simply not available yet, and the invite says so when it is tapped. */
+  if (error) { renderTogetherHome(); return; }
+  const rows = data || [];
+  TG_HISTORY = rows.filter((r) => r.status === "done");
+  const open = rows.find((r) => TG_OPEN.includes(r.status) && !tgStale(r)) || null;
+  /* A finished session this phone has not shown its finish for yet stays
+     current, so the person who finished first still gets the "you both did
+     it" moment when the other one lands. */
+  const unseenDone = !open && SESSION?.together
+    ? rows.find((r) => r.id === SESSION.together.id && r.status === "done") : null;
+  TG = open || unseenDone || null;
+  const ids = [...new Set([TG?.id, ...TG_HISTORY.map((r) => r.id)].filter(Boolean))];
+  if (ids.length) {
+    const { data: sets } = await sb.from("together_sets").select("*").in("session_id", ids);
+    TG_SETS = sets || [];
+  } else TG_SETS = [];
+  renderTogether();
+}
+
+function watchTogether() {
+  if (TG_WATCHING) return;
+  TG_WATCHING = true;
+  sb.channel("together")
+    .on("postgres_changes", { event: "*", schema: "public", table: "together_sessions" },
+      (p) => tgOnSession(p.new && Object.keys(p.new).length ? p.new : p.old))
+    .on("postgres_changes", { event: "*", schema: "public", table: "together_sets" },
+      (p) => tgOnSet(p.new))
+    .subscribe();
+}
+
+/* Everything that arrives from the other phone comes through these two. The
+   sandbox's simulated partner calls them directly, which is why they take a
+   plain row and nothing about the realtime payload. */
+function tgOnSession(row) {
+  if (!row?.id) return;
+  if (!(tgSame(row.host_email, MY_EMAIL) || tgSame(row.guest_email, MY_EMAIL))) return;
+  if (TG && TG.id !== row.id && TG_OPEN.includes(TG.status) && TG_OPEN.includes(row.status) && !tgStale(TG)) return;
+  const prev = TG;
+  TG = row;
+  if (row.status === "done") TG_HISTORY = [row, ...TG_HISTORY.filter((r) => r.id !== row.id)];
+  renderTogether(prev);
+}
+
+function tgOnSet(row) {
+  if (!row?.session_id) return;
+  const before = TG_SETS.find((s) => tgSetKey(s) === tgSetKey(row));
+  tgMergeSet(row);
+  if (!TG || row.session_id !== TG.id) return;
+  const theirs = !tgSame(row.email, MY_EMAIL);
+  if (theirs && row.done && !before?.done) tgCallout(row);
+  tgRenderHud();
+  if (document.querySelector(".tg-scrim.finish")) tgShowFinish();
+  if (document.querySelector(".tg-scrim.watch")) tgShowWatch();
+}
+
+async function tgUpdate(patch) {
+  if (!TG) return false;
+  const before = TG;
+  TG = { ...TG, ...patch, updated_at: tgNow() };
+  const { error } = await sb.from("together_sessions").update({ ...patch, updated_at: TG.updated_at }).eq("id", before.id);
+  if (error) {
+    console.error("together session not updated", error);
+    TG = before;
+    toast(/leader|in charge/i.test(error.message || "") ? "Only the person in charge can change the workout" : "Couldn't update the session. Check your connection.");
+    renderTogether();
+    return false;
+  }
+  renderTogether(before);
+  return true;
+}
+
+/* ---- Asking ----
+   From Home, a fresh session: the lobby picks the workout. From inside a
+   workout already running ("I'm doing this, come in"), the workout is the one
+   on screen and there is no lobby: they join straight into it. */
+async function tgInvite({ fromSession = false } = {}) {
+  if (!PARTNER_EMAIL) return;
+  if (TG && TG_OPEN.includes(TG.status) && !tgStale(TG)) { renderTogether(); return; }
+  /* A workout already going is the workout, however they got here: from the
+     strip inside it, or from the profile with the session minimised. Starting
+     a second one from the lobby would leave the first one open underneath. */
+  const running = SESSION && !SESSION.finished ? (TODAY_WORKOUT?.exercises || []) : null;
+  /* Nothing else is preloaded: the workout is made through the app's own flow
+     (Mo, 2026-10-04), so the lists start empty and fill from the plan screen. */
+  const exercises = running || [];
+  const row = {
+    id: (crypto.randomUUID && crypto.randomUUID()) || `tg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    host_email: MY_EMAIL, guest_email: PARTNER_EMAIL, leader_email: MY_EMAIL,
+    status: "invited", mode: "same",
+    source: exercises.length ? "host" : null,
+    workout: {
+      exercises: tgCleanExercises(exercises),
+      focus: running ? (TODAY_WORKOUT?.focus || "") : "",
+      joinRunning: !!running,
+    },
+    host_workout: { exercises: running ? tgCleanExercises(exercises) : [], focus: "" },
+    guest_workout: { exercises: [], focus: "" },
+    created_at: tgNow(), updated_at: tgNow(),
+  };
+  const { error } = await sb.from("together_sessions").insert(row);
+  if (error) {
+    console.error("could not invite to train together", error);
+    toast(error.code === "42P01" || /does not exist/i.test(error.message || "") ? "Training together isn't switched on yet" : "Couldn't send the invite");
+    return;
+  }
+  TG = row;
+  if (running) { SESSION.together = { id: row.id }; saveSessionToStorage(); }
+  sfxPlay("set");
+  buzz(12);
+  renderTogether();
+}
+
+/* Joining a workout they have just started. Mo, 2026-10-04: only while they
+   are still setting up; once the sets are going, the workout has started and
+   that is that. So: live, details shared, nothing logged, and inside the first
+   ten minutes. It asks rather than walks in, and they are in charge, because
+   it is their workout. */
+function tgCanJoinLive(row = LIVE_PARTNER) {
+  if (!row || !PARTNER_EMAIL || (SESSION && !SESSION.finished)) return false;
+  if (TG && TG_OPEN.includes(TG.status) && !tgStale(TG)) return false;
+  if (!liveDetailsShared(row)) return false;
+  const fresh = (row.elapsed_sec || 0) < 10 * 60;
+  return fresh && !(row.set_done > 0) && !((row.exercise_index || 0) > 0);
+}
+
+async function tgRequestJoin() {
+  if (!tgCanJoinLive()) { toast(`${tgPartnerFirst()} has already started`); return; }
+  const plans = plansOnDate(todayStr(), PARTNER_EMAIL).filter((p) => (p.exercises || []).length && !p.completed_at);
+  const plan = plans[0];
+  if (!plan) { toast(`Couldn't see ${tgPartnerFirst()}'s workout`); return; }
+  const row = {
+    id: (crypto.randomUUID && crypto.randomUUID()) || `tg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    host_email: MY_EMAIL, guest_email: PARTNER_EMAIL, leader_email: PARTNER_EMAIL,
+    status: "invited", mode: "same", source: "guest",
+    workout: { exercises: tgCleanExercises(plan.exercises), focus: plan.focus || "", joinRunning: true, request: true },
+    host_workout: { exercises: [], focus: "" }, guest_workout: { exercises: [], focus: "" },
+    created_at: tgNow(), updated_at: tgNow(),
+  };
+  const { error } = await sb.from("together_sessions").insert(row);
+  if (error) { console.error("join request not sent", error); toast("Couldn't ask to join"); return; }
+  TG = row;
+  sfxPlay("set");
+  renderTogether();
+}
+
+async function tgRespond(accept) {
+  if (!TG) return;
+  if (accept && SESSION && !SESSION.finished && !SESSION.together && !TG.workout?.request) {
+    toast("Finish or end the workout you have going first, then join");
+    return;
+  }
+  if (!accept) { await tgUpdate({ status: "declined" }); TG = null; tgCloseOverlay(); renderTogetherHome(); return; }
+  const straightIn = !!TG.workout?.joinRunning;
+  await tgUpdate(straightIn ? { status: "active", started_at: tgNow() } : { status: "lobby" });
+}
+
+async function tgLeave() {
+  if (!TG) return;
+  const id = TG.id;
+  await tgUpdate({ status: "cancelled", cancelled_by: MY_EMAIL });
+  if (SESSION?.together?.id === id) { delete SESSION.together; saveSessionToStorage(); }
+  TG = null;
+  tgCloseOverlay();
+  tgRenderHud();
+  renderTogetherHome();
+}
+
+/* Two people who pick the same workout on their own are doing the joint
+   workout whether they meant to or not, so the app says so and offers it. */
+function tgMaybePerfect() {
+  if (!TG || (TG.mode || "same") !== "own") return;
+  const mine = TG[tgMySide()]?.exercises || [], theirs = TG[tgTheirSide()]?.exercises || [];
+  if (tgSameNames(mine, theirs)) toast("You picked the same workout. Make it a joint one below.");
+}
+
+async function tgSetMode(mode) {
+  /* Whoever invited decides, how you train as well as what, until they hand
+     it over (Mo, 2026-10-04). */
+  if (!TG || (TG.mode || "same") === mode || !tgAmLeader()) return;
+  const patch = { mode };
+  /* Switching to joint from two matching lists keeps that list, so nobody
+     loses what they just built. Only the person in charge writes the shared
+     list; for anyone else the switch carries the mode alone. */
+  if (mode === "same" && tgAmLeader()) {
+    const mine = TG[tgMySide()]?.exercises || [];
+    const theirs = TG[tgTheirSide()]?.exercises || [];
+    /* The two of you landed on the same list: that list IS the joint workout,
+       whatever was sitting in the shared one from before. */
+    if (mine.length && (tgSameNames(mine, theirs) || !(TG.workout?.exercises || []).length)) {
+      patch.workout = { ...TG.workout, exercises: mine, focus: TG[tgMySide()]?.focus || TG.workout?.focus || "" };
+    }
+  }
+  if (await tgUpdate(patch) && mode === "same") toast("Perfect, joint workout. Same exercises, same time, 1.5x XP.");
+}
+
+function tgReady() {
+  if (!TG || TG.status !== "lobby") return false;
+  if ((TG.mode || "same") === "same") return (TG.workout?.exercises || []).length > 0;
+  return (TG.host_workout?.exercises || []).length > 0 && (TG.guest_workout?.exercises || []).length > 0;
+}
+async function tgStart() {
+  if (!TG || !tgAmLeader() || TG.status !== "lobby") return;
+  if (!tgReady()) { toast((TG.mode || "same") === "same" ? "Make the workout first" : "You each need a workout first"); return; }
+  await tgUpdate({ status: "active", started_at: tgNow() });
+}
+
+/* ---- Making the workout: the app's own flow ----
+   Mo, 2026-10-04: no separate builder in the lobby. Making the workout is the
+   same flow as making any workout: the Workout tab's Generate for me, I'll plan
+   my own or today's plan, the plan screen with its match ring, its swaps and
+   its add exercise. While that is going on a bar sits along the bottom saying
+   who it is for, and Use this hands the plan back to the session, which opens
+   the review. Edit from the review goes back into the same plan screen. */
+let TG_MAKING = false;
+
+function tgMakingPlan() {
+  return plansOnDate(todayStr()).find((p) => (p.exercises || []).length && !p.completed_at) || null;
+}
+
+function tgBeginMaking({ edit = false } = {}) {
+  if (!TG) return;
+  if ((TG.mode || "same") === "same" && !tgAmLeader()) return;
+  TG_MAKING = true;
+  tgCloseOverlay();
+  if (edit && tgMakingPlan()) showPlanScreen(todayStr());
+  else { switchTab("workout"); goWorkoutScreen("choose"); }
+  tgRenderMakeBar();
+}
+
+function tgStopMaking() {
+  TG_MAKING = false;
+  tgRenderMakeBar();
+}
+
+function tgRenderMakeBar() {
+  let bar = $("tgMakeBar");
+  const show = TG_MAKING && TG && TG_OPEN.includes(TG.status)
+    && !document.body.classList.contains("session-open")
+    && !$("tab-workout")?.classList.contains("hidden");
+  if (!show) { bar?.remove(); return; }
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "tgMakeBar";
+    bar.className = "tg-makebar";
+    document.body.appendChild(bar);
+  }
+  const first = tgPartnerFirst();
+  const plan = tgMakingPlan();
+  const same = (TG.mode || "same") === "same";
+  bar.innerHTML = `
+    <div class="tg-mb-txt">
+      <b>${same ? `For you and ${first}` : `Yours, beside ${first}`}</b>
+      <span>${plan ? `${escapeHtml(displayFocus(plan.focus, plan.exercises) || "Your plan")} · ${plan.exercises.length} exercises` : "Generate one, or plan your own"}</span>
+    </div>
+    <button type="button" class="tg-mb-back" id="tgMbBack">Back</button>
+    <button type="button" class="tg-mb-use" id="tgMbUse" ${plan ? "" : "disabled"}>Use this</button>`;
+  $("tgMbBack").onclick = () => { tgStopMaking(); renderTogether(); };
+  $("tgMbUse").onclick = tgUseTodayPlan;
+}
+
+async function tgUseTodayPlan() {
+  const plan = tgMakingPlan();
+  if (!plan || !TG) return;
+  const list = { exercises: tgCleanExercises(plan.exercises), focus: plan.focus || "" };
+  tgStopMaking();
+  if ((TG.mode || "same") === "same") await tgUpdate({ workout: { ...TG.workout, ...list } });
+  else await tgUpdate({ [tgMySide()]: list });
+  tgMaybePerfect();
+  renderTogether();
+}
+
+/* Compatibility: the plan screen's own match, asked of each person. How much
+   of this workout lands on what that person has trained least this week,
+   scored per muscle against their own most worked one, exactly as
+   matchDetail scores yours. One workout, two numbers, which is what makes the
+   joint workout an honest choice rather than one person's plan with a guest. */
+function tgMatchFor(exs, name) {
+  const counts = {};
+  for (const ex of exs || []) {
+    const rule = classifyMuscles(ex.name || "");
+    if (!rule) continue;
+    for (const g of rule.primary) counts[g] = (counts[g] || 0) + 2;
+    for (const g of rule.secondary) counts[g] = (counts[g] || 0) + 1;
+  }
+  const trained = Object.keys(counts);
+  if (!trained.length || !name) return null;
+  const vols = computeMuscleVolume(name, 0, todayStr());
+  const peak = Math.max(...Object.values(vols), 0);
+  const fresh = trained.map((m) => (peak > 0 ? Math.max(0, Math.min(100, Math.round((1 - (vols[m] || 0) / peak) * 100))) : 100));
+  return Math.max(35, Math.min(99, Math.round(fresh.reduce((a, b) => a + b, 0) / fresh.length)));
+}
+
+function tgWorkoutCard({ who, title, exs, focus, editable, compat, waiting }) {
+  if (!exs.length) {
+    return `<section class="tg-wk ${who} empty">
+      <div class="tg-wk-head"><span class="tg-wk-who">${title}</span></div>
+      <p class="tg-wk-wait">${waiting}</p>
+    </section>`;
+  }
+  const groups = groupsHitFor(exs);
+  const mins = sessionEstimateMinutes(exs, null);
+  return `<section class="tg-wk ${who}">
+    <div class="tg-wk-head">
+      <span class="tg-wk-who">${title}</span>
+      ${editable ? `<button type="button" class="tg-link-btn" data-tg-edit>Edit</button>` : ""}
+    </div>
+    <h3 class="tg-wk-focus">${escapeHtml(displayFocus(focus, exs) || "Workout")}</h3>
+    <div class="tg-wk-meta">${exs.length} exercises · ${Math.max(10, mins - 5)}-${mins + 5} min</div>
+    ${groups.length ? `<div class="tg-hits ${who}">Hits <b>${escapeHtml(bodyGroupsPhrase(groups))}</b></div>` : ""}
+    <ul class="tg-list compact">
+      ${exs.map((ex) => `<li><span class="tg-ex">${escapeHtml(ex.name)}</span><span class="tg-sr">${ex.sets || 3} × ${escapeHtml(String(ex.reps ?? ""))}</span></li>`).join("")}
+    </ul>
+    ${compat.length ? `<div class="tg-compat">
+      ${compat.map(([label, pct, side]) => pct == null ? "" : `
+        <div class="tg-cp ${side}"><span>${label}</span><span class="tg-cp-bar"><i style="width:${pct}%"></i></span><b>${pct}%</b></div>`).join("")}
+      <p class="tg-cp-note">Fit: how much of it lands on what ${compat.length > 1 ? "each of you has" : `${compat[0][0] === "You" ? "you have" : `${compat[0][0]} has`}`} trained least this week.</p>
+    </div>` : ""}
+  </section>`;
+}
+
+/* ---- Into the workout ----
+   The agreed list becomes this person's plan for today in the lifting slot,
+   which replaces an unstarted lift (you are doing this one instead) and sits
+   beside one already finished. Then it is an ordinary startWorkout. */
+async function tgStartMySession() {
+  if (TG_STARTING || !TG) return;
+  /* This person's session for this together session already exists, running
+     or finished. Finishing your half while your partner is still going leaves
+     the session active, and treating that as "start my workout" again started
+     a second workout on top of the finish screen, which froze it (Mo,
+     2026-10-04). Once is all anyone gets. */
+  if (SESSION?.together?.id === TG.id) { if (!SESSION.finished) tgRenderHud(); return; }
+  if (SESSION && !SESSION.finished) {
+    /* The host who invited from a running workout: that workout IS the one.
+       Brought back on screen, because it may have been minimised. */
+    SESSION.together = { id: TG.id };
+    saveSessionToStorage();
+    if (!document.body.classList.contains("session-open")) {
+      switchTab("workout");
+      openSessionUI();
+      $("workoutContent")?.classList.add("hidden");
+    }
+    renderSession();
+    return;
+  }
+  TG_STARTING = true;
+  try {
+    const date = todayStr();
+    const slot = nextPlanSlot(date, { lifting: true });
+    const mine = (TG.mode || "same") === "own" ? TG[tgMySide()] : TG.workout;
+    const focus = mine?.focus ? `${mine.focus}, together` : "Together";
+    const { error } = await upsertPlanRow({
+      user_name: ME, email: MY_EMAIL, entry_date: date,
+      focus, exercises: mine?.exercises || [], mobility: null,
+      completed_at: null, duration_sec: null,
+    }, slot);
+    if (error) { console.error("together plan not saved", error); toast("Couldn't set up the workout"); return; }
+    await loadAll();
+    const plan = plansOnDate(date).find((p) => planSlot(p) === slot);
+    if (!plan) { toast("Couldn't find the workout"); return; }
+    TODAY_WORKOUT = plan;
+    if (typeof switchTab === "function") switchTab("workout");
+    startWorkout();
+    if (SESSION) {
+      SESSION.together = { id: TG.id };
+      saveSessionToStorage();
+      renderSession();
+    }
+  } finally {
+    TG_STARTING = false;
+  }
+}
+
+/* Called from toggleSet, after the set is banked on this phone. */
+async function tgPushSet(ei, setIdx, done) {
+  if (!SESSION?.together || !TODAY_WORKOUT) return;
+  const ex = TODAY_WORKOUT.exercises?.[ei];
+  if (!ex) return;
+  const row = {
+    session_id: SESSION.together.id, email: MY_EMAIL, exercise_name: ex.name, set_idx: setIdx,
+    weight: SESSION.setWeights?.[ei]?.[setIdx] ?? null,
+    reps: parseInt(SESSION.reps?.[ei], 10) || null,
+    done, updated_at: tgNow(),
+  };
+  tgMergeSet(row);
+  tgRenderHud();
+  const { error } = await sb.from("together_sets").upsert(row, { onConflict: "session_id,email,exercise_name,set_idx" });
+  if (error) console.error("together set not shared", error);
+}
+
+/* Called from finishWorkout. The session is done when both halves are. */
+async function tgMarkDone() {
+  if (!TG || !SESSION?.together || SESSION.together.id !== TG.id) return;
+  const mine = tgAmHost() ? "host_done_at" : "guest_done_at";
+  const theirs = tgAmHost() ? TG.guest_done_at : TG.host_done_at;
+  const patch = { [mine]: tgNow() };
+  if (theirs) { patch.status = "done"; patch.ended_at = tgNow(); }
+  await tgUpdate(patch);
+  if (patch.status === "done") TG_HISTORY = [TG, ...TG_HISTORY.filter((r) => r.id !== TG.id)];
+  setTimeout(tgShowFinish, 700);
+}
+
+/* ---- 1.5x ----
+   A workout finished together earns half again what it earned on its own:
+   half the day's gym points and half of five per exercise this person logged
+   in it. Records are left out of the multiplier on purpose: a record is about
+   the lift, not about who was there. Both halves have to be finished. */
+function togetherBonusXPBetween(name, from, to) {
+  const email = ALL_PROFILES.find((p) => p.user_name === name)?.email;
+  if (!email || !TG_HISTORY.length) return 0;
+  const inRange = (d) => (!from || d >= from) && (!to || d <= to);
+  let xp = 0;
+  for (const r of TG_HISTORY) {
+    if (r.status !== "done" || !r.host_done_at || !r.guest_done_at) continue;
+    if (!(tgSame(r.host_email, email) || tgSame(r.guest_email, email))) continue;
+    if (!inRange(tgLocalDay(r.started_at || r.created_at))) continue;
+    xp += tgBonusFor(r, email);
+  }
+  return xp;
+}
+function tgBonusFor(r, email) {
+  const names = new Set(TG_SETS.filter((s) => s.session_id === r.id && tgSame(s.email, email) && s.done)
+    .map((s) => s.exercise_name.toLowerCase()));
+  return names.size ? Math.round(0.5 * (10 + 5 * names.size)) : 0;
+}
+function tgStatsFor(email, id = TG?.id) {
+  const sets = TG_SETS.filter((s) => s.session_id === id && tgSame(s.email, email) && s.done);
+  const volume = sets.reduce((n, s) => n + (Number(s.weight) || 0) * (Number(s.reps) || 0), 0);
+  const exercises = new Set(sets.map((s) => s.exercise_name.toLowerCase())).size;
+  return { sets: sets.length, volume: Math.round(volume), exercises };
+}
+
+/* ---- Drawing ---- */
+function renderTogether(prev = null) {
+  renderTogetherHome();
+  if (!TG) { tgCloseOverlay("lobby"); tgCloseOverlay("invite"); tgRenderHud(); return; }
+  const s = TG.status;
+  if (s === "declined" || s === "cancelled") {
+    TG_MAKING = false;
+    tgRenderMakeBar();
+    const wasOpen = prev && TG_OPEN.includes(prev.status);
+    if (wasOpen && s === "declined" && tgAmHost()) toast(`${tgPartnerFirst()} can't train right now`);
+    if (wasOpen && s === "cancelled" && !tgSame(TG.cancelled_by, MY_EMAIL)) toast(`${tgPartnerFirst()} left the session`);
+    if (SESSION?.together?.id === TG.id) { delete SESSION.together; saveSessionToStorage(); }
+    TG = null;
+    tgCloseOverlay();
+    tgRenderHud();
+    renderTogetherHome();
+    return;
+  }
+  if (s === "invited") { if (tgAmHost()) tgShowLobby(); else tgShowInvite(); return; }
+  if (s === "lobby") { tgShowLobby(); return; }
+  if (s === "active") {
+    tgStopMaking();
+    tgCloseOverlay("lobby"); tgCloseOverlay("invite");
+    if (prev && prev.status !== "active") { sfxPlay("paired"); buzz([14, 50, 22]); }
+    /* Your half already finished: nothing to start, you are waiting for them. */
+    if (!TG[tgAmHost() ? "host_done_at" : "guest_done_at"]) tgStartMySession();
+    else if (document.querySelector(".tg-scrim.watch")) tgShowWatch();
+    tgRenderHud();
+    return;
+  }
+  if (s === "done") {
+    clearInterval(TG_WATCH_TICK);
+    if (document.querySelector(".tg-scrim.watch")) { tgShowFinish(); return; }
+    tgRenderHud();
+    if (document.querySelector(".tg-scrim.finish") || (prev && prev.status !== "done" && SESSION?.finished)) tgShowFinish();
+  }
+}
+
+function tgCloseOverlay(kind = null) {
+  const el = document.querySelector(".tg-scrim");
+  if (!el) return;
+  if (kind && !el.classList.contains(kind)) return;
+  el.remove();
+}
+
+function tgOverlay(kind) {
+  let el = document.querySelector(".tg-scrim");
+  if (el && !el.classList.contains(kind)) { el.remove(); el = null; }
+  if (!el) {
+    el = document.createElement("div");
+    el.className = `tg-scrim ${kind}`;
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-modal", "true");
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+async function tgFaces(myState, theirState) {
+  const mine = await avatarHTML(MY_EMAIL, ME, "me", "div");
+  const theirs = await avatarHTML(tgPartnerEmail(), partnerName(), "them", "div");
+  return `<div class="tg-faces">
+      <div class="tg-face ${myState}">${mine}</div>
+      <svg class="tg-link" viewBox="0 0 60 12" aria-hidden="true"><path d="M2 6h56"/></svg>
+      <div class="tg-face ${theirState}">${theirs}</div>
+    </div>`;
+}
+
+async function tgShowInvite() {
+  const token = ++TG_RENDER;
+  const host = TG.host_email;
+  const who = tgFirst(profileFor(host)?.user_name || partnerName());
+  const running = !!TG.workout?.joinRunning;
+  const focus = TG.workout?.focus ? escapeHtml(TG.workout.focus) : "";
+  const faces = await tgFaces("waiting", "here");
+  if (token !== TG_RENDER || !TG || TG.status !== "invited") return;
+  const el = tgOverlay("invite");
+  el.setAttribute("aria-label", `${who} wants to train together`);
+  el.innerHTML = `
+    <div class="tg-card">
+      ${faces}
+      <h2 class="tg-h">${TG.workout?.request ? `${who} wants to join your workout` : `${who} wants to train together`}</h2>
+      <p class="tg-sub">${TG.workout?.request
+        ? `${who} does your workout alongside you, at their own pace, and you watch each other's sets land. 1.5x XP.`
+        : running
+        ? `${who} is already on ${focus || "a workout"}. Join and do the same one, each at your own pace, and watch each other's sets land.`
+        : "Pick a workout together and do it at the same time, wherever you both are. Finish it together for 1.5x XP."}</p>
+      <div class="tg-actions">
+        <button type="button" class="btn-primary" id="tgJoin">${TG.workout?.request ? "Let them join" : "Join"}</button>
+        <button type="button" class="tg-ghost" id="tgNo">Not now</button>
+      </div>
+    </div>`;
+  $("tgJoin").onclick = () => tgRespond(true);
+  $("tgNo").onclick = () => tgRespond(false);
+  if (!el.dataset.rang) { el.dataset.rang = "1"; sfxPlay("restEnd"); buzz([20, 80, 20]); }
+}
+
+async function tgShowLobby() {
+  if (TG_MAKING) { tgRenderMakeBar(); return; }
+  /* Asked from inside your own running workout: there is nothing to choose,
+     they join that one. Stay on the workout; its strip says you are waiting. */
+  if (TG.workout?.joinRunning && !TG.workout?.request && TG.status === "invited" && tgAmHost()) {
+    tgCloseOverlay("lobby");
+    tgRenderHud();
+    return;
+  }
+  if (TG.workout?.request && TG.status === "invited") {
+    const token = ++TG_RENDER;
+    const faces = await tgFaces("here", "waiting");
+    if (token !== TG_RENDER || !TG || TG.status !== "invited") return;
+    const first = tgPartnerFirst();
+    const el = tgOverlay("lobby");
+    el.innerHTML = `
+      <div class="tg-card">
+        ${faces}
+        <h2 class="tg-h">Asking ${first}</h2>
+        <p class="tg-sub">You'll do ${escapeHtml(displayFocus(TG.workout.focus, TG.workout.exercises) || "their workout")} alongside ${first}, at your own pace.</p>
+        <div class="tg-actions"><button type="button" class="tg-ghost" id="tgLeave">Cancel</button></div>
+      </div>`;
+    $("tgLeave").onclick = tgLeave;
+    return;
+  }
+  const token = ++TG_RENDER;
+  const here = TG.status === "lobby";
+  const faces = await tgFaces("here", here ? "here" : "waiting");
+  if (token !== TG_RENDER || !TG || !["invited", "lobby"].includes(TG.status) || TG_MAKING) return;
+  const first = tgPartnerFirst();
+  const mode = TG.mode || "same";
+  const same = mode === "same";
+  const leader = tgAmLeader();
+  const shared = TG.workout?.exercises || [];
+  const mine = TG[tgMySide()]?.exercises || [];
+  const theirs = TG[tgTheirSide()]?.exercises || [];
+  const reviewing = same ? shared.length > 0 : mine.length > 0;
+  const partner = partnerName();
+  const leaderFirst = leader ? "You" : first;
+  const el = tgOverlay("lobby");
+  el.setAttribute("aria-label", `Work out with ${first}`);
+
+  let body;
+  if (!reviewing) {
+    /* Step one: how you are training. Then into the app's own flow. */
+    body = `
+      <p class="tg-q">${leader ? "How do you want to train?" : `${first} is choosing how you train`}</p>
+      <div class="tg-modes">
+        <button type="button" class="tg-modecard ${same ? "on" : ""}" data-tg-mode="same" ${leader ? "" : "disabled"}>
+          <b>Same workout</b><span>One workout for both of you, done at the same time. 1.5x XP.</span>
+        </button>
+        <button type="button" class="tg-modecard ${!same ? "on" : ""}" data-tg-mode="own" ${leader ? "" : "disabled"}>
+          <b>Each our own</b><span>Your own workouts, side by side, watching each other live.</span>
+        </button>
+      </div>
+      <div class="tg-actions">
+        ${same && !leader
+          ? `<p class="tg-wait"><span class="tg-dot"></span> ${first} is making the workout</p>`
+          : `<button type="button" class="btn-primary" id="tgMake">${same ? "Make the workout" : "Make your workout"}</button>`}
+        ${same && leader && here ? `<button type="button" class="tg-ghost" id="tgHand">Let ${first} make it</button>` : ""}
+      </div>`;
+  } else if (same) {
+    body = `
+      <div class="tg-banner same"><b>Joint workout</b><span>The same exercises for both of you, at the same time. 1.5x XP.</span></div>
+      ${tgWorkoutCard({ who: "both", title: `${leaderFirst === "You" ? "You" : first} made this`, exs: shared, focus: TG.workout?.focus,
+        editable: leader, compat: [["You", tgMatchFor(shared, ME), "me"], [first, tgMatchFor(shared, partner), "them"]] })}
+      ${leader ? `<button type="button" class="tg-ghost small" data-tg-mode="own">Do our own workouts instead</button>` : ""}`;
+  } else {
+    const matching = tgSameNames(mine, theirs);
+    body = `
+      <div class="tg-banner own"><b>Side by side</b><span>You each do your own workout and watch each other live. 1.5x XP.</span></div>
+      ${matching ? `<div class="tg-perfect"><b>You picked the same workout.</b>${leader ? `<button type="button" class="tg-link-btn" data-tg-mode="same">Make it a joint workout</button>` : ""}</div>` : ""}
+      ${tgWorkoutCard({ who: "me", title: "Your workout", exs: mine, focus: TG[tgMySide()]?.focus, editable: true, compat: [["You", tgMatchFor(mine, ME), "me"]] })}
+      ${tgWorkoutCard({ who: "them", title: `${first}'s workout`, exs: theirs, focus: TG[tgTheirSide()]?.focus, editable: false,
+        compat: [[first, tgMatchFor(theirs, partner), "them"]], waiting: here ? `${first} is making theirs` : `${first} makes theirs once they join` })}
+      ${leader ? `<button type="button" class="tg-ghost small" data-tg-mode="same">Do the same workout instead</button>` : ""}`;
+  }
+
+  el.innerHTML = `
+    <div class="tg-card lobby">
+      <button type="button" class="tg-x" id="tgLeave" aria-label="Leave">&times;</button>
+      ${faces}
+      <h2 class="tg-h">${reviewing ? "Your workouts" : `Work out with ${first}`}</h2>
+      <p class="tg-status ${here ? "on" : ""}">${here ? `${first}'s here` : `Waiting for ${first} to join`}</p>
+      ${body}
+      ${reviewing ? `<div class="tg-actions">
+        ${leader
+          ? `<button type="button" class="btn-primary" id="tgGo" ${here && tgReady() ? "" : "disabled"}>${!here ? `Waiting for ${first}` : tgReady() ? "Start together" : `Waiting for ${first}'s workout`}</button>`
+          : `<p class="tg-wait">${first} starts it when you're both ready</p>`}
+      </div>` : ""}
+    </div>`;
+  el.querySelectorAll("[data-tg-mode]").forEach((b) => { b.onclick = () => tgSetMode(b.dataset.tgMode); });
+  el.querySelectorAll("[data-tg-edit]").forEach((b) => { b.onclick = () => tgBeginMaking({ edit: true }); });
+  $("tgLeave").onclick = tgLeave;
+  if ($("tgMake")) $("tgMake").onclick = () => tgBeginMaking();
+  if ($("tgHand")) $("tgHand").onclick = () => tgUpdate({ leader_email: tgPartnerEmail() });
+  if ($("tgGo")) $("tgGo").onclick = tgStart;
+}
+
+/* The two-player strip on the workout screen. Both faces in progress rings,
+   what the other one is on right now, and their sets on the lift you are on,
+   weight and reps, filling in as they land. Outside a together session it is
+   the way in: an invite from the workout already running. */
+async function tgRenderHud() {
+  const root = $("tgHud");
+  if (!root) return;
+  /* The strip redraws on every set either of you logs, so the callout that
+     announces their set lives beside it, not inside it: drawn inside, the
+     redraw that the same set triggers wiped it the moment it appeared. */
+  if (!root.querySelector(".tg-hud-body")) root.innerHTML = `<div class="tg-hud-body"></div><div class="tg-callout" id="tgCallout" aria-live="polite"></div>`;
+  const hud = root.querySelector(".tg-hud-body");
+  /* Only once they are actually in: an invite they have not answered is not
+     somebody "warming up" on your strip. */
+  const on = !!(SESSION && !SESSION.finished && SESSION.together && TG && TG.id === SESSION.together.id && ["active", "done"].includes(TG.status));
+  $("sessionCard")?.classList.toggle("together", on);
+  if (!on) {
+    /* The invite itself is in the pause menu now; all the strip says outside a
+       together session is that one you sent is still waiting. */
+    const waiting = SESSION?.together && TG && TG.status === "invited";
+    root.classList.toggle("hidden", !waiting);
+    hud.innerHTML = waiting ? `<div class="tg-ask waiting"><span class="tg-dot"></span>Waiting for ${tgPartnerFirst()} to join</div>` : "";
+    return;
+  }
+  const token = ++TG_RENDER;
+  const partner = tgPartnerEmail();
+  const exs = TODAY_WORKOUT?.exercises || [];
+  const total = exs.reduce((n, e) => n + (e.sets || 3), 0) || 1;
+  /* Side by side, they are on a different list, so their ring is measured
+     against theirs and the chips follow the lift THEY are on. Joint, the chips
+     sit on the lift you are on, so the two of you can be compared set for set. */
+  const own = (TG.mode || "same") === "own";
+  const theirList = own ? tgListFor(partner) : exs;
+  const theirTotal = theirList.reduce((n, e) => n + (e.sets || 3), 0) || 1;
+  const mineDone = (SESSION.setsDone || []).flat().filter(Boolean).length;
+  const theirs = TG_SETS.filter((s) => s.session_id === TG.id && tgSame(s.email, partner) && s.done);
+  const last = theirs.slice().sort((a, b) => Date.parse(b.updated_at || 0) - Date.parse(a.updated_at || 0))[0];
+  const ex = own ? (theirList.find((e) => last && tgSame(e.name, last.exercise_name)) || theirList[0]) : exs[SESSION.exerciseIndex];
+  const first = tgPartnerFirst();
+  const theirsHere = ex ? theirs.filter((s) => tgSame(s.exercise_name, ex.name)) : [];
+  const chips = ex ? Array.from({ length: ex.sets || 3 }, (_, i) => {
+    const s = theirsHere.find((x) => x.set_idx === i);
+    return s ? `<span class="tg-chip done">${s.weight != null ? `${Number(s.weight)}×` : ""}${s.reps ?? "✓"}</span>` : `<span class="tg-chip"></span>`;
+  }).join("") : "";
+  const ring = (frac) => {
+    const c = 2 * Math.PI * 25;
+    return `<svg class="tg-ring" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="25"/><circle class="fill" cx="28" cy="28" r="25" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - Math.min(1, frac))).toFixed(1)}"/></svg>`;
+  };
+  const mineAv = await avatarHTML(MY_EMAIL, ME, "me", "div");
+  const theirAv = await avatarHTML(partner, partnerName(), "them", "div");
+  if (token !== TG_RENDER) return;
+  const doneBoth = TG.host_done_at || TG.guest_done_at;
+  root.classList.remove("hidden");
+  hud.innerHTML = `
+    <div class="tg-hud-row">
+      <div class="tg-p me">${ring(mineDone / total)}${mineAv}<span><b>You</b>${mineDone}/${total} sets</span></div>
+      <span class="tg-vs">${own ? "side by side" : "together"}</span>
+      <div class="tg-p them"><span><b>${first}</b>${theirs.length}/${theirTotal} sets</span>${ring(theirs.length / theirTotal)}${theirAv}</div>
+    </div>
+    ${ex ? `<div class="tg-lane">
+      <span class="tg-lane-who">${last ? `${first} is on <b>${escapeHtml(last.exercise_name)}</b>` : `${first} is warming up`}</span>
+      <span class="tg-chips" aria-label="${first}'s sets on ${escapeHtml(ex.name)}">${chips}</span>
+    </div>` : ""}
+    ${doneBoth && !TG[tgAmHost() ? "host_done_at" : "guest_done_at"] ? `<div class="tg-lane"><span class="tg-lane-who"><b>${first} finished.</b> Bring it home.</span></div>` : ""}`;
+}
+
+let TG_CALLOUT_T = 0;
+function tgCallout(set) {
+  const box = $("tgCallout");
+  if (!box) return;
+  const first = tgPartnerFirst();
+  const exs = TODAY_WORKOUT?.exercises || [];
+  const ex = exs.find((e) => tgSame(e.name, set.exercise_name));
+  const allIn = ex && TG_SETS.filter((s) => s.session_id === set.session_id && tgSame(s.email, set.email) && tgSame(s.exercise_name, set.exercise_name) && s.done).length >= (ex.sets || 3);
+  const load = set.weight != null ? `${Number(set.weight)} × ${set.reps ?? ""}` : `${set.reps ?? ""} reps`;
+  box.innerHTML = allIn
+    ? `<b>${first} finished ${escapeHtml(set.exercise_name)}</b>`
+    : `<b>${first}</b> · ${escapeHtml(set.exercise_name)} set ${set.set_idx + 1}, ${load}`;
+  box.classList.remove("show"); void box.offsetWidth; box.classList.add("show");
+  sfxPlay("restStart");
+  clearTimeout(TG_CALLOUT_T);
+  TG_CALLOUT_T = setTimeout(() => box.classList.remove("show"), 3400);
+}
+
+async function tgShowFinish() {
+  if (!TG) return;
+  const token = ++TG_RENDER;
+  const partner = tgPartnerEmail();
+  const both = !!(TG.host_done_at && TG.guest_done_at);
+  const first = tgPartnerFirst();
+  const me = tgStatsFor(MY_EMAIL), them = tgStatsFor(partner);
+  const bonus = both ? tgBonusFor(TG, MY_EMAIL) : 0;
+  const mineAv = await avatarHTML(MY_EMAIL, ME, "me", "div");
+  const theirAv = await avatarHTML(partner, partnerName(), "them", "div");
+  if (token !== TG_RENDER || !TG) return;
+  const col = (who, av, st, done) => `
+    <div class="tg-col ${who}">${av}
+      <b>${who === "me" ? "You" : first}</b>
+      <span>${done ? `${st.sets} ${st.sets === 1 ? "set" : "sets"} · ${st.exercises} ${st.exercises === 1 ? "lift" : "lifts"}` : "Still going"}</span>
+      <span class="tg-vol">${done && st.volume ? `${st.volume.toLocaleString()} lb moved` : ""}</span>
+    </div>`;
+  const el = tgOverlay("finish");
+  const wasBoth = el.dataset.both === "1";
+  el.dataset.both = both ? "1" : "0";
+  el.innerHTML = `
+    <div class="tg-card finish">
+      <h2 class="tg-h">${both ? "You both did it" : `Waiting for ${first}`}</h2>
+      <p class="tg-sub">${both ? "Same workout, same day, start to finish." : `You're done. ${first} is still going; this updates when they finish.`}</p>
+      <div class="tg-cols">
+        ${col("me", mineAv, me, true)}
+        ${col("them", theirAv, them, !!(tgAmHost() ? TG.guest_done_at : TG.host_done_at))}
+      </div>
+      ${both ? `<div class="tg-bonus"><span>Together bonus</span><b>1.5x XP · +${bonus}</b></div>` : ""}
+      <div class="tg-actions">
+        ${both ? `<button type="button" class="btn-primary" id="tgDone">Done</button>`
+          : `<button type="button" class="btn-primary" id="tgWatchGo">Watch ${first}</button><button type="button" class="tg-ghost" id="tgDone">Close</button>`}
+      </div>
+    </div>`;
+  $("tgDone").onclick = () => { el.remove(); if (TG?.status === "done") { TG = null; renderTogetherHome(); } };
+  if ($("tgWatchGo")) $("tgWatchGo").onclick = () => tgShowWatch();
+  if (both && !wasBoth) {
+    sfxPlay("pr");
+    buzz([20, 60, 30]);
+    setTimeout(() => { const c = el.querySelector(".tg-bonus"); if (c && el.isConnected) confettiBurst(c, 40); }, 250);
+  }
+}
+
+/* ---- Watching them finish ----
+   Mo, 2026-10-04: in a joint workout, finishing first should not throw you out.
+   Your half is done, theirs is not, so the workout becomes something you
+   watch: where they are, every set landing with its weight and reps, how far
+   through they are, the clock, and a cheer you can send. It is what the
+   Workout tab shows until they finish, and the finish card and Home both lead
+   here. When they finish it turns into the shared finish. */
+function tgWatching() {
+  if (!TG || TG.status !== "active") return false;
+  const mine = TG[tgAmHost() ? "host_done_at" : "guest_done_at"];
+  const theirs = TG[tgAmHost() ? "guest_done_at" : "host_done_at"];
+  return !!mine && !theirs;
+}
+
+let TG_WATCH_TICK = 0;
+let TG_CHEER_AT = 0;
+async function tgShowWatch() {
+  if (!tgWatching()) { clearInterval(TG_WATCH_TICK); return; }
+  const token = ++TG_RENDER;
+  const partner = tgPartnerEmail();
+  const first = tgPartnerFirst();
+  const list = tgListFor(partner);
+  const sets = TG_SETS.filter((x) => x.session_id === TG.id && tgSame(x.email, partner) && x.done);
+  const doneOn = (ex) => sets.filter((x) => tgSame(x.exercise_name, ex.name));
+  const total = list.reduce((n, e) => n + (e.sets || 3), 0) || 1;
+  const currentIdx = Math.max(0, list.findIndex((ex) => doneOn(ex).length < (ex.sets || 3)));
+  const cur = list[currentIdx];
+  const last = sets.slice().sort((a, b) => Date.parse(b.updated_at || 0) - Date.parse(a.updated_at || 0))[0];
+  const theirAv = await avatarHTML(partner, partnerName(), "them", "div");
+  if (token !== TG_RENDER || !tgWatching()) return;
+  const c = 2 * Math.PI * 46;
+  const frac = Math.min(1, sets.length / total);
+  const chips = cur ? Array.from({ length: cur.sets || 3 }, (_, i) => {
+    const s2 = doneOn(cur).find((x) => x.set_idx === i);
+    return s2 ? `<span class="tg-wchip done"><b>${s2.weight != null ? Number(s2.weight) : "-"}</b><small>× ${s2.reps ?? ""}</small></span>` : `<span class="tg-wchip"><small>Set ${i + 1}</small></span>`;
+  }).join("") : "";
+  const me = tgStatsFor(MY_EMAIL);
+  const el = tgOverlay("watch");
+  el.setAttribute("aria-label", `Watching ${first} train`);
+  el.innerHTML = `
+    <div class="tg-card watch">
+      <button type="button" class="tg-x" id="tgWatchX" aria-label="Close">&times;</button>
+      <div class="tg-live"><span class="tg-dot"></span>LIVE · <span id="tgWatchClock">0:00</span></div>
+      <div class="tg-wface">
+        <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46"/><circle class="fill" cx="50" cy="50" r="46" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(1)}"/></svg>
+        ${theirAv}
+      </div>
+      <h2 class="tg-h">${first} is still going</h2>
+      <p class="tg-sub">${sets.length} of ${total} sets${last ? ` · last: ${escapeHtml(last.exercise_name)} ${last.weight != null ? `${Number(last.weight)} × ${last.reps ?? ""}` : ""}` : ""}</p>
+      ${cur ? `<section class="tg-now">
+        <span class="tg-wk-who">Now</span>
+        <h3>${escapeHtml(cur.name)}</h3>
+        <div class="tg-wchips">${chips}</div>
+      </section>` : ""}
+      <ol class="tg-wlist">
+        ${list.map((ex, i) => {
+          const n = doneOn(ex).length, of = ex.sets || 3;
+          const st = n >= of ? "done" : i === currentIdx ? "now" : "";
+          return `<li class="${st}"><span>${escapeHtml(ex.name)}</span><span class="tg-sr">${n}/${of}</span></li>`;
+        }).join("")}
+      </ol>
+      <div class="tg-cheers" role="group" aria-label="Cheer ${first} on">
+        ${["Let's go", "Almost there", "Beast"].map((t) => `<button type="button" data-tg-cheer="${t}">${t}</button>`).join("")}
+      </div>
+      <button type="button" class="tg-clip" id="tgWatchClip">${icon("camera", 18)} Send a quick video</button>
+      <p class="tg-mine">You finished · ${me.sets} ${me.sets === 1 ? "set" : "sets"}${me.volume ? ` · ${me.volume.toLocaleString()} lb` : ""}</p>
+    </div>`;
+  $("tgWatchX").onclick = () => { clearInterval(TG_WATCH_TICK); el.remove(); };
+  /* The same one-view clip the live sheet sends (Mo, 2026-10-04). The watch
+     sits above the recorder, so it steps aside rather than closing: set
+     updates keep redrawing it underneath, and closeClipRecorder brings it
+     back exactly where it was. */
+  $("tgWatchClip").onclick = () => { el.classList.add("tg-hold"); openClipRecorder(partner); };
+  el.querySelectorAll("[data-tg-cheer]").forEach((b) => {
+    b.onclick = async () => {
+      /* One every few seconds: a cheer is a tap, not a stream. */
+      if (Date.now() - TG_CHEER_AT < 3000) return;
+      TG_CHEER_AT = Date.now();
+      b.classList.add("sent");
+      const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: partner, message: b.dataset.tgCheer });
+      if (error) { console.error("cheer not sent", error); toast("Couldn't send it"); b.classList.remove("sent"); return; }
+      buzz(10);
+      toast(`Sent to ${first}`);
+      setTimeout(() => b.classList.remove("sent"), 1200);
+    };
+  });
+  /* The clock is theirs: time since the session started. */
+  const start = Date.parse(TG.started_at || TG.created_at || Date.now());
+  const tick = () => {
+    const box = $("tgWatchClock");
+    if (!box) { clearInterval(TG_WATCH_TICK); return; }
+    const sec = Math.max(0, Math.round((Date.now() - start) / 1000));
+    box.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  };
+  tick();
+  clearInterval(TG_WATCH_TICK);
+  TG_WATCH_TICK = setInterval(tick, 1000);
+}
+
+/* Home: the way in when nobody is training, and the way back while it runs. */
+function renderTogetherHome() {
+  const slot = $("tgHome");
+  if (!slot) return;
+  if (!PARTNER_EMAIL || isCoachedClient?.()) { slot.innerHTML = ""; return; }
+  const first = tgPartnerFirst();
+  if (TG && TG_OPEN.includes(TG.status) && !tgStale(TG)) {
+    const label = tgWatching() ? `${first} is still going` : TG.status === "active" ? `You're training with ${first}` : TG.status === "lobby" ? `${first}'s in the lobby` : tgAmHost() ? `Waiting for ${first}` : `${first} wants to train together`;
+    slot.innerHTML = `<button type="button" class="tg-home live" id="tgHomeBtn"><span class="tg-dot"></span><span class="tg-home-txt"><b>${label}</b><span>${tgWatching() ? "Watch them finish" : "Tap to open"}</span></span><span class="tg-home-go">${tgWatching() ? "Watch" : "Open"}</span></button>`;
+    $("tgHomeBtn").onclick = () => {
+      if (tgWatching()) { tgShowWatch(); return; }
+      if (TG.status === "active") { switchTab("workout"); if (SESSION) openSessionUI?.(); renderSession?.(); } else renderTogether();
+    };
+    return;
+  }
+  /* Nothing when nobody is training together: the way in is their profile
+     (Mo, 2026-10-04: "me clicking on her profile"), so Home only speaks up
+     while a session is actually open. */
+  slot.innerHTML = "";
 }
 
 /* ---------- The photo editor ----------
@@ -18287,10 +19830,29 @@ async function openPartnerSheet() {
         </div>`).join("")
         : `<div class="ps-empty">Nothing logged yet.<br />When ${escapeHtml(name)} trains, it shows up here.</div>`}
     </div>
-    <button type="button" class="btn-primary" id="psCheer">Send encouragement</button>`;
+    <div class="ps-actions">
+      <button type="button" class="btn-primary ps-together" id="psTogether">${TG && TG_OPEN.includes(TG.status) && !tgStale(TG) ? "Open your session" : "Work out together"}</button>
+      <div class="ps-row">
+        <button type="button" class="ps-secondary" id="psProgress">See progress</button>
+        <button type="button" class="ps-secondary" id="psCheer">Encourage</button>
+      </div>
+    </div>`;
 
   $("psClose").onclick = closePartnerSheet;
   $("psCheer").onclick = () => { closePartnerSheet(); openNoteComposer("congratulate"); };
+  /* Train together starts here, on their profile, where you already go to see
+     what they are up to. An open session reopens rather than inviting twice. */
+  $("psTogether").onclick = () => {
+    closePartnerSheet();
+    if (TG && TG_OPEN.includes(TG.status) && !tgStale(TG)) renderTogether();
+    else tgInvite();
+  };
+  $("psProgress").onclick = () => {
+    closePartnerSheet();
+    PROGRESS_VIEW = "partner";
+    PROGRESS_GOAL_LENS = null;
+    switchTab("progress");
+  };
   $("partnerSheetScrim").classList.remove("hidden");
   $("partnerSheetScrim").onclick = (ev) => {
     if (ev.target === $("partnerSheetScrim")) closePartnerSheet();
@@ -19238,6 +20800,8 @@ function closeClipRecorder() {
   clipBlob = null;
   $("clipRecScrim").classList.add("hidden");
   $("clipRecStage").innerHTML = "";
+  /* A Train together watch that stepped aside for the recorder comes back. */
+  document.querySelector(".tg-scrim.tg-hold")?.classList.remove("tg-hold");
 }
 
 /* Safari gives MediaRecorder mp4; Chrome gives webm. Ask for what the browser
@@ -19491,7 +21055,14 @@ function showClipReview(toEmail, mime) {
       <div class="clip-note">Two watches, during this workout, then gone.</div>
     </div>`;
   $("clipCancel").onclick = () => { URL.revokeObjectURL(url); closeClipRecorder(); };
-  $("clipRetake").onclick = () => { URL.revokeObjectURL(url); closeClipRecorder(); openClipRecorder(toEmail); };
+  $("clipRetake").onclick = () => {
+    URL.revokeObjectURL(url);
+    /* Keep a held Train together watch held through the retake. */
+    const held = document.querySelector(".tg-scrim.tg-hold");
+    closeClipRecorder();
+    held?.classList.add("tg-hold");
+    openClipRecorder(toEmail);
+  };
   $("clipSend").onclick = async () => {
     $("clipSend").disabled = true;
     await sendClip(toEmail, mime);
@@ -20520,7 +22091,9 @@ async function renderLiveCard() {
   const nameLine = sharing
     ? `${escapeHtml(name)} is on ${escapeHtml(row.focus || "a workout")}`
     : `${escapeHtml(name)} is training`;
-  const what = sharing
+  const what = tgCanJoinLive(row)
+    ? "Still setting up · tap to join"
+    : sharing
     ? [row.exercise_name, `${mins} min in`, liveStateLabel(row)].filter(Boolean).join(" · ")
     : [`${mins} min in`, liveStateLabel(row), `${todaysEffortXP(name)} XP today`].join(" · ");
 
@@ -20603,6 +22176,11 @@ async function renderLiveSheet() {
     ${!sharing ? `<p class="lw-private-note">${escapeHtml(name)} keeps workout details private. Their effort score is always shared.</p>` : ""}
     ${sharing && nextEx ? `<p class="lw-next">Up next: <b>${escapeHtml(nextEx.name || "")}</b>${nextEx.sets ? ` · ${nextEx.sets} × ${escapeHtml(String(nextEx.reps || ""))}` : ""}</p>` : ""}
     ${stale ? `<p class="lw-stale">Their screen is off, so this is where they were a few minutes ago.</p>` : ""}
+    ${tgCanJoinLive(row) ? `<div class="lw-card lw-join">
+      <div class="lw-card-label">They have not started yet</div>
+      <button type="button" class="btn-primary" id="lwJoin" style="margin-top:6px">Ask to join ${escapeHtml(name.split(" ")[0])}'s workout</button>
+      <p class="lw-join-note">Same workout, each at your own pace. 1.5x XP.</p>
+    </div>` : ""}
     ${canCheer ? `<div class="lw-card">
       <div class="lw-card-label">Cheer them on</div>
       <div class="lw-send">
@@ -20619,6 +22197,7 @@ async function renderLiveSheet() {
   if ($("lwWhy")) $("lwWhy").onclick = () => { closeLiveSheet(); openEffortInfo(); };
   if ($("lwMsg")) $("lwMsg").onclick = () => { closeLiveSheet(); openNoteComposer("congratulate"); };
   if ($("lwClip")) $("lwClip").onclick = () => { closeLiveSheet(); openClipRecorder(row.email); };
+  if ($("lwJoin")) $("lwJoin").onclick = () => { closeLiveSheet(); tgRequestJoin(); };
 }
 
 /* ---------- Together timeline ----------
@@ -21480,6 +23059,7 @@ function relativeDay(dateStr) {
 let HOME_PAINTED = false;   // the first paint of a session is an arrival, the rest are refreshes
 
 function renderHome(animate = false) {
+  renderTogetherHome();
   renderHero(animate);
   /* Here rather than inside renderHero, because renderHero also runs on things
      that are not somebody arriving at the dashboard (a save on another tab, a
@@ -22059,7 +23639,7 @@ function renderToneChart(series, isPartner, unit = "in") {
      nobody can see. */
   if (!hired()) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => { if (!$("toneHero")?.classList.contains("hidden")) renderToneChart(series, isPartner, unit); })
       .catch(() => chartUnavailable("toneChart"));
     return;
@@ -22660,7 +24240,7 @@ function goalLineChart(canvasId, series, isPartner, unit, live) {
      nobody can see. */
   if (!hired()) return null;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       /* Whichever goal screen asked for it: the tab redraws and whoever is on
          screen gets their line. Checking one screen's id here meant the other
          two silently never came back from a cold library load. */
@@ -24145,7 +25725,7 @@ function renderActivityLive(a, stage) {
           <div class="sess-quip-slot" id="csnQuipSlot">
             ${said ? `<div class="sess-quip done">
               <span class="sess-quip-bub">
-                <span class="sess-quip-who">Coach</span>
+                <span class="sess-quip-who">Unio</span>
                 <span class="sess-quip-line">${escapeHtml(said)}</span>
               </span>
             </div>` : ""}
@@ -24496,10 +26076,21 @@ function renderCardioStage() {
             them both. Everywhere else it stays gone.
 
             Reversed the next day: Mo, 2026-09-21, "remove weightlifting."
-            The "lift" key stays valid in secondSessionPicks, so a day where
-            lifting IS the recommendation still argues for it up in the
-            Recommended cards; only this standalone door, the one this same
-            tile existed to add, is gone. */ ""}
+
+            And back, for the second session only: Mo, 2026-10-04, "when I do
+            another session, I still want weightlifting to be there, just in
+            case I wanted another lift." So the tile is offered on that arrival
+            and nowhere else, unless the Recommended cards above already carry
+            it. It goes through the lift card's own door: a plan for today
+            aimed at what the week has had least of, which lands on the plan
+            screen to change before starting. */ ""}
+      ${nextUp && !picks.some((x) => x.key === "lift") ? `
+          <div class="ob-styles act-styles">
+            <button type="button" class="ob-style" data-next="lift">
+              <span class="obs-ico">${icon("dumbbell", 20)}</span>
+              <span class="obs-label">Weightlifting</span>
+            </button>
+          </div>` : ""}
       ${!nextUp ? "" : `
         ${/* Said before the tap rather than discovered after it, and only while
               it is still true. ai_workouts WAS unique on (email, entry_date), so
@@ -25402,7 +26993,7 @@ function renderEnduranceChart(buckets, isPartner) {
      nobody can see. */
   if (!hired()) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => { if (!$("endHero")?.classList.contains("hidden")) renderEnduranceChart(buckets, isPartner); })
       .catch(() => chartUnavailable("endChart"));
     return;
@@ -25701,7 +27292,7 @@ let consistencyChart = null;
 
 function renderConsistencyChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderConsistencyChart).catch(() => chartUnavailable("consistencyChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26029,7 +27620,7 @@ let strengthChart = null;
 
 function renderStrengthChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderStrengthChart).catch(() => chartUnavailable("strengthChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26387,7 +27978,7 @@ function openLiftDetail(exerciseName) {
       },
     });
   };
-  if (window.Chart) draw(); else loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(draw).catch(() => {});
+  if (window.Chart) draw(); else loadScriptOnce("vendor/lib/chart-4.5.1.js").then(draw).catch(() => {});
 }
 
 /* ---------- Volume card ----------
@@ -26462,7 +28053,7 @@ let volumeChart = null;
 
 function renderVolumeChart() {
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderVolumeChart).catch(() => chartUnavailable("volumeChart"));
     return;
   }
   const viewingPartner = PROGRESS_VIEW === "partner";
@@ -26665,7 +28256,7 @@ function renderWeekCard(spec) {
   const card = $(spec.card);
   if (!card) return;
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1")
+    loadScriptOnce("vendor/lib/chart-4.5.1.js")
       .then(() => renderWeekCard(spec)).catch(() => chartUnavailable(spec.id + "Chart"));
     return;
   }
@@ -26747,7 +28338,7 @@ function renderWeightChart() {
   /* Chart.js is 70 KB and only this card uses it, so it arrives with the card
      rather than with the app. */
   if (!window.Chart) {
-    loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js@4.5.1").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
+    loadScriptOnce("vendor/lib/chart-4.5.1.js").then(renderWeightChart).catch(() => chartUnavailable("weightChart"));
     return;
   }
   /* ONE person per chart. Both lines shared a y axis, and with forty five
@@ -27889,7 +29480,7 @@ const GEN_STEPS = [
   "Setting your weights",
   "Almost there",
 ];
-let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0;
+let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0, genOpenedAt = 0;
 let genRaf = null, genRevShown = 0, genFrameAt = 0, genCancelled = false;
 
 function openGenOverlay(title) {
@@ -27897,6 +29488,7 @@ function openGenOverlay(title) {
   scrim.classList.remove("done");
   genPct = 0;
   genStepAt = 0;
+  genOpenedAt = Date.now();
   $("genStage").innerHTML = `
     <div class="gen-head">
       <div class="gen-word-wrap">
@@ -28043,6 +29635,31 @@ function stopGenTicker() {
   stopGenWordCycle();
 }
 
+/* Mo, 2026-10-04: the build "always has to stay for at least three seconds"
+   and the bar has to visibly reach the top of the head before it goes. A
+   cached plan came back in a few hundred ms and the screen flashed past. So a
+   finished generate waits out the three seconds, then fills the rest of the
+   way at a pace you can see, holds the full figure a beat, and only then
+   leaves. Cancelling still leaves at once. */
+const GEN_MIN_MS = 3000;
+async function finishGenOverlay() {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const left = GEN_MIN_MS - (Date.now() - genOpenedAt);
+  if (left > 0) await wait(left);
+  if (genCancelled) return;
+  stopGenTicker();
+  const from = genPct, t0 = Date.now(), FILL_MS = 900;
+  while (!genCancelled) {
+    const k = Math.min(1, (Date.now() - t0) / FILL_MS);
+    paintGen(from + (100 - from) * k);
+    if (k >= 1 && genRevShown >= 99.5) break;
+    if (Date.now() - t0 > FILL_MS + 1500) { genRevShown = 100; writeRev(); break; }
+    await wait(30);
+  }
+  if (genCancelled) return;
+  await wait(450);
+}
+
 function closeGenOverlay() {
   stopGenTicker();
   stopGenRaf();
@@ -28091,10 +29708,6 @@ let JUST_GENERATED = null;   // { date }
    Keyed by the day and never cleared: a sitting holds at most a week of them,
    and the next generate for a day replaces that day's. */
 const PLAN_WARNINGS = new Map();   // entry_date -> [{ kind, text }]
-/* Which day's notes are unfolded past PLAN_NOTES_SHOWN. One day at a time and
-   never persisted: opening the rest of Thursday's lines is a thing you did
-   on Thursday's screen. */
-let PLAN_NOTES_OPEN = null;
 
 /* Matched on the engine's own phrases, so a rewording there costs a line and
    never a plan.
@@ -28129,7 +29742,6 @@ let PLAN_NOTES_OPEN = null;
    the rule is not the linear default, since "add weight when every rep lands"
    is the plan's normal state and a line on every plan is not a line. */
 const PLAN_NOTE_KINDS = ["injury", "days", "secondary", "frequency", "equipment", "bodymap", "missing", "deload", "progression", "rotation"];
-const PLAN_NOTES_SHOWN = 3;
 
 /* The first sentence of an engine note, which is where each of them puts the
    fact before the paragraph of why. */
@@ -28259,10 +29871,54 @@ function closeSwapSheet() {
   pinSheets();
 }
 
-function renderSwapSheet() {
+/* Mo, 2026-10-04: "sometimes it doesn't have another option, which is a
+   mistake". Only plans the engine built carry `alternatives`; anything built
+   by hand, by Plan my own or before the engine attached them has none, and the
+   sheet said there was nothing close. The same ranked matcher No equipment
+   today uses works them out here instead, from the lifting library, keeping
+   out what is already on the plan. Remembered per name for the sitting so
+   reopening the sheet is instant. */
+const SWAP_ALTS = new Map();
+async function swapAlternativesFor(ex) {
+  const bw = bwOnly();
+  const own = (ex.alternatives || []).filter((a) => a && a.name && a.name !== ex.name && (!bw || exIsBodyweight(a)));
+  if (own.length) return own.slice(0, 3);
+  const key = `${(ex.name || "").toLowerCase()}|${bw ? "bw" : "all"}`;
+  if (SWAP_ALTS.has(key)) return SWAP_ALTS.get(key);
+  const onPlan = (SWAP_CTX?.list?.() || []).map((e) => e.name);
+  const pool = bw ? strengthLibraryPool().filter(exIsBodyweight) : strengthLibraryPool();
+  let out = [];
+  const libEx = findStrengthLibraryExercise(ex.name);
+  const mod = libEx ? await ensureAlternativesMatcher() : null;
+  if (mod && libEx) {
+    out = mod.scoreAlternatives({ exercise: libEx, pool, exclude: onPlan, count: 3 })
+      .map((a) => ({ name: a.name, why: a.why }));
+  }
+  /* A name the library does not know (typed by hand): fall back to anything
+     that works the same main muscle, so there is always something to offer. */
+  if (!out.length) {
+    const prim = classifyMuscles(ex.name || "")?.primary || [];
+    out = pool.filter((p) => p.name !== ex.name && !onPlan.includes(p.name) && (p.primary || []).some((g) => prim.includes(g)))
+      .slice(0, 3).map((p) => ({ name: p.name, why: `Also works your ${(p.primary || [])[0] || "same muscles"}` }));
+  }
+  SWAP_ALTS.set(key, out);
+  return out;
+}
+
+/* Which picker area an exercise belongs to, so Browse opens on its section. */
+function swapGroupFor(ex) {
+  const libEx = findStrengthLibraryExercise(ex.name);
+  const prim = libEx?.primary || classifyMuscles(ex.name || "")?.primary || [];
+  const g = CB_GROUPS.find((x) => x.cats && x.cats.some((c) => prim.includes(c)));
+  return g ? g.key : "all";
+}
+
+async function renderSwapSheet() {
   const ex = swapTarget();
   if (!ex) { closeSwapSheet(); return; }
-  const alts = (ex.alternatives || []).filter((a) => a && a.name && a.name !== ex.name).slice(0, 3);
+  const alts = await swapAlternativesFor(ex);
+  if (swapTarget() !== ex) return;   // the sheet moved on while that was being worked out
+  const group = CB_GROUPS.find((g) => g.key === swapGroupFor(ex));
   $("swapSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="scr-head">
@@ -28270,26 +29926,30 @@ function renderSwapSheet() {
       <div class="scr-title">Swap ${escapeHtml(ex.name || "")}</div>
       <div class="spacer"></div>
     </div>
-    <p class="muted-note" style="margin:-6px 0 14px;">${alts.length
+    <p class="muted-note" style="margin:-6px 0 12px;">${alts.length
       ? "Same job, a different movement. Sets and reps stay where they are."
-      : "Nothing close enough to suggest for this one. Search the library instead."}</p>
+      : "Nothing close enough to suggest for this one. Browse the library instead."}</p>
+    <div class="bw-toggle-wrap">${bwToggleHTML()}</div>
     <div class="sv-rows">
-      ${alts.map((a, i) => `<button type="button" class="sv-row" data-alt="${i}">
-        <span class="sv-row-ico">${icon("swap", 18)}</span>
+      ${alts.map((a, i) => `<button type="button" class="sv-row sv-row-fig" data-alt="${i}">
+        <span class="sv-fig" data-fig="${escapeHtml(a.name)}" data-fig-static></span>
         <span class="sv-row-txt">
           <span class="sv-row-name">${escapeHtml(a.name)}</span>
           <span class="sv-row-meta">${escapeHtml(a.why || "")}</span>
         </span>
         <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
       </button>`).join("")}
-      ${SWAP_SEARCHING ? "" : `<button type="button" class="sv-row" id="swSearchRow">
-        <span class="sv-row-ico">${icon("plus", 18)}</span>
+      ${/* Browse opens the same picker Add exercise uses, on this exercise's
+            own section (Mo: swapping an upper body lift browses upper body),
+            with the other sections one tap away in its chips. */ ""}
+      <button type="button" class="sv-row" id="swBrowseRow">
+        <span class="sv-row-ico">${icon("dumbbell", 18)}</span>
         <span class="sv-row-txt">
-          <span class="sv-row-name">Search all exercises</span>
-          <span class="sv-row-meta">Anything in the library, not just these</span>
+          <span class="sv-row-name">Browse ${group && group.key !== "all" ? `${escapeHtml(group.label.toLowerCase())} ` : ""}exercises</span>
+          <span class="sv-row-meta">With pictures. Switch sections any time.</span>
         </span>
         <span class="sv-row-go">${icon("chevronLeft", 16)}</span>
-      </button>`}
+      </button>
     </div>
     ${SWAP_SEARCHING ? `
     <div class="ex-search-wrap" style="margin-top:12px">
@@ -28298,11 +29958,13 @@ function renderSwapSheet() {
     <div class="sv-rows" id="swResults" style="margin-top:8px"></div>` : ""}`;
 
   $("swClose").onclick = closeSwapSheet;
+  wireBwToggle($("swapSheet"), renderSwapSheet);
   $("swapSheet").querySelectorAll("[data-alt]").forEach((b) => {
     const a = alts[Number(b.dataset.alt)];
     b.onclick = () => applySwap(a.name, "suggested");
   });
-  if ($("swSearchRow")) $("swSearchRow").onclick = () => { SWAP_SEARCHING = true; renderSwapSheet(); };
+  if ($("swBrowseRow")) $("swBrowseRow").onclick = () => { CB_GROUP = swapGroupFor(ex); cbOpenPicker("swap"); };
+  mountMotionFigures($("swapSheet"));
   if ($("swSearch")) {
     // The same catalog and the same normaliser the manual builder searches, so
     // "push up" finds "Push-Up" here for the same reason it does there.
@@ -28319,7 +29981,7 @@ function renderSwapResults() {
   const query = $("swSearch")?.value.trim() || "";
   if (!query) { wrap.innerHTML = `<div class="cb-none">Type a name to search the library.</div>`; return; }
   const seen = new Set();
-  const found = searchExerciseCatalog(query, 12).filter((ex) => {
+  const found = bwFilter(searchExerciseCatalog(query, 12)).filter((ex) => {
     const key = (ex.name || "").toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
@@ -28428,7 +30090,7 @@ async function applySwap(chosen, source) {
      whole distinction exists to avoid. */
   const chosenKit = findStrengthLibraryExercise(chosen);
   ex.loadBasis = last != null ? "your last session"
-    : BODYWEIGHT_EQUIPMENT.has(chosenKit?.equipment) ? "bodyweight"
+    : exIsBodyweight({ name: chosen, equipment: chosenKit?.equipment }) ? "bodyweight"
     : "unknown";
 
   const idx = ctx.index;
@@ -28499,6 +30161,48 @@ function swapCurrentExercise() {
   });
 }
 
+/* The current movement, taken out of today's workout from inside the
+   session (Mo, 2026-10-04: "if we changed our mind"). Every per-exercise list
+   the session keeps moves with it, including the two keyed by position, and
+   the saved plan is rewritten so the session still matches it on the way
+   back in. */
+async function removeCurrentExercise() {
+  if (!SESSION || !TODAY_WORKOUT?.exercises?.length) return;
+  const exs = TODAY_WORKOUT.exercises;
+  const ei = SESSION.exerciseIndex;
+  if (exs.length <= 1 || (SESSION.setsDone[ei] || []).some(Boolean)) return;
+  const name = exs[ei].name;
+  exs.splice(ei, 1);
+  for (const k of ["setsDone", "setWeights", "weights", "reps", "completed"]) SESSION[k]?.splice(ei, 1);
+  if (SESSION.rampTicks) {
+    const next = {};
+    for (const [k, v] of Object.entries(SESSION.rampTicks)) { const n = Number(k); if (n !== ei) next[n > ei ? n - 1 : n] = v; }
+    SESSION.rampTicks = next;
+  }
+  if (SESSION.restLog) {
+    const next = {};
+    for (const [k, v] of Object.entries(SESSION.restLog)) {
+      const [a, b] = k.split("-").map(Number);
+      if (a !== ei) next[`${a > ei ? a - 1 : a}-${b}`] = v;
+    }
+    SESSION.restLog = next;
+  }
+  /* On to the next thing not yet done, looking forward first. */
+  let to = SESSION.completed.findIndex((c, i) => i >= ei && !c);
+  if (to === -1) to = SESSION.completed.findIndex((c) => !c);
+  SESSION.exerciseIndex = to === -1 ? Math.min(ei, exs.length - 1) : to;
+  SESSION.restStartedAt = null;
+  stopRestTicker();
+  SESSION_LAST_EX = null;
+  saveSessionToStorage();
+  renderSession();
+  toast(`Removed ${name}`);
+  if (TODAY_WORKOUT.id) {
+    const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
+    if (error) console.error("removed exercise not saved to the plan", error);
+  }
+}
+
 /* ---------- No equipment today ----------
    Mo, mo-knowledge/FLOW-DECISIONS-2026-09-17.md, "Do not lock me in the
    workout": "Open rules, not endpoints." Somebody who cannot get to the gym
@@ -28560,6 +30264,45 @@ const NO_GYM_EQUIPMENT = new Set(["barbell", "cable", "machine", "dumbbell"]);
    rather than inferred from NO_GYM_EQUIPMENT's complement: a band, a wall and
    a foam roller are none of them a gym and none of them a weight you pick. */
 const BODYWEIGHT_EQUIPMENT = new Set(["bodyweight", "none", "wall", "doorway", "bench", "foam roller"]);
+
+/* ---------- Bodyweight only ----------
+   Mo, 2026-10-04: one switch, on the swap sheet, the library and Plan my
+   own, that narrows what you are SHOWN to moves you can do anywhere. It never
+   rewrites a workout (that was No equipment today, which this replaces in
+   the session menu); it only changes which options are on screen, and you
+   still choose. Remembered for the day, because a day at home and the next
+   one back at the gym are different answers. */
+const bwOnlyKey = () => `unio.bwOnly.${todayStr()}`;
+function bwOnly() { try { return localStorage.getItem(bwOnlyKey()) === "1"; } catch { return false; } }
+function setBwOnly(on) { try { localStorage.setItem(bwOnlyKey(), on ? "1" : "0"); } catch { /* the switch still works for this screen */ } }
+/* The library files these as bodyweight and each needs kit: plates, a weight
+   belt, an ab wheel, a glute-ham machine. Overridden here until the library
+   is corrected (mo-knowledge/LIBRARY-REQUESTS.md, item 13). A bar is not on
+   this list on purpose: pull-ups and dips are bodyweight training. */
+const NEEDS_KIT_DESPITE_LABEL = new Set(["plate pinch", "weighted dip", "weighted pull-up", "ab wheel rollout", "glute-ham raise"]);
+function exIsBodyweight(ex) {
+  if (NEEDS_KIT_DESPITE_LABEL.has(String(ex?.name || "").toLowerCase())) return false;
+  const kit = String(ex?.equipment ?? findStrengthLibraryExercise(ex?.name)?.equipment ?? "").toLowerCase();
+  return BODYWEIGHT_EQUIPMENT.has(kit);
+}
+function bwFilter(list) { return bwOnly() ? list.filter(exIsBodyweight) : list; }
+function bwToggleHTML() {
+  const on = bwOnly();
+  return `<label class="gym-toggle bw-toggle${on ? " checked" : ""}">
+      <span><b>Bodyweight only</b><i>Your body, a bar at most</i></span>
+      <input type="checkbox" data-bw${on ? " checked" : ""} />
+    </label>`;
+}
+/* `redraw` repaints whatever the list is; the switch's own look follows here. */
+function wireBwToggle(root, redraw) {
+  const input = root?.querySelector("[data-bw]");
+  if (!input) return;
+  input.onchange = () => {
+    setBwOnly(input.checked);
+    input.closest(".bw-toggle")?.classList.toggle("checked", input.checked);
+    redraw();
+  };
+}
 
 /* "Already logged" means a set is actually in the log, not that every set is.
    SESSION.completed[i] only flips once the last of them lands, so a plan with
@@ -29456,7 +31199,7 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
    seven of those in a row is seven overlays over one button press and seven
    round trips fetching a week that is still being written. The caller reloads
    and redraws once at the end, and reads the answer off the return value. */
-async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null, limits = null, focusGroups = null, quiet = false, avoidNames = null, slot: wantSlot = null } = {}) {
+async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null, limits = null, focusGroups = null, quiet = false, avoidNames = null, slot: wantSlot = null, force = false } = {}) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
   /* Mo: "the only way I can go back and generate a new workout or do anything
      is if I end that workout." The workout tab already stands in front of
@@ -29498,6 +31241,36 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
   const wanted = typeof forDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(forDate) ? forDate : null;
   const target = wanted || todayStr();
   const isToday = target === todayStr();
+  /* Red muscles: a rest day, unless they say otherwise. Asked of the local
+     engine with the same inputs the real build gets, so the warning names what
+     THIS generate would train, then checked against the Body tab's reading.
+     Today only (tomorrow's red is not tomorrow's problem), never on a
+     regenerate (they already chose), never for the quiet week builder. */
+  if (!quiet && !force && !sameAgain && isToday) {
+    let red = [];
+    try {
+      const engine = await ensurePlanEngine();
+      if (engine) {
+        const built = engine.generateFromPayload(workoutEnginePayload({
+          focus: keepFocus || MY_PROFILE?.focus, sessionMinutes, limits, focusGroups,
+        }), { includePlan: true });
+        const day = (built.plan?.week || []).find((d) => d?.name === built.meta?.dayName);
+        const groups = day?.mainGroups?.length ? day.mainGroups
+          : (built.workout?.exercises || []).flatMap((e) => classifyMuscles(e.name)?.primary || []);
+        red = redAreasFor(await recoveryAreasNow(), groups);
+      }
+    } catch (e) { console.warn("rest day check skipped", e); }
+    if (red.length) {
+      const go = await askConfirm({
+        heading: "Rest day recommended",
+        body: redAreasSentence(red),
+        ok: "Generate anyway",
+        cancel: "Rest today",
+        tone: "warn",
+      });
+      if (!go) return false;
+    }
+  }
   if (!quiet) {
     WORKOUT_MODE = null;
     openGenOverlay(isToday ? "Generating" : "Planning");
@@ -29713,9 +31486,11 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        cancelled: they left, and landing them on a screen they did not ask for
        would be the app following them out. */
     if (!genCancelled) {
-      paintGen(100);   // the last frame is a finished bar, not one caught mid sweep
-      closeGenOverlay();
-      showPlanScreen(target);
+      await finishGenOverlay();   // three seconds at least, and a full bar
+      if (!genCancelled) {
+        closeGenOverlay();
+        showPlanScreen(target);
+      }
     }
     /* Answered, so a caller that has to undo something on failure can tell the
        two apart. Nothing else reads it. */
@@ -29964,20 +31739,58 @@ function clearSessionStorage() {
 /* `bodyHtml` is for the one caller that needs a list rather than a sentence.
    Everything else still passes `body` and is still escaped; this is markup the
    app wrote about itself, never anything a person typed. */
-function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going" }) {
+/* ---------- Red on the Body tab ----------
+   Mo, 2026-10-04: a muscle worked hard in the last day (red on the Body tab,
+   "give it a day") should not be trained again without being told. Generate
+   recommends a rest day instead and Plan my own warns on the exercise, and
+   both let you go ahead anyway: a recommendation, never a lock. Red only. The
+   Body tab itself calls amber fine to train, and warning on amber would be the
+   app arguing with its own legend. */
+async function recoveryAreasNow() {
+  try {
+    const rec = await ensureRecoveryEngine();
+    if (rec && EXERCISE_TRAININGS.length) {
+      const states = rec.muscleRecoveryStates({
+        logs: workoutEnginePayload().logs,
+        muscleIndex: rec.buildMuscleIndex(EXERCISE_TRAININGS),
+        today: new Date(),
+      });
+      return bodyAreasFromEngine(states);
+    }
+  } catch (e) { console.warn("recovery reading for the warning", e); }
+  return bodyAreaStates();   // the Body tab's own fallback, same as it shows offline
+}
+const redAreasFor = (areas, groups) =>
+  areas.filter((a) => a.state === "hold" && a.members.some((m) => groups.includes(m)));
+/* "Legs was worked hard in the last day. It's fully recovered in about 30 hours." */
+function redAreasSentence(red) {
+  const names = bodyPhraseAnd(red.map((a) => a.label));
+  const hours = Math.max(1, Math.round(Math.max(...red.map((a) => a.hoursLeft))));
+  return `${names} ${red.length === 1 ? "was" : "were"} worked hard in the last day. Fully recovered in about ${hours} hours. We'd give ${red.length === 1 ? "it" : "them"} a rest today.`;
+}
+
+/* `tone: "warn"` is for the app advising against the thing being asked (Mo,
+   2026-10-04: "maybe you should have it like red"). Red heading and icon, the
+   reason in a red box, and the buttons swap weight: the safe answer is the big
+   one and going ahead anyway is the quiet one, because that is the advice. */
+function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going", tone = null }) {
   return new Promise((resolve) => {
+    const warn = tone === "warn";
     const scrim = document.createElement("div");
     scrim.className = "pop-scrim";
     scrim.innerHTML = `
-      <div class="pop">
+      <div class="pop${warn ? " pop-warn" : ""}">
         <div class="pop-body">
           <div class="ds-top">
-            <div class="pop-who" style="color:var(--muted)">${escapeHtml(heading.toUpperCase())}</div>
+            <div class="pop-who"${warn ? "" : ` style="color:var(--muted)"`}>${warn ? icon("alert", 16) : ""}${escapeHtml(heading.toUpperCase())}</div>
             <button type="button" class="ds-x" data-confirm="0" aria-label="Close">&times;</button>
           </div>
-          ${bodyHtml || `<p class="muted-note">${escapeHtml(body)}</p>`}
-          <button type="button" class="btn-primary" data-confirm="1" style="margin-top:16px;">${escapeHtml(ok)}</button>
-          <button type="button" class="btn-ghost" data-confirm="0">${escapeHtml(cancel)}</button>
+          ${bodyHtml || `<p class="${warn ? "pop-warn-body" : "muted-note"}">${escapeHtml(body)}</p>`}
+          ${warn
+            ? `<button type="button" class="btn-primary" data-confirm="0" style="margin-top:16px;">${escapeHtml(cancel)}</button>
+               <button type="button" class="btn-ghost pop-warn-anyway" data-confirm="1">${escapeHtml(ok)}</button>`
+            : `<button type="button" class="btn-primary" data-confirm="1" style="margin-top:16px;">${escapeHtml(ok)}</button>
+               <button type="button" class="btn-ghost" data-confirm="0">${escapeHtml(cancel)}</button>`}
         </div>
       </div>`;
     document.body.appendChild(scrim);
@@ -29994,7 +31807,7 @@ function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going" }) {
    Both session kinds ask it now, so the noun is passed in: a run is not a
    workout, and "End treadmill session here" is already what the Finish button
    on that same screen calls it. */
-function askPauseOrEnd({ noun = "workout" } = {}) {
+function askPauseOrEnd({ noun = "workout", invite = null } = {}) {
   return new Promise((resolve) => {
     const scrim = document.createElement("div");
     scrim.className = "pop-scrim";
@@ -30006,6 +31819,9 @@ function askPauseOrEnd({ noun = "workout" } = {}) {
             <button type="button" class="ds-x" data-choice="" aria-label="Close">&times;</button>
           </div>
           <button type="button" class="btn-primary" data-choice="" style="margin-top:8px;">Keep going</button>
+          ${/* Train together from inside a workout lives here now, not in a strip
+                across the top of the session (Mo, 2026-10-04). */ ""}
+          ${invite ? `<button type="button" class="btn-ghost tg-pause-invite" data-choice="invite">${icon("people", 16)} ${escapeHtml(invite)}</button>` : ""}
           <button type="button" class="btn-ghost" data-choice="pause">Pause ${escapeHtml(noun)}</button>
           <button type="button" class="btn-ghost" data-choice="end" style="color:var(--danger, #ff5c5c);">End ${escapeHtml(noun)} here</button>
         </div>
@@ -30049,6 +31865,9 @@ function todaysLoggedExerciseNames() {
 }
 
 function startWorkout() {
+  /* Making a workout for Train together, Start means "this one": it goes back
+     to the session's review rather than starting a workout on your own. */
+  if (TG_MAKING) { tgUseTodayPlan(); return; }
   if (!TODAY_WORKOUT) return;
   /* A run or a class is not a list of sets, and this screen opens on an
      exercise. Every Begin in the app comes through here, so the one branch
@@ -30605,6 +32424,13 @@ function sfxNote(ctx, at, n) {
 }
 
 const SFX_KIT = {
+  /* Two people became a pair. Up a sixth, both notes held: the warmest thing
+     in the kit, and it plays once per pair, ever. */
+  paired: [
+    { at: 0, hz: 523, ms: 180, peak: 0.13, type: "sine" },
+    { at: 0.14, hz: 880, ms: 420, peak: 0.13, type: "sine" },
+    { at: 0.16, hz: 1319, ms: 380, peak: 0.05, type: "sine" },
+  ],
   /* Logged. One note, high and short: the sound of a thing landing, not of a
      thing being celebrated. It happens forty times a workout. */
   set: [{ at: 0, hz: 880, ms: 90, peak: 0.16 }],
@@ -30993,7 +32819,7 @@ function sayQuip(key) {
   el.innerHTML = `
     <span class="sess-quip-av">${icon("dumbbell", 15)}</span>
     <span class="sess-quip-bub">
-      <span class="sess-quip-who">Coach</span>
+      <span class="sess-quip-who">Unio</span>
       <span class="sess-quip-line"><span class="sess-quip-txt"></span><i class="sess-quip-cur"></i></span>
     </span>`;
   /* The lines are written with HTML entities (&rsquo;, &ldquo;) because they
@@ -31114,6 +32940,13 @@ function homeBotLine() {
   if (partner && !mineToday && theirsToday) {
     return { text: `${partner} already trained today. Your move.` };
   }
+  /* Mo, 2026-10-04: he suggests training together. Only when it is true that
+     neither of you has, and only when nothing together is already open. The
+     card is still one button (Mo did not want a second CTA under him): for
+     this line, tapping him is the invite. */
+  if (partner && !mineToday && !theirsToday && !iAmIn && !(TG && TG_OPEN.includes(TG.status) && !tgStale(TG))) {
+    return { text: `Neither of you has trained yet today. Tap me and we will do one together.`, action: "together" };
+  }
   if (!mineToday) {
     const habit = weekdayHabit(ME);
     if (habit) {
@@ -31167,8 +33000,10 @@ function sayHomeQuip() {
      session bubble does it: nobody should have to wait out an animation before
      their screen reader will tell them what it said. */
   const say = el.querySelector(".home-quip-say");
-  say.setAttribute("aria-label", `He says: ${said}. Tap to dismiss`);
-  say.onclick = () => hideHomeQuip();
+  const spoken = said.replace(/[.!?]+$/, "");
+  say.setAttribute("aria-label", real?.action === "together" ? `He says: ${spoken}. Tap to train together` : `He says: ${spoken}. Tap to dismiss`);
+  say.onclick = real?.action === "together" ? () => { hideHomeQuip(); tgInvite(); } : () => hideHomeQuip();
+  if (real?.action === "together") el.classList.add("act");
   slot.replaceChildren(el);
   document.getElementById("tab-home")?.classList.add("bot-between");
   /* He stays. There is no set coming to push him off, and a line that vanishes
@@ -31460,6 +33295,8 @@ function toggleSet(setIdx) {
     SESSION.restStartedAt = null;
   }
   saveSessionToStorage();
+  /* Sent to the other phone the moment it is banked here. */
+  if (SESSION.together) tgPushSet(ei, setIdx, nowDone);
   renderSession();
   // After the redraw: the pop is fixed to the page, not inside the markup that
   // was just replaced, and the toast reads off what the render just banked.
@@ -32277,6 +34114,7 @@ function startSessionWake() {
 function renderSession() {
   beatLive();
   pushLiveActivity();
+  tgRenderHud();
   /* The two timed phases have their own screen. Everything below this line is
      the lift, and none of it can see a stretch. */
   if (SESSION.phase === "warmup" || SESSION.phase === "cooldown") { renderStretchPhase(); return; }
@@ -32794,8 +34632,9 @@ function openExerciseActions() {
   const ei = SESSION.exerciseIndex;
   const ex = TODAY_WORKOUT?.exercises?.[ei];
   if (!ex) return;
-  const nextIdx = TODAY_WORKOUT.exercises.findIndex((x, i) => i !== ei && !SESSION.completed[i]);
-  const canGoBodyweight = remainderNeedsEquipmentSwitch();
+  /* Logged sets are the record of what happened, so a lift with any on it
+     stays; and a workout needs something in it. */
+  const canRemove = TODAY_WORKOUT.exercises.length > 1 && !(SESSION.setsDone[ei] || []).some(Boolean);
 
   const scrim = document.createElement("div");
   scrim.className = "pop-scrim";
@@ -32811,22 +34650,16 @@ function openExerciseActions() {
             <span class="sess-act-ico">${icon("swap", 18)}</span>
             <span>Swap exercise<i>A different movement for the same muscles</i></span>
           </button>
-          <button type="button" class="sess-act" data-act="skip"${nextIdx === -1 ? " disabled" : ""}>
-            <span class="sess-act-ico">${icon("chevronRight", 18)}</span>
-            <span>Skip exercise<i>${nextIdx === -1
-              ? "Nothing else left to move to"
-              : `Move on to ${escapeHtml(TODAY_WORKOUT.exercises[nextIdx].name)}, come back any time`}</i></span>
+          ${/* Mo, 2026-10-04: Swap and Remove, nothing else. Skip already sits
+                at the bottom of the session screen; No equipment today became
+                the Bodyweight only switch on the swap sheet; Who can see this
+                went with the plan screen's Advanced button. */ ""}
+          <button type="button" class="sess-act" data-act="remove"${canRemove ? "" : " disabled"}>
+            <span class="sess-act-ico">${icon("close", 18)}</span>
+            <span>Remove exercise<i>${canRemove
+              ? "Take it out of today's workout"
+              : TODAY_WORKOUT.exercises.length <= 1 ? "It's the only one left" : "You've already logged sets on it"}</i></span>
           </button>
-          <button type="button" class="sess-act" data-act="noequip"${canGoBodyweight ? "" : " disabled"}>
-            <span class="sess-act-ico">${icon("body", 18)}</span>
-            <span>No equipment today<i>${canGoBodyweight
-              ? "Switch what's left of this workout to bodyweight"
-              : "Nothing left needs a barbell, cable, machine or dumbbell"}</i></span>
-          </button>
-          ${PARTNER_EMAIL ? `<button type="button" class="sess-act" data-act="privacy">
-            <span class="sess-act-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 18)}</span>
-            <span>Who can see this<i>${escapeHtml(privacySummary())}</i></span>
-          </button>` : ""}
         </div>
       </div>
     </div>`;
@@ -32838,9 +34671,7 @@ function openExerciseActions() {
       const act = b.dataset.act;
       close();
       if (act === "swap") swapCurrentExercise();
-      else if (act === "skip" && nextIdx !== -1) jumpToExercise(nextIdx);
-      else if (act === "noequip" && canGoBodyweight) noEquipmentToday();
-      else if (act === "privacy") openWorkoutPrivacy();
+      else if (act === "remove" && canRemove) removeCurrentExercise();
     };
   });
 }
@@ -32905,6 +34736,8 @@ function sessionRecordedAnything() {
 async function finishWorkout() {
   if (!SESSION || SESSION.finished) return;   // already banked
   SESSION.finished = true;
+  /* Your half of a together session is done; the session is done when both are. */
+  if (SESSION.together) tgMarkDone();
   /* On the tap, not after the writes below. The sound is about what the person
      just did; whether a row landed is a different question with its own toast. */
   sfx.play("finish");
@@ -33630,9 +35463,11 @@ function openSessionUI() {
        and holding to end a workout, standing in front of a stretch. */
     if (SESSION.standaloneStretch) { endStretchSession(); return; }
     if (SESSION.pausedAt) { togglePause(); return; }   // the play icon just resumes
-    const choice = await askPauseOrEnd();
+    const canInvite = PARTNER_EMAIL && !SESSION.together && !(TG && TG_OPEN.includes(TG.status) && !tgStale(TG));
+    const choice = await askPauseOrEnd({ invite: canInvite ? `Invite ${partnerName().split(" ")[0]} to join` : null });
     if (choice === "pause") togglePause();
     else if (choice === "end") endWorkoutNow();
+    else if (choice === "invite") tgInvite({ fromSession: true });
   };
   $("sessionMinBtn").innerHTML = icon("chevronDown", 20);
   $("sessionMinBtn").onclick = minimiseSession;
@@ -33818,7 +35653,6 @@ function pausedScreenHTML({ overlay }) {
     <div class="pz${overlay ? "" : " pz-inline"}">
       <div class="pz-top">
         <button type="button" class="pz-min" id="pzHome" aria-label="Home, the workout keeps running">${icon("home", 22)}</button>
-        ${f.canGoBodyweight ? `<button type="button" class="pz-min" id="pzKit" aria-label="No equipment today. Switch what's left to bodyweight">${icon("body", 22)}</button>` : ""}
       </div>
 
       <div class="pz-mid">
@@ -33915,7 +35749,6 @@ function wirePausedScreen({ overlay, root: given }) {
      nothing. That was "the buttons don't work on this page". */
   const q = (id) => root.querySelector("#" + id);
   q("pzHome").onclick = () => (SESSION ? goHomeFromSession() : goHomeFromActivity());
-  if (q("pzKit")) q("pzKit").onclick = () => noEquipmentToday({ overlay });
   q("pzResume").onclick = () => resumeFromPaused({ overlay, root });
   mountMotionFigures(root);
   renderPausedLive(root);
@@ -34213,6 +36046,7 @@ function closeAllWorkouts() { $("allWorkoutsScrim").classList.add("hidden"); }
 
 function renderWorkoutTab({ respectMode = false } = {}) {
   renderFab();
+  tgRenderMakeBar();   // the Train together bar rides on this tab while a workout is being made for it
   resumeSessionIfAny();          // loads a saved session, does not take over
   restoreCardioSession();        // and the same for a run left going
   if (SESSION) FRESH_PLAN_ID = null;   // once it is being lifted it is not untouched any more
@@ -35425,7 +37259,14 @@ function renderChooseScreen() {
       ? optionCard("chooseActivityBtn", "play", `Resume ${csnAct().label.toLowerCase()}`,
           `Running for ${csnClock(csnElapsedMs())}.`, false)
       : optionCard("chooseActivityBtn", "run", "Start an activity",
-          "Run, cycle, Pilates, and the rest.", false)}`;
+          "Run, cycle, Pilates, and the rest.", false)}
+    ${/* Mo, 2026-10-04: Train together was hidden behind their profile. This is
+          where you decide how to train, so it is one of the ways. Not while
+          a Train together workout is being made: you are already in it. */ ""}
+    ${PARTNER_EMAIL && !coached && !TG_MAKING
+      ? optionCard("chooseTogetherBtn", "people", `Work out with ${partnerName().split(" ")[0]}`,
+          "Same workout or side by side, live, anywhere. 1.5x XP.", false)
+      : ""}`;
 
   const preview = coached ? "" : `
     <div class="spp">
@@ -35673,7 +37514,19 @@ function renderChooseScreen() {
                 should match." One solid primary action, one quiet line under
                 it, the same shape wkt-week-gen already uses below: not two
                 buttons of near-equal weight side by side. */ ""}
-          ${tomorrowPlan ? "" : `<button type="button" class="wkt-more" id="choosePlanBtn">or plan it yourself ${icon("chevronRight", 13)}</button>`}
+          ${/* Mo, 2026-10-04: "plan it yourself" was a small grey link that read
+                as an afterthought, and a second full width button for Train
+                together under the primary was one button too many. So: the one
+                primary, then one row of two equal buttons, the same height as
+                it, with the same gap all the way down. Train together only for
+                today and not while one is being made. */ ""}
+          ${tomorrowPlan ? "" : (() => {
+            const together = PARTNER_EMAIL && !coached && !TG_MAKING && !allDone;
+            return `<div class="wkt-acts-row${together ? " two" : ""}">
+              <button type="button" class="wkt-btn-soft" id="choosePlanBtn">${icon("pencil", 16)} Plan my own</button>
+              ${together ? `<button type="button" class="wkt-btn-soft wkt-with" id="chooseTogetherBtn">${icon("people", 16)} With ${escapeHtml(partnerName().split(" ")[0])}</button>` : ""}
+            </div>`;
+          })()}
           ${/* Ahead of the generate, not after it: the plan screen's own time
                 control (planTimeBtn) only exists once a plan does, and this is
                 the moment "how long have you got" actually matters, before
@@ -35821,6 +37674,9 @@ function renderChooseScreen() {
      card, which IS its preview, and Start the clock is one tap further: one
      preview, not two. */
   if ($("chooseBeginBtn")) $("chooseBeginBtn").onclick = () => goWorkoutScreen(null);
+  if ($("chooseTogetherBtn")) $("chooseTogetherBtn").onclick = () => {
+    if (TG && TG_OPEN.includes(TG.status) && !tgStale(TG)) renderTogether(); else tgInvite();
+  };
   /* One door for both days. It used to hand a finished day to the day planner,
      whose first offer is Generate one, so "Plan my own" answered with the
      question it had just been told no to. The builder writes to whatever
@@ -38373,6 +40229,20 @@ function cbExercisesFor(groupKey, query) {
     for (const ex of c.exercises) {
       if (seen.has(ex.name)) continue;
       if (q && !normalizeSearch(ex.name).includes(q)) continue;
+      if (bwOnly() && !exIsBodyweight(ex)) continue;
+      seen.add(ex.name);
+      out.push(ex);
+    }
+  }
+  /* The calisthenics library files its moves by pattern (push, pull, legs),
+     not by muscle, so a Handstand Push-Up was in no section at all and
+     Bodyweight only left Shoulders empty. Each one joins the section of its
+     main muscle, after the section's own. */
+  if (group.cats) {
+    for (const ex of strengthLibraryPool()) {
+      if (seen.has(ex.name) || !(ex.primary || []).some((g) => group.cats.includes(g))) continue;
+      if (q && !normalizeSearch(ex.name).includes(q)) continue;
+      if (bwOnly() && !exIsBodyweight(ex)) continue;
       seen.add(ex.name);
       out.push(ex);
     }
@@ -38381,6 +40251,9 @@ function cbExercisesFor(groupKey, query) {
 }
 
 function renderManualBuildScreen() {
+  /* Back to the library, Mo 2026-10-04: the guided body-part flow that stood
+     in front of this (pick areas, then exercises per area) is gone and Plan my
+     own opens straight on the list with Add an exercise. */
   $("workoutContent").innerHTML = `
     ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { saveDraft(); cbTeardown(); } }))}
     <div class="cb-hero">
@@ -38398,13 +40271,16 @@ function renderManualBuildScreen() {
       <p class="muted-note">Tap a row to change its sets, reps or weight. Drag the handle to reorder.</p>
       <div class="reorder-list" id="draftRows"></div>
     </div>
-    <button type="button" class="cb-add" id="cbAddBtn">${icon("plus", 18)} Add an exercise</button>
-    <!-- Start comes before Cancel now that the bar is in the flow, so the thing
-         you actually want is the first one you reach at the end of the list. -->
-    <div class="cb-go hidden" id="cbGo">
-      <button type="button" class="btn-primary" id="manualStartBtn">${PLAN_FOR_DATE && PLAN_FOR_DATE !== todayStr() ? "Put it on that day" : "Start Workout"}</button>
-    </div>
-    <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>`;
+    <!-- One even stack below the list, so nothing sits at its own odd
+         distance. Start comes before Cancel, so the thing you actually want
+         is the first one you reach at the end of the list. -->
+    <div class="cb-actions">
+      <button type="button" class="cb-add" id="cbAddBtn">${icon("plus", 18)} Add an exercise</button>
+      <div class="cb-go hidden" id="cbGo">
+        <button type="button" class="btn-primary" id="manualStartBtn">${PLAN_FOR_DATE && PLAN_FOR_DATE !== todayStr() ? "Put it on that day" : "Start Workout"}</button>
+      </div>
+      <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>
+    </div>`;
 
   $("cbAddBtn").onclick = () => cbOpenPicker();
 
@@ -38442,7 +40318,8 @@ let CB_PENDING = null;   // the exercise waiting on its sets and reps
 let CB_TARGET = "draft";
 /* "plan" is whichever plan the screen behind this sheet is showing, which is
    today's unless somebody is reviewing another day. */
-const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || []) : MANUAL_DRAFT);
+const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || [])
+  : CB_TARGET === "swap" ? (SWAP_CTX?.list?.() || []) : MANUAL_DRAFT);
 
 async function cbCommit() {
   if (CB_TARGET === "plan") { await savePlanExercises(); rerenderPlanScreen(); return; }
@@ -38452,6 +40329,8 @@ async function cbCommit() {
 
 function cbOpenPicker(target = "draft") {
   CB_TARGET = target;
+  /* Above the swap sheet it was opened from (#swapScrim is 96). */
+  $("cbPickScrim").style.zIndex = target === "swap" ? "98" : "";
   $("cbPickScrim").classList.remove("hidden");
   $("cbPickScrim").onclick = (e) => { if (e.target === $("cbPickScrim")) cbClosePicker(); };
   cbRenderPicker();
@@ -38461,6 +40340,7 @@ function cbClosePicker() {
   CB_PENDING = null;
   CB_TARGET = "draft";
   $("cbPickScrim").classList.add("hidden");
+  $("cbPickScrim").style.zIndex = "";
   pinSheets();
 }
 
@@ -38471,8 +40351,8 @@ function cbRenderPicker() {
     <div class="ds-grip"></div>
     <div class="cb-sheet-head">
       <div>
-        <div class="cb-sheet-title">Add an exercise</div>
-        <div class="cb-sheet-count">${n ? `${n} in your workout so far` : "Nothing added yet"}</div>
+        <div class="cb-sheet-title">${CB_TARGET === "swap" ? `Swap ${escapeHtml(swapTarget()?.name || "")}` : "Add an exercise"}</div>
+        <div class="cb-sheet-count">${CB_TARGET === "swap" ? "Pick one to put in its place" : n ? `${n} in your workout so far` : "Nothing added yet"}</div>
       </div>
     </div>
     <div class="cb-pick-top">
@@ -38486,10 +40366,12 @@ function cbRenderPicker() {
         ${CB_GROUPS.map((g) => `<button type="button" class="cb-chip${g.key === CB_GROUP ? " on" : ""}" data-group="${g.key}">${escapeHtml(g.label)}</button>`).join("")}
         <button type="button" class="cb-chip${CB_GROUP === "own" ? " on" : ""}" data-group="own">Other</button>
       </div>
+      ${bwToggleHTML()}
     </div>
     <div class="cb-grid" id="cbGrid"></div>`;
 
   $("cbPickX").onclick = cbClosePicker;
+  wireBwToggle($("cbPickSheet"), () => cbRenderGrid());
   $("cbChips").querySelectorAll("[data-group]").forEach((b) => {
     b.onclick = () => {
       CB_GROUP = b.dataset.group;
@@ -38536,6 +40418,9 @@ function cbRenderGrid() {
   grid.querySelectorAll("[data-pick]").forEach((b) => {
     const ex = list.find((e) => e.name === b.dataset.pick);
     b.onclick = () => {
+      /* Swapping: the tap IS the choice. Sets and reps stay with the slot,
+         exactly as a suggested swap keeps them. */
+      if (CB_TARGET === "swap") { const name = ex.name; cbClosePicker(); applySwap(name, "searched"); return; }
       // The tick means it is already in there, so this tap changes that entry
       // rather than quietly making a second identical one.
       const at = cbList().findIndex((e) => e.name === ex.name);
@@ -38651,12 +40536,33 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
         cbUpdateCharacter();
         return;
       }
-      cbAdd(name, sets, reps, weight);
-      cbRenderPicker();      // straight back to the grid, ready for the next one
+      /* Red on the Body tab: say so before it goes in, and let them add it
+         anyway. Asked once per area a day, so a leg day built on purpose is
+         one warning, not one per exercise. */
+      const add = () => { cbAdd(name, sets, reps, weight); cbRenderPicker(); };
+      const prim = classifyMuscles(name)?.primary || [];
+      recoveryAreasNow().then(async (areas) => {
+        const red = redAreasFor(areas, prim).filter((a) => !RED_WAIVED.has(`${todayStr()}|${a.key}`));
+        if (!red.length) { add(); return; }
+        const go = await askConfirm({
+          heading: "Still recovering",
+          body: redAreasSentence(red),
+          ok: "Add it anyway",
+          cancel: "Pick something else",
+          tone: "warn",
+        });
+        if (!go) { cbRenderPicker(); return; }
+        red.forEach((a) => RED_WAIVED.add(`${todayStr()}|${a.key}`));
+        add();
+      });
     };
   };
   draw();
 }
+
+/* Areas somebody has already been warned about and chose to train anyway,
+   today. Not stored: a new launch asking once more is fine. */
+const RED_WAIVED = new Set();
 
 /* Adding never re-renders the list: the new row is appended and animates in. */
 function cbAdd(name, sets, reps, weight = 0) {
@@ -38795,9 +40701,10 @@ function cbUpdateCharacter() {
         <div class="cb-empty">Tap an exercise below. The body fills in as you go, so you can see what you are actually training.</div>`;
     } else {
       const groups = cbGroupsHit();
-      /* Number on its own line, words under it. Inline, "4 exercises · 14
-         sets" broke after "14" and left "sets" stranded. */
-      facts.innerHTML = `<div class="cb-count">${MANUAL_DRAFT.length}<span>exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} · ${total} sets</span></div>
+      /* "4 exercises" as the headline and the sets under it. The number alone
+         on a line read as a stray digit; the full "4 exercises · 14 sets"
+         broke after "14" and stranded "sets". */
+      facts.innerHTML = `<div class="cb-count">${MANUAL_DRAFT.length} exercise${MANUAL_DRAFT.length === 1 ? "" : "s"}<span>${total} sets</span></div>
         <div class="cb-groups">${groups.length ? escapeHtml(bodyGroupsPhrase(groups)) : "Nothing recognised yet"}</div>`;
     }
   }
@@ -39606,17 +41513,8 @@ function renderPlanPreview(opts) {
      they come off the row, so this screen says the same thing tomorrow morning
      as it said when the plan was built. */
   const planSays = warningsForPlan(plan);
-  /* The one unprompted offer in the app, and it is here rather than in
-     onboarding because a limit is a constraint on how a goal gets trained for,
-     not a goal: asking up front turns "what do you want" into "what is wrong
-     with you" and can block somebody from ever getting a plan. By here the plan
-     exists, so the answer can only make it safer. null means never asked. Only
-     on a plan that was just built, because that is the moment it is about. */
-  /* Never on a day with no lifts on it. "Anything that hurts, or gear you
-     don't have" is a question about how a LIFTING day gets built, and asking
-     it under a yoga class is the app not reading its own screen. It comes
-     round again on the next day that has lifts on it. */
-  const askLimits = !!justMade && !isCoachedClient() && MY_PROFILE?.limits == null && !activityDay;
+  /* The after-plan "anything to work around?" offer that sat here is gone
+     (Mo, 2026-10-04). Limits are asked in Setup and on the day review. */
 
   /* A plan made moments ago is untouched even when it happens to name something
      already logged this morning, so it keeps its grips, its remove buttons and
@@ -39663,13 +41561,16 @@ function renderPlanPreview(opts) {
   const askedMin = oneOff?.minutes ?? (Number(MY_PROFILE?.session_minutes) || null);
   const overMin = estMin && askedMin ? estMin - askedMin : 0;
   const overLine = overMin > 2 ? `${overMin} min over the ${askedMin} you asked for. Tap the time to fit it.` : "";
-  const timeRow = (reviewingOtherDay || started || finished || SESSION || isCoachedClient() || !estMin) ? "" : `
-    <div class="plan-time-row">
+  /* Mo, 2026-10-04: the time sits on the Back row, on the right, rather than
+     on a line of its own under an empty gap. The pill is drawn into that row;
+     what a time change did, and the way back from it, stay under it. */
+  const showTime = !(reviewingOtherDay || started || finished || SESSION || isCoachedClient() || !estMin);
+  const timePill = showTime ? `
       <button type="button" class="plan-time" id="planTimeBtn" aria-label="About ${estMin} minutes.${overLine ? " " + overLine : ""} Change how long you have today.">
         ${icon("clock", 14)}<span>About <b>${estMin} min</b></span>${icon("chevronRight", 13)}
-      </button>
-      ${oneOff?.from?.minutes ? `<button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button>` : ""}
-    </div>
+      </button>` : "";
+  const timeRow = !showTime ? "" : `
+    ${oneOff?.from?.minutes ? `<div class="plan-time-row"><span></span><button type="button" class="link-btn" id="planTimeBackBtn">Back to ${oneOff.from.minutes} min</button></div>` : ""}
     ${overLine ? `<p class="plan-time-change plan-time-over" id="planTimeOver">${escapeHtml(overLine)}</p>` : ""}
     ${oneOff?.changed ? `<p class="plan-time-change" id="planTimeChange">${escapeHtml(oneOff.changed)}</p>` : ""}`;
 
@@ -39816,17 +41717,14 @@ function renderPlanPreview(opts) {
     </div>` : "";
 
   $("workoutContent").innerHTML = `
-    ${backBar("Back", () => goWorkoutScreen(review ? PLAN_VIEW_RETURN : "choose", { back: true }))}
+    <div class="plan-head">
+      ${backBar("Back", () => goWorkoutScreen(review ? PLAN_VIEW_RETURN : "choose", { back: true }))}
+      ${timePill}
+    </div>
     ${dayList}
     ${overview}
-    ${/* Not on an activity day: "0/0" over a class is a progress bar for a
-          list that does not exist, and the clock is what measures this one. */ ""}
-    ${review || activityDay ? "" : `
-    <div class="workout-progress-row">
-      <span>Progress</span>
-      <span class="workout-progress-count">${doneCount}/${total}</span>
-    </div>
-    <div class="workout-progress-track"><div class="workout-progress-fill" style="width:${total ? (doneCount / total) * 100 : 0}%"></div></div>`}
+    ${/* No progress bar on the plan (Mo, 2026-10-04, twice). The tick on each
+          finished row already says how far you are. */ ""}
     ${timeRow}
     ${/* What the session actually is, through the one function that draws a
           day with no sets in it, run or class alike. A day the generator built
@@ -39844,22 +41742,19 @@ function renderPlanPreview(opts) {
       swap: actSession?.kind === "flow" && !finished && !actLive,
     }) : ""}
     ${activityDay && !actSession ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
-    ${/* Three lines and a fold. The lines are already in order, so what shows
-          is the most important three and "more" is only ever the rest. */ ""}
-    ${(PLAN_NOTES_OPEN === planDate ? planSays : planSays.slice(0, PLAN_NOTES_SHOWN))
+    ${/* Only the injury warning shows on the plan (Mo, 2026-10-04: "too much
+          words. They will get it"). The rest explained the engine's choices,
+          volume caps, deloads, progression, rotation, and a person does not
+          need the reasoning to do the workout. The injury line stays because
+          it is the app admitting it put a lift near something that hurts. */ ""}
+    ${planSays.filter((n) => n.kind === "injury")
       .map((n) => `<p class="ef-note" data-note-kind="${escapeHtml(n.kind)}">${escapeHtml(n.text)}</p>`).join("")}
-    ${planSays.length > PLAN_NOTES_SHOWN
-      ? `<button type="button" class="link-btn plan-notes-more" id="planNotesMoreBtn">${
-          PLAN_NOTES_OPEN === planDate ? "Fewer" : `${planSays.length - PLAN_NOTES_SHOWN} more`}</button>`
-      : ""}
     ${stretchBlockHTML("warmup", finished, plan)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished, plan)}
     ${finished || activityDay ? "" : `<button type="button" class="btn-ghost" id="planAddExToggleBtn">+ Add exercise</button>`}
-    ${askLimits ? `
-    <p class="ef-note">Anything that hurts, or gear you don&rsquo;t have? Tell me once and every plan after this one will respect it.</p>
-    <button type="button" class="btn-ghost" id="planLimitsAskBtn">Tell me what to work around</button>
-    <button type="button" class="btn-ghost" id="planLimitsNoneBtn">Nothing to work around</button>` : ""}
+    ${/* The two work-around buttons that sat here are gone (Mo, 2026-10-04).
+          Limits are still asked in setup and on the day review. */ ""}
     ${review ? reviewActions : finished
       ? `<p class="muted-note" style="text-align:center;margin:14px 0 10px;">${icon("check", 14)} Workout complete.</p>
          <button type="button" class="btn-primary" id="planNewBtn">Start new workout</button>`
@@ -39875,16 +41770,11 @@ function renderPlanPreview(opts) {
            ? `${icon("play", 17)} Back to your ${escapeHtml(actNounWord)}, ${csnClock(csnElapsedMs())}`
            : `${icon("play", 17)} Start ${escapeHtml(displayFocus(plan.focus, exercises).toLowerCase())}`}</button>
          ${started || isCoachedClient() || handPlanned ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`
-      : `${/* Who can see it is a question about the live lifting session, which
-               hides an exercise name and a set count. An activity has neither:
-               what a watcher sees of it is the minutes, and those are not
-               negotiable per session, so this whole branch is off on one. */ ""}
-         ${PARTNER_EMAIL ? `<button type="button" class="wp-open" id="planPrivacyBtn">
-             <span class="wp-open-ico">${icon(workoutPrivacyLocked() ? "lock" : "people", 16)}</span>
-             <span class="wp-open-txt"><b>Advanced</b><i>${escapeHtml(privacySummary())}</i></span>
-             <span class="wp-open-go">${icon("chevronRight", 16)}</span>
-           </button>` : ""}
-         <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${started ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>
+      : `${/* The Advanced (who can see this workout) button that sat here is gone
+               (Mo, 2026-10-04): your partner sees what you are training by
+               default. The same switches are still in the menu inside a
+               running workout, for the day you want something off. */ ""}
+         <button type="button" class="btn-primary" id="planStartBtn" style="margin-top:12px;">${TG_MAKING ? `Use this with ${tgPartnerFirst()}` : started ? "Resume today&rsquo;s plan" : "Start today&rsquo;s plan"}</button>
          ${started || isCoachedClient() ? "" : `<button type="button" class="btn-ghost" id="planRegenBtn">Regenerate</button>`}`}
     ${review ? addSessionFootHTML(date, review) : ""}
     ${delToday}`;
@@ -40007,12 +41897,8 @@ function renderPlanPreview(opts) {
     });
   }
   if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
-  if ($("planNotesMoreBtn")) {
-    $("planNotesMoreBtn").onclick = () => { PLAN_NOTES_OPEN = PLAN_NOTES_OPEN === planDate ? null : planDate; rerenderPlanScreen(); };
-  }
 
   // These three are mutually exclusive depending on how far the workout got.
-  if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
   if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
   if ($("planStartActBtn")) $("planStartActBtn").onclick = () => startPlannedActivity(plan);
   /* Regenerate overwrites today's row outright, so it says what goes with it.
@@ -40042,32 +41928,6 @@ function renderPlanPreview(opts) {
      that was the last one. */
   if ($("planRemoveSessionBtn")) {
     $("planRemoveSessionBtn").onclick = () => removePlannedSession(plan, plan.entry_date || todayStr());
-  }
-
-  /* The limits offer, which the reveal screen used to make and dismiss for
-     you: tapping Let's go there quietly wrote the empty answer, which is how
-     "offered once" stayed true. Nothing on this screen can stand in for that,
-     so the dismissal is its own button and says what it means. Either tap
-     writes the row, which is what stops this being asked after every plan;
-     walking away without answering leaves the question open, and it is asked
-     again the next time a plan is built. That is the honest version. */
-  if ($("planLimitsAskBtn")) {
-    $("planLimitsAskBtn").onclick = () => {
-      switchTab("setup");
-      openSettingsPage("limits");
-      // After openSettingsPage, which renders the page: Skip there should now
-      // record the answer rather than leaving it null.
-      LIMITS_ASKED_AFTER_PLAN = true;
-    };
-  }
-  if ($("planLimitsNoneBtn")) {
-    $("planLimitsNoneBtn").onclick = async () => {
-      /* saveLimits answers rather than throws. An unchecked failure here is a
-         question that looks answered and comes back tomorrow. */
-      const ok = await saveLimits(emptyLimits(), { quiet: true });
-      if (ok === false) { toast("Couldn't save that. Try again."); return; }
-      rerenderPlanScreen();
-    };
   }
 
   /* The review doors. Each one hands the day to the sheet that already does
@@ -40710,7 +42570,7 @@ function loadScriptOnce(src) {
 let riveRuntimePromise = null;
 function ensureRiveRuntime() {
   if (!riveRuntimePromise) {
-    riveRuntimePromise = loadScriptOnce("https://cdn.jsdelivr.net/npm/@rive-app/webgl2@2.42.0/rive.min.js")
+    riveRuntimePromise = loadScriptOnce("vendor/lib/rive-2.42.0.js")
       .then(() => {
         try { window.rive?.RuntimeLoader?.setWasmUrl("/vendor/rive-2.42.0.wasm"); }
         catch (e) { console.warn("rive wasm url", e); }

@@ -461,3 +461,30 @@ which modes are covered.
 **Why we did not work around it:** authoring gaits in `index.html` is how the
 running robot happened, and the robot then outlived its own honesty by being the
 fallback for everything that had nothing. We are not drawing a second one.
+
+## 13. Five moves are labelled bodyweight and need kit (2026-10-04)
+
+The app's Bodyweight only switch reads `equipment` straight off the library, and
+Mo found Plate Pinch in it. Five entries in `knowledge/exercise-library/` carry
+`equipment: "bodyweight"` and cannot be done with nothing:
+
+| Move | What it actually needs |
+|---|---|
+| Plate Pinch | weight plates |
+| Weighted Dip | a dip belt and a weight |
+| Weighted Pull-Up | a dip belt and a weight |
+| Ab Wheel Rollout | an ab wheel |
+| Glute-Ham Raise | a glute-ham developer |
+
+**Ask:** correct those five labels. Until then `index.html` overrides them by
+name (`NEEDS_KIT_DESPITE_LABEL`), and that list should be deleted the day the
+library is right.
+
+**Not on the list, deliberately:** pull-ups, chin-ups, dips, hangs and leg
+raises need a bar, and the app treats a bar as bodyweight training. If the
+library wants a `bar` equipment value so that can be a choice, that would be
+welcome, but it is not this request.
+
+**A gap while we are here:** with the switch on, every shoulders option is a
+handstand or planche progression. A beginner has nothing. Pike Push-Up and
+Elevated Pike Push-Up would close it.

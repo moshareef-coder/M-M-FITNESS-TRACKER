@@ -21,6 +21,98 @@
     el.dispatchEvent(new w.Event("input", { bubbles: true }));
   }
 
+  /* ---------- a pretend Mell, for Train together ----------
+     Mell does on the fake database what Mell's phone would do on the real one,
+     then hands the same row to the app the way realtime would. So the lobby,
+     the live strip and the finish react exactly as they will with a real
+     partner on the other end. One timer at a time; a new step stops the last. */
+  const sim = { timer: null, watch: null };
+  function simStop() { clearInterval(sim.timer); clearInterval(sim.watch); sim.timer = sim.watch = null; }
+  const nowIso = () => new Date().toISOString();
+  function tgRow(w) { const rows = w.__SANDBOX.db.together_sessions || []; return rows[rows.length - 1] || null; }
+  function mellIsHost(w, r) { return (r.host_email || "").toLowerCase() === (w.__SANDBOX.them || "").toLowerCase(); }
+  function mellUpdate(w, patch) {
+    const row = tgRow(w);
+    if (!row) return null;
+    Object.assign(row, patch, { updated_at: nowIso() });
+    w.tgOnSession(JSON.parse(JSON.stringify(row)));
+    return row;
+  }
+  function mellPlan(w) {
+    const them = (w.__SANDBOX.them || "").toLowerCase(), today = w.todayStr();
+    const plans = (w.__SANDBOX.db.ai_workouts || []).filter((p) => (p.email || "").toLowerCase() === them && (p.exercises || []).length);
+    const p = plans.find((x) => x.entry_date === today) || plans[plans.length - 1];
+    return p ? { exercises: JSON.parse(JSON.stringify(p.exercises)).slice(0, 5), focus: p.focus || "" } : null;
+  }
+  /* Mell trains at a steady clip, one set every few seconds, and finishes. */
+  function mellTrains(w, pace = 4500) {
+    clearInterval(sim.timer);
+    let ei = 0, si = 0;
+    sim.timer = setInterval(() => {
+      const r = tgRow(w);
+      if (!r || !["active", "done"].includes(r.status)) return;
+      const side = mellIsHost(w, r) ? "host_workout" : "guest_workout";
+      const exs = (r.mode || "same") === "own" ? (r[side]?.exercises || []) : (r.workout?.exercises || []);
+      if (ei >= exs.length) {
+        clearInterval(sim.timer);
+        const mine = mellIsHost(w, r) ? "host_done_at" : "guest_done_at";
+        const other = mellIsHost(w, r) ? r.guest_done_at : r.host_done_at;
+        mellUpdate(w, other ? { [mine]: nowIso(), status: "done", ended_at: nowIso() } : { [mine]: nowIso() });
+        return;
+      }
+      const ex = exs[ei];
+      const set = { session_id: r.id, email: w.__SANDBOX.them, exercise_name: ex.name, set_idx: si,
+        weight: 35 + ei * 15 + si * 5, reps: Number(String(ex.reps).split("-")[0]) || 10, done: true, updated_at: nowIso() };
+      (w.__SANDBOX.db.together_sets ??= []).push(set);
+      w.tgOnSet(JSON.parse(JSON.stringify(set)));
+      if (++si >= (ex.sets || 3)) { ei++; si = 0; }
+    }, pace);
+  }
+  /* Starts Mell training the moment the session goes active, whoever started it. */
+  function whenActive(w, then) {
+    clearInterval(sim.watch);
+    sim.watch = setInterval(() => {
+      const r = tgRow(w);
+      if (r && r.status === "active") { clearInterval(sim.watch); then(); }
+    }, 400);
+  }
+  /* Mell's half of the lobby: joins, and in "each our own" picks Mell's own
+     workout a moment later, a different one from yours so the side by side
+     view has something to show. */
+  function mellInLobby(w) {
+    clearInterval(sim.watch);
+    sim.watch = setInterval(() => {
+      const r = tgRow(w);
+      if (!r) return;
+      if (r.status === "invited" && (r.host_email || "").toLowerCase() === (w.__SANDBOX.me || "").toLowerCase() && !sim.joining) {
+        sim.joining = setTimeout(() => { mellUpdate(w, { status: "lobby" }); sim.joining = null; }, 2600);
+      }
+      if (r.status === "lobby" && (r.mode || "same") === "own" && !(r.guest_workout?.exercises || []).length && !sim.picking) {
+        sim.picking = setTimeout(() => {
+          const plan = mellPlan(w) || { exercises: [{ name: "Romanian Deadlift", sets: 3, reps: 8 }, { name: "Leg Press", sets: 3, reps: 10 }, { name: "Hip Thrust", sets: 3, reps: 10 }], focus: "Legs" };
+          mellUpdate(w, { guest_workout: plan }); sim.picking = null;
+        }, 1500);
+      }
+      if (r.status === "active") { clearInterval(sim.watch); mellTrains(w); }
+    }, 400);
+  }
+  function quietTours(w) {
+    try { w.localStorage.setItem("unio.tourPartnerFace", "1"); } catch {}
+    w.document.querySelector(".pc-scrim")?.remove();
+  }
+  function mellInvites(w, { running = false } = {}) {
+    const plan = mellPlan(w) || { exercises: [], focus: "" };
+    const row = {
+      id: "tg-sim-" + Date.now(), host_email: w.__SANDBOX.them, guest_email: w.__SANDBOX.me, leader_email: w.__SANDBOX.them,
+      status: "invited", source: running ? "host" : null,
+      workout: { exercises: running ? plan.exercises : [], focus: running ? plan.focus : "", joinRunning: running },
+      created_at: nowIso(), updated_at: nowIso(),
+    };
+    (w.__SANDBOX.db.together_sessions ??= []).push(row);
+    w.tgOnSession(JSON.parse(JSON.stringify(row)));
+    return row;
+  }
+
   /* ---------- the journey ----------
      Grouped the way a person meets the app, not the way the code is laid out.
      `scenario` says which world the step needs; the phone only reloads when
@@ -105,8 +197,8 @@
 
       { t: "Build one yourself", scenario: "paired",
         s: "Search, categories, sets and reps",
-        note: "The screen with the keyboard bug we fixed: type in the search box and the sheet should stay put rather than sliding under the keyboard. Categories should clear the search field.",
-        run: (w) => { w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
+        note: "Plan my own opens on your list with Add an exercise, which opens the whole library: search, a section per muscle, two cards a row, and a Bodyweight only switch. Type in the search box and the sheet should stay put rather than sliding under the keyboard. Categories should clear the search field. This step clears any saved draft so it opens empty.",
+        run: (w) => { w.clearDraft(); w.eval("MANUAL_DRAFT = []"); w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
 
       { t: "Plan the week", scenario: "paired",
         s: "Assign workouts to days",
@@ -195,9 +287,107 @@
         s: "The screen after the last rep",
         note: "Every exercise on today's plan already logged, so the app's own route lands here: the ring fills, time, volume and the record land under it, and the last line is the pair rather than a solo total. End a workout early instead and the same layout drops the PR tile and the confetti, because that is not the same event.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
+
+      { t: "Still recovering", scenario: "finished",
+        s: "Adding a lift for a red muscle",
+        note: "Today's push day is logged, so chest, shoulders and arms are red on the Body tab. This opens Plan my own and adds Barbell Bench Press, which asks first: Add it anyway, or Pick something else. It asks once per area a day, so add a second chest move after Add it anyway and it goes straight in. Try a back or core move: no warning, those are rested.",
+        run: (w) => {
+          w.eval(`(async () => {
+            document.querySelectorAll(".pop-scrim").forEach((x) => x.remove());
+            clearDraft(); MANUAL_DRAFT = [];
+            switchTab("workout"); goWorkoutScreen("manual");
+            await new Promise((r) => setTimeout(r, 900));
+            cbOpenPicker(); CB_GROUP = "chest"; cbRenderPicker();
+            await new Promise((r) => setTimeout(r, 500));
+            [...document.querySelectorAll("#cbGrid .cb-card")].find((c) => c.querySelector(".cb-card-name")?.textContent.trim() === "Barbell Bench Press")?.click();
+            await new Promise((r) => setTimeout(r, 400));
+            document.getElementById("cbConfirmBtn")?.click();
+          })()`);
+        } },
+
+      { t: "Rest day recommended", scenario: "finished",
+        s: "Generate when the build would hit red",
+        note: "Same day, chest and shoulders red. This asks Generate for a push day, so the build would train what is still recovering, and it offers a rest day instead: Rest today builds nothing, Generate anyway builds it. A plain Generate on this day does not ask at all, because the engine already picks what is rested.",
+        run: (w) => {
+          w.eval(`document.querySelectorAll(".pop-scrim").forEach((x) => x.remove()); switchTab("workout"); generateWorkout(null, { keepFocus: "Push" });`);
+        } },
+    ]},
+
+    { group: "Train together", note: "Two players, one workout, anywhere, each at their own pace. Mell is simulated: Mell joins, picks, trains and finishes on a timer, through the same code a real partner's phone would hit.", steps: [
+      { t: "Invite Mell from Mell's profile", scenario: "paired",
+        s: "Tap Mell's face, Work out together",
+        note: "Tap Mell's face at the top right (this step opens it for you), then Work out together. Mell joins about three seconds later. Pick how you train (Same workout or Each our own), then Make the workout: that takes you through the app's own flow on the Workout tab, Generate for me, I'll plan my own or today's plan, with a bar along the bottom saying who it is for. On the plan screen the button reads Use this with Mell. That lands you on the review: the workout (or both workouts), what each one hits, and the fit for each of you. Edit goes back into the plan screen. Start together drops you both in, with Mell's sets landing live on your strip; finish for the shared finish and the 1.5x bonus.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => w.openPartnerSheet(), 300); mellInLobby(w); } },
+
+      { t: "From Pick how to train", scenario: "paired",
+        s: "Work out with Mell, under Start",
+        note: "The other way in, where you decide how to train: Work out with Mell sits right under Start today's plan on the Workout tab. Tap it and you are in the lobby, Mell joining a few seconds later.",
+        run: (w) => { simStop(); quietTours(w); mellInLobby(w); w.switchTab("workout"); w.goWorkoutScreen("choose"); } },
+
+      { t: "The robot suggests it", scenario: "paired",
+        s: "Neither of you has trained today",
+        note: "When neither of you has trained yet today, the robot on Home says so and the card takes your two colours: tapping him is the invite. This step clears today's sessions on the fake data so that is true.",
+        run: (w) => { simStop(); quietTours(w); mellInLobby(w);
+          w.eval("ALL_ENTRIES = ALL_ENTRIES.filter((e) => e.entry_date !== todayStr())");
+          w.switchTab("home");
+          setTimeout(() => { try { w.eval("HOME_QUIP_AT = 0"); } catch {} w.document.getElementById("homeQuipSlot")?.replaceChildren(); w.sayHomeQuip(); }, 400); } },
+
+      { t: "Join Mell while Mell sets up", scenario: "live",
+        s: "Ask to join, before the first set",
+        note: "Mell has started but not logged a set yet, so Mell's live card says Still setting up and the sheet offers Ask to join. Once the sets are going it disappears: the workout has started. Asking waits on Mell, who is in charge because it is Mell's workout; about three seconds later Mell lets you in and you are on the same workout.",
+        run: (w) => { simStop(); quietTours(w);
+          const mp = { user_name: "Mell", email: w.__SANDBOX.them, entry_date: w.todayStr(), slot: 0, focus: "Leg Day",
+            exercises: [{ name: "Barbell Back Squat", sets: 4, reps: 6 }, { name: "Romanian Deadlift", sets: 3, reps: 8 }, { name: "Leg Press", sets: 3, reps: 10 }] };
+          (w.__SANDBOX.db.ai_workouts ??= []).push(mp);
+          w.eval(`ALL_PLANS.push(${JSON.stringify(mp)}); LIVE_PARTNER = { ...LIVE_PARTNER, set_done: 0, exercise_index: 0, elapsed_sec: 90 }`);
+          w.switchTab("home"); w.renderLiveCard(); setTimeout(() => w.openLiveSheet(), 400);
+          clearInterval(sim.watch);
+          sim.watch = setInterval(() => {
+            const r = tgRow(w);
+            if (r && r.status === "invited" && r.workout?.request && !sim.joining) {
+              sim.joining = setTimeout(() => { mellUpdate(w, { status: "active", started_at: nowIso() }); sim.joining = null; mellTrains(w); clearInterval(sim.watch); }, 3000);
+            }
+          }, 400); } },
+
+      { t: "Each our own, side by side", scenario: "paired",
+        s: "Different workouts, live together",
+        note: "The second way to train together: you on your workout, Mell on a different one, at the same time. Mell picks legs while you keep yours; the strip then shows Mell's ring against Mell's own list and the chips follow whatever lift Mell is on. Switch to Same workout to make it joint instead.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); mellInLobby(w);
+          setTimeout(async () => { await w.tgInvite(); setTimeout(() => w.tgSetMode("own"), 400); }, 300); } },
+
+      { t: "Mell invites you", scenario: "paired",
+        s: "Join, Mell picks, Mell starts",
+        note: "The invite as the person receiving it: a full screen ask with Join and Not now. Join takes you into the lobby, where Mell is in charge, so the picker is read only and you watch it change: about two seconds later Mell picks Mell's own workout, and two after that Mell starts it and you are both in.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => mellInvites(w), 300);
+          clearInterval(sim.watch);
+          sim.watch = setInterval(() => {
+            const r = tgRow(w);
+            if (r && r.status === "lobby") {
+              clearInterval(sim.watch);
+              const plan = mellPlan(w) || { exercises: [], focus: "" };
+              setTimeout(() => mellUpdate(w, { source: "host", workout: { ...r.workout, exercises: plan.exercises, focus: plan.focus } }), 2000);
+              setTimeout(() => { mellUpdate(w, { status: "active", started_at: nowIso() }); mellTrains(w); }, 4200);
+            }
+          }, 400); } },
+
+      { t: "Join Mell's workout mid-way", scenario: "paired",
+        s: "\"I'm doing this, come in\"",
+        note: "Mell is already training and asks you in. No lobby this time: the workout is the one Mell is on, so Join puts you straight into it, each at your own pace, with Mell's sets landing on your strip as you go.",
+        run: (w) => { simStop(); quietTours(w); w.switchTab("home"); setTimeout(() => mellInvites(w, { running: true }), 300);
+          whenActive(w, () => mellTrains(w)); } },
     ]},
 
     { group: "The other person", note: "Everything that only matters because someone else is there.", steps: [
+      { t: "Partner joins", scenario: "paired",
+        s: "Rings close, robot pops up, once ever",
+        note: "What both of you see the moment you become a pair, once. Your two faces glide together, your blue arc and their orange arc close into one ring, then the robot pops up on top with confetti in your two colours. Turn sound on in the phone frame to hear it. Congratulate Mell sends Mell a 'We're a team now' note and takes you to Progress, where the tour below starts. Later skips the note and goes to the same place.",
+        run: (w) => { try { w.localStorage.removeItem("unio.tourPartnerFace"); } catch {} w.showPairCelebration(); } },
+
+      { t: "Progress tour: tap your partner", scenario: "paired",
+        s: "Dim, spotlight their face, one tap",
+        note: "The first time anyone with a partner lands on Progress. Everything dims except Mell's face in the top corner, which pulses, and a tip says to tap it. Tap it and you are on Mell's side, then the spotlight moves to your own face to show the way back; tap that and you are home. Skip ends it at either step. It never shows again on that phone, so this step resets it each time.",
+        run: (w) => { try { w.localStorage.removeItem("unio.tourPartnerFace"); } catch {} w.switchTab("progress"); } },
+
       { t: "They are training now", scenario: "live",
         s: "Live card on home",
         note: "Mell is nineteen minutes into leg day. The live card is on home; tap it for the sheet with what she is on and the cheer buttons. This is the state that fires the push notification we added.",

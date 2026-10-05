@@ -17,7 +17,7 @@ const nodes = {};
 const MISSES = new Set();
 /* Ids created at runtime via createElement, so absence from markup is expected.
    Every one of these MUST be null-checked at its lookup site. */
-const DYNAMIC = new Set(["weightEmpty", "proofRemoveBtn", "clipHomeCard"]);
+const DYNAMIC = new Set(["weightEmpty", "proofRemoveBtn", "clipHomeCard", "tgMakeBar"]);
 /* Ids built from template literals inside an innerHTML the same code just
    wrote, e.g. `${containerId}_${s.key}_val`. They exist by lookup time. */
 const DYNAMIC_PATTERNS = [/_val$/];
