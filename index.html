@@ -48148,9 +48148,22 @@ function trainStylesToSave() {
    splits on it. Kept first in the grid because it governs the most: their
    weight, their goal weight and their tape are one answer, not three. */
 const SHARE_WEIGH_KEY = "weigh_ins";
+/* Only what you track can be offered to share (Mo, 2026-10-04: "if I have
+   only weight selected for me... it should only have weight on there").
+   Tracked across every goal you hold, main and extras, since each goal keeps
+   its own picks and they all show on your Progress. Weigh-ins covers the
+   scale and the tape together, so either one brings it. A key left off the
+   grid keeps whatever it was set to: the writer only flips what is tapped. */
+function myTrackedEverywhere() {
+  const goals = [MY_PROFILE?.goal_bubble || "consistent",
+    ...normaliseGoalSecondary(MY_PROFILE?.goal_secondary).map((e) => e.bubble)];
+  return new Set(goals.flatMap((g) => trackedMetrics(g, MY_PROFILE)));
+}
 function shareGridMetrics() {
-  return [{ key: SHARE_WEIGH_KEY, label: "Weigh-ins", ico: "scale", blurb: "Your weight and tape" }]
-    .concat(PROGRESS_SHARE_KEYS.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean));
+  const mine = myTrackedEverywhere();
+  const weigh = mine.has("weight") || MEASUREMENTS.some((m) => mine.has(m.key));
+  return (weigh ? [{ key: SHARE_WEIGH_KEY, label: "Weigh-ins", ico: "scale", blurb: "Your weight and tape" }] : [])
+    .concat(PROGRESS_SHARE_KEYS.filter((k) => mine.has(k)).map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean));
 }
 function shareGridOn() {
   const on = new Set(PROGRESS_SHARE_KEYS.filter((k) => progressKeyShared(k, MY_PROFILE?.progress_hidden)));
@@ -48162,7 +48175,9 @@ function shareGridOn() {
 function paintShareGrid(host) {
   if (!host) return;
   const on = shareGridOn();
-  host.innerHTML = trackTilesHTML(shareGridMetrics(), on, null);
+  const offered = shareGridMetrics();
+  host.innerHTML = offered.length ? trackTilesHTML(offered, on, null)
+    : `<p class="trk-any">You are not tracking anything yet, so there is nothing to share. Pick what you track from the menu on Progress.</p>`;
   wireTrackTiles(host, on, async (live) => {
     /* One array, two meanings: everything but photos is stored as what is
        HIDDEN (its own default is shared, so only the exceptions need a
@@ -48223,7 +48238,7 @@ function renderShareSheet() {
       <div class="scr-title">What ${escapeHtml(partnerName())} sees</div>
       <div class="spacer"></div>
     </div>
-    <p class="trk-any" style="margin:0 0 14px">On is shown to them, off holds that one back. Everything starts on except photos, which waits until you turn it on.</p>
+    <p class="trk-any" style="margin:0 0 14px">What you track, and whether ${escapeHtml(partnerName())} sees it. On is shown, off holds it back. Photos start off.</p>
     <div class="trk-grid" id="shareSheetGrid"></div>
     <button type="button" class="btn-primary" id="shareDone" style="margin-top:16px">Done</button>`;
   paintShareGrid($("shareSheetGrid"));
