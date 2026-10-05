@@ -44337,13 +44337,21 @@ const TRACK_OFFERS = {
    tracked_metrics stays as the union across goals, because the onboarding
    write and anything that just wants "does this person track their waist at
    all" still reads it; the per goal map is what every screen reads. */
-function trackedMetrics(goalId = null) {
+/* Whose answer this is follows whose Progress is on screen. Mo, 2026-10-04:
+   "what their screen looks like is what my screen should look like when I
+   switch over to theirs." It used to read MY_PROFILE always, so a partner's
+   view showed Waist and Arms tiles to someone who tracks only their weight,
+   because I track those. The two callers about MY settings (the tracking
+   picker and the measurement logger) pass MY_PROFILE explicitly, so leaving
+   Progress on a partner's view never puts their choices in my Setup. */
+const trackedProfile = () => (PROGRESS_VIEW === "partner" && PARTNER_PROFILE ? PARTNER_PROFILE : MY_PROFILE);
+function trackedMetrics(goalId = null, prof = trackedProfile()) {
   const known = new Set(TRACK_ALL.map((m) => m.key));
   const bubble = goalId
-    || (PROGRESS_VIEW === "partner" ? null : PROGRESS_GOAL_LENS)
-    || MY_PROFILE?.goal_bubble
+    || (prof !== MY_PROFILE ? null : PROGRESS_GOAL_LENS)
+    || prof?.goal_bubble
     || "consistent";
-  const byGoal = MY_PROFILE?.tracked_by_goal;
+  const byGoal = prof?.tracked_by_goal;
   if (byGoal && typeof byGoal === "object" && Array.isArray(byGoal[bubble])) {
     /* An empty list is a real answer, not a missing one: somebody who turned
        every tile off meant it, so it is honoured rather than filled in. */
@@ -44353,13 +44361,13 @@ function trackedMetrics(goalId = null) {
      that set one should keep seeing it rather than being silently reset to a
      default. Only for their MAIN goal though: a flat list was never an answer
      about the other two. */
-  const flat = MY_PROFILE?.tracked_metrics;
-  if (Array.isArray(flat) && bubble === (MY_PROFILE?.goal_bubble || "consistent")) {
+  const flat = prof?.tracked_metrics;
+  if (Array.isArray(flat) && bubble === (prof?.goal_bubble || "consistent")) {
     return flat.filter((k) => known.has(k));
   }
   return TRACK_DEFAULTS[bubble] || ["weight"];
 }
-const isTracked = (key, goalId = null) => trackedMetrics(goalId).includes(key);
+const isTracked = (key, goalId = null, prof = trackedProfile()) => trackedMetrics(goalId, prof).includes(key);
 
 /* THE CHIP STRIP AT THE TOP OF A GOAL SCREEN, for every screen that has one.
 
@@ -44702,7 +44710,7 @@ function renderWeightTrend(id, name, profile, isPartner, always) {
   /* Was `isPartner ||`, which read as "always, on their view". Their weight is
      theirs to give now (partnerSharesBody), and the callers above cannot be
      the only thing standing between it and the screen. */
-  const wanted = hired() && (isPartner ? partnerSharesBody() : isTracked("weight"))
+  const wanted = hired() && (!isPartner || partnerSharesBody()) && isTracked("weight")
     && (always || entriesFor(name).some((e) => e.weight != null));
   el.classList.toggle("hidden", !wanted);
   el.innerHTML = wanted ? weightTrendHTML(name, profile, { card: id !== "wtHeroTrend" }) : "";
@@ -46031,10 +46039,10 @@ function renderProgTiles(kind, isPartner, opts = {}) {
      shouldn't see waist measurements down there" on this tile row, and "I
      also shouldn't see this page [the sheet it opens] except wait [weight]
      on here." The tile was offered unconditionally whenever this row shows
-     at all, whatever the tracking picker said; a partner's own tape is a
-     separate question (bodyShared) and stays exactly as it was. */
+     at all, whatever the tracking picker said. On a partner's view the
+     picker is THEIRS (trackedProfile), so they see the row they chose. */
   const chev = `<span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
-  const waistOffered = isPartner || MEASUREMENTS.some((m) => isTracked(m.key));
+  const waistOffered = MEASUREMENTS.some((m) => isTracked(m.key));
   const waist = $("tileWaist");
   waist.classList.toggle("hidden", !waistOffered);
   if (waistOffered) {
@@ -46314,7 +46322,7 @@ function renderTrackSheet() {
      from the offer list alone, so a legacy key sitting in the flat/global
      union neither shows here nor survives the next save for this goal. */
   const offerKeys = TRACK_OFFERS[goalId] || TRACK_OFFERS.consistent;
-  const tracked = new Set(trackedMetrics(goalId));
+  const tracked = new Set(trackedMetrics(goalId, MY_PROFILE));
   const on = new Set(offerKeys.filter((k) => tracked.has(k)));
   const shown = offerKeys.map((k) => TRACK_ALL.find((m) => m.key === k)).filter(Boolean);
   /* Same chrome as the measurements sheet next door: grip, back chevron,
@@ -46414,7 +46422,7 @@ function lastMeasurement(key) {
    its goal, which is a real but rare choice. */
 function measRowsToShow() {
   const rows = MEAS_ROWS || MEASUREMENTS;
-  const filtered = rows.filter((m) => isTracked(m.key));
+  const filtered = rows.filter((m) => isTracked(m.key, null, MY_PROFILE));
   return filtered.length ? filtered : rows;
 }
 
@@ -46573,7 +46581,7 @@ function renderProgressTab() {
      pounds. Where they track nothing, showing up is the only honest headline
      left, which is the same answer Move better gets and for the same reason.
      Your own view only; a partner's screen follows THEIR choices. */
-  if (PROGRESS_VIEW !== "partner" && !isTracked("weight") && (kind === "scale" || kind === "bulk")) {
+  if (!isTracked("weight") && (kind === "scale" || kind === "bulk")) {
     /* "Still tracks a tape measurement", which is what the paragraph above
        says and what the test used to get wrong: it asked whether they track
        ANYTHING, and the recomp screen is built around inches. Now that a goal
@@ -46625,7 +46633,7 @@ function renderProgressTab() {
      and it has to: a person on Get stronger who ticked Workouts a week has to
      be able to find it, or the question was decoration. The hero is still the
      answer; these sit underneath it, in the order the picker stores them. */
-  const chosenCards = (isPartner ? [] : trackedMetrics())
+  const chosenCards = trackedMetrics()
     .map((k) => TRACK_ALL.find((m) => m.key === k)?.card)
     .filter((c, i, all) => c && PICKED_CARDS.has(c) && !barred.has(c) && all.indexOf(c) === i);
   /* Photos used to be barred from a partner's view unconditionally, here and
@@ -46667,7 +46675,7 @@ function renderProgressTab() {
      the scale not moving, so somebody who asked to stop being shown it must
      actually stop being shown it, including on the screen their goal would
      otherwise lead with. The tape and photo tiles below stand in as the door. */
-  const wantsWeight = isPartner ? bodyShared : isTracked("weight");
+  const wantsWeight = bodyShared && isTracked("weight");
   const shownRaw = (blank
     ? (weightLed && !isPartner ? ["cardWeight"] : [])
     : weightScreen ? ["cardWeight"]
