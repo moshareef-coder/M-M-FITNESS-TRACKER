@@ -22,9 +22,6 @@ const ASSETS = [
      the web it resolves from the repo root; left out of the bundle the import
      throws and he has no lines at all, in the session or on the Lock Screen. */
   "quips.mjs",
-  /* The onboarding tour's in-memory client, imported when the tour starts.
-     Left out, the tour cannot start on a phone. */
-  "tour/demo-client.mjs",
   "sw.js",
   /* The launch animation's three layers, cut from the master render by
      scripts/split-logo-parts.py. These are <img> src rather than a runtime

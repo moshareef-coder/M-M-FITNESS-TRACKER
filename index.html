@@ -5231,7 +5231,7 @@
   /* Tall phones (a Pro Max is 932 high) get the same screens a size up, so
      the extra 90 pixels go into the picture rather than into the gaps. */
 
-  /* ---- Round 7: the lock screen and the tour's coach layer ----
+  /* ---- The lock screen (round 7, kept in round 8) ----
      The lock screen is the moment before the app, in the app's own dark
      ground and colours. The notification on it is the look Mo picked: a light
      frosted card, the app icon, UNIO and now in a row, the title in bold and
@@ -5267,43 +5267,25 @@
   .ob2-notif-title { font-size: 15.5px; font-weight: 700; }
   .ob2-notif-body { font-size: 14px; line-height: 1.35; color: rgba(17,19,24,.62); }
   .ob2-lock-hint { text-align: center; font-size: 14px; opacity: .6; margin: 0; }
-  .ob-step.ob2.ob2-tourload { justify-content: center; align-items: center; }
-
-  /* The coach. Four clear panels take the taps that are not on the control;
-     the hole draws the dim with one large shadow and glides to each control
-     on a compositor transform, so it stays smooth on a phone. */
-  .ob-coach { position: fixed; inset: 0; z-index: 9000; pointer-events: none; }
-  .obc-block { position: fixed; pointer-events: auto; background: transparent; }
-  .obc-hole {
-    position: fixed; left: 0; top: 0; width: 0; height: 0; border-radius: 16px; pointer-events: none;
-    box-shadow: 0 0 0 200vmax rgba(8, 10, 14, .58), 0 0 0 2px var(--accent);
-    transition: transform .45s cubic-bezier(.22,1,.36,1), width .45s cubic-bezier(.22,1,.36,1), height .45s cubic-bezier(.22,1,.36,1);
-    will-change: transform;
-  }
-  .obc-hole.none { box-shadow: 0 0 0 200vmax rgba(8, 10, 14, .58); }
-  .obc-bub {
-    position: fixed; left: 14px; right: 14px; pointer-events: auto; display: flex; gap: 12px; align-items: flex-start;
-    padding: 14px 15px; border-radius: var(--radius); background: var(--card-fill); border: 1px solid var(--border);
-    box-shadow: var(--shadow-lift, var(--shadow-card)); max-width: 452px; margin: 0 auto;
-    opacity: 0; transform: translateY(10px) scale(.98);
-    transition: opacity .28s ease, transform .32s cubic-bezier(.22,1,.36,1), top .45s cubic-bezier(.22,1,.36,1), bottom .45s cubic-bezier(.22,1,.36,1);
-  }
-  .obc-bub.in { opacity: 1; transform: none; }
-  .obc-bub.bottom { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
-  .obc-bub.top { top: calc(18px + env(safe-area-inset-top, 0px)); }
-  .obc-face { flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: var(--panel-2); }
-  .obc-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-  .obc-say { margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.4; color: var(--text); }
-  .obc-acts { display: flex; gap: 8px; flex-wrap: wrap; }
-  .obc-acts:empty { display: none; }
-  .obc-btn { width: auto; flex: 1 1 auto; margin: 0; padding: 12px 14px; }
-  .ob-tour-cover { position: fixed; inset: 0; z-index: 9500; display: grid; place-items: center; background: var(--bg); opacity: 0; transition: opacity .32s ease; }
-  .ob-tour-cover.on { opacity: 1; }
+  /* The tastes (round 8): Home's card and notice, the session stage and the
+     body, each on its own screen. */
+  .ob2 .ob2-tastecard { margin: 0; padding: 16px 15px; transition: box-shadow .4s ease, border-color .4s ease; }
+  .ob2 .ob2-tastecard .stand { margin: 14px 0 2px; }
+  .ob2 .ob2-tastecard.ob2-glow { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow-card); }
+  .ob2 .ob2-tastenotice { margin: 0; background: var(--card-fill); box-shadow: var(--shadow-card); animation: ob2In .35s ease both; }
+  .ob2 .ob2-tastenotice .notice-body { padding-right: 0; }
+  .ob2-tastehint { font-size: 14px; color: var(--muted); line-height: 1.35; }
+  .ob2 #ob2T1Show { margin: 0; }
+  .ob2 #ob2T2Log { margin: 0; width: 100%; }
+  .ob2-tastefigs .bi-canvas { height: 280px; }
+  .ob2-pairentry { display: flex; flex-direction: column; align-items: stretch; }
+  .ob2-pairentry .ob-hint { margin-bottom: 12px; }
+  .ob2-pairentry .code-divider { margin: 4px 0 14px; }
+  @media (min-height: 900px) { .ob2-tastefigs .bi-canvas { height: 330px; } .ob2-tour-stage { height: 300px; } }
   /* Every onboarding screen arrives rather than appears. */
   .ob-step.ob2 { animation: ob2Screen .32s cubic-bezier(.22,1,.36,1) both; }
   @keyframes ob2Screen { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) {
-    .obc-hole, .obc-bub { transition: opacity .2s ease; }
     .ob-step.ob2, .ob2-notif, .ob-step.ob2.ob2-lock { animation: none; }
   }
   @media (min-height: 900px) {
@@ -8722,11 +8704,6 @@
   </div>
   <p class="boot-word">UNIO</p>
 </div>
-<script data-tour-back>
-  /* Back from the onboarding tour, which ends with a reload: the launch mark
-     already played once, so it does not play again over the questions. */
-  try { if (sessionStorage.getItem("ob-tour-back")) document.getElementById("boot").style.display = "none"; } catch (e) {}
-</script>
 
 <!-- Only Supabase blocks: nothing can be shown until we know who is signed in.
      Chart.js is the progress chart and the Rive runtime is the body figure;
@@ -10057,10 +10034,7 @@ const APP_STORE_URL = "https://apps.apple.com/app/id6812201708";
 
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_890hsPHDiiz4-fQi7Jqd9g_a_aoHyz2";
-/* A let, not a const, for one reason: the onboarding tour (startObTour) swaps
-   in an in-memory client for its length, so the real screens run on sample
-   data and write nowhere. Nothing else reassigns it. */
-let sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const FUNCTION_URL = SUPABASE_URL + "/functions/v1/generate-workout";
 
 /* Dynamic import from a classic (non-module) script, since the rest of the app has no build
@@ -10137,7 +10111,7 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.10.04.8";
+const APP_VERSION = "2026.10.04.9";
 /* Bump when the Terms of Use or Privacy Policy change in a way people must agree to again.
    It is stored on the account (profiles.terms_version) with the moment they agreed. */
 const TERMS_VERSION = "2026-10-04";
@@ -10615,9 +10589,7 @@ function dismissBoot() {
      the dumbbell landing behind them at 1.16 plus 0.5, the word from 1.52
      taking 0.7. A beat past that lets the finished mark be looked at, which is
      the point of it. */
-  let back = false;
-  try { back = !!sessionStorage.getItem("ob-tour-back"); sessionStorage.removeItem("ob-tour-back"); } catch { /* private mode */ }
-  const left = back ? 0 : Math.max(0, 2500 - (Date.now() - BOOT_STARTED));
+  const left = Math.max(0, 2500 - (Date.now() - BOOT_STARTED));
   setTimeout(() => {
     boot.classList.add("done");
     setTimeout(() => boot.remove(), 660);
@@ -10681,9 +10653,6 @@ function initOnboard() {
 /* Capacitor injects this global before the page loads, so no bundler or script
    tag is involved and the web build simply sees undefined. */
 function isNativeApp() {
-  /* The onboarding tour runs the app as if it were the web: no Live Activity,
-     no widget, no haptics, no purchase sheet off sample data. */
-  if (window.__OB_TOUR_ON === true) return false;
   return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function"
     && window.Capacitor.isNativePlatform());
 }
@@ -15240,32 +15209,29 @@ const OB2_CHAPTER_NAMES = ["", "Your goal", "About you", "How you train", "Your 
    the list so the numbering matches the plan and so it is obvious where it
    goes back in. */
 const OB2_PATH_A = [
-  /* Round 3 (Mo, 2026-10-04): the tour comes before any question, the week is
-     generated by a button they press, and the price is said last, after an
-     honest word about the beta and the promise. */
-  /* Round 7: the notification, then the tour inside the real app (him, the
-     invite, Mell joining, training together, the finish, the proof photo,
-     cheering her on, Body and Progress), then the questions. */
-  "ping", "tour", "privacy", "name",
-  "goal", "goal2", "words", "react",
+  /* Round 8, the order Mo approved: the notification, Unio's hello, three
+     runs of questions with one taste of the app after each, Generate my week,
+     the beta word, the promise and the price, then the invite (the only
+     place the code appears), training days, notifications and Home. */
+  "ping", "hello", "name", "who", "goal", "goal2", "words",
+  "taste1",
   "sex", "age", "height", "weight", "activity", "summary",
-  "styles", "freq", "equip", "focus", "hurts", "warmup",
-  "days", "minutes", "projection",
+  "taste2",
+  "styles", "freq", "equip", "focus", "hurts", "warmup", "days", "minutes", "projection",
   { id: "proof", off: "No real couple quote or App Store review yet. Back in when there is one; never a made up one." },
+  "taste3",
   "build", "preview",
   { id: "account", off: "Sign-in already happened before onboarding started." },
-  "beta", "commit", "pay2", "invite", "week", "notify", "inside", "home",
+  "beta", "commit", "pay2", "invite", "week", "notify", "home",
 ];
 const OB2_PATH_B = [
-  "accept", "tour", "privacy", "name",
-  "goal", "goal2", "words", "react",
+  "accept", "hello", "name", "goal", "goal2", "words",
+  "taste1",
   "sex", "age", "height", "weight", "activity", "summary",
-  "styles", "freq", "equip", "focus", "hurts", "warmup",
-  "days", "minutes", "build", "preview", "beta", "commit",
-  /* The plan's "account, pairing completes here". The account already exists
-     and the pairing completed on Accept, so this is the "You're paired" line
-     the plan asks for, on its own screen. */
-  "paired", "weeknotify", "pay",
+  "taste2",
+  "styles", "freq", "equip", "focus", "hurts", "warmup", "days", "minutes",
+  "taste3",
+  "build", "preview", "beta", "commit", "pay", "weeknotify",
 ];
 
 const ob2Path = (d) => (d.path === "b" ? OB2_PATH_B : OB2_PATH_A);
@@ -15710,378 +15676,50 @@ function ob2PushSampleHTML(who) {
     </div>`;
 }
 
-/* ---- The tour, inside the real app (round 7) ----
-   Mo, 2026-10-04: "it must look exactly like our app... they have to press
-   the buttons themselves... an experience they're immersing themselves into."
-
-   So the opening is not drawn: it is the app. Home, the partner page, the
-   train together invite and lobby, the session with its Log set, the finish
-   card, the proof photo, the partner sheet and its Encourage, Body and
-   Progress, all of them the real screens, running on a sample week. A coach
-   layer dims everything except the one control to press, Unio says in a line
-   what to do, and NOTHING moves until they press it: no timers push the run,
-   and Mell, the sample partner, only ever acts in answer to a tap.
-
-   How it stays off the real account:
-   - `sb` is swapped for tour/demo-client.mjs, an in-memory client, for the
-     length of the tour. Every read and write the screens make lands in its
-     arrays.
-   - Every request to the Supabase project is refused while the tour runs
-     (OB_TOUR.blocked keeps the list), so a write that went around `sb` fails
-     instead of landing. The one exception is generate-workout, answered in the
-     browser by the same engine the edge function wraps.
-   - Native surfaces are off (isNativeApp() is false during the tour): no Live
-     Activity, no widget, no haptics, no purchase sheet. The share sheet and the
-     clipboard are stubbed, the camera is never opened (the proof photo is a
-     drawn sample).
-   - When it ends, local storage is put back exactly as it was (the auth keys
-     excepted, which only the real client touches) and the page reloads, so no
-     global the tour set can reach the real, empty account. The run carries on
-     at the questions. */
-let OB_TOUR = null;
-
-/* Not a `let` read by isNativeApp, because isNativeApp runs during the
-   script's own evaluation, before this line, and a let there would throw. */
-function obTourOn() { return window.__OB_TOUR_ON === true; }
-
-const OB_TOUR_ME = "you@tour.unio";
-const OB_TOUR_THEM = "partner@tour.unio";
-
-/* The one notification that opens the run. One constant, so the words can
-   change without touching the screen. */
+/* The one notification that opens the run (round 7, kept in round 8). One
+   constant, so the words can change without touching the screen. */
 const OB2_PING_COPY = { title: "Unio wants to train with you", body: "Tap to meet your trainer." };
 
-function obTourGuards() {
-  const realFetch = window.fetch.bind(window);
-  OB_TOUR.realFetch = realFetch;
-  OB_TOUR.blocked = [];
-  window.fetch = async (input, init) => {
-    const url = typeof input === "string" ? input : (input && input.url) || "";
-    if (url.includes("/functions/v1/generate-workout")) return obTourGenerate(init);
-    if (url.startsWith(SUPABASE_URL) && !url.includes("/auth/v1/")) {
-      OB_TOUR.blocked.push(url);
-      return new Response(JSON.stringify({ error: "not during the tour" }), { status: 503, headers: { "Content-Type": "application/json" } });
-    }
-    return realFetch(input, init);
-  };
-  const stub = (obj, key, value) => { try { Object.defineProperty(obj, key, { configurable: true, writable: true, value }); } catch { /* read only here */ } };
-  stub(navigator, "share", async () => { OB_TOUR.shared = true; });
-  if (navigator.clipboard) stub(navigator.clipboard, "writeText", async () => { OB_TOUR.shared = true; });
+/* ---- The tastes (round 8) ----
+   Mo, on round 7: "I want features of our app, not the whole app. I don't
+   want it to seem like a tutorial but an onboarding." So the guided tour of
+   the whole app is gone, and three single screens sit between the questions
+   instead, each one feature: the two of you, a logged set, your body. Each
+   is built from the app's own pieces (Home's ring card, the partner notice
+   and its flame, the session stage with the rig and Log set, the rest clock,
+   the Rive body and the working-muscles line) on sample numbers held in the
+   screen, and each waits for a tap: nothing moves until they press.
+
+   SANDBOXED: a taste makes no Supabase call, sends nothing, writes nothing
+   to storage and touches no app state. Mell is a sample, tagged as one, in
+   the cold run; the invited run uses their real partner's name and is told
+   from that partner's side. */
+const ob2Sample = (d) => (d.path === "b" ? ob2Partner(d) : "Mell");
+const ob2Tag = (text) => `<p class="ob2-demo-tag">${icon("play", 12)} ${escapeHtml(text)}</p>`;
+
+/* One of Home's rings moved in place, so the stroke animates on .pring-fill's
+   own transition. The numbers are personRing's. */
+function ob2SetRing(col, done, target, state) {
+  if (!col) return;
+  const circ = 2 * Math.PI * 52;
+  const fill = col.querySelector(".pring-fill");
+  if (fill) fill.style.strokeDashoffset = String(circ * (1 - Math.max(0, Math.min(1, done / target))));
+  const val = col.querySelector(".pcol-val");
+  if (val) val.textContent = `${done} / ${target}`;
+  const pct = col.querySelector(".pcol-pct");
+  if (pct && state) pct.outerHTML = `<div class="pcol-pct pcol-${state.tone}">${state.ico ? icon(state.ico, 12) : ""}${escapeHtml(state.text)}</div>`;
 }
 
-/* Generate, answered here. A short session for the tour: two lifts, two
-   sets each, no warm-up block, said on screen. */
-async function obTourGenerate(init) {
-  const mod = await ensurePlanEngine();
-  let payload = {};
-  try { payload = JSON.parse(init?.body || "{}"); } catch { /* empty */ }
-  const out = mod.generateFromPayload(payload);
-  out.workout.exercises = (out.workout.exercises || []).slice(0, 2).map((e) => ({ ...e, sets: 2 }));
-  out.workout.warmup = []; out.workout.cooldown = [];
-  return new Response(JSON.stringify({ workout: out.workout, honest: null, meta: out.meta, notes: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+/* The figure's muscles for one exercise, from the exercise library the
+   engine reads (recovery.mjs buildMuscleIndex), the same source the Body tab
+   is drawn from: the doing muscles at full, the helping ones lighter. */
+async function ob2MusclesFor(name) {
+  const [rec] = await Promise.all([ensureRecoveryEngine(), FIT_MATH_READY]);
+  if (!rec || !EXERCISE_TRAININGS.length) return { primary: [], secondary: [] };
+  const hit = rec.buildMuscleIndex(EXERCISE_TRAININGS).get(String(name).toLowerCase());
+  return hit ? { primary: [...hit.primary], secondary: [...hit.secondary] } : { primary: [], secondary: [] };
 }
-
-/* A drawn proof photo: the gym floor, a bench and a barbell, in the app's
-   colours. Never the camera. */
-function obTourProofFile() {
-  return new Promise((resolve) => {
-    const c = document.createElement("canvas");
-    c.width = 600; c.height = 800;
-    const g = c.getContext("2d");
-    const sky = g.createLinearGradient(0, 0, 0, 800);
-    sky.addColorStop(0, "#2a2f37"); sky.addColorStop(1, "#0b0d11");
-    g.fillStyle = sky; g.fillRect(0, 0, 600, 800);
-    g.fillStyle = "#3a404a"; g.fillRect(0, 560, 600, 240);
-    g.fillStyle = "#c9ced6"; g.fillRect(150, 470, 300, 26); g.fillRect(190, 496, 18, 64); g.fillRect(392, 496, 18, 64);
-    g.fillStyle = "#e7eaee"; g.fillRect(80, 380, 440, 10);
-    g.fillStyle = "#4dd36a"; g.fillRect(70, 340, 26, 90); g.fillRect(504, 340, 26, 90);
-    g.fillStyle = "rgba(255,255,255,.8)"; g.font = "700 30px sans-serif"; g.fillText("Sample photo", 30, 60);
-    c.toBlob((b) => resolve(new File([b], "proof.jpg", { type: "image/jpeg" })), "image/jpeg", 0.85);
-  });
-}
-
-async function startObTour(d) {
-  if (OB_TOUR) return;
-  const snap = {};
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!/^sb-/.test(k)) snap[k] = localStorage.getItem(k);
-    }
-  } catch { /* private mode: nothing to put back */ }
-  const b = d.path === "b";
-  const myName = (ob2Name(d) || "You").split(" ")[0];
-  const themName = b ? (d.partner?.name || "Your partner").split(" ")[0] : "Mell";
-  const mod = await import("./tour/demo-client.mjs");
-  const db = mod.demoWorld({ me: OB_TOUR_ME, myName, them: OB_TOUR_THEM, theirName: themName, paired: b });
-  OB_TOUR = { d, realEmail: MY_EMAIL, snap, db, myName, themName, b, client: mod.createDemoClient(db, { me: OB_TOUR_ME }), sets: 0, theirs: 0 };
-  window.__OB_TOUR_ON = true;
-  obTourGuards();
-  OB_TOUR.realClient = sb;
-  sb = OB_TOUR.client;
-  MY_EMAIL = OB_TOUR_ME;
-  ME = myName;
-  MY_PROFILE = db.profiles[0];
-  IS_PREMIUM = true;
-  if (b) { PARTNER_EMAIL = OB_TOUR_THEM; MY_PARTNERSHIP = db.partnerships[0]; pairSeenSet(OB_TOUR_THEM); markPartnerTourDone(); }
-  else pairSeenSet("none");
-  /* The proof photo button opens the camera through this input; in the tour
-     it hands over the drawn sample instead. */
-  $("proofInput").click = async () => { OB_TOUR.proofTaken = true; uploadProof(await obTourProofFile()); };
-  /* Mell's set lands when theirs does: an answer to their tap, never a timer. */
-  document.addEventListener("click", obTourOnTap, true);
-  await showApp();
-  IS_PREMIUM = true;
-  switchTab("home");
-  obCoachRun(b ? OB_TOUR_STEPS.filter((s) => !s.aOnly) : OB_TOUR_STEPS);
-}
-
-/* Ends the tour: storage back as it was, the next screen recorded under the
-   real account, and a reload, behind a cover so nothing flashes. */
-function endObTour() {
-  const t = OB_TOUR;
-  const cover = document.createElement("div");
-  cover.className = "ob-tour-cover";
-  cover.innerHTML = robotFaceSVG(96);
-  document.body.appendChild(cover);
-  requestAnimationFrame(() => cover.classList.add("on"));
-  setTimeout(() => {
-    try {
-      const keys = [];
-      for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
-      for (const k of keys) if (!/^sb-/.test(k) && !(k in t.snap)) localStorage.removeItem(k);
-      for (const [k, v] of Object.entries(t.snap)) localStorage.setItem(k, v);
-      const next = ob2Ids(t.d)[ob2Ids(t.d).indexOf("tour") + 1];
-      localStorage.setItem(`ft_ob_draft_${t.realEmail}`, JSON.stringify({ step: "v2:" + next, data: { ...t.d, toured: true } }));
-      sessionStorage.setItem("ob-tour-back", "1");
-    } catch { /* private mode */ }
-    location.reload();
-  }, 380);
-}
-
-/* Mell, in answer to the person's tap. */
-function obTourTG() { return (OB_TOUR.db.together_sessions || []).slice(-1)[0] || null; }
-function obTourMell(patch) {
-  const row = obTourTG();
-  if (!row) return;
-  Object.assign(row, patch, { updated_at: new Date().toISOString() });
-  tgOnSession(JSON.parse(JSON.stringify(row)));
-}
-function obTourMellJoins() {
-  const db = OB_TOUR.db;
-  db.partnerships.push({ id: "p1", inviter_email: OB_TOUR_ME, invitee_email: OB_TOUR_THEM, status: "accepted", created_at: new Date().toISOString(), responded_at: new Date().toISOString() });
-  PARTNER_EMAIL = OB_TOUR_THEM;
-  MY_PARTNERSHIP = db.partnerships[0];
-  closeSettingsPage();
-  switchTab("home");
-  /* "Mell joined" is the app's own moment for it, the pair celebration. Its
-     follow-on (the partner face tour on Progress) is marked seen so it does
-     not open a second guide over this one; storage is put back at the end. */
-  pairSeenSet(OB_TOUR_THEM);
-  markPartnerTourDone();
-  return loadAll().then(() => { renderAvatarPair(); switchTab("home"); return showPairCelebration(); });
-}
-function obTourMellInvites() {
-  const row = { id: "tg-tour", host_email: OB_TOUR_THEM, guest_email: OB_TOUR_ME, leader_email: OB_TOUR_THEM, status: "invited", mode: "same",
-    workout: { exercises: [], focus: "" }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
-  OB_TOUR.db.together_sessions.push(row);
-  tgOnSession(JSON.parse(JSON.stringify(row)));
-}
-function obTourMellPicks() {
-  const plan = OB_TOUR.db.ai_workouts.find((w) => w.email === OB_TOUR_THEM);
-  obTourMell({ workout: { exercises: JSON.parse(JSON.stringify(plan.exercises)), focus: plan.focus } });
-}
-function obTourOnTap(e) {
-  if (!OB_TOUR || !SESSION?.together) return;
-  if (!e.target.closest?.("#logSetBtn, #logNowBtn, .sess-chip")) return;
-  setTimeout(() => {
-    const mine = (SESSION?.setsDone || []).flat().filter(Boolean).length;
-    const row = obTourTG();
-    if (!row || mine <= OB_TOUR.theirs) return;
-    const exs = row.workout?.exercises || TODAY_WORKOUT?.exercises || [];
-    const total = exs.reduce((n, x) => n + (x.sets || 2), 0);
-    while (OB_TOUR.theirs < mine && OB_TOUR.theirs < total) {
-      let left = OB_TOUR.theirs, ei = 0;
-      while (ei < exs.length && left >= (exs[ei].sets || 2)) { left -= exs[ei].sets || 2; ei++; }
-      const ex = exs[ei];
-      const set = { session_id: row.id, email: OB_TOUR_THEM, exercise_name: ex.name, set_idx: left,
-        weight: ex.targetWeight || null, reps: Number(String(ex.reps).split("-")[0]) || 10, done: true, updated_at: new Date().toISOString() };
-      OB_TOUR.db.together_sets.push(set);
-      tgOnSet(JSON.parse(JSON.stringify(set)));
-      OB_TOUR.theirs++;
-    }
-    if (OB_TOUR.theirs >= total && !row.host_done_at) obTourMell({ host_done_at: new Date().toISOString() });
-  }, 350);
-}
-
-/* ---- The coach layer ----
-   A hole over the one control to press, the rest dimmed and closed to taps,
-   and Unio's line beside it. The hole glides from control to control (one
-   transform, composited, so it holds 60fps on a phone) and follows the
-   control if the screen under it moves. A step ends when what the press
-   does has happened, read off the real app's state, never on a clock. */
-const OB_COACH = { el: null, steps: [], i: -1, raf: 0, rect: null, waiting: false };
-
-function obCoachVisible(sel) {
-  const list = Array.isArray(sel) ? sel : [sel];
-  for (const s of list) {
-    for (const el of document.querySelectorAll(s)) {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden") return el;
-    }
-  }
-  return null;
-}
-
-function obCoachRun(steps) {
-  const el = document.createElement("div");
-  el.className = "ob-coach";
-  el.innerHTML = `
-    <div class="obc-block" data-b="t"></div><div class="obc-block" data-b="b"></div>
-    <div class="obc-block" data-b="l"></div><div class="obc-block" data-b="r"></div>
-    <div class="obc-hole"></div>
-    <div class="obc-bub" role="dialog" aria-live="polite">
-      <span class="obc-face">${robotFaceSVG(40)}</span>
-      <div class="obc-txt"><p class="obc-say"></p><div class="obc-acts"></div></div>
-    </div>`;
-  document.body.appendChild(el);
-  OB_COACH.el = el; OB_COACH.steps = steps; OB_COACH.i = -1;
-  obCoachNext();
-  const loop = () => { obCoachFrame(); OB_COACH.raf = requestAnimationFrame(loop); };
-  OB_COACH.raf = requestAnimationFrame(loop);
-}
-
-function obCoachNext() {
-  OB_COACH.i++;
-  /* A branch not taken (who picks the workout) is passed over at once: it is
-     the answer to the press that chose the other branch, not a timer. */
-  while (OB_COACH.steps[OB_COACH.i]?.skipIf?.()) OB_COACH.i++;
-  const step = OB_COACH.steps[OB_COACH.i];
-  if (!step) return;
-  OB_COACH.target = null;
-  OB_COACH.armed = false;
-  const bub = OB_COACH.el.querySelector(".obc-bub");
-  bub.classList.remove("in");
-  const say = typeof step.say === "function" ? step.say() : step.say;
-  /* The new line eases in once the old one is out of the way, so the eye is
-     never asked to read two at once. */
-  setTimeout(() => {
-    bub.querySelector(".obc-say").textContent = say;
-    const acts = bub.querySelector(".obc-acts");
-    acts.innerHTML = (step.choices || (step.next ? [{ label: step.next }] : []))
-      .map((c, k) => `<button type="button" class="${k === 0 ? "btn-primary" : "btn-secondary"} obc-btn" data-c="${k}">${escapeHtml(typeof c.label === "function" ? c.label() : c.label)}</button>`).join("");
-    acts.querySelectorAll("[data-c]").forEach((btn) => btn.onclick = async () => {
-      const c = (step.choices || [{}])[Number(btn.dataset.c)];
-      btn.disabled = true;
-      if (c?.run) await c.run();
-      if (step.then) await step.then();
-      if (!step.until) obCoachNext();
-      else OB_COACH.armed = true;
-    });
-    requestAnimationFrame(() => bub.classList.add("in"));
-  }, 180);
-  if (step.enter) step.enter();
-  if (!step.next && !step.choices) OB_COACH.armed = true;
-}
-
-function obCoachFrame() {
-  const step = OB_COACH.steps[OB_COACH.i];
-  if (!step || !OB_COACH.el) return;
-  const target = step.target ? obCoachVisible(typeof step.target === "function" ? step.target() : step.target) : null;
-  if (target && target !== OB_COACH.target) {
-    OB_COACH.target = target;
-    const r0 = target.getBoundingClientRect();
-    if (r0.top < 60 || r0.bottom > innerHeight - 60) target.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-  }
-  const pad = 6;
-  /* A step whose control has not arrived yet (a sheet still sliding in, a
-     screen still drawing) keeps the hole where it was, so it glides from the
-     last control to the next instead of closing and opening again. */
-  if (!target && step.target && OB_COACH.lastRect) {
-    OB_COACH.armedRect = true;
-    return obCoachHold(step);
-  }
-  const r = target ? target.getBoundingClientRect() : null;
-  OB_COACH.lastRect = r;
-  const box = r ? { x: r.left - pad, y: r.top - pad, w: r.width + pad * 2, h: r.height + pad * 2 } : { x: innerWidth / 2, y: innerHeight / 2, w: 0, h: 0 };
-  const key = `${Math.round(box.x)}|${Math.round(box.y)}|${Math.round(box.w)}|${Math.round(box.h)}|${!!step.look}`;
-  if (key !== OB_COACH.key) {
-    OB_COACH.key = key;
-    const el = OB_COACH.el;
-    const hole = el.querySelector(".obc-hole");
-    hole.style.transform = `translate(${box.x}px, ${box.y}px)`;
-    hole.style.width = `${box.w}px`; hole.style.height = `${box.h}px`;
-    hole.classList.toggle("none", !r);
-    /* The four panels around the hole take every tap that is not on the
-       control. A "look" step closes the hole too: the screen is there to be
-       read, and the way on is his button. */
-    const [t, b2, l, rt] = ["t", "b", "l", "r"].map((k) => el.querySelector(`[data-b="${k}"]`));
-    const closed = !r || step.look;
-    t.style.cssText = `top:0;left:0;right:0;height:${closed ? innerHeight : Math.max(0, box.y)}px`;
-    b2.style.cssText = closed ? "display:none" : `top:${box.y + box.h}px;left:0;right:0;bottom:0`;
-    l.style.cssText = closed ? "display:none" : `top:${box.y}px;left:0;width:${Math.max(0, box.x)}px;height:${box.h}px`;
-    rt.style.cssText = closed ? "display:none" : `top:${box.y}px;left:${box.x + box.w}px;right:0;height:${box.h}px`;
-    /* His line sits on the side of the screen the control is not on. */
-    const bub = el.querySelector(".obc-bub");
-    const low = r && box.y + box.h / 2 > innerHeight * 0.52;
-    bub.classList.toggle("top", !!low);
-    bub.classList.toggle("bottom", !low);
-  }
-  if (OB_COACH.armed && step.until && step.until()) obCoachNext();
-}
-
-function obCoachHold(step) {
-  if (OB_COACH.armed && step.until && step.until()) obCoachNext();
-}
-
-function obCoachEnd() {
-  cancelAnimationFrame(OB_COACH.raf);
-  document.removeEventListener("click", obTourOnTap, true);
-}
-
-/* The run. `aOnly` steps are the cold path's (the invited partner is already
-   paired). `until` is read every frame once the step is live, and it only
-   turns true because of something the person pressed. */
-const OB_TOUR_STEPS = [
-  { say: () => `Hi ${OB_TOUR.myName}. I'm Unio, your trainer.`, next: "Hi Unio" },
-  { say: "I plan your workouts, count your sets, and keep you and your partner going. This is the app. Let me show you around.", next: "Show me" },
-  { aOnly: true, say: "Training is better with two. Tap Invite.", target: "#invitePartnerBtn", until: () => !!obCoachVisible("#setupShareCodeBtn") },
-  { aOnly: true, say: "Send your partner your invite. In the tour nothing is really sent.", target: "#setupShareCodeBtn", until: () => OB_TOUR.shared },
-  { aOnly: true, say: "Sent. Tap to see what happens when they join.", next: "See", then: () => obTourMellJoins() },
-  { aOnly: true, say: () => `${OB_TOUR.themName} joined you. Say congrats.`, target: "#pcGo", until: () => !document.querySelector(".pc-scrim") },
-  { aOnly: true, say: "Now back to Home. Tap Home.", target: '.tab-btn[data-tab="home"]', until: () => !$("tab-home")?.classList.contains("hidden") && !!obCoachVisible("#openPartnerBtn") },
-  { say: () => `${OB_TOUR.themName} ${OB_TOUR.b ? "is" : "is"} on your Home now. You see each other's week.`, target: "#openPartnerBtn", look: true, next: "Nice" },
-  { say: () => `${OB_TOUR.themName} wants to work out with you. Tap to see her invite.`, next: "Show me", then: () => obTourMellInvites() },
-  { say: "Tap Join.", target: "#tgJoin", until: () => TG?.status === "lobby" },
-  { say: "Who picks today's workout?", target: ".tg-card.lobby", look: true,
-    choices: [
-      { label: "I'll pick", run: () => { OB_TOUR.picker = "me"; obTourMell({ leader_email: OB_TOUR_ME }); } },
-      { label: () => `Let ${OB_TOUR.themName} pick`, run: () => { OB_TOUR.picker = "them"; } },
-    ] },
-  /* Their pick, in the real workout flow. */
-  { skipIf: () => OB_TOUR.picker !== "me", say: "One workout for both of you. Tap Make the workout.", target: "#tgMake", until: () => !!obCoachVisible("#chooseGenerateBtn") },
-  { skipIf: () => OB_TOUR.picker !== "me", say: "Tap Generate workout. I build it from what you want.", target: "#chooseGenerateBtn", until: () => !!obCoachVisible("#planStartBtn") },
-  { skipIf: () => OB_TOUR.picker !== "me", say: () => `Your workout. Tap Use this with ${OB_TOUR.themName}.`, target: "#planStartBtn", until: () => !!obCoachVisible("#tgGo") },
-  { skipIf: () => OB_TOUR.picker !== "me", say: "Both ready. Tap Start together.", target: "#tgGo", until: () => !!SESSION?.together },
-  /* Hers, made in her app, landing in your lobby. */
-  { skipIf: () => OB_TOUR.picker !== "them", say: () => `${OB_TOUR.themName} is making the workout. Tap to see what she picks.`, target: ".tg-card.lobby", look: true, next: "Show me", then: () => obTourMellPicks() },
-  { skipIf: () => OB_TOUR.picker !== "them", say: () => `${OB_TOUR.themName} picked it. Tell her you're ready.`, target: ".tg-card.lobby", look: true, next: "I'm ready", then: () => obTourMell({ status: "active", started_at: new Date().toISOString() }) },
-  { say: () => `Same workout, two phones. Log your set and watch ${OB_TOUR.themName}'s land.`, target: ["#logSetBtn", "#startSetBtn", "#nextExBtn"],
-    until: () => !!document.querySelector(".tg-scrim.finish") || !!SESSION?.finished },
-  { say: "You both did it. Finishing together is worth 1.5x XP.", target: ["#tgDone", "#tgWatchGo"], until: () => !document.querySelector(".tg-scrim.finish") },
-  { say: "Snap a proof photo that you trained. In the tour I use a sample.", target: "#sessionProofBtn", until: () => OB_TOUR.proofTaken && !obCoachVisible("#sessionProofBtn") },
-  { say: "There it is. Tap Done.", target: "#sessionDoneBtn", until: () => !document.body.classList.contains("session-open") && !obCoachVisible("#sessionDoneBtn") },
-  { say: "Back to Home. Tap Home.", target: '.tab-btn[data-tab="home"]', until: () => !$("tab-home")?.classList.contains("hidden") && !!obCoachVisible("#openPartnerBtn") },
-  { say: () => `Cheer ${OB_TOUR.themName} on. Tap her ring.`, target: "#openPartnerBtn", until: () => !!obCoachVisible("#psCheer") },
-  { say: "Tap Encourage.", target: "#psCheer", until: () => !!obCoachVisible("#noteSend") },
-  { say: "Pick a message.", target: ".pop-body.compose .qchip", until: () => !!$("noteInput")?.value },
-  { say: "Tap Send it. In the tour it stays here.", target: "#noteSend", until: () => (OB_TOUR.db.encouragements || []).length > 0 },
-  { say: "Now what that workout did. Tap Body.", target: '.tab-btn[data-tab="body"]', until: () => !$("tab-body")?.classList.contains("hidden") },
-  { say: "What you trained lights up, and I tell you what is ready next.", target: ["#tab-body .bi-figures", "#tab-body .card"], look: true, next: "Got it" },
-  { say: "Tap Progress.", target: '.tab-btn[data-tab="progress"]', until: () => !$("tab-progress")?.classList.contains("hidden") },
-  { say: "Your trend, week by week. Your weight is only yours.", target: ["#tab-progress canvas", "#tab-progress .card"], look: true, next: "Got it" },
-  { say: "That's Unio. Now let me set up your plan.", next: "Set up my plan", then: () => { obCoachEnd(); endObTour(); } },
-];
+let OB2_TASTE_FIGS = [];
 
 /* ---- Filling the screen ----
    Round 5, Mo: "half the time I feel like the screen isn't fully filled out."
@@ -16205,28 +15843,175 @@ const OB2 = {
     $("ob2Ping").onclick = () => { obTrack("ping", "open"); ui.next({ pinged: true }); };
   } },
 
-  /* A2 onwards: the tour, inside the real app. See startObTour. A draft
-     reopened after the tour has `toured` and goes straight on. */
-  tour: { ch: 0, render(d, ui) {
-    if (d.toured) { ui.next(); return; }
-    $("onboard").innerHTML = `<div class="ob-step ob2 ob2-tourload">${ob2HeroBot(140)}</div>`;
-    startObTour(d).catch((e) => { console.error("tour failed to start", e); ui.next({ toured: true }); });
+  /* Unio says hello, in text, and nothing else on the screen asks anything.
+     The invited run names the partner who is already waiting. */
+  hello: { ch: 0, render(d, ui) {
+    const first = (ob2Name(d) || "").split(" ")[0];
+    const b = d.path === "b";
+    ui.paint({
+      noBack: true,
+      title: `Hi${first ? ` ${first}` : ""}. I'm Unio, your trainer.${b ? ` ${ob2Partner(d)}'s already here.` : ""} Let's build your plan.`,
+      body: ob2HeroBot(200),
+      cta: "Let's go", onNext: () => ui.next(),
+    });
   } },
 
-  privacy: { ch: 0, render(d, ui) {
-    const them = d.path === "b" ? ob2Partner(d) : "Your partner";
-    const rows = [
-      ["people", `${them} sees your workouts and your streak.`],
-      ["lock", "Your weight stays yours. It is shown to nobody unless you turn on sharing in Setup."],
-      ["check", "Your answers build your workouts. They are never sold."],
-    ];
+  /* Is anybody joining. The old "who are you training with" question, two
+     answers now, into the same train_with field. */
+  who: { ch: 0, when: (d) => d.path !== "b", render(d, ui) {
+    let pick = d.train_with || null;
     ui.paint({
-      title: "What's yours stays yours.",
-      body: `${ob2PairHTML(ob2Name(d) || "You", d.path === "b" ? ob2Partner(d) : null, { joined: d.path === "b" })}
-        ${ob2Card(`Shared with ${d.path === "b" ? ob2Partner(d) : "your partner"}`, `<div class="ob2-rows">${rows.slice(0, 1).map(([ico, t]) => `<div class="ob2-row-i"><span>${icon(ico, 18)}</span><p>${escapeHtml(t)}</p></div>`).join("")}</div>`)}
-        ${ob2Card("Only yours", `<div class="ob2-rows">${rows.slice(1).map(([ico, t]) => `<div class="ob2-row-i"><span>${icon(ico, 18)}</span><p>${escapeHtml(t)}</p></div>`).join("")}</div>`)}`,
+      title: "Is anyone joining you?",
+      why: "Unio is built for two. You can always start on your own.",
+      body: `<div id="ob2WhoPair"></div>` + ob2ChoiceHTML([
+        { id: "partner", label: "Yes, my partner", ico: "heart" },
+        { id: "solo", label: "Just me for now", ico: "body", sub: "You can bring somebody in any time." },
+      ], pick, { attr: "who" }),
+      cta: "Continue", ctaOff: !pick,
+      onNext: () => ui.next({ train_with: pick }),
+    });
+    const seat = () => {
+      const me = `<span class="ob2-av me">${escapeHtml(initials(ob2Name(d) || "You"))}</span>`;
+      const other = pick === "partner"
+        ? `<span class="ob2-av them ob2-av-ico">${icon("heart", 26)}</span>`
+        : `<span class="ob2-av ob2-av-empty them">${icon("plus", 18)}</span>`;
+      $("ob2WhoPair").innerHTML = `<div class="ob2-pair${pick === "partner" ? " joined" : ""}">${me}<span class="ob2-pair-link"></span>${other}</div>`;
+    };
+    seat();
+    ob2WireOne("who", (v) => { pick = v; $("ob2Next").disabled = false; seat(); });
+  } },
+
+  /* Taste 1, together. Home's ring card for the two of you; her set lands
+     when they press Show me, and the partner notice with its flame comes up
+     under it, the way it does on Home. One tap on the flame is the cheer. */
+  taste1: { ch: 1, render(d, ui) {
+    const b = d.path === "b";
+    const me = ob2Name(d) || "You", them = ob2Sample(d);
+    /* Told from the partner's side in the invited run: the card on THEIR
+       phone, with this person's ring the one that fills. */
+    const left = b ? them : me, right = b ? me : them;
+    const who = b ? me : them;
+    ui.paint({
+      title: b ? `This is ${them}'s phone when you train.` : "This is you and your partner, every day.",
+      body: `${ob2Tag(b ? `What ${them} sees` : "Sample, with Mell")}
+        <div class="card ob2-tastecard" id="ob2T1Card">
+          <div class="hero-kicker">This week together</div>
+          <b class="ob2-dh" id="ob2T1Head">Stronger Together</b>
+          <div class="stand">
+            ${personRing(1, 3, "me", "", left, false, false, { tone: "idle", text: "Not yet today" })}
+            <div class="stand-div"></div>
+            ${personRing(1, 3, "them", "", right, false, false, { tone: "idle", text: "Not yet today" })}
+          </div>
+        </div>
+        <div id="ob2T1Notice"></div>
+        <button type="button" class="btn-secondary ob2-pulse" id="ob2T1Show">Show me</button>`,
+      cta: "Continue", ctaOff: true, onNext: () => ui.next(),
+    });
+    $("ob2T1Show").onclick = () => {
+      $("ob2T1Show").remove();
+      const col = $("ob2T1Card").querySelector(b ? ".pcol.them" : ".pcol.them");
+      ob2SetRing(col, 2, 3, { tone: "done", ico: "check", text: "Just now" });
+      ob2Type($("ob2Q"), b ? `Your set lands on ${them}'s ring the moment you log it.` : `${them} just finished. Cheer her on.`);
+      /* The partner notice Home draws when they have trained, flame and all. */
+      $("ob2T1Notice").innerHTML = `<div class="notice ob2-tastenotice">
+          <div class="notice-body">
+            <span class="notice-av">${escapeHtml(initials(who))}</span>
+            <div class="notice-text"><div class="notice-head">${escapeHtml(who)} worked out</div><div class="notice-sub">Just now</div></div>
+          </div>
+          <div class="notice-actions">
+            <button type="button" class="react-btn ob2-pulse" id="ob2T1React" aria-label="React">${icon("flame", 20)}</button>
+            <span class="ob2-tastehint">${b ? `Tap the flame: that is ${escapeHtml(them)} cheering you` : `Tap the flame to cheer ${escapeHtml(them)}`}</span>
+          </div>
+        </div>`;
+      $("ob2T1React").onclick = () => {
+        const btn = $("ob2T1React");
+        btn.classList.remove("ob2-pulse");
+        btn.classList.add("sent");
+        $("ob2T1Card").classList.add("ob2-glow");
+        ob2Type($("ob2Q"), b ? `${them} cheered you. It lands on your phone.` : `Cheer sent. ${them} sees it on her phone.`);
+        $("ob2Next").disabled = false;
+      };
+    };
+  } },
+
+  /* Taste 2, one set. The session stage, the rig doing the move, the real
+     Log set, and the rest clock counting up the way it does in a workout,
+     with the plan cut short and said to be. */
+  taste2: { ch: 2, render(d, ui) {
+    const ex = "Push-Up";
+    const REST = 20;
+    ui.paint({
+      title: d.path === "b" ? `Log a set. ${ob2Partner(d)} sees it land.` : "Try one set.",
+      body: `${ob2Tag("Sample set")}
+        <div class="ob2-tour-row"><b>${ex}</b><span>Set 1 of 3</span></div>
+        <div class="sess-stage ob2-tour-stage" id="ob2T2Stage"><div class="sess-stage-main">
+          <div class="sess-fig sess-fig-stage" data-fig="${ex}" data-theme="light" data-mood="neutral"></div>
+        </div></div>
+        <div class="sess-chips ob2-tour-chips" id="ob2T2Chips"><span class="sess-chip current">1</span><span class="sess-chip">2</span><span class="sess-chip">3</span></div>
+        <button type="button" class="btn-big btn-primary ob2-pulse" id="ob2T2Log">Log set 1 of 3</button>`,
+      cta: "Continue", ctaOff: true, onNext: () => ui.next({ taste_ex: ex }),
+    });
+    mountMotionFigures($("ob2T2Stage"));
+    $("ob2T2Log").onclick = () => {
+      $("ob2T2Log").remove();
+      $("ob2T2Chips").firstElementChild.outerHTML = `<span class="sess-chip done">${icon("check", 18)}</span>`;
+      $("ob2T2Chips").children[1].classList.add("current");
+      const stage = $("ob2T2Stage");
+      stage.classList.add("resting");
+      stage.querySelector(".sess-stage-main").innerHTML = `
+        <div class="sess-fig sess-fig-stage" data-fig="Rest: Water" data-theme="light" data-mood="happy"></div>
+        <div class="sess-rest" id="ob2T2Rest"><div class="sess-rest-eyebrow">Resting</div>
+          <div class="sess-rest-clock" id="ob2T2Clock">0:00</div>
+          <div class="sess-rest-plan" id="ob2T2Plan">Plan says 0:${REST}, shortened here</div></div>`;
+      mountMotionFigures(stage);
+      ob2Type($("ob2Q"), "Logged. Your rest starts on its own.");
+      $("ob2Next").disabled = false;
+      /* The clock is the rest timer's own rule (restState): it counts up and
+         turns when the plan is passed. It moves nothing but its own number. */
+      const t0 = Date.now();
+      const tick = setInterval(() => {
+        const el = $("ob2T2Clock");
+        if (!el) { clearInterval(tick); return; }
+        const sec = (Date.now() - t0) / 1000;
+        el.textContent = formatRest(sec * 1000);
+        if (sec >= REST && !$("ob2T2Rest").classList.contains("ready")) {
+          $("ob2T2Rest").classList.add("ready");
+          $("ob2T2Plan").textContent = "Past the plan, go when ready";
+        }
+      }, 250);
+      OB2_CLEANUP.push(() => clearInterval(tick));
+    };
+  } },
+
+  /* Taste 3, your body. The Rive figure lit by the set from taste 2, the
+     muscles from the exercise library the Body tab reads, and the working
+     muscles line the session shows under the figure. */
+  taste3: { ch: 4, render(d, ui) {
+    const ex = d.taste_ex || "Push-Up";
+    ui.paint({
+      title: "This is what that set worked.",
+      why: "Every set you log fills in your body, so you can see what you have trained and what you keep missing.",
+      body: `${ob2Tag("Your sample set")}
+        <div class="bi-figures ob2-tastefigs" aria-hidden="true">
+          <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Front"></canvas></div>
+          <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Back"></canvas></div>
+        </div>
+        <div class="card ob2-kcard">${workingMusclesHTML(ex, { who: "me", size: "sm", heading: true })}</div>`,
       cta: "Continue", onNext: () => ui.next(),
     });
+    const sex = d.sex === "Female" ? "Female" : "Male";
+    Promise.all([ensureRiveBodyModule(), ob2MusclesFor(ex)]).then(([mod, groups]) => {
+      if (!$("ob2T3Front")) return;
+      const lv = {};
+      for (const g of groups.primary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lv[m] = 3;
+      for (const g of groups.secondary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lv[m] = Math.max(lv[m] || 0, 1);
+      OB2_TASTE_FIGS = ["Front", "Back"].map((view) => mod.createBodyHeatmap({
+        canvas: $(view === "Front" ? "ob2T3Front" : "ob2T3Back"),
+        artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE, intensities: {},
+        onLoad: () => OB2_TASTE_FIGS.forEach((c) => c?.setIntensities({ ...lv })),
+      }));
+      OB2_CLEANUP.push(() => { OB2_TASTE_FIGS.forEach((c) => c?.destroy()); OB2_TASTE_FIGS = []; });
+    }).catch((e) => console.warn("onboarding: the body did not load", e));
   } },
 
   /* Required, no Skip, for the reason the old name step gives: ME is read as
@@ -16329,27 +16114,6 @@ const OB2 = {
       k = (k + 1) % EXAMPLES.length;
       el.placeholder = EXAMPLES[k];
     }, 2600);
-  } },
-
-  /* The one outside number in the whole run, labelled for what it is: one
-     small study from 1995. Nothing about Unio's own users, because there is
-     nothing true to say yet. The rings that used to play here are in the
-     tour now. */
-  react: { ch: 1, render(d, ui) {
-    ui.paint({
-      title: "Here is why two works better than one.",
-      body: `${ob2PairHTML(ob2Name(d) || "You", d.path === "b" ? ob2Partner(d) : null, { joined: true })}<div class="ob2-stat">
-          <b>6.3% <small>vs</small> 43%</b>
-          <div class="ob2-bars" aria-hidden="true">
-            <div><span>Joined together</span><i style="--w:6.3%"></i><em>6.3%</em></div>
-            <div><span>Joined alone</span><i class="alone" style="--w:43%"></i><em>43%</em></div>
-          </div>
-          <p class="ob2-bars-k">Dropped out within a year</p>
-          <p>One study found couples who joined a fitness program together dropped out at 6.3%, against 43% for married people who joined on their own.</p>
-          <small>Wallace, Raglin and Jastremski, 1995. One small, old study, but it points one way.</small>
-        </div>`,
-      cta: "Continue", onNext: () => ui.next(),
-    });
   } },
 
   /* Chapter 2. The why lines are the ones the old About step measured and
@@ -16867,31 +16631,39 @@ const OB2 = {
     });
   } },
 
-  /* A28. The real invite link (shareInviteLink, the same one time token as Home's invite)
-     with the real message it sends shown above the button. */
+  /* The invite, and the only place onboarding mentions a code. It is the
+     app's own pairing entry (pairEntryHtml and wirePairEntry, the ones Setup >
+     Partner uses): Send an invite mints the one time link, the box takes
+     their code or a link they sent, and their own code sits underneath. */
   invite: { ch: 5, render(d, ui) {
     const solo = d.train_with === "solo";
-    const who = ob2Name(d) || "Someone";
-    const after = `<div class="ob2-after">${ob2HeroBot(110)}${ob2PairHTML(who, null)}
-        <p class="ob2-why">They don't need the app yet. The link takes them to it, and pairs you once they are in.</p>
-        <div class="ob2-msg">${escapeHtml(who)} wants to train with you on Unio. Tap the link. If you do not have the app yet it will take you to the App Store.</div></div>`;
+    const who = ob2Name(d) || "You";
     ui.paint({
-      title: solo ? "Got a friend who'd keep you honest?" : "Your plan has room for two.",
-      body: after,
-      cta: d.invite_sent ? "Invite's out. Continue" : "Send invite",
-      onNext: async () => {
-        if (d.invite_sent) { ui.next(); return; }
-        await ensureProfileForInvite(d);
-        const sent = await shareInviteLink($("ob2Next"));
-        if (sent === "paired") { toast("You already have a partner"); ui.next(); return; }
-        if (sent) ui.next({ invite_sent: true });
-      },
+      title: solo ? "Got a friend who'd keep you honest?" : "Bring your partner in.",
+      why: "They don't need the app yet. The link takes them to it, and pairs you once they are in.",
+      body: `${ob2PairHTML(who, null)}<div class="ob2-pairentry">${pairEntryHtml(MY_PROFILE?.invite_code || null)}</div>`,
       foot: `<button type="button" class="btn-ghost" id="ob2InviteLater">I'll invite them later</button>`,
     });
+    /* The code needs a profile row to exist (a server default on insert), so
+       it is asked for here and shown when it arrives. */
+    ensureProfileForInvite(d).then((code) => {
+      const line = $("myCodeLine");
+      if (!line || !code) return;
+      $("myInviteCode").textContent = code;
+      line.hidden = false;
+    });
+    wirePairEntry({
+      onPaired: (res) => { clearSolo(); if (res?.partner_name) toast(`Paired with ${res.partner_name}`); ui.next({ invite_sent: true, paired_in_onboarding: true }); },
+      onPending: (res) => { toast(res?.error || "Request sent"); ui.next({ invite_sent: true }); },
+      onShared: () => {
+        const later = $("ob2InviteLater");
+        if (later) { later.textContent = "Invite's out. Continue"; later.className = "btn-primary"; }
+        d.invite_sent = true;
+      },
+    });
     /* Later is an answer, not a skip, so he does not say "skipped". */
-    $("ob2InviteLater").onclick = () => ui.next({ invite_later: true });
+    $("ob2InviteLater").onclick = () => ui.next(d.invite_sent ? { invite_sent: true } : { invite_later: true });
   } },
-
   week: { ch: 5, render(d, ui) {
     const want = d.days_per_week || 3;
     const state = { days: Array.isArray(d.week_days) ? d.week_days : (OB2_SPREAD[want] || OB2_SPREAD[3]), time: d.week_time || null };
@@ -16973,39 +16745,8 @@ const OB2 = {
     ob2WirePrice(ui);
   } },
 
-  /* A33. The second chance at the invite, after the commitment. */
-  inside: { ch: 5, render(d, ui) {
-    const day1 = ob2FirstDay(d);
-    const card = d.invite_sent
-      ? `<div class="ob2-card-note">${ob2PairHTML(ob2Name(d) || "You", null)}<p>Your partner has not opened the invite yet. Send it again?</p>
-          <button type="button" class="btn-ghost" id="ob2Again">Send it again</button></div>`
-      : d.train_with !== "solo" ? `<div class="ob2-card-note"><p>Invite them whenever you are ready. The empty seat on Home does it.</p></div>` : "";
-    ui.paint({
-      noBack: true,
-      title: `You're in${ob2Name(d) ? `, ${ob2Name(d)}` : ""}.${day1 ? ` Day 1 is ${day1}.` : ""}`,
-      body: ob2HeroBot() + (Array.isArray(d.week_days) ? ob2Card("Your week", `<div class="ob2-week ob2-week-show">${OB2_WEEKDAYS.map((w, i) => `<span class="ob2-wd${d.week_days.includes(i) ? " on" : ""}">${w.slice(0, 1)}<small>${w}</small></span>`).join("")}</div>`) : "") + card,
-      cta: "Take me to day 1", onNext: () => ui.next(),
-    });
-    if ($("ob2Again")) $("ob2Again").onclick = (e) => shareInviteLink(e.currentTarget);
-  } },
-
   /* A34, the hand-off, not a screen: it writes everything and lands on Home. */
   home: { ch: 5, render(d) { obV2Finish(d); } },
-
-  /* B24: the pairing, said. */
-  paired: { ch: 5, render(d, ui) {
-    ui.paint({
-      title: `You're paired with ${ob2Partner(d)}.`,
-      body: `<div class="ob2-after">${ob2HeroBot(150)}${ob2PairHTML(ob2Name(d) || "You", ob2Partner(d), { joined: true })}
-        ${/* Home's own card for the two of you, as it reads on day one. */ ""}
-        <div class="card ob2-namecard"><div class="hero-kicker">This week together</div>
-          <div class="stand">${personRing(0, d.days_per_week || 3, "me", "", ob2Name(d) || "You", false, false, { tone: "idle", text: "Starting" })}
-            <div class="stand-div"></div>
-            ${personRing(0, d.partner?.days || 3, "them", "", ob2Partner(d), false, false, { tone: "idle", text: "Paired today" })}</div></div>
-        <p class="ob2-why ob2-center">You see each other's workouts and streaks. Your weight stays yours.</p></div>`,
-      cta: "Continue", onNext: () => ui.next(),
-    });
-  } },
 
   /* B25: days, time and the nudge on one screen. Opens on the partner's
      days where they have a planned week, so the two weeks start lined up. */
@@ -19537,9 +19278,6 @@ let MILESTONE_CHECK_RUNNING = false;
    have one. Only ever writes MY_EMAIL's own row: RLS would refuse anything
    else, and it would not mean anything if it did not. */
 async function checkNewMilestoneBadges() {
-  /* Not during the onboarding tour: sample history earning badges would put
-     "First one down" over a person who has not done anything yet. */
-  if (window.__OB_TOUR_ON === true) return;
   if (!MY_EMAIL || MILESTONE_CHECK_RUNNING) return;
   MILESTONE_CHECK_RUNNING = true;
   try {
@@ -34531,10 +34269,6 @@ function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going", tone =
 const HEALTH_V = "2026-10-04";
 let HEALTH_PENDING = null;
 function healthAgreed() {
-  /* The onboarding tour stores nothing, so there is nothing to consent to yet.
-     The real agreement is asked at the end of onboarding, before the first
-     real write, exactly as before. */
-  if (window.__OB_TOUR_ON === true) return true;
   if (MY_PROFILE?.health_ack_at && MY_PROFILE?.health_consent_at) return true;
   try { return JSON.parse(localStorage.getItem("unio.health") || "null")?.v === HEALTH_V; } catch { return false; }
 }
