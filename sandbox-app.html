@@ -3866,30 +3866,10 @@
      150s plus the gap missed it by a few pixels, so every list fell to one
      card per row (Mo, 2026-10-04: "you can fit two in here"). */
   .cb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 10px; margin-bottom: 16px; }
-  /* Plan my own, guided: the area question and one area at a time. */
-  /* The card's own h2 rule is a small grey eyebrow; this is the screen's
-     question, so it is spelled out in full at higher specificity. */
-  #workoutContent h2.pmo-h { margin: 4px 0 4px; font-size: 24px; line-height: 1.15; letter-spacing: -.025em; font-weight: 800; text-wrap: balance;
-    text-transform: none; color: var(--text); }
-  .pmo-sub { margin: 0 0 16px; color: var(--muted); font-size: 14.5px; }
-  .pmo-more { margin: -4px 0 12px; }
-  .pmo-sec + .pmo-sec { margin-top: 8px; }
-  .pmo-sec-h { margin: 0 0 10px; font-size: 17px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
-  .pmo-search { position: relative; margin: 0 0 14px; }
-  .pmo-search input { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border);
-    background: var(--panel-2); color: var(--text); font: inherit; font-size: 16px; }
-  .pmo-whole { display: block; margin: 4px auto 6px; border: 1.5px solid var(--border); background: var(--panel); color: var(--text);
-    border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
-  .pmo-foot { display: grid; gap: 6px; margin: 4px 0 8px; }
-  .pmo-actions { display: grid; gap: 10px; margin-top: 16px; }
-  /* Picker, then Whole body, then Continue, at even steps. */
-  /* The chips already show what is picked, so the sentence is noise here. */
-  #pmoBody .bp-note { display: none; }
-  #pmoBody .bp-chips { margin-bottom: 16px; }
-  #pmoBody .pmo-whole { margin: 0 auto 20px; }
-  .pmo-actions .cb-go { margin-top: 0; }
-  .pmo-actions .btn-ghost, .pmo-actions .cb-add { margin: 0; }
-  .pmo-skip { background: none; border: 0; color: var(--muted); font: inherit; font-size: 14.5px; font-weight: 600; padding: 10px; cursor: pointer; width: 100%; }
+  /* The build screen's buttons under the list: one even stack. */
+  .cb-actions { display: grid; gap: 10px; margin-top: 16px; }
+  .cb-actions .cb-go { margin-top: 0; }
+  .cb-actions .btn-ghost, .cb-actions .cb-add { margin: 0; }
   .cb-card {
     position: relative; overflow: hidden; text-align: left; cursor: pointer; font: inherit;
     padding: 12px 12px 11px; border-radius: 14px; min-height: 74px;
@@ -40204,200 +40184,12 @@ function cbExercisesFor(groupKey, query) {
   return out;
 }
 
-/* ---------- Plan my own, guided ----------
-   Mo, 2026-10-04: picking from the whole library at once was being bombarded
-   with options. So Plan my own starts with one question, what do you want to
-   hit today, takes the areas picked one at a time with only that area's
-   exercises on screen, and lands on the review this screen always had (the
-   list, the figure, sets and reps, Start). Taps go straight into the same
-   MANUAL_DRAFT the picker writes, so nothing downstream changed. */
-/* The areas come off the body: the same tappable figure onboarding uses
-   (Mo, 2026-10-04: "I want to be able to see the body itself and be able to
-   click it"), but with the picker's own six sections as the regions, one chip
-   one page. Arms and shoulders were one region at first; Mo split them the
-   same day because they are completely different workouts, and legs and core
-   come apart for the same reason. */
-const PMO_REGIONS = ["chest", "back", "shoulders", "arms", "legs", "core"].map((key) => {
-  const g = CB_GROUPS.find((x) => x.key === key);
-  return { id: key, label: g.label, say: `your ${g.label.toLowerCase()}`, groups: g.cats };
-});
-const PMO_ORDER = ["legs", "chest", "back", "shoulders", "arms", "core"];
-const PMO_SHOWN = 8;   // per area before "Show all": a handful, not the library
-let PMO = { stage: "areas", regions: [], open: [], q: "" };
-function pmoReset() { closeBodyRegionPicker(); PMO = { stage: "areas", regions: [], open: [], q: "" }; }
-function pmoSections() {
-  const want = new Set(PMO.regions);
-  return PMO_ORDER.filter((g) => want.has(g));
-}
-
-/* Exercise cards, the picker's own, that toggle in and out of the draft. Used
-   by the area pages and by search, so a pick looks and behaves the same from
-   either. */
-function pmoCardsHTML(list) {
-  const chosen = new Set(MANUAL_DRAFT.map((e) => e.name));
-  return list.map((ex, i) => `
-    <button type="button" class="cb-card${chosen.has(ex.name) ? " picked" : ""}" data-pmo-pick="${escapeHtml(ex.name)}" style="--d:${Math.min(i, 12) * 22}ms">
-      <span class="cb-fig" data-fig="${escapeHtml(ex.name)}" data-fig-static></span>
-      <span class="cb-card-name">${escapeHtml(ex.name)}</span>
-      <span class="cb-card-meta">${escapeHtml(ex.equipment || "")}${ex.level ? ` · ${escapeHtml(ex.level)}` : ""}</span>
-      <span class="cb-tick">${icon("check", 26)}</span>
-    </button>`).join("");
-}
-function pmoWireCards(root, after) {
-  root.querySelectorAll("[data-pmo-pick]").forEach((b) => {
-    b.onclick = () => {
-      const name = b.dataset.pmoPick;
-      const at = MANUAL_DRAFT.findIndex((e) => e.name === name);
-      if (at >= 0) MANUAL_DRAFT.splice(at, 1);
-      else MANUAL_DRAFT.push({ name, sets: 3, reps: 10, targetWeight: 0 });
-      saveDraft();
-      b.classList.toggle("picked", at < 0);
-      buzz(8);
-      after?.();
-    };
-  });
-  mountMotionFigures(root);
-}
-
-/* Search across the whole library, from either screen. Only the results redraw,
-   so the field keeps focus and the figures already on screen stay put. */
-function pmoSearchResults(q) {
-  const seen = new Set();
-  return bwFilter(searchExerciseCatalog(q, 30)).filter((e) => {
-    const k = e.name.toLowerCase();
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  }).slice(0, 12);
-}
-function pmoSearchHTML(placeholder) {
-  return `<div class="pmo-search">
-      <input type="search" id="pmoSearch" placeholder="${escapeHtml(placeholder)}" autocomplete="off" value="${escapeHtml(PMO.q)}" />
-    </div>`;
-}
-
-function pmoReviewLabel() { return `Review your workout (${MANUAL_DRAFT.length})`; }
-
-function renderPlanMyOwn() {
-  if (PMO.stage === "pick") { renderPmoPick(); return; }
-  closeBodyRegionPicker();
-  const sex = profileFor(MY_EMAIL)?.sex;
-  $("workoutContent").innerHTML = `
-    ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { pmoReset(); saveDraft(); } }))}
-    <h2 class="pmo-h">What do you want to hit today?</h2>
-    <div id="pmoBody">
-      <div id="pmoBodyPick">${bodyRegionPickerHTML({ sex, selected: PMO.regions, regions: PMO_REGIONS })}</div>
-      <button type="button" class="pmo-whole" id="pmoWhole">Whole body</button>
-    </div>
-    <div class="pmo-foot">
-      <button type="button" class="btn-primary" id="pmoGo"></button>
-      <button type="button" class="pmo-skip" id="pmoReview" hidden></button>
-    </div>`;
-  const syncFoot = () => {
-    const n = pmoSections().length;
-    const go = $("pmoGo");
-    go.disabled = !n;
-    go.textContent = n ? `Continue with ${n} ${n === 1 ? "area" : "areas"}` : "Tap what you want to work on";
-    const r = $("pmoReview");
-    r.hidden = !MANUAL_DRAFT.length;
-    r.textContent = pmoReviewLabel();
-  };
-  wireBodyRegionPicker($("pmoBodyPick"), { sex, regions: PMO_REGIONS, onChange: (ids) => { PMO.regions = ids; syncFoot(); } });
-  $("pmoWhole").onclick = () => {
-    /* Every region on, through the chips, so the figure and the sentence
-       follow exactly as if each had been tapped. */
-    $("pmoBodyPick").querySelectorAll(".bp-chip:not(.on)").forEach((c) => c.click());
-  };
-  $("pmoGo").onclick = () => {
-    if (!pmoSections().length) return;
-    closeBodyRegionPicker();
-    PMO.stage = "pick"; PMO.open = []; PMO.q = "";
-    renderPlanMyOwn();
-    window.scrollTo(0, 0);
-  };
-  $("pmoReview").onclick = () => { closeBodyRegionPicker(); PMO.stage = "done"; PMO.q = ""; renderManualBuildScreen(); window.scrollTo(0, 0); };
-  syncFoot();
-}
-
-/* Every area picked, on one page: Mo, 2026-10-04, walking area to area with
-   Next and Skip was in the way. Each area is a short section (a handful, then
-   Show all), and one search above them reaches the whole library. */
-function renderPmoPick() {
-  const sections = pmoSections();
-  if (!sections.length) { PMO.stage = "areas"; renderPlanMyOwn(); return; }
-  const labelOf = (k) => CB_GROUPS.find((x) => x.key === k)?.label || k;
-  const names = sections.map(labelOf);
-  const title = names.length === 1 ? names[0] : names.slice(0, -1).join(", ") + " and " + names[names.length - 1].toLowerCase();
-  const countLine = () => `${MANUAL_DRAFT.length ? `${MANUAL_DRAFT.length} picked. ` : ""}Tap the ones you want. Two or three an area is plenty.`;
-  $("workoutContent").innerHTML = `
-    ${backBar("Back", () => { PMO.stage = "areas"; PMO.open = []; PMO.q = ""; renderPlanMyOwn(); window.scrollTo(0, 0); })}
-    <h2 class="pmo-h" id="pmoTitle">${escapeHtml(title)}</h2>
-    <p class="pmo-sub" id="pmoCount">${countLine()}</p>
-    ${pmoSearchHTML("Search any exercise")}
-    <div class="bw-toggle-wrap">${bwToggleHTML()}</div>
-    <div id="pmoGridWrap"></div>
-    <div class="pmo-foot">
-      <button type="button" class="btn-primary" id="pmoNext"></button>
-    </div>`;
-  const refreshFoot = () => {
-    $("pmoCount").textContent = countLine();
-    $("pmoNext").textContent = MANUAL_DRAFT.length ? pmoReviewLabel() : "Pick at least one";
-    $("pmoNext").disabled = !MANUAL_DRAFT.length;
-  };
-  const drawGrid = () => {
-    const wrap = $("pmoGridWrap");
-    const q = PMO.q.trim();
-    if (q) {
-      const res = pmoSearchResults(q);
-      $("pmoTitle").textContent = "Search";
-      wrap.innerHTML = res.length ? `<div class="cb-grid">${pmoCardsHTML(res)}</div>` : `<div class="cb-none">Nothing matches "${escapeHtml(q)}".</div>`;
-    } else {
-      $("pmoTitle").textContent = title;
-      if (!EXERCISE_TRAININGS.length) { wrap.innerHTML = `<div class="cb-none">Loading the exercise library…</div>`; }
-      else wrap.innerHTML = sections.map((g) => {
-        const all = cbExercisesFor(g, "");
-        const open = PMO.open.includes(g);
-        const list = open ? all : all.slice(0, PMO_SHOWN);
-        return `<section class="pmo-sec">
-            ${sections.length > 1 ? `<h3 class="pmo-sec-h">${escapeHtml(labelOf(g))}</h3>` : ""}
-            <div class="cb-grid">${pmoCardsHTML(list)}</div>
-            ${!open && all.length > PMO_SHOWN ? `<button type="button" class="btn-ghost pmo-more" data-more="${g}">Show all ${all.length} ${escapeHtml(labelOf(g).toLowerCase())} exercises</button>` : ""}
-          </section>`;
-      }).join("");
-      wrap.querySelectorAll("[data-more]").forEach((b) => { b.onclick = () => { PMO.open.push(b.dataset.more); drawGrid(); }; });
-    }
-    pmoWireCards(wrap, refreshFoot);
-  };
-  drawGrid();
-  refreshFoot();
-  $("pmoSearch").oninput = (e) => { PMO.q = e.target.value; drawGrid(); };
-  wireBwToggle($("workoutContent"), drawGrid);
-  $("pmoNext").onclick = () => {
-    if (!MANUAL_DRAFT.length) return;
-    PMO.q = "";
-    PMO.stage = "done";
-    renderManualBuildScreen();
-    window.scrollTo(0, 0);
-  };
-}
-
-/* Back from the review goes one screen back, not out of Plan my own: to the
-   exercises page, or to the body for a draft reopened from earlier.
-   Mo, 2026-10-04: "I can't go back." The draft rides along either way. */
-function pmoReviewBack() {
-  saveDraft(); cbTeardown();
-  if (!PMO.regions.length) { PMO.stage = "areas"; renderPlanMyOwn(); }
-  else { PMO.stage = "pick"; PMO.q = ""; renderPmoPick(); }
-  window.scrollTo(0, 0);
-}
-
 function renderManualBuildScreen() {
-  /* A fresh Plan my own starts with the question, not the library. A draft
-     already holding exercises goes straight to its review. */
-  if (PMO.stage !== "done" && !MANUAL_DRAFT.length) { renderPlanMyOwn(); return; }
-  if (PMO.stage !== "done") PMO.stage = "done";
+  /* Back to the library, Mo 2026-10-04: the guided body-part flow that stood
+     in front of this (pick areas, then exercises per area) is gone and Plan my
+     own opens straight on the list with Add an exercise. */
   $("workoutContent").innerHTML = `
-    ${backBar("Back", pmoReviewBack)}
+    ${backBar("Back", () => goWorkoutScreen("choose", { back: true, before: () => { saveDraft(); cbTeardown(); } }))}
     <div class="cb-hero">
       <div class="cb-figs">
         <canvas class="cb-fig" id="cbFigure"></canvas>
@@ -40413,18 +40205,18 @@ function renderManualBuildScreen() {
       <p class="muted-note">Tap a row to change its sets, reps or weight. Drag the handle to reorder.</p>
       <div class="reorder-list" id="draftRows"></div>
     </div>
-    <!-- One way to add, by body part: Mo, 2026-10-04, the whole library is not
-         a way in any more, so "Add an exercise" became another area. One even
-         stack below the list, so nothing sits at its own odd distance. -->
-    <div class="pmo-actions">
-      <button type="button" class="cb-add" id="pmoAgain">${icon("plus", 18)} Add another area</button>
+    <!-- One even stack below the list, so nothing sits at its own odd
+         distance. Start comes before Cancel, so the thing you actually want
+         is the first one you reach at the end of the list. -->
+    <div class="cb-actions">
+      <button type="button" class="cb-add" id="cbAddBtn">${icon("plus", 18)} Add an exercise</button>
       <div class="cb-go hidden" id="cbGo">
         <button type="button" class="btn-primary" id="manualStartBtn">${PLAN_FOR_DATE && PLAN_FOR_DATE !== todayStr() ? "Put it on that day" : "Start Workout"}</button>
       </div>
       <button type="button" class="btn-ghost" id="manualCancelBtn">Cancel</button>
     </div>`;
 
-  $("pmoAgain").onclick = () => { cbTeardown(); PMO = { stage: "areas", regions: [], open: [], q: "" }; renderPlanMyOwn(); window.scrollTo(0, 0); };
+  $("cbAddBtn").onclick = () => cbOpenPicker();
 
   cbRenderLineup();
   cbUpdateCharacter();
@@ -40433,13 +40225,11 @@ function renderManualBuildScreen() {
   $("manualStartBtn").onclick = () => {
     if (!MANUAL_DRAFT.length) { toast("Pick at least one exercise"); return; }
     cbTeardown();
-    pmoReset();
     saveManualWorkout();
   };
   $("manualCancelBtn").onclick = () => {
     if (MANUAL_DRAFT.length && !confirm(`Discard ${MANUAL_DRAFT.length} exercise${MANUAL_DRAFT.length === 1 ? "" : "s"} you added?`)) return;
     cbTeardown();
-    pmoReset();
     const wasFor = PLAN_FOR_DATE;
     PLAN_FOR_DATE = null;
     WORKOUT_MODE = wasFor ? "week" : null;
@@ -40821,7 +40611,7 @@ function cbUpdateCharacter() {
   if (facts) {
     if (!MANUAL_DRAFT.length) {
       facts.innerHTML = `<div class="cb-count">Build it<span></span></div>
-        <div class="cb-empty">Add an area below. The body fills in as you go, so you can see what you are actually training.</div>`;
+        <div class="cb-empty">Tap an exercise below. The body fills in as you go, so you can see what you are actually training.</div>`;
     } else {
       const groups = cbGroupsHit();
       /* "4 exercises" as the headline and the sets under it. The number alone
