@@ -196,9 +196,9 @@
         } },
 
       { t: "Build one yourself", scenario: "paired",
-        s: "Tap the body, then pick from those areas",
-        note: "Plan my own starts on the body: tap muscles on the front or back figure (or Chest, Back, Shoulders, Arms, Legs, Core under it, or Whole body). Continue opens one page with every area you picked as its own section (eight each, and Show all), and one search above them that finds any exercise. Review your workout leads to the review: the figure lit with what you picked, sets and reps, Add another area, Start. Back always goes one step back. This step clears any saved draft so it opens on the body.",
-        run: (w) => { w.clearDraft(); w.eval("MANUAL_DRAFT = []; pmoReset()"); w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
+        s: "Search, categories, sets and reps",
+        note: "Plan my own opens on your list with Add an exercise, which opens the whole library: search, a section per muscle, two cards a row, and a Bodyweight only switch. Type in the search box and the sheet should stay put rather than sliding under the keyboard. Categories should clear the search field. This step clears any saved draft so it opens empty.",
+        run: (w) => { w.clearDraft(); w.eval("MANUAL_DRAFT = []"); w.switchTab("workout"); w.goWorkoutScreen("manual"); } },
 
       { t: "Plan the week", scenario: "paired",
         s: "Assign workouts to days",
