@@ -6329,12 +6329,15 @@
     display: flex; gap: 16px;
     border-bottom: 1px solid var(--border);
   }
-  .prog-who-row + .goal-tabs { margin-top: 14px; }
+  .prog-who-row + .goal-tabs { margin-top: 16px; }
+  /* The controls ride the tab row's centre line, lifted clear of its rule. */
+  .goal-tabs { align-items: center; }
+  .goal-tabs .prog-goal-actions { margin-bottom: 8px; }
   /* Mo | Mell. Each half wears its person's colour when it is the one on
      screen, the same blue and orange as everywhere else the two of you are
      told apart. */
   .prog-who-row { display: flex; align-items: center; gap: 10px; }
-  .prog-who { display: flex; flex: 1; min-width: 0; max-width: 280px; padding: 4px; gap: 4px; border-radius: 999px;
+  .prog-who { display: flex; flex: 1; min-width: 0; padding: 4px; gap: 4px; border-radius: 999px;
     background: var(--panel-2); border: 1px solid var(--border); }
   .prog-who-b { flex: 1; min-width: 0; padding: 9px 12px; border: 0; border-radius: 999px; background: none; cursor: pointer;
     font: inherit; font-size: 15px; font-weight: 700; color: var(--muted);
@@ -7065,8 +7068,12 @@
      No Row chip. Mo cut it, and the app's own muscle rules already read a bare
      "row" as a barbell row, so a Row chip would have collected the logs that
      are not cardio at all. */
-  .end-head { margin: 2px 0 12px; position: relative; padding-right: 66px; min-height: 54px; }
+  /* The title is centred on the robot beside it rather than hanging off the
+     top of his 54px box, which left a short gap above the title and a long
+     one under it (Mo, 2026-10-04: "space everything correctly"). */
+  .end-head { margin: 0 0 14px; position: relative; padding-right: 66px; min-height: 54px; display: flex; align-items: center; }
   .end-head .wth-title { margin-top: 0; }
+  .end-head .wth-bot { top: 50%; transform: translateY(-50%); }
   .goal-screen .wth-stats { margin-top: 0; }
   .goal-screen .wth-now-fig { margin-top: 6px; }
   .goal-screen .tone-photos { margin: 0 0 12px; }
@@ -45873,11 +45880,14 @@ function renderGoalChips(profile) {
     </span>`;
   const who = progWhoSwitchHTML();
   const tabs = ids.map((id) => chip(goalTileFor(id))).join("");
-  /* Paired: the switch and the goal's controls share the top row, and goal
-     tabs get a row of their own only when there is more than one goal to
-     choose between. Alone: no switch, so the goal tabs keep the row as before. */
+  /* Paired: the switch has the top row to itself, full width, and the goal's
+     controls sit at the end of the goal tabs, because they edit the goal on
+     those tabs (Mo, 2026-10-04: move the settings down to the tabs). One
+     goal means no tabs, so the controls stay beside the switch rather than
+     on a row of their own. Alone: no switch, the tabs keep the row as before. */
+  const many = ids.length > 1;
   host.innerHTML = who
-    ? `<div class="prog-who-row">${who}${actions}</div>${ids.length > 1 ? `<div class="goal-tabs">${tabs}</div>` : ""}`
+    ? `<div class="prog-who-row">${who}${many ? "" : actions}</div>${many ? `<div class="goal-tabs">${tabs}${actions}</div>` : ""}`
     : `<div class="goal-tabs">${tabs}${actions}</div>`;
   wireProgWhoSwitch(host);
   const shareBtn = host.querySelector("#progShareBtn");
