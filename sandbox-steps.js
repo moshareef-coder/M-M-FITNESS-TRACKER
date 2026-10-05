@@ -307,7 +307,7 @@
 
       { t: "Finishing", scenario: "finished",
         s: "The screen after the last rep",
-        note: "Every exercise on today's plan already logged, so the app's own route lands here: the ring fills, time, volume and the record land under it, and the last line is the pair rather than a solo total. End a workout early instead and the same layout drops the PR tile and the confetti, because that is not the same event.",
+        note: "Every exercise on today's plan already logged, so the app's own route lands here: the ring fills, time and volume land under it, then the XP card reveals each move of the day one row at a time, counting its points into the total. The bars beside a move are its library level: 5 XP for a beginner move, 7 intermediate, 10 advanced, plus 10 for showing up, 25 for a record and the together bonus when there is one. The total is exactly what the day banks. The bar underneath fills toward the next level, and says Level up when today crosses one. End a workout early instead and the confetti stays off, because that is not the same event.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
 
       { t: "Still recovering", scenario: "finished",
