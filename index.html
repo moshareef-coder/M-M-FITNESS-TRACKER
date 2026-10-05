@@ -32889,7 +32889,68 @@ function quipCtx() {
     weekDone,
     weekTarget,
     hour: new Date().getHours(),
+    ...quipExercises(),
+    ...quipHoldName(),
   };
+}
+
+/* In a warm-up or cool-down the move on screen is the hold, so the hold is
+   what `name` and `lift` mean there. Without this the warm-up bank's cue line
+   read the first lift's cue over a stretch, telling somebody doing arm
+   circles to pinch their shoulder blades on the bench. */
+function quipHoldName() {
+  if (SESSION?.phase !== "warmup" && SESSION?.phase !== "cooldown") return {};
+  let move = null;
+  try { move = stretchList()[SESSION.stretchIndex] || null; } catch { move = null; }
+  return move?.name ? { name: move.name, lift: move.name.toLowerCase() } : {};
+}
+
+/* What the library knows about the move on screen and the one coming next,
+   for his exercise-aware lines (exerciseLines in quips.mjs). In a warm-up or
+   cool-down the move on screen is the hold, not the lift at exerciseIndex,
+   which still points at the first lift while the warm-up runs. The next move
+   is the first lift not yet done other than this one, the same rule
+   doFinishExerciseAndAdvance uses to pick it. */
+function quipExercises() {
+  if (!SESSION || !TODAY_WORKOUT) return { ex: null, nextEx: null };
+  const ei = SESSION.exerciseIndex;
+  if (SESSION.phase === "warmup" || SESSION.phase === "cooldown") {
+    let move = null;
+    try { move = stretchList()[SESSION.stretchIndex] || null; } catch { move = null; }
+    return { ex: quipFact(move?.name), nextEx: null };
+  }
+  const list = TODAY_WORKOUT.exercises || [];
+  const ni = list.findIndex((_, i) => i !== ei && !SESSION.completed?.[i]);
+  return { ex: quipFact(list[ei]?.name), nextEx: ni === -1 ? null : quipFact(list[ni].name) };
+}
+
+/* Library row by name, with the training and category it is filed under,
+   because the lines are said differently for a lift, a pose and a stretch.
+   First match wins, which puts weight training ahead of the calisthenics and
+   yoga copies of the same move, the same order the library lists them in. A
+   name the library does not know (somebody's custom lift) comes back as
+   its name and whatever muscles its name gives away, which still gets any
+   signature lines and nothing invented about level or equipment. */
+let QUIP_FACTS = null;
+let QUIP_FACTS_FOR = -1;
+function quipFact(name) {
+  if (!name) return null;
+  if (!QUIP_FACTS || QUIP_FACTS_FOR !== EXERCISE_TRAININGS.length) {
+    QUIP_FACTS_FOR = EXERCISE_TRAININGS.length;
+    QUIP_FACTS = new Map();
+    for (const t of EXERCISE_TRAININGS) for (const c of t.categories || []) for (const ex of c.exercises || []) {
+      const key = normalizeSearch(ex.name);
+      if (key && !QUIP_FACTS.has(key)) QUIP_FACTS.set(key, { ...ex, training: t.id, category: c.key });
+    }
+  }
+  const known = QUIP_FACTS.get(normalizeSearch(name));
+  if (known) return known;
+  /* Not in the library: read its muscles the way the heat map does, so a
+     custom "Bench Press" still hears about its chest. classifyMuscles returns
+     the library row when there is one, so this is only the keyword rules. */
+  let m = null;
+  try { m = classifyMuscles(name); } catch { m = null; }
+  return m?.primary?.length ? { name, primary: m.primary, secondary: m.secondary || [], training: "custom" } : { name };
 }
 
 /* The bank itself lives in quips.mjs, imported once at boot, so this file and
@@ -32929,15 +32990,53 @@ let QUIP_TYPE = null;          // the interval writing the current line out
    on a fresh account. */
 function pickQuip(key) {
   const ctx = quipCtx();
+  const alt = quipSpecificKey(key, ctx);
+  return (alt && pickQuipFrom(alt, ctx)) || pickQuipFrom(key, ctx);
+}
+
+/* Mo, 2026-10-05: talk about the exercise itself, during the set and in the
+   rest. A share of these beats goes to the exercise-aware banks (exSet,
+   exRest, exNext in quips.mjs) instead of the generic one, and an empty
+   specific bank falls straight back to the generic line.
+
+   A share and not all of them, on purpose. Every line about the move is true,
+   but a man who only ever talks about the exercise on screen reads like a
+   label printer, and the generic banks are where most of his character is.
+   Just over half keeps the exercise in the room without making him a list.
+   This changes WHAT he says, never how often: the floor and the odds in
+   sayQuip are untouched, so he is no chattier than he was.
+
+   In the rest after the last set of a lift there is nothing more of it to
+   do, so that rest is mostly about the next one. Between sets it is about
+   the one you are on, since the next thing coming is more of it. */
+const QUIP_SPECIFIC = { idle: "exSet", nextExercise: "exSet", warmup: "exSet", cooldown: "exSet", stretch: "exSet", rest: "exRest", restLong: "exRest" };
+const QUIP_SPECIFIC_SHARE = 0.55;
+function quipSpecificKey(key, ctx) {
+  const alt = QUIP_SPECIFIC[key];
+  if (!alt || !ctx.ex || Math.random() >= QUIP_SPECIFIC_SHARE) return null;
+  if (alt === "exRest" && ctx.nextEx && ctx.setsLeft === 0) return Math.random() < 0.75 ? "exNext" : "exRest";
+  return alt;
+}
+
+let QUIP_LAST_LINE = null;     // never the same line twice running, across banks
+function pickQuipFrom(key, ctx) {
+  /* flatMap rather than map: an exercise-aware entry returns every line that
+     is true for the move at once, and flattening them here is what lets the
+     no-repeat tracking below work line by line rather than per entry. */
   const bank = (QUIPS[key] || [])
-    .map((l) => (typeof l === "function" ? l(ctx) : l))
+    .flatMap((l) => (typeof l === "function" ? l(ctx) : l))
     .filter(Boolean);
   if (!bank.length) return null;
   const used = QUIP_RECENT[key] || (QUIP_RECENT[key] = []);
-  if (used.length >= bank.length) used.length = 0;
-  const left = bank.filter((l) => !used.includes(l));
+  if (bank.every((l) => used.includes(l))) used.length = 0;
+  /* A bank that has just been reset could hand back the line it ended on,
+     which is exactly the back to back repeat this exists to prevent. */
+  let left = bank.filter((l) => !used.includes(l) && l !== QUIP_LAST_LINE);
+  if (!left.length) left = bank.filter((l) => l !== QUIP_LAST_LINE);
+  if (!left.length) return null;
   const line = left[Math.floor(Math.random() * left.length)];
   used.push(line);
+  QUIP_LAST_LINE = line;
   return line;
 }
 

@@ -521,6 +521,544 @@ const jokeOf = (c) => {
   return Array.isArray(f.joke) ? f.joke[Math.floor(Math.random() * f.joke.length)] : f.joke;
 };
 
+/* ------------------------------------------------- the exercise itself ----
+
+   Mo, 2026-10-05: he should talk about the exercise you are actually doing.
+   "If I'm doing the human flag, could it be like, you do this? This is really
+   difficult." And while you rest, about that exercise or the one coming up.
+
+   FORM above already gives every lift a cue and a joke, but those are one or
+   two lines a move, so across a long session he still spends most of his time
+   in the generic banks. Writing a bank per exercise for 286 moves would be a
+   week of lines that drift out of date the first time the library changes.
+   So this is layered, and every layer is only allowed to say what is true:
+
+   1. SIGNATURE. Hand-written lines for the moves people know by name, the
+      showpieces and the big barbell lifts, where a generic line would waste
+      the moment.
+   2. FACTS. Lines built from what the library says about the move: its
+      primary muscles, its level, its equipment and which training it belongs
+      to. An advanced calisthenics move gets the "you do this?" treatment, a
+      beginner one gets steady encouragement, and a muscle is only ever named
+      when the library lists it as primary for that exact move. That is the
+      rule that keeps him from praising your back during a calf raise.
+   3. NEXT UP. In the rest after the last set of a lift, he previews the next
+      one, by name and by the muscle it moves to.
+
+   The generic banks stay as they are and stay the fallback. index.html
+   decides how often a beat goes to these lines rather than a generic one
+   (QUIP_SPECIFIC there), so he does not become a man who only reads out
+   exercise names. Most lines here do not contain the name at all.
+
+   `fact` is the library row ({ name, primary, secondary, equipment, level })
+   plus `training` (the library it came from) and `category`. A name the
+   library does not know arrives as { name } alone, and gets only its
+   signature lines if it has any. */
+
+/* How he says each muscle key the library uses. `lats` is said as back,
+   because nobody says "over to your lats" out loud. `pl` is for the verb. */
+const MUSCLE = {
+  chest: { your: "your chest", pl: false },
+  shoulders: { your: "your shoulders", pl: true },
+  lats: { your: "your back", pl: false },
+  traps: { your: "your traps", pl: true },
+  biceps: { your: "your biceps", pl: true },
+  triceps: { your: "your triceps", pl: true },
+  forearms: { your: "your forearms", pl: true },
+  quads: { your: "your quads", pl: true },
+  hamstrings: { your: "your hamstrings", pl: true },
+  glutes: { your: "your glutes", pl: true },
+  calves: { your: "your calves", pl: true },
+  abs: { your: "your abs", pl: true },
+  obliques: { your: "your obliques", pl: true },
+  lowerback: { your: "your lower back", pl: false },
+};
+
+/* What he says about a muscle while it is working (`set`) and while it rests
+   (`rest`). Written to be true of every move that lists the muscle as
+   primary, which is why there is almost no instruction in them: "pull with
+   the elbows" is right for a row and wrong for a straight-arm pulldown, and
+   the instruction for the exact move already lives in FORM. */
+const MUSCLE_LINES = {
+  chest: {
+    set: ["This one is all chest. Let it do the work.", "Chest working. I can tell from here. I cannot tell anything.", "Your chest is doing the work. Your face does not have to."],
+    rest: ["Let the chest open up. Arms loose.", "The chest gets a minute. It earned it."],
+  },
+  shoulders: {
+    set: ["Shoulders. Small muscles, big opinions.", "This is a shoulder one. They are listening.", "Shoulders working. Keep your neck out of it."],
+    rest: ["Roll the shoulders out. Slowly.", "Shoulders get a breather. They carry everything else."],
+  },
+  lats: {
+    set: ["This is back work. The hands just hold on.", "Your back is doing this one. You cannot see it. I can.", "Back work. The side of you the mirror never shows."],
+    rest: ["Let the arms hang. Your back gets a minute.", "Your back did that. It will not say thank you. I will."],
+  },
+  traps: {
+    set: ["Traps. The muscles that live next to your ears.", "Upper back on this one. The part you never see."],
+    rest: ["Let the traps drop. Ears are not the destination.", "Traps get a rest. They carry your stress all day."],
+  },
+  biceps: {
+    set: ["This one is for the biceps. They know what they did.", "Biceps working. I am pretending not to look."],
+    rest: ["Shake the arms out. Biceps need a second.", "The biceps rest. The pump stays a bit longer."],
+  },
+  triceps: {
+    set: ["Triceps. Most of your upper arm, a fraction of the attention.", "Back of the arm, this one. The unsung half."],
+    rest: ["Shake the arms out. Triceps get a break.", "Triceps, resting. Quietly the bigger half of the arm."],
+  },
+  forearms: {
+    set: ["Forearms. And grip. Mostly grip.", "This is a forearm one. The hands complain first."],
+    rest: ["Open and close your hands. Wake them up.", "Forearms rest. Grip comes back faster than you think."],
+  },
+  quads: {
+    set: ["Quads. The front of the legs, doing the heavy lifting.", "Legs, this one. The quads in particular. They know.", "Quad work. Tomorrow's stairs are already worried."],
+    rest: ["Walk it off a little. Quads like that.", "Quads get a minute. The stairs later will be interesting."],
+  },
+  hamstrings: {
+    set: ["Hamstrings. The back of the legs, finally noticed.", "This is a hamstring one. Slow is your friend."],
+    rest: ["Hamstrings rest. Stand tall, let them settle.", "The back of the legs gets a break. It needed one."],
+  },
+  glutes: {
+    set: ["Glutes. The biggest muscle you own. Use it.", "This one is for the glutes. Squeeze like it matters. It matters."],
+    rest: ["Glutes get a minute. Walk around a bit.", "The glutes rest. Biggest muscle, smallest complaint."],
+  },
+  calves: {
+    set: ["Calves. Famously stubborn. Be more stubborn.", "Calf work. Full range. Every rep."],
+    rest: ["Calves rest. Rock back on your heels a little.", "The calves get a minute. They carry you everywhere, after all."],
+  },
+  abs: {
+    set: ["Abs on this one. Breathe out as you work.", "Core work. The middle is the whole point.", "This one is abs. I have none. I am lines."],
+    rest: ["Breathe all the way out. The abs rest now.", "Core gets a minute. It holds everything else together."],
+  },
+  obliques: {
+    set: ["Obliques. The sides of your middle, very much involved.", "Side work. Control beats speed here."],
+    rest: ["Obliques rest. Stand tall, breathe out.", "The sides get a minute. They hold you upright all day."],
+  },
+  lowerback: {
+    set: ["Lower back on this one. Smooth beats fast.", "This one is for the lower back. Slow keeps it happy."],
+    rest: ["Lower back rests. Stand tall and breathe.", "Let the lower back settle. It did good work."],
+  },
+};
+
+/* The showpieces and the big lifts. Keyed by the lowercased library name.
+   `set` while it is on screen, `rest` between its sets, `next` when it is the
+   one coming up. Every line here was checked against the library's primary
+   and secondary muscles for that move. */
+const SIGNATURE = {
+  "human flag": {
+    set: ["Hold on. You do this? This is genuinely difficult.", "A human, held sideways off a pole. By you. I need a minute.", "Most people only ever see this in videos. You are doing it."],
+    rest: ["You just held yourself sideways in the air. Casually.", "That was a human flag. I am telling the other drawings."],
+    next: ["Next up, the human flag. Yes. That one.", "Human flag after this. Rest properly. You will need everything."],
+  },
+  "front lever": {
+    set: ["A front lever. Flat in the air, hanging from a bar. Absurd. Brilliant.", "You do this? I have seen people train years for it."],
+    rest: ["That was a front lever. Do not act like that was normal.", "Horizontal, from a bar. I am still processing it."],
+    next: ["Front lever next. Rest like you mean it.", "Next up, the front lever. The hard one."],
+  },
+  "tuck front lever": {
+    set: ["Tuck front lever. The road to the full one starts right here.", "Tucked, flat, off the bar. That is real strength."],
+    rest: ["Every second of that counts toward the full lever.", "Tucked lever done. Very serious business."],
+    next: ["Tuck front lever next. Knees tight, when it comes.", "Next up, the tuck front lever."],
+  },
+  "full planche": {
+    set: ["A full planche. I did not know people actually did this.", "Floating on two hands, flat. You do this? Respect."],
+    rest: ["You just did a planche. I need to sit down. I cannot sit.", "That is the hardest thing on the whole list."],
+    next: ["Next up, the full planche. Gather yourself.", "Planche next. Everything you have, then."],
+  },
+  "tuck planche": {
+    set: ["A tuck planche. Feet off the floor, on purpose.", "Balancing on your hands, knees tucked. Very few people can."],
+    rest: ["Tuck planche. You are on the road most people never start.", "That was a planche. Tucked, but a planche."],
+    next: ["Tuck planche next. Wrists ready.", "Next up, the tuck planche."],
+  },
+  "planche lean": {
+    set: ["The planche lean. Where every planche begins.", "Leaning further than feels sensible. Correct."],
+    rest: ["Lean done. Wrists, give them a shake.", "That lean is building something. Something absurd."],
+    next: ["Next up, the planche lean. Warm the wrists.", "Planche lean after this."],
+  },
+  "muscle-up": {
+    set: ["A muscle-up. Pull-up, then up and over. You do this?", "Over the bar, not just up to it. Big deal. Huge."],
+    rest: ["You went over the bar. Over it. I saw.", "Muscle-up done. The bar has been dealt with."],
+    next: ["Muscle-up next. Fast pull, when it comes.", "Next up, the muscle-up. The fun one. The hard one."],
+  },
+  "pistol squat": {
+    set: ["One leg, all the way down. You do this? Respect.", "A pistol squat. Balance, strength and ankles, all at once."],
+    rest: ["One leg squats. I am still recovering from watching.", "Pistols done. Your quads are filing a report."],
+    next: ["Pistol squat next. One leg at a time, obviously.", "Next up, pistols. Quads, prepare yourselves."],
+  },
+  "shrimp squat": {
+    set: ["A shrimp squat. Harder than a pistol, according to many people's knees.", "One leg, the other tucked behind you. Very advanced."],
+    rest: ["Shrimp squats. Named badly. Done well.", "That was one of the hard ones. You made it look tidy."],
+    next: ["Shrimp squat next. Quads first, dignity second.", "Next up, the shrimp squat."],
+  },
+  "nordic curl": {
+    set: ["Nordic curls. The hamstring exercise everyone fears. You are doing it.", "Lowering forward as slowly as you can. This one is brutal."],
+    rest: ["Your hamstrings will remember that one for days.", "Nordics done. I would sit down too, if I could."],
+    next: ["Nordic curls next. Hamstrings, I am so sorry.", "Next up, the nordic curl. The hard one."],
+  },
+  "deadlift": {
+    set: ["The deadlift. Pick it up. Put it down. The oldest test there is.", "Deadlift. Hamstrings, glutes, lower back, all at once."],
+    rest: ["Big lift. Breathe all the way out before the next one.", "Deadlift sets cost a lot. Take the full rest."],
+    next: ["Next up, deadlifts. The big one.", "Deadlift after this. Flat back when it comes."],
+  },
+  "sumo deadlift": {
+    set: ["Sumo deadlift. Wide feet, big hips, heavy bar.", "The sumo. Advanced, and you are doing it."],
+    rest: ["Sumo done. Your glutes will want a word later.", "That one is heavy work. Rest properly."],
+    next: ["Sumo deadlift next. Wide stance, when it comes.", "Next up, the sumo deadlift."],
+  },
+  "barbell back squat": {
+    set: ["The back squat. The king of the leg lifts, apparently. I was not consulted.", "Squats. Quads doing the heavy lifting. Literally."],
+    rest: ["Squat sets are expensive. Take the whole rest.", "That was a real squat set. Walk it off."],
+    next: ["Next up, back squats. Your quads already know.", "Squats after this. Brace when it comes."],
+  },
+  "front squat": {
+    set: ["Front squat. Advanced, upright, honest. Elbows up.", "A front squat. Quads absolutely on fire, probably."],
+    rest: ["Front squats. Hard on the quads, harder on the ego.", "Front squat set done. Give the wrists a shake."],
+    next: ["Front squat next. Elbows high when it comes.", "Next up, the front squat."],
+  },
+  "barbell bench press": {
+    set: ["The bench press. The one everybody asks about.", "Bench. Chest doing the pushing, bar doing the arguing."],
+    rest: ["Bench set done. Somebody, somewhere, is asking what you bench."],
+    again: ["Let the chest settle. Bench again in a minute."],
+    next: ["Next up, bench press. Chest day, officially.", "Bench after this. Shoulder blades back when it comes."],
+  },
+  "overhead press": {
+    set: ["Overhead press. Pushing the sky. The sky is fine.", "Strict pressing. Shoulders doing the honest work."],
+    rest: ["Overhead pressing is hard. Everyone stalls on it. Everyone."],
+    again: ["Shoulders get a minute. Press again soon."],
+    next: ["Next up, overhead press. Ribs down when it comes.", "Overhead press after this."],
+  },
+  "pull-up": {
+    set: ["Pull-ups. You against gravity. Gravity is losing.", "A pull-up. Your back lifting all of you. That is a lot of you."],
+    rest: ["Pull-ups done. That is your whole bodyweight, moved. Repeatedly.", "Let the arms hang. Back gets a minute."],
+    next: ["Next up, pull-ups. Back's turn.", "Pull-ups after this. Chalk up, metaphorically."],
+  },
+  "chin-up": {
+    set: ["Chin-ups. Palms toward you. Your biceps are thrilled.", "The friendly pull-up. Still all of your bodyweight."],
+    rest: ["Chin-ups done. Biceps and back, both busy."],
+    again: ["Shake the arms out. Chin-ups again soon."],
+    next: ["Next up, chin-ups. Back and biceps.", "Chin-ups after this."],
+  },
+  "weighted pull-up": {
+    set: ["A pull-up with extra weight. You do this? Respect.", "Bodyweight was not enough, apparently. Bold."],
+    rest: ["That was a weighted pull-up. Most people cannot do the unweighted one.", "Unclip, breathe, shake out the arms."],
+    next: ["Weighted pull-ups next. Strap up.", "Next up, weighted pull-ups. The serious kind."],
+  },
+  "one-arm pull-up": {
+    set: ["One arm. One. You do this? I am speechless. I am never speechless.", "A one-arm pull-up. The final form."],
+    rest: ["You pulled yourself up with one arm. I saw it.", "That might be the hardest pull there is."],
+    next: ["Next up, the one-arm pull-up. Rest fully. Seriously.", "One-arm pull-ups after this. Gather everything."],
+  },
+  "archer pull-up": {
+    set: ["Archer pull-ups. One arm working, one arm assisting. Fancy.", "This is the road to the one-arm pull-up. You are on it."],
+    rest: ["Archers done. One side at a time, the hard way.", "That was an advanced pull. Breathe."],
+    next: ["Archer pull-ups next. Back's turn, one side at a time.", "Next up, archer pull-ups."],
+  },
+  "one-arm push-up": {
+    set: ["A one-arm push-up. You do this? Excellent. Alarming.", "One arm on the floor, the other just watching. Respect."],
+    rest: ["One arm. You did that with one arm.", "One-arm push-ups done. Shake both arms out, even the lazy one."],
+    next: ["Next up, one-arm push-ups. Feet wide when it comes.", "One-arm push-ups after this."],
+  },
+  "handstand push-up": {
+    set: ["Upside down. Pressing. You do this? Show off.", "A handstand push-up. Shoulders holding up the entire you."],
+    rest: ["You pressed your whole body upside down. Normal Tuesday.", "Shoulders rest. Blood back where it belongs."],
+    next: ["Handstand push-ups next. Shoulders, brace yourselves.", "Next up, the handstand push-up."],
+  },
+  "freestanding handstand": {
+    set: ["A freestanding handstand. No wall. Brave.", "Balancing on your hands. Everything is upside down except your focus."],
+    rest: ["Handstand done. The room is the right way up now.", "That is real balance. Shake the wrists out."],
+    next: ["Freestanding handstand next. Wrists ready.", "Next up, the handstand. No wall this time."],
+  },
+  "l-sit": {
+    set: ["An L-sit. It looks like sitting. It is not sitting.", "Legs straight out, held in the air. Abs, fully employed."],
+    rest: ["L-sit done. Harder than it looks, every time.", "Shake the wrists. The abs can rest too."],
+    next: ["L-sit next. Legs straight when it comes.", "Next up, the L-sit."],
+  },
+  "v-sit": {
+    set: ["A V-sit. Higher than an L-sit. You do this? Respect.", "Legs up past your hands. That takes years."],
+    rest: ["That was a V-sit. Very few people get there.", "Abs rest now. They worked hard for that shape."],
+    next: ["V-sit next. Hips forward when it comes.", "Next up, the V-sit."],
+  },
+  "ab wheel rollout": {
+    set: ["The ab wheel. One wheel. Enormous consequences.", "Rollouts. Your abs holding the whole line."],
+    rest: ["Rollouts done. The abs will mention it tomorrow.", "Breathe out. That wheel is not your friend."],
+    next: ["Ab wheel next. Ribs down when it comes.", "Next up, rollouts."],
+  },
+  "hanging windshield wiper": {
+    set: ["Windshield wipers. Hanging, twisting, controlling all of it.", "Very advanced. Very sideways."],
+    rest: ["Wipers done. Your obliques are reconsidering everything.", "Shake out the grip. That was a lot."],
+    next: ["Windshield wipers next. Control over speed.", "Next up, hanging windshield wipers."],
+  },
+  "glute-ham raise": {
+    set: ["The glute-ham raise. Built entirely to humble hamstrings.", "Advanced hamstring work. You are doing it anyway."],
+    rest: ["Hamstrings rest. They did something heroic.", "That one is hard. Breathe."],
+    next: ["Glute-ham raises next. Hamstrings, you have been warned.", "Next up, the glute-ham raise."],
+  },
+  "sissy squat": {
+    set: ["Sissy squats. Named terribly. Brutal on the quads.", "Knees forward, leaning back. Quads, on fire."],
+    rest: ["Sissy squats done. Nothing sissy about them.", "Walk it off. Quads need it."],
+    next: ["Sissy squats next. Hold onto something.", "Next up, the sissy squat."],
+  },
+  "push-up": {
+    set: ["Push-ups. The original. Still one of the best.", "A push-up. Chest and triceps, no equipment, no excuses."],
+    rest: ["Push-ups done. A classic for a reason."],
+    again: ["Shake the arms out. Push-ups again in a moment."],
+    next: ["Next up, push-ups. Chest's turn.", "Push-ups after this. The classic."],
+  },
+  "plank": {
+    set: ["Holding still. Hardest thing there is.", "A plank. Abs holding a straight line for you."],
+    rest: ["Plank done. Time moves differently in a plank.", "Breathe out. The abs can let go now."],
+    next: ["Plank next. Ribs down, body straight.", "Next up, the plank. Very still, very hard."],
+  },
+  "hip thrust": {
+    set: ["Hip thrusts. Strange looking. Excellent for the glutes.", "Glutes, all of them, squeezing at the top."],
+    rest: ["Glutes rest. That was the best glute exercise there is, probably.", "Hip thrusts done. Walk around a bit."],
+    next: ["Hip thrusts next. Glutes' turn.", "Next up, hip thrusts."],
+  },
+  "romanian deadlift": {
+    set: ["Romanian deadlift. Hips back, hamstrings stretched.", "RDLs. Your hamstrings feel every inch of this."],
+    rest: ["Hamstrings rest. RDLs are sneaky like that.", "That stretch you felt? That was the point."],
+    next: ["RDLs next. Hips back when it comes.", "Next up, Romanian deadlifts."],
+  },
+  "bulgarian split squat": {
+    set: ["Bulgarian split squats. Everybody's least favourite. Still here.", "One leg at a time. Quads, very much in charge."],
+    rest: ["Bulgarians. The leg exercise nobody enjoys. You did it.", "Walk it off. The quads earned that."],
+    next: ["Bulgarian split squats next. I am sorry in advance.", "Next up, Bulgarians. Quads' turn."],
+  },
+  "crow pose": {
+    set: ["Crow pose. Your whole body on your hands. You do this? Lovely.", "Balancing on your arms. Calm face, very busy shoulders."],
+    rest: ["Crow done. Shake the wrists out.", "That was an arm balance. People practise months for that."],
+    next: ["Crow pose next. Look slightly ahead when it comes.", "Next up, crow."],
+  },
+  "wheel pose": {
+    set: ["A full wheel. Upside down and backward. Respect.", "The wheel. The biggest backbend on the list."],
+    rest: ["Wheel done. Come down slowly, always.", "Let the back rest. That was a big one."],
+    next: ["Wheel pose next. Warm the back first.", "Next up, the wheel."],
+  },
+  "splits (hanumanasana)": {
+    set: ["The splits. Slowly. The floor is getting closer.", "Hanumanasana. Very advanced. Blocks are not cheating."],
+    rest: ["Splits done. Ease out slowly.", "Hamstrings rest. They gave you a lot there."],
+    next: ["Splits next. Blocks within reach.", "Next up, the splits. Gently."],
+  },
+  "corpse pose (savasana)": {
+    set: ["Savasana. Lying perfectly still. My one true talent.", "The pose where you do nothing. Do it properly."],
+    rest: ["That was the stillest you have been all day.", "Savasana done. Come back slowly."],
+    next: ["Savasana next. The best part.", "Next up, corpse pose. Lie down. Finally."],
+  },
+};
+
+/* Older plans and the sandbox fixture name the big lifts the way people say
+   them rather than the way the library files them. Only aliases with exactly
+   one honest reading: plain "squat" could be any of eight, so it has none. */
+const SIGNATURE_ALIAS = {
+  "bench press": "barbell bench press",
+  "flat bench press": "barbell bench press",
+  "back squat": "barbell back squat",
+  "conventional deadlift": "deadlift",
+};
+
+/* Training-level lines, for the moves with nothing named about them. `strength`
+   is weights and calisthenics, `flow` is yoga and pilates, `stretch` is the
+   stretching library, `cardio` is cardio. */
+function kindOf(fact) {
+  const t = fact?.training;
+  /* "custom" is a lift the library does not know, whose muscles index.html
+     read off its name (classifyMuscles). It gets the muscle lines and
+     nothing else: no level and no equipment, because those would be guesses. */
+  if (t === "weight-training" || t === "calisthenics" || t === "custom") return "strength";
+  if (t === "yoga" || t === "pilates") return "flow";
+  if (t === "stretching") return "stretch";
+  if (t === "cardio") return "cardio";
+  return null;
+}
+
+/* Level is what the library calls the technique the move demands, so
+   advanced is where "you do this?" is honest, and beginner is where it would
+   be sarcasm. Beginner gets steady encouragement instead. */
+const LEVEL_LINES = {
+  strength: {
+    advanced: {
+      set: ["You do this? Respect.", "This is an advanced move. Most people never get here.", "People avoid this one for years. You are just doing it.", (n) => `${n}. I am impressed, and I am a drawing.`],
+      rest: ["You just did an advanced move and now you are standing there casually.", "That was one of the hard ones. Breathe."],
+      next: [(n) => `Next up, ${n}. The hard one. Rest properly.`, (n) => `${n} after this. Breathe now, you will want it.`],
+    },
+    intermediate: {
+      set: ["This one takes real technique. Yours is showing.", "Not a beginner move. Smooth reps beat fast ones."],
+      rest: ["That one asks a lot. Take the full rest."],
+      again: ["Technique held up on that set. Same again."],
+      next: [(n) => `Next up, ${n}. Take the full rest first.`, (n) => `${n} after this. Proper technique, when it comes.`],
+    },
+    beginner: {
+      set: ["Simple does not mean easy. Clean reps.", "Foundation work. Everyone strong still does this.", "Nothing fancy. Just good, steady work."],
+      rest: ["Steady. That is how it is done."],
+      again: ["Clean set. Same again in a minute."],
+      next: [(n) => `Next up, ${n}. A friendly one.`, (n) => `${n} after this. Nothing scary.`],
+    },
+  },
+  flow: {
+    advanced: {
+      set: ["You do this? I am made of lines and even I cannot bend like that.", "An advanced one. In slowly, out slowly.", (n) => `${n}. Respect. Genuinely.`],
+      rest: ["That was an advanced shape. Come out of it gently.", "Breathe. That one asks a lot."],
+      next: [(n) => `Next up, ${n}. An advanced one. Breathe first.`, (n) => `${n} after this. Take your time getting there.`],
+    },
+    intermediate: {
+      set: ["This one takes practice. You have had some.", "Steady breath. The shape will follow."],
+      rest: ["Good. Let it settle before the next one.", "Breathe out. That one takes practice."],
+      next: [(n) => `Next up, ${n}. Steady breath, when it comes.`, (n) => `${n} after this.`],
+    },
+    beginner: {
+      set: ["A gentle one. Let it be easy.", "Simple shape. Still worth doing properly.", "Breathe. That is most of the job here."],
+      rest: ["Nice and easy. Exactly right.", "Let it go. Breathe."],
+      next: [(n) => `Next up, ${n}. A gentle one.`, (n) => `${n} after this. Nothing hard.`],
+    },
+  },
+  stretch: {
+    advanced: {
+      set: ["This is a tricky one. Go only as far as feels fine.", "An advanced stretch. Patience beats force."],
+      rest: ["Ease out of it. No rushing.", "Good. That one takes control."],
+      next: [(n) => `Next up, ${n}. A tricky one. Go gently.`],
+    },
+    intermediate: {
+      set: ["Ease into it. Never force the end.", "This one takes a bit of practice. Breathe."],
+      rest: ["Let it go slowly.", "Good. Breathe out."],
+      next: [(n) => `Next up, ${n}. Ease into it.`],
+    },
+    beginner: {
+      set: ["Easy does it. Breathe out into it.", "Gentle. Never bounce."],
+      rest: ["Nice and loose.", "Good. Shake it out."],
+      next: [(n) => `Next up, ${n}. A gentle one.`],
+    },
+  },
+};
+
+/* Equipment lines, only for strength moves. In the other libraries the field
+   is about the room (a wall, a doorway) or does not apply, and the cardio rope
+   is filed as a band, which a band line would get wrong. */
+const EQUIPMENT_LINES = {
+  barbell: ["The barbell. Hands even, bar balanced.", "A barbell. It does not care how you feel. I do."],
+  dumbbell: ["Dumbbell work. Honest weight, nowhere to hide.", "Dumbbells. Each side carries its own load."],
+  machine: ["The machine sets the path. You bring the effort.", "Machine work. Set it up right and it does the rest. Except the effort."],
+  cable: ["Cables keep tension the whole way. No free rides.", "A cable. It pulls back. Every time."],
+  bodyweight: ["Your own body is the weight here. Convenient.", "Bodyweight. You brought the main equipment yourself."],
+  band: ["A band. Harder the further it stretches. Very honest."],
+};
+
+/* Stretching is said by what the stretch does, which the library files by
+   category: dynamic wakes a muscle up, static lengthens it, mobility moves a
+   joint through it. The muscle is still only named from `primary`. */
+const STRETCH_VERB = {
+  dynamic: (m) => [`Waking up ${m}. Easy does it.`, `This one gets ${m} ready. Loose, not forced.`],
+  static: (m) => [`A stretch for ${m}. Breathe out and let it go.`, `Feel it in ${m}? That is the point. Gently.`],
+  mobility: (m) => [`Mobility for ${m}. Smooth, not forced.`, `Moving ${m} through its range. Slowly.`],
+};
+
+const FLOW_MUSCLE = (m) => [`This one asks a lot of ${m}. Breathe through it.`, `Feel it in ${m}? Good. Stay there.`];
+
+/* Cardio is said by its effort, not its muscles: nobody running intervals
+   wants to hear about their hamstrings. */
+const CARDIO_MODE = {
+  running: "Running. Land under your hips. Short quick steps.",
+  walking: "Walking. It counts. It genuinely counts.",
+  cycling: "Cycling. Spin, do not grind.",
+  rowing: "Rowing. Legs first, then back, then arms.",
+  swimming: "Swimming. Long strokes. Breathe out underwater.",
+  elliptical: "The elliptical. Stand tall, go steady.",
+  stairs: "Stairs. Stand up straight. No leaning on the rails.",
+  hiit: "Intervals. Hard on, real rest off.",
+  hiking: "Hiking. A walk that got ambitious.",
+  "jump rope": "Jump rope. Soft landings, quiet feet.",
+};
+
+const spoken = (name) => String(name || "").replace(/\s*\([^)]*\)/g, "").trim();
+const evalLine = (l, n) => (typeof l === "function" ? l(n) : l);
+
+/* Every line for one move at one moment, each with the muscle keys it names,
+   so the check in scripts/check-exercise-quips.mjs can prove no line names a
+   muscle the library does not list for that move. `moment` is "set" (the move
+   is on screen), "rest" (between its sets, or just after its last one) or
+   "next" (it is the one coming up). `c` is quipCtx, read only for setsLeft. */
+export function exerciseLinesTagged(fact, moment, c = {}) {
+  if (!fact || !fact.name) return [];
+  const out = [];
+  const add = (text, muscles = []) => { if (text) out.push({ text, muscles }); };
+  const name = spoken(fact.name);
+  const low = String(fact.name).toLowerCase();
+  const sig = SIGNATURE[low] || SIGNATURE[SIGNATURE_ALIAS[low]];
+  if (sig && sig[moment]) for (const t of sig[moment]) add(t);
+  /* `again` lines promise another set, so they only exist while one is left. */
+  const more = moment === "rest" && c.setsLeft > 0;
+  if (sig && more) for (const t of sig.again || []) add(t);
+
+  const kind = kindOf(fact);
+  const primary = (fact.primary || []).filter((m) => MUSCLE[m]);
+  const level = fact.level;
+
+  if (moment === "next") {
+    /* Next-up lines name the move, because that is the news. The muscle tail
+       uses the first primary only, so a two-muscle move is not read out as a
+       list. */
+    const m = primary[0];
+    if (m && kind !== "cardio") {
+      add(`Next up, ${name}. Over to ${MUSCLE[m].your}.`, [m]);
+      add(`Coming up after this, something for ${MUSCLE[m].your}.`, [m]);
+    }
+    if (m && kind === "strength" && kindOf(c.ex) === "strength" && (c.ex.primary || []).includes(m)) {
+      add(`Next up, ${name}. Same muscles, different angle.`);
+    }
+    const lv = LEVEL_LINES[kind]?.[level]?.next || [];
+    for (const l of lv) add(evalLine(l, name));
+    if (kind === "cardio") {
+      add(`Next up, ${name}. ${fact.effort >= 7 ? "A hard one. Rest now." : "An easy one. Enjoy it."}`);
+      add(`${name} after this. Heart's turn.`);
+    }
+    if (!out.length) add(`Next up, ${name}.`);
+    return out;
+  }
+
+  if (kind === "strength") {
+    for (const m of primary) for (const t of MUSCLE_LINES[m][moment] || []) add(t, [m]);
+    for (const l of LEVEL_LINES.strength[level]?.[moment] || []) add(evalLine(l, name));
+    if (more) for (const l of LEVEL_LINES.strength[level]?.again || []) add(evalLine(l, name));
+    /* A weighted dip or a plate pinch is filed as bodyweight, and "your own
+       body is the weight" would be wrong about both. */
+    const loaded = /weighted|plate/i.test(fact.name);
+    if (moment === "set" && !(fact.equipment === "bodyweight" && loaded)) for (const t of EQUIPMENT_LINES[fact.equipment] || []) add(t);
+    if (more) {
+      add(`Another set of ${name} after this.`);
+      add(c.setsLeft === 1 ? "One more set of this, then it is done." : `${c.setsLeft} more sets of this. Pace yourself.`);
+    }
+  } else if (kind && more) {
+    /* Outside the weights a "set" is a round or a hold, so it says round. */
+    add(`Another round of ${name} after this.`);
+  }
+  if (kind === "flow") {
+    if (moment === "set") for (const m of primary) for (const t of FLOW_MUSCLE(MUSCLE[m].your)) add(t, [m]);
+    for (const l of LEVEL_LINES.flow[level]?.[moment] || []) add(evalLine(l, name));
+    if (moment === "set") add(fact.training === "pilates" ? "Small and controlled. That is pilates." : "Hold. Breathe. That is the whole job.");
+  } else if (kind === "stretch") {
+    const verb = STRETCH_VERB[fact.category] || STRETCH_VERB.static;
+    if (moment === "set") for (const m of primary) for (const t of verb(MUSCLE[m].your)) add(t, [m]);
+    for (const l of LEVEL_LINES.stretch[level]?.[moment] || []) add(evalLine(l, name));
+  } else if (kind === "cardio") {
+    if (moment === "set") {
+      if (CARDIO_MODE[fact.mode]) add(CARDIO_MODE[fact.mode]);
+      add(fact.effort >= 8 ? "This one is meant to be hard. Hard means hard. Then it ends."
+        : fact.effort <= 4 ? "Easy effort. Easy is the point today."
+          : "Comfortably uncomfortable. That is the target.");
+      add(`${name}. Heart is a muscle. This is its set.`);
+      add("Find the rhythm, then stay in it. That is the whole trick.");
+    } else {
+      add("Breathe it down. Let the heart rate settle.");
+      add(fact.effort >= 8 ? "That was meant to be hard. It was." : "Steady work. That is the whole job.");
+    }
+  }
+  return out;
+}
+
+export const exerciseLines = (fact, moment, c) => exerciseLinesTagged(fact, moment, c).map((l) => l.text);
+
+/* For the check script: every hand-written signature key, so it can prove
+   each one still matches a library name rather than silently never firing
+   after a rename. */
+export const SIGNATURE_NAMES = Object.keys(SIGNATURE);
+
 export const QUIPS = {
   /* The dashboard. Mo asked for him here: "the robot with a message, a funny
      little message", right under the card that offers today's workout.
@@ -867,6 +1405,15 @@ export const QUIPS = {
     (c) => (c.lift.includes("machine") ? "A machine. It has one opinion and it is very firm." : null),
     (c) => (c.lift.includes("dumbbell") ? "Dumbbells. Two of them. Famously." : null),
   ],
+  /* The exercise-aware banks, built from exerciseLinesTagged above. Each is a
+     single function returning every line that is true right now, which
+     pickQuip in index.html flattens, so its no-repeat tracking works across
+     them line by line. They never fire on their own: index.html routes a
+     share of the idle, rest and new-lift beats here (QUIP_SPECIFIC) and falls
+     back to the generic bank when one comes up empty. */
+  exSet: [(c) => exerciseLines(c.ex, "set", c)],
+  exRest: [(c) => exerciseLines(c.ex, "rest", c)],
+  exNext: [(c) => (c.nextEx ? exerciseLines(c.nextEx, "next", c) : null)],
 };
 // No finish bank: the summary screen replaces the session view outright, so
 // the stage he speaks from does not exist by the time a workout ends.
@@ -887,4 +1434,7 @@ export const QUIP_MOMENTS = {
   cardio: { label: "A cardio session or class", when: "NOT WIRED YET. Cardio is logged as an activity rather than run as a session, so nothing calls this bank. It needs one sayQuip(\"cardio\") where an activity is saved." },
   cooldown: { label: "A cool-down hold", when: "On each cool-down move, about 80% of the time." },
   stretch: { label: "A stretch on its own", when: "On each hold of a stretch started from the Recovery screen, about 80% of the time. Never inside a workout: the warm-up and cool-down banks own those." },
+  exSet: { label: "About the exercise on screen", when: "In place of an idle, new-lift, warm-up or cool-down line, a little over half the time. Built from the move's signature lines and its library facts (muscle, level, equipment)." },
+  exRest: { label: "About the exercise just done", when: "In place of a rest line, a little over half the time while sets remain on this lift. Lines promising another set only appear while one is left." },
+  exNext: { label: "Next up", when: "In the rest after the last set of a lift, most of the exercise-aware rest beats preview the next one by name and muscle." },
 };

@@ -271,6 +271,29 @@
           w.eval(`SESSION.restAntic = ${JSON.stringify(antic)}; saveSessionToStorage(); renderSession();`);
         } })),
 
+      { t: "He talks about the lift", scenario: "paired",
+        s: "Lines about the exercise on screen, then the next one",
+        note: "Unio now talks about the exact move: during a set about the lift on screen (its muscle, how hard it is, its kit, or a hand-written line for showpieces like the Human Flag), between sets about that lift, and in the rest after its last set about the one coming up (\"Next up, Overhead Press. Over to your shoulders.\"). This step logs every Bench Press set and makes him speak now instead of waiting the usual thirty seconds, so the bubble shows a next-up line. Log a set on the next lift and wait half a minute to hear him on his own. A bit over half his beats are about the exercise; the rest are his usual lines, and he talks no more often than before. Every line is checked against the library by node scripts/check-exercise-quips.mjs.",
+        run: (w) => {
+          w.switchTab("workout");
+          w.startWorkout();
+          w.endStretchPhase();
+          setSessionWeight(w, 175);
+          /* Rigged coin flips so the step shows the new kind of line every
+             time: the first three draws pass sayQuip's odds and route the
+             beat to the exercise banks, then the real random picks the line. */
+          w.eval(`(() => {
+            const n = SESSION.setsDone[SESSION.exerciseIndex].length;
+            for (let i = 0; i < n; i++) toggleSet(i);
+            setTimeout(() => {
+              const r = Math.random; let k = 0;
+              Math.random = () => (k++ < 3 ? 0.01 : r());
+              QUIP_LAST_AT = 0;
+              try { sayQuip("rest"); } finally { Math.random = r; }
+            }, 4000);
+          })()`);
+        } },
+
       { t: "A record, as it happens", scenario: "paired",
         s: "The banner on the set that broke it",
         note: "Bench Press has been logged at 180 before, so a set at 190 is a real record and says so on the spot instead of turning up later as a tag in Recent Activity. The banner drops in, bursts once and retracts on its own. Log two more sets at the same weight: it should stay quiet, because the record was already announced.",
