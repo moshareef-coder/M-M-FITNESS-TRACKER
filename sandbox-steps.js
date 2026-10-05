@@ -235,7 +235,7 @@
 
             { t: "Do the workout", scenario: "paired",
         s: "Five exercises, live timer",
-        note: "The real session screen on today's push day, reached the way Next through the warm-up reaches it. One screen, no scrolling: the figure stands on a light stage, everything you touch is in the sheet under your thumb. The chips are the sets, W is a warm-up rung off the plan's ramp and is never logged. Tap the exercise name for swap, skip and sharing; pull the handle for what is up next; tap the clock while it is counting a rest to go again. Finish it and the cool-down runs, then the completion screen banks the workout into the fake database.",
+        note: "The real session screen on today's push day, reached the way Next through the warm-up reaches it. One screen, no scrolling: the figure stands on a light stage, everything you touch is in the sheet under your thumb. The chips are the sets, W is a warm-up rung off the plan's ramp and is never logged. Tap the exercise name to swap it, remove it, or add another exercise to the end of today's workout from the same picker the plan screen uses; pull the handle for what is up next; tap the clock while it is counting a rest to go again. Finish it and the cool-down runs, then the completion screen banks the workout into the fake database.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); w.endStretchPhase(); } },
 
       { t: "Resting between sets", scenario: "paired",

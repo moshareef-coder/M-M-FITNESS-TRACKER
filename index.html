@@ -30225,6 +30225,44 @@ async function removeCurrentExercise() {
   }
 }
 
+/* A movement added to today's workout from inside the session (Mo,
+   2026-10-05). It goes on the END: nothing done so far moves, the exercise on
+   screen stays on screen, and restLog and rampTicks, which are keyed by
+   position, stay pointing at the lifts they were written for. Inserting it
+   next would renumber all of that for the sake of an order they can still
+   get by swiping to it or picking it from Up next. Every per-exercise list grows with it, exactly as
+   startWorkout seeds a row, and the saved plan is rewritten so the session
+   still matches it on the way back in. */
+async function addExerciseToSession(name, sets, reps, weight = 0) {
+  if (!SESSION || SESSION.finished || !TODAY_WORKOUT?.exercises) return;
+  const exs = TODAY_WORKOUT.exercises;
+  /* The weight dial opens at 0, and 0 left alone means "not chosen", not "an
+     empty bar". Same reasoning applySwap uses: what they last lifted on it is
+     the only honest number, and with none the row asks instead of guessing. */
+  const last = Number(weight) > 0 ? null : lastLoggedWeight(name);
+  const kit = findStrengthLibraryExercise(name);
+  const ex = { name, sets, reps, targetWeight: Number(weight) > 0 ? weight : last ?? 0 };
+  /* A number they dialled in needs no basis, a real weight outranks one. */
+  if (!(Number(weight) > 0)) {
+    ex.loadBasis = last != null ? "your last session"
+      : exIsBodyweight({ name, equipment: kit?.equipment }) ? "bodyweight" : "unknown";
+  }
+  exs.push(ex);
+  const n = ex.sets || 3;
+  SESSION.setsDone.push(new Array(n).fill(false));
+  SESSION.setWeights.push(new Array(n).fill(null));
+  SESSION.weights.push(plannedStartWeight(ex));
+  SESSION.reps.push(ex.reps ?? "");
+  SESSION.completed.push(false);
+  saveSessionToStorage();
+  renderSession();
+  toast(`${name} added to the end`);
+  if (TODAY_WORKOUT.id) {
+    const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
+    if (error) console.error("added exercise not saved to the plan", error);
+  }
+}
+
 /* ---------- No equipment today ----------
    Mo, mo-knowledge/FLOW-DECISIONS-2026-09-17.md, "Do not lock me in the
    workout": "Open rules, not endpoints." Somebody who cannot get to the gym
@@ -34676,6 +34714,12 @@ function openExerciseActions() {
                 at the bottom of the session screen; No equipment today became
                 the Bodyweight only switch on the swap sheet; Who can see this
                 went with the plan screen's Advanced button. */ ""}
+          ${/* Mo, 2026-10-05: "an option while you're doing the workout ... to
+                add a workout as well". Same picker the plan screen adds with. */ ""}
+          <button type="button" class="sess-act" data-act="add">
+            <span class="sess-act-ico">${icon("plus", 18)}</span>
+            <span>Add exercise<i>Put another one in today's workout</i></span>
+          </button>
           <button type="button" class="sess-act" data-act="remove"${canRemove ? "" : " disabled"}>
             <span class="sess-act-ico">${icon("close", 18)}</span>
             <span>Remove exercise<i>${canRemove
@@ -34693,6 +34737,7 @@ function openExerciseActions() {
       const act = b.dataset.act;
       close();
       if (act === "swap") swapCurrentExercise();
+      else if (act === "add") cbOpenPicker("session");
       else if (act === "remove" && canRemove) removeCurrentExercise();
     };
   });
@@ -40341,7 +40386,10 @@ let CB_TARGET = "draft";
 /* "plan" is whichever plan the screen behind this sheet is showing, which is
    today's unless somebody is reviewing another day. */
 const cbList = () => (CB_TARGET === "plan" ? (planBeingEdited()?.exercises || [])
-  : CB_TARGET === "swap" ? (SWAP_CTX?.list?.() || []) : MANUAL_DRAFT);
+  : CB_TARGET === "swap" ? (SWAP_CTX?.list?.() || [])
+  /* "session" is the workout running right now, added to from its own
+     options menu: see addExerciseToSession. */
+  : CB_TARGET === "session" ? (TODAY_WORKOUT?.exercises || []) : MANUAL_DRAFT);
 
 async function cbCommit() {
   if (CB_TARGET === "plan") { await savePlanExercises(); rerenderPlanScreen(); return; }
@@ -40446,6 +40494,10 @@ function cbRenderGrid() {
       // The tick means it is already in there, so this tap changes that entry
       // rather than quietly making a second identical one.
       const at = cbList().findIndex((e) => e.name === ex.name);
+      /* Mid workout the dose of a lift already in it is changed on the
+         session screen itself, set by set. The edit step here writes the
+         draft, which is not the thing running. */
+      if (at >= 0 && CB_TARGET === "session") { toast(`${ex.name} is already in your workout`); return; }
       if (at >= 0) { cbConfirmStep(cbList()[at], { editIndex: at }); return; }
       cbConfirmStep(ex);
     };
@@ -40561,7 +40613,14 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
       /* Red on the Body tab: say so before it goes in, and let them add it
          anyway. Asked once per area a day, so a leg day built on purpose is
          one warning, not one per exercise. */
-      const add = () => { cbAdd(name, sets, reps, weight); cbRenderPicker(); };
+      /* Into a running session the picker closes behind the add: they are
+         mid workout and came for one movement, and the session screen is
+         where the new one shows up. */
+      const add = () => {
+        const toSession = CB_TARGET === "session";
+        cbAdd(name, sets, reps, weight);
+        if (!toSession) cbRenderPicker();
+      };
       const prim = classifyMuscles(name)?.primary || [];
       recoveryAreasNow().then(async (areas) => {
         const red = redAreasFor(areas, prim).filter((a) => !RED_WAIVED.has(`${todayStr()}|${a.key}`));
@@ -40594,6 +40653,7 @@ function cbAdd(name, sets, reps, weight = 0) {
     toast(`${name} is already in your workout`);
     return;
   }
+  if (CB_TARGET === "session") { cbClosePicker(); addExerciseToSession(name, sets, reps, weight); return; }
   cbList().push({ name, sets, reps, targetWeight: weight || 0 });
   /* Writing into the plan means the plan screen redraws underneath, and none
      of the builder's row animation applies. */
