@@ -430,6 +430,14 @@
         note: "One person per chart, whoever the You / Mell toggle is on: both lines shared an axis before, and forty five pounds between them flattened each into a straight line. Start, now, change and the goal read across the top, the dashes are the target, the pills change the window, and every weigh-in below opens the day it belongs to so a mistyped number is fixable here.",
         run: (w) => w.switchTab("progress") },
 
+      { t: "Mell's Progress, as Mell sees it", scenario: "paired",
+        s: "Her goal, her picks, her screen",
+        note: "Mell is on Lose weight and tracks her weight only, and shares her weigh-ins. Her Progress from your account is the screen she sees on hers: weight, and no Waist or Arms, because she never picked them. It used to borrow your picks. What differs is only what is hers to control (her goal button, which opens her own tracking picker) and your link to what she can see of you. Switch back to You and your own picks are untouched.",
+        run: (w) => {
+          w.eval(`Object.assign(PARTNER_PROFILE, { goal: "Lose weight", goal_bubble: "lose-weight", tracked_by_goal: { "lose-weight": ["weight"] }, share_weigh_ins: true });
+            PROGRESS_VIEW = "partner"; switchTab("progress"); renderProgressTab();`);
+        } },
+
       { t: "Default: Stay consistent", scenario: "paired",
         s: "Same tab, a different goal",
         note: "Mo's fixture goal is Lose weight, so the step above defaults to the weight chart. This one flips his goal to Stay consistent and reloads Progress: the default becomes days-trained-vs-target instead, because the old default was a flat [weight, trained] for every goal, and \"trained\" was not even a real card.",
