@@ -32726,7 +32726,19 @@ function quipCtx() {
     weekTarget,
     hour: new Date().getHours(),
     ...quipExercises(),
+    ...quipHoldName(),
   };
+}
+
+/* In a warm-up or cool-down the move on screen is the hold, so the hold is
+   what `name` and `lift` mean there. Without this the warm-up bank's cue line
+   read the first lift's cue over a stretch, telling somebody doing arm
+   circles to pinch their shoulder blades on the bench. */
+function quipHoldName() {
+  if (SESSION?.phase !== "warmup" && SESSION?.phase !== "cooldown") return {};
+  let move = null;
+  try { move = stretchList()[SESSION.stretchIndex] || null; } catch { move = null; }
+  return move?.name ? { name: move.name, lift: move.name.toLowerCase() } : {};
 }
 
 /* What the library knows about the move on screen and the one coming next,
