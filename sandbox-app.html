@@ -1177,40 +1177,12 @@
   #heroCard { box-shadow: var(--shadow-lift); }
   #tab-home #heroCard { padding: 16px 15px 15px; }
 
-  /* Home reads as one card, not three.
-
-     The hero and the week grid stay two elements because renderHero() owns
-     heroCard's innerHTML and would wipe any markup nested inside it. So they
-     are joined at the seam instead: the hero loses its bottom edge and
-     radius, the week card loses its top ones and tucks up under it. The
-     result is a single block with one divider through it, and neither
-     renderer had to learn about the other.
-
-     Worth knowing if you split them again: the shadow has to come off the
-     hero too, or it draws a line across the middle of the merged card. */
-  #tab-home.home-one #heroCard {
-    border-bottom-left-radius: 0; border-bottom-right-radius: 0;
-    border-bottom: none; box-shadow: none; margin-bottom: 0; padding-bottom: 4px;
-  }
-  #tab-home.home-one #weekTogetherCard {
-    border-top-left-radius: 0; border-top-right-radius: 0;
-    border-top: 1px solid var(--border); margin-top: 0;
-  }
-  /* Unless he is sitting between them, which is where Mo asked for him. The
-     merge above is a seam: the hero gives up its bottom edge because the week
-     card continues it, and the week card gives up its top edge because the hero
-     already drew one. Put a third card in that seam and both halves are left
-     mid-sentence, which is what the 0px butt joint and the squared-off corners
-     were. Three cards then, properly finished, evenly spaced. Toggled from
-     sayHomeQuip rather than with :has, so it behaves the same everywhere. */
-  #tab-home.home-one.bot-between #heroCard {
-    border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius);
-    border-bottom: 1px solid var(--border); box-shadow: var(--shadow-lift);
-    margin-bottom: 10px; padding-bottom: 15px;
-  }
-  #tab-home.home-one.bot-between #weekTogetherCard {
-    border-top-left-radius: var(--radius); border-top-right-radius: var(--radius);
-  }
+  /* Two cards, always (Mo, 2026-10-04). The hero and the week grid used to be
+     joined at a seam into one block, and the seam had to be undone whenever he
+     sat between them. Dismissing him snapped them back into one box, and on a
+     slow repaint the undo lost to the join and the Start button ran straight
+     into his bubble. Now each is its own finished card, with him as a third
+     between them when he is talking, all at the same 10px gap. */
   /* The grid is the second half of a card now, not a card of its own, so it
      drops the heading that used to name it. */
   #tab-home.home-one #weekTogetherCard .card-head h2 { font-size: 11px; font-weight: 700;
@@ -2880,7 +2852,10 @@
   /* Momentum, under the rings. Deliberately not an accent colour: Mo's rule is
      that green means shared achievement or an action, and a status line is
      neither. The only loud green left on Home is the button. */
-  .hero-mo { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 9px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+  /* Label on its own line, the three numbers under it, and room before the
+     button: run together in one wrapping row, the label landed beside the
+     first number and the button touched the last line. */
+  .hero-mo { display: flex; flex-direction: column; gap: 4px; margin: 16px 0 16px; font-size: 13px; color: var(--muted); }
   .hm-label { font-size: 10.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); opacity: .8; }
   .hm-bits { min-width: 0; }
   .hm-bits b { color: var(--text); font-weight: 800; font-variant-numeric: tabular-nums; }
