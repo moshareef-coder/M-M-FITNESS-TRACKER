@@ -29507,7 +29507,7 @@ const GEN_STEPS = [
   "Setting your weights",
   "Almost there",
 ];
-let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0;
+let genTimer = null, genPct = 0, genStepAt = 0, genWordTimer = null, genWordAt = 0, genOpenedAt = 0;
 let genRaf = null, genRevShown = 0, genFrameAt = 0, genCancelled = false;
 
 function openGenOverlay(title) {
@@ -29515,6 +29515,7 @@ function openGenOverlay(title) {
   scrim.classList.remove("done");
   genPct = 0;
   genStepAt = 0;
+  genOpenedAt = Date.now();
   $("genStage").innerHTML = `
     <div class="gen-head">
       <div class="gen-word-wrap">
@@ -29661,6 +29662,31 @@ function stopGenTicker() {
   stopGenWordCycle();
 }
 
+/* Mo, 2026-10-04: the build "always has to stay for at least three seconds"
+   and the bar has to visibly reach the top of the head before it goes. A
+   cached plan came back in a few hundred ms and the screen flashed past. So a
+   finished generate waits out the three seconds, then fills the rest of the
+   way at a pace you can see, holds the full figure a beat, and only then
+   leaves. Cancelling still leaves at once. */
+const GEN_MIN_MS = 3000;
+async function finishGenOverlay() {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const left = GEN_MIN_MS - (Date.now() - genOpenedAt);
+  if (left > 0) await wait(left);
+  if (genCancelled) return;
+  stopGenTicker();
+  const from = genPct, t0 = Date.now(), FILL_MS = 900;
+  while (!genCancelled) {
+    const k = Math.min(1, (Date.now() - t0) / FILL_MS);
+    paintGen(from + (100 - from) * k);
+    if (k >= 1 && genRevShown >= 99.5) break;
+    if (Date.now() - t0 > FILL_MS + 1500) { genRevShown = 100; writeRev(); break; }
+    await wait(30);
+  }
+  if (genCancelled) return;
+  await wait(450);
+}
+
 function closeGenOverlay() {
   stopGenTicker();
   stopGenRaf();
@@ -29709,10 +29735,6 @@ let JUST_GENERATED = null;   // { date }
    Keyed by the day and never cleared: a sitting holds at most a week of them,
    and the next generate for a day replaces that day's. */
 const PLAN_WARNINGS = new Map();   // entry_date -> [{ kind, text }]
-/* Which day's notes are unfolded past PLAN_NOTES_SHOWN. One day at a time and
-   never persisted: opening the rest of Thursday's lines is a thing you did
-   on Thursday's screen. */
-let PLAN_NOTES_OPEN = null;
 
 /* Matched on the engine's own phrases, so a rewording there costs a line and
    never a plan.
@@ -29747,7 +29769,6 @@ let PLAN_NOTES_OPEN = null;
    the rule is not the linear default, since "add weight when every rep lands"
    is the plan's normal state and a line on every plan is not a line. */
 const PLAN_NOTE_KINDS = ["injury", "days", "secondary", "frequency", "equipment", "bodymap", "missing", "deload", "progression", "rotation"];
-const PLAN_NOTES_SHOWN = 3;
 
 /* The first sentence of an engine note, which is where each of them puts the
    fact before the paragraph of why. */
@@ -31378,9 +31399,11 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        cancelled: they left, and landing them on a screen they did not ask for
        would be the app following them out. */
     if (!genCancelled) {
-      paintGen(100);   // the last frame is a finished bar, not one caught mid sweep
-      closeGenOverlay();
-      showPlanScreen(target);
+      await finishGenOverlay();   // three seconds at least, and a full bar
+      if (!genCancelled) {
+        closeGenOverlay();
+        showPlanScreen(target);
+      }
     }
     /* Answered, so a caller that has to undo something on failure can tell the
        two apart. Nothing else reads it. */
@@ -41763,14 +41786,13 @@ function renderPlanPreview(opts) {
       swap: actSession?.kind === "flow" && !finished && !actLive,
     }) : ""}
     ${activityDay && !actSession ? `<p class="ef-note">No lifts on this one. It is ${escapeHtml(displayFocus(plan.focus, exercises))}, on the clock.</p>` : ""}
-    ${/* Three lines and a fold. The lines are already in order, so what shows
-          is the most important three and "more" is only ever the rest. */ ""}
-    ${(PLAN_NOTES_OPEN === planDate ? planSays : planSays.slice(0, PLAN_NOTES_SHOWN))
+    ${/* Only the injury warning shows on the plan (Mo, 2026-10-04: "too much
+          words. They will get it"). The rest explained the engine's choices,
+          volume caps, deloads, progression, rotation, and a person does not
+          need the reasoning to do the workout. The injury line stays because
+          it is the app admitting it put a lift near something that hurts. */ ""}
+    ${planSays.filter((n) => n.kind === "injury")
       .map((n) => `<p class="ef-note" data-note-kind="${escapeHtml(n.kind)}">${escapeHtml(n.text)}</p>`).join("")}
-    ${planSays.length > PLAN_NOTES_SHOWN
-      ? `<button type="button" class="link-btn plan-notes-more" id="planNotesMoreBtn">${
-          PLAN_NOTES_OPEN === planDate ? "Fewer" : `${planSays.length - PLAN_NOTES_SHOWN} more`}</button>`
-      : ""}
     ${stretchBlockHTML("warmup", finished, plan)}
     <div class="reorder-list" id="planRows">${rows}</div>
     ${stretchBlockHTML("cooldown", finished, plan)}
@@ -41924,9 +41946,6 @@ function renderPlanPreview(opts) {
     });
   }
   if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
-  if ($("planNotesMoreBtn")) {
-    $("planNotesMoreBtn").onclick = () => { PLAN_NOTES_OPEN = PLAN_NOTES_OPEN === planDate ? null : planDate; rerenderPlanScreen(); };
-  }
 
   // These three are mutually exclusive depending on how far the workout got.
   if ($("planPrivacyBtn")) $("planPrivacyBtn").onclick = openWorkoutPrivacy;
