@@ -287,6 +287,30 @@
         s: "The screen after the last rep",
         note: "Every exercise on today's plan already logged, so the app's own route lands here: the ring fills, time, volume and the record land under it, and the last line is the pair rather than a solo total. End a workout early instead and the same layout drops the PR tile and the confetti, because that is not the same event.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
+
+      { t: "Still recovering", scenario: "finished",
+        s: "Adding a lift for a red muscle",
+        note: "Today's push day is logged, so chest, shoulders and arms are red on the Body tab. This opens Plan my own and adds Barbell Bench Press, which asks first: Add it anyway, or Pick something else. It asks once per area a day, so add a second chest move after Add it anyway and it goes straight in. Try a back or core move: no warning, those are rested.",
+        run: (w) => {
+          w.eval(`(async () => {
+            document.querySelectorAll(".pop-scrim").forEach((x) => x.remove());
+            clearDraft(); MANUAL_DRAFT = [];
+            switchTab("workout"); goWorkoutScreen("manual");
+            await new Promise((r) => setTimeout(r, 900));
+            cbOpenPicker(); CB_GROUP = "chest"; cbRenderPicker();
+            await new Promise((r) => setTimeout(r, 500));
+            [...document.querySelectorAll("#cbGrid .cb-card")].find((c) => c.querySelector(".cb-card-name")?.textContent.trim() === "Barbell Bench Press")?.click();
+            await new Promise((r) => setTimeout(r, 400));
+            document.getElementById("cbConfirmBtn")?.click();
+          })()`);
+        } },
+
+      { t: "Rest day recommended", scenario: "finished",
+        s: "Generate when the build would hit red",
+        note: "Same day, chest and shoulders red. This asks Generate for a push day, so the build would train what is still recovering, and it offers a rest day instead: Rest today builds nothing, Generate anyway builds it. A plain Generate on this day does not ask at all, because the engine already picks what is rested.",
+        run: (w) => {
+          w.eval(`document.querySelectorAll(".pop-scrim").forEach((x) => x.remove()); switchTab("workout"); generateWorkout(null, { keepFocus: "Push" });`);
+        } },
     ]},
 
     { group: "Train together", note: "Two players, one workout, anywhere, each at their own pace. Mell is simulated: Mell joins, picks, trains and finishes on a timer, through the same code a real partner's phone would hit.", steps: [
