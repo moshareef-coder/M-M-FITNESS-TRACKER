@@ -949,7 +949,11 @@
      too: load the app with ?j=sandboxinvitefrommell1 and peek answers for it. */
   const DEMO_TOKEN = "sandboxinvitefrommell1";
   const LINKS = [{ token: DEMO_TOKEN, owner_email: THEM, revoked_at: null, claimed_at: null }];
-  if (OB) {
+  /* Not on the reload the onboarding tour ends with: that reload is the run
+     carrying on, and its draft is what says where to. */
+  let tourBack = false;
+  try { tourBack = !!sessionStorage.getItem("ob-tour-back"); } catch { /* private mode */ }
+  if (OB && !tourBack) {
     try {
       localStorage.removeItem("ft_ob_draft_" + ME);
       if (OB === "b") localStorage.setItem("ft_pending_invite_token", DEMO_TOKEN);
