@@ -6834,6 +6834,9 @@
      will set this once and never look at it again. */
   /* Right aligned above the tiles, so it sits with the cards it controls and
      takes no width from them. */
+  .prog-log { margin: 0 0 14px; }
+  /* The old doors, one per goal screen, give way to the top button. */
+  #cardWeight .wt-logcard, #toneActions, #bulkActions { display: none !important; }
   .prog-goal-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
   .track-kebab {
     width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
@@ -8345,6 +8348,13 @@
     <div class="trk-run hidden" id="trackSetup"></div>
 
     <div class="goal-chips" id="progGoalChips"></div>
+    <!-- One way to log, at the top. Mell, 2026-10-07: "the flow would be
+         better with the button top then the progress after that, cause I
+         didn't even know that button was there." It replaces the weigh-in
+         card under the weight chart, Log measurements on the tone screen and
+         Log check-in on the build screen: three doors at three depths, each
+         below the fold. -->
+    <button type="button" class="btn-primary prog-log hidden" id="progLogBtn"></button>
 
     <div class="card" id="progHeadline"></div>
 
@@ -46894,8 +46904,8 @@ function openMeasurementsSheet(opts = {}) {
      backstop for any door that forgets to hide itself on that view. */
   if (PROGRESS_VIEW === "partner") return;
   MEAS_TOUCHED = new Set();
-  MEAS_ROWS = opts.rows || MEASUREMENTS;
-  MEAS_TITLE = opts.title || "Log measurements";
+  MEAS_ROWS = opts.rows || PROGRESS_LOG_ROWS;
+  MEAS_TITLE = opts.title || "Log progress";
   renderMeasurementsSheet();
   $("measureScrim").classList.remove("hidden");
   $("measureScrim").onclick = (e) => { if (e.target === $("measureScrim")) closeMeasurementsSheet(); };
@@ -46922,11 +46932,20 @@ function lastMeasurement(key) {
    Save button and no fields is a worse answer than showing everything, and
    it can only happen on an account that turned off every tape reading for
    its goal, which is a real but rare choice. */
+/* Mell, 2026-10-07: the sheet offered Waist, Hips, Chest, Thighs and Arms
+   to someone who tracks none of them, and no weight at all, because it fell
+   back to every tape reading when none was tracked. Now it is weight plus the
+   tape you track, and with nothing tracked it is weight alone, never the
+   whole list. */
+const WEIGHT_ROW = { key: "weight", label: "Weight", unit: "lb" };
+const PROGRESS_LOG_ROWS = [WEIGHT_ROW, ...MEASUREMENTS];
 function measRowsToShow() {
-  const rows = MEAS_ROWS || MEASUREMENTS;
+  const rows = MEAS_ROWS || PROGRESS_LOG_ROWS;
   const filtered = rows.filter((m) => isTracked(m.key, null, MY_PROFILE));
-  return filtered.length ? filtered : rows;
+  return filtered.length ? filtered : [WEIGHT_ROW];
 }
+/* Whether the top button has anything to log for this person. */
+const progressLogOffered = () => PROGRESS_LOG_ROWS.some((m) => isTracked(m.key, null, MY_PROFILE));
 
 function renderMeasurementsSheet() {
   $("measureSheet").innerHTML = `
@@ -46997,7 +47016,7 @@ async function saveMeasurements() {
      asking somebody to measure themselves twice. */
   if (await saveBodyReading(todayStr(), patch)) {
     closeMeasurementsSheet();
-    toast("Measurements saved");
+    toast("Progress saved");
     await loadAll();
     if (typeof renderProgressTab === "function") renderProgressTab();
     return;
@@ -47028,6 +47047,12 @@ function renderProgressTab() {
   // showing a control that would log to your own entry while looking at theirs.
   $("weightLogBlock")?.classList.toggle("hidden", isPartner);
   if (!isPartner) renderScaleCheck();
+  const logTop = $("progLogBtn");
+  if (logTop) {
+    logTop.classList.toggle("hidden", isPartner || !progressLogOffered());
+    if (!logTop.querySelector("svg")) logTop.innerHTML = `${icon("plus", 18)} Log progress`;
+    logTop.onclick = () => openMeasurementsSheet();
+  }
 
   const name = isPartner ? partnerName() : ME;
   const email = isPartner ? PARTNER_EMAIL : MY_EMAIL;
