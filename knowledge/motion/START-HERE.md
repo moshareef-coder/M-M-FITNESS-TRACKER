@@ -25,12 +25,15 @@ the app animates from keyframes. There are about 285 animations:
 https://claude.ai/artifact/3eog6Vgew8BT3QtauyRuv5
 
 - Set "Editing as" to your name (top left).
-- Pick an animation, drag the coloured dots or use the sliders, press Play.
-- **Save draft** while you are working. **Submit for the app** when it is right.
-- **Looks right already** when an animation needs nothing.
+- Pick a category (Bodyweight, Barbell, Dumbbell, Cable, Machines, Yoga,
+  Pilates, Stretching, Cardio, Resting), then an animation.
+- Drag the coloured dots or use the sliders, press Play.
+- **Complete** when it is right. **Looks right already** when it needed nothing.
 - **Flag for review** when you want Mo to look, with a note saying what.
-- Submitted animations reach the app when you tell Claude:
-  **"ship the submitted animations"** (see below).
+- **Reset** (tap twice) puts an animation back to how it is in the app and
+  clears your saved version. Use it any time something goes wrong.
+- Nothing reaches the app from the studio. When the batch is done, **Mo** tells
+  Claude everything is ready, and Claude ships the Complete ones (see below).
 
 **2. By asking Claude** in a terminal in your workspace (`~/unio-animations`):
 describe the fix ("Barbell Row: the bar should touch the stomach at the top"),
@@ -59,13 +62,13 @@ node scripts/make-sandbox.mjs             # then check it in the sandbox app
 Then send Mo the preview link and wait for his yes. Nothing goes to the live
 app without Mo.
 
-## For Claude: shipping what was submitted
+## For Claude: shipping what is complete
 
-When asked to "ship the submitted animations":
+Only when **Mo** says the animations are ready (not on Yahya's word alone):
 
 1. Read the studio's database: ArtifactData `list` on collection `moves` at
    https://claude.ai/artifact/3eog6Vgew8BT3QtauyRuv5, keep docs with
-   `status: "submitted"`.
+   `status: "complete"` (`fine` means nothing changed; `todo` means reset).
 2. For each, put `keys` into that move's object **verbatim** (his numbers are
    the spec, never re-solve them). `name` says which move; find it with
    `grep -n '"<name>"' knowledge/motion/moves/*.mjs mo-knowledge/motion/rest.mjs`.
