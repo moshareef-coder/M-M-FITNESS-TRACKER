@@ -28,8 +28,9 @@ https://claude.ai/artifact/3eog6Vgew8BT3QtauyRuv5
 - Pick a category (Bodyweight, Barbell, Dumbbell, Cable, Machines, Yoga,
   Pilates, Stretching, Cardio, Resting), then an animation.
 - Drag the coloured dots or use the sliders, press Play.
-- **Complete** when it is right. An animation that needs nothing stays To do.
-- **Flag for review** when you want Mo to look, with a note saying what.
+- **Complete** when it is right. **Looks right already** when it needed nothing.
+- **Flag for review** (one tap, tap again to clear) when you want Mo to look.
+  There is no note: Mo looks at the animation itself.
 - **Reset** (tap twice) puts an animation back to how it is in the app and
   clears your saved version. Use it any time something goes wrong.
 - Nothing reaches the app from the studio. When the batch is done, **Mo** tells
@@ -76,14 +77,13 @@ Only when **Mo** says the animations are ready (not on Yahya's word alone):
    the root rotation difference if their body tilt differs).
 3. `node knowledge/motion/validate.mjs`: 0 invalid, or stop and tell him which
    one failed and why.
-4. Commit, one commit per batch, naming each move and quoting his `note`.
+4. Commit, one commit per batch, naming each move.
 5. Write each doc back with `status: "shipped"` (pin with `if_version`), adding
    `{status: "shipped", by: "Claude", at}` to `history`.
 6. Republish the studio so its copy of the move files matches the repo
    (it serves its own copy: `knowledge/motion/**` and `mo-knowledge/motion/rest.mjs`
    published next to the page).
-7. Docs with `status: "flagged"` are for Mo: list them with their `flagNote`,
-   do not ship them.
+7. Docs with `status: "flagged"` are for Mo: list them by name, do not ship them.
 
 ## Where his work lives
 
