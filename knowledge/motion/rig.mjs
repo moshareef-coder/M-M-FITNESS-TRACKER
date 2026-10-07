@@ -2514,8 +2514,15 @@ const PROPS = {
        bar's real length the screen shows, so 0 is end on and 1 is broadside.
        Nothing is authored for this; it falls out of the hand positions, which
        is why the six bench presses could turn their cameras without a single
-       prop changing. */
-    if (!p.place && p.side !== undefined) {
+       prop changing.
+       So ONE barbell prop is the whole bar; two (one per hand) draw two whole
+       bars. `single: true` opts out for a lone plate hanging off a paired
+       point (a dip belt plate at the hip is one disc, never a bar between the
+       hips). `sleeve` is how far outside the hands the plates sit: 9 suits a
+       wide bench grip, a shoulder width grip needs more or the plates crowd
+       the hands. Broadside, the bar's sleeve pokes past each plate, which is
+       what makes it read as a barbell and not two discs on a stick. */
+    if (!p.place && p.side !== undefined && !p.single) {
       const pt = p.point || "hand";
       const Lh = S.sides.L[pt], Rh = S.sides.R[pt];
       const L3 = S.sides.L.p3[pt], R3 = S.sides.R.p3[pt];
@@ -2527,7 +2534,7 @@ const PROPS = {
           const dx = p.dx || 0, dy = p.dy || 0;
           const g = Math.sqrt(Math.max(0, 1 - f * f));
           const ux = (Rh.x - Lh.x) / D2, uy = (Rh.y - Lh.y) / D2;
-          const sleeve = 9 * f, t = Math.max(1.6, r * 0.26);
+          const sleeve = (p.sleeve === undefined ? 9 : p.sleeve) * f, t = Math.max(1.6, r * 0.26);
           const ends = [
             { x: Lh.x + dx - ux * sleeve, y: Lh.y + dy - uy * sleeve, d: Lh.d },
             { x: Rh.x + dx + ux * sleeve, y: Rh.y + dy + uy * sleeve, d: Rh.d },
@@ -2549,16 +2556,29 @@ const PROPS = {
             }
             ctx.restore();
           };
-          plate(ends[0]);
-          ctx.save();
-          ctx.strokeStyle = C.edge; ctx.lineWidth = 4.4; ctx.lineCap = "round";
-          ctx.beginPath(); ctx.moveTo(ends[0].x, ends[0].y); ctx.lineTo(ends[1].x, ends[1].y); ctx.stroke();
-          ctx.strokeStyle = C.chrome; ctx.lineWidth = 2.4;
-          ctx.beginPath(); ctx.moveTo(ends[0].x, ends[0].y); ctx.lineTo(ends[1].x, ends[1].y); ctx.stroke();
-          ctx.strokeStyle = C.chromeHi; ctx.lineWidth = 0.8;
-          ctx.beginPath(); ctx.moveTo(ends[0].x, ends[0].y - 0.7); ctx.lineTo(ends[1].x, ends[1].y - 0.7); ctx.stroke();
-          ctx.restore();
-          plate(ends[1]);
+          const steel = (a, b) => {
+            ctx.save();
+            ctx.strokeStyle = C.edge; ctx.lineWidth = 4.4; ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            ctx.strokeStyle = C.chrome; ctx.lineWidth = 2.4;
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            ctx.strokeStyle = C.chromeHi; ctx.lineWidth = 0.8;
+            ctx.beginPath(); ctx.moveTo(a.x, a.y - 0.7); ctx.lineTo(b.x, b.y - 0.7); ctx.stroke();
+            ctx.restore();
+          };
+          // the sleeve tip out of each plate's outer face, scaled by f so it
+          // vanishes end on; each drawn right after its own plate, so a turned
+          // bar's near plate still covers the far tip
+          const tipLen = 4.5 * f, face = t * f;
+          const tip = (e, o) => {
+            if (tipLen <= 1) return;
+            const s = Math.sign((e.x - o.x) * ux + (e.y - o.y) * uy) || 1;
+            steel({ x: e.x + ux * s * face, y: e.y + uy * s * face },
+              { x: e.x + ux * s * (face + tipLen), y: e.y + uy * s * (face + tipLen) });
+          };
+          plate(ends[0]); tip(ends[0], ends[1]);
+          steel(ends[0], ends[1]);
+          plate(ends[1]); tip(ends[1], ends[0]);
           return;
         }
       }

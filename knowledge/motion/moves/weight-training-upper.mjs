@@ -504,7 +504,7 @@ const WEIGHTED_DIP = {
     ...DIP.props,
     // dip belt: the chain drops from the belt at the waist to the plate
     { type: "band", rest: 0, from: { side: "R", point: "hip", dx: -1, dy: -2 }, to: { side: "R", point: "hip", dx: -6, dy: 21 }, front: true },
-    { type: "barbell", side: "R", point: "hip", dx: -6, dy: 28, r: 7, front: true },
+    { type: "barbell", side: "R", point: "hip", dx: -6, dy: 28, r: 7, single: true, front: true },
   ],
 };
 
@@ -842,7 +842,7 @@ const WEIGHTED_PULL_UP = {
     ...PULL_UP.props,
     // dip belt, seen from behind: the chain shows below the crotch to the plate
     { type: "band", rest: 0, from: { side: "R", point: "hip", dx: -5.5, dy: 4 }, to: { side: "R", point: "hip", dx: -4, dy: 9.5 }, front: true },
-    { type: "barbell", side: "R", point: "hip", dx: -4, dy: 17, r: 7.5, front: true },
+    { type: "barbell", side: "R", point: "hip", dx: -4, dy: 17, r: 7.5, single: true, front: true },
   ],
 };
 
@@ -860,10 +860,13 @@ const WEIGHTED_PULL_UP = {
 // The signs are opposite because dx is screen space and is NOT mirrored by
 // `side`: giving both plates the same dx slides the whole barbell sideways
 // instead of spreading it, which is what the first attempt did.
+// Since the rig draws a barbell between two separated hands as a whole bar
+// (5bcfbdd), ONE prop is the whole bar; the old band plus a prop per hand drew
+// two bars sixteen units apart with four plates. Plates are the deadlift's
+// r 9.5 so a plate is the same size on every card; sleeve 15 puts them about
+// where an Olympic bar's collars sit outside a shoulder width grip.
 const frontBar = (front) => ([
-  { type: "band", rest: 0, from: { side: "L", point: "hand" }, to: { side: "R", point: "hand" }, front },
-  { type: "barbell", side: "L", point: "hand", dx: -8, r: 7, front },
-  { type: "barbell", side: "R", point: "hand", dx: 8, r: 7, front },
+  { type: "barbell", side: "R", point: "hand", r: 9.5, sleeve: 15, front },
 ]);
 
 // Standing with a weight hanging at arm's length, lift the shoulders straight up
