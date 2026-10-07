@@ -28,7 +28,7 @@ https://claude.ai/artifact/3eog6Vgew8BT3QtauyRuv5
 - Pick a category (Bodyweight, Barbell, Dumbbell, Cable, Machines, Yoga,
   Pilates, Stretching, Cardio, Resting), then an animation.
 - Drag the coloured dots or use the sliders, press Play.
-- **Complete** when it is right. **Looks right already** when it needed nothing.
+- **Complete** when it is right. An animation that needs nothing stays To do.
 - **Flag for review** when you want Mo to look, with a note saying what.
 - **Reset** (tap twice) puts an animation back to how it is in the app and
   clears your saved version. Use it any time something goes wrong.
