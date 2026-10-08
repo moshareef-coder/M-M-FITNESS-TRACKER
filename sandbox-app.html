@@ -16699,13 +16699,14 @@ const OB2 = {
   theme: { ch: 0, render(d, ui) {
     const phone = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
     let pick = d.theme === "light" || d.theme === "dark" ? d.theme : phone;
-    /* Picked for them, from the phone, but Continue waits for a tap: Mo
-       wants the choice made, not defaulted past. */
+    /* The screen wears the phone's theme, but neither card is ticked until
+       they tap one: Mo, 2026-10-08, a card already ticked with Continue still
+       off looked broken. */
     let tapped = d.theme === "light" || d.theme === "dark";
     ob2FlipTheme(pick);
     ui.paint({
       title: "Light or dark? Choose carefully. I'll judge you either way.",
-      body: `<div class="ob2-themes">${["light", "dark"].map((t) => `<button type="button" class="ob2-theme${t === pick ? " on" : ""}" data-th="${t}" aria-pressed="${t === pick}">
+      body: `<div class="ob2-themes">${["light", "dark"].map((t) => `<button type="button" class="ob2-theme${tapped && t === pick ? " on" : ""}" data-th="${t}" aria-pressed="${tapped && t === pick}">
           ${ob2ThemePreviewHTML(t)}<b>${t === "light" ? "Light" : "Dark"}</b></button>`).join("")}</div>`,
       cta: "Continue", ctaOff: !tapped,
       onNext: () => {
