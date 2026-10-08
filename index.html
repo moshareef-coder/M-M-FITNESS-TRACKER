@@ -16819,7 +16819,16 @@ const OB2 = {
         ui.next({ goal_bubble: pick, goal_child: null, goalKey: tile.legacy, goalLabel: tile.title, goal_secondary: extras });
       },
     });
-    ob2WireOne("goal", (v) => { pick = v; $("ob2Next").disabled = false; });
+    const SAY = {
+      "lose-weight": "Losing weight. I'd lose some too, but I'm mostly plastic.",
+      "tone-lean-abs": "Abs. They're in there somewhere. We'll go find them.",
+      "build-muscle": "Muscle. I'd build some too, but they keep giving me wires.",
+      "get-stronger": "Stronger. I can't lift a thing, so you're lifting for both of us.",
+      "build-endurance": "Endurance. My battery could never. Yours will.",
+      "move-better": "Move better. I walk like this on purpose. You don't have to.",
+      consistent: "Just showing up. Honestly the hardest one. I'll be here every day.",
+    };
+    ob2WireOne("goal", (v) => { pick = v; $("ob2Next").disabled = false; if (SAY[v]) ob2Type($("ob2Q"), SAY[v]); });
   } },
 
   goal2: { ch: 1, render(d, ui) {
@@ -16844,7 +16853,9 @@ const OB2 = {
     });
     const wire = () => $("onboard").querySelectorAll("[data-g2]").forEach((b) => b.onclick = () => {
       const id = b.dataset.g2;
+      const adding = !picked.includes(id);
       picked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id].slice(0, MAX);
+      if (adding) ob2Type($("ob2Q"), picked.length >= MAX ? "That's two. I'm a robot, not a miracle worker." : "Greedy. I like it.");
       $("ob2Goal2").innerHTML = ob2ChoiceHTML(opts(), picked, { multi: true, attr: "g2" });
       wire();
     });
@@ -16865,7 +16876,8 @@ const OB2 = {
     });
     ob2MountSexFigure(pick === "Female" ? "Female" : "Male");
     OB2_CLEANUP.push(() => { OB2_SEX_FIG?.destroy(); OB2_SEX_FIG = null; });
-    ob2WireOne("sex", (v) => { pick = v; $("ob2Next").disabled = false; ob2MountSexFigure(v === "Female" ? "Female" : "Male"); });
+    const SAY = { Male: "Got it. Hold still, I'm drawing you.", Female: "Got it. Hold still, I'm drawing you. Best side only.", none: "Fair. I don't have one either." };
+    ob2WireOne("sex", (v) => { pick = v; $("ob2Next").disabled = false; ob2MountSexFigure(v === "Female" ? "Female" : "Male"); ob2Type($("ob2Q"), SAY[v]); });
   } },
 
 age: { ch: 2, render(d, ui) {
@@ -17033,7 +17045,12 @@ height: { ch: 2, render(d, ui) {
       onNext: () => ui.next({ activity_level: pick }),
     });
     mountMotionFigures($("onboard"));
-    ob2WireOne("act", (v) => { pick = v; $("ob2Next").disabled = false; ob2SetFig("ob2Fig", OB2_ACTIVITY_FIG[v]); });
+    const SAY = {
+      Sedentary: "Same. I've been sitting in your phone all day.",
+      Moderate: "Up and down all day. Like my battery.",
+      Active: "On your feet all day? I'd need an oil change. I'll go easy on your legs.",
+    };
+    ob2WireOne("act", (v) => { pick = v; $("ob2Next").disabled = false; ob2SetFig("ob2Fig", OB2_ACTIVITY_FIG[v]); ob2Type($("ob2Q"), SAY[v]); });
   } },
 
   /* The halfway point, as his verdict on them: one card, his face, a line
@@ -17293,7 +17310,8 @@ hurts: { ch: 3, render(d, ui) {
       onNext: () => ui.next({ skip_stretching: pick === "skip" }),
     });
     mountMotionFigures($("onboard"));
-    ob2WireOne("wu", (v) => { pick = v; $("ob2Next").disabled = false; ob2SetFig("ob2Fig", v === "skip" ? "Push-Up" : "Arm Circles"); });
+    const SAY = { keep: "Warm-ups. My joints thank you. Yours will too.", skip: "One of those people. Fine. I'll pretend I didn't see that." };
+    ob2WireOne("wu", (v) => { pick = v; $("ob2Next").disabled = false; ob2SetFig("ob2Fig", v === "skip" ? "Push-Up" : "Arm Circles"); ob2Type($("ob2Q"), SAY[v]); });
   } },
 
   /* Chapter 4. challenge_target. Only the counts this goal actually builds
