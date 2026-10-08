@@ -1569,7 +1569,7 @@ const BIRD_DOG = {
   props: [{ type: "mat", x: 10, w: 120 }],
   keys: [
     {"ik":{"wristL":{"bend":1,"x":91,"y":113},"wristR":{"bend":1,"x":95,"y":113}},"joints":{"ankleL":-78,"ankleR":-78,"hipL":-90,"hipR":-90,"kneeL":90,"kneeR":90,"neck":-12,"spine":0,"wristL":86,"wristR":86},"root":{"rot":90,"x":66,"y":84},"t":0},
-    {"ik":{"wristL":{"bend":1,"x":137.4,"y":78.7},"wristR":{"bend":1,"x":95,"y":113}},"joints":{"ankleL":-20,"ankleR":-20,"hipAbdR":0,"hipL":-180,"hipR":-144,"kneeL":4,"kneeR":0,"neck":-10,"spine":0,"wristL":0,"wristR":86},"root":{"rot":90,"x":66,"y":84},"t":1},
+    {"ik":{"wristL":{"bend":1,"x":137.4,"y":78.7},"wristR":{"bend":1,"x":95,"y":113}},"joints":{"ankleL":-20,"ankleR":-20,"hipAbdL":0,"hipAbdR":0,"hipL":-151,"hipR":-183,"kneeL":0,"kneeR":0,"neck":-10,"spine":0,"wristL":0,"wristR":86},"root":{"rot":90,"x":67,"y":86.3},"t":1},
   ],
 };
 
