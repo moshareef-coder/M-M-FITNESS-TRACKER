@@ -1024,6 +1024,9 @@
           onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
           signInWithOAuth: async () => ({ error: null }),
           signInWithOtp: async () => ({ error: null }),
+          /* The email button on the launch sheet: answered as a wrong password,
+             so the sheet's own error path is what a review sees. */
+          signInWithPassword: async () => ({ error: { message: "Invalid login credentials" } }),
           signOut: async () => { location.reload(); return { error: null }; },
         },
         from: builder,
