@@ -81,15 +81,57 @@ Deno.serve(async (req) => {
   const expiresMs = event.expiration_at_ms;
   const expiresAt = typeof expiresMs === "number" ? new Date(expiresMs).toISOString() : null;
 
-  const row = {
+  /* RevenueCat does not promise delivery order, and a retried INITIAL_PURCHASE
+     arriving after the CANCELLATION would otherwise switch will_renew back on
+     and send a trial reminder to somebody who already said no. So the newest
+     event wins: anything older than the one the row was last written from is
+     acknowledged and dropped. Read then write rather than one statement, which
+     leaves a window of milliseconds between two deliveries for the same
+     person; RevenueCat sends one person's events seconds apart, not at once. */
+  const eventMs = typeof event.event_timestamp_ms === "number" ? event.event_timestamp_ms : Date.now();
+  const prev = await fetch(
+    `${SUPABASE_URL}/rest/v1/subscriptions?email=eq.${encodeURIComponent(email)}&select=last_event_ms`,
+    { headers: svc },
+  );
+  if (prev.ok) {
+    const rows = await prev.json();
+    const last = rows?.[0]?.last_event_ms;
+    if (typeof last === "number" && eventMs < last) return json({ ok: true, stale: type });
+  }
+
+  const row: Record<string, unknown> = {
     email,
     rc_app_user_id: String(event.original_app_user_id ?? event.app_user_id ?? email),
     entitlement: "premium",
     status,
     expires_at: expiresAt,
     store,
+    environment: event.environment ? String(event.environment).toUpperCase() : null,
+    last_event_ms: eventMs,
     updated_at: new Date().toISOString(),
   };
+
+  /* What the trial reminder needs (trial-reminder reads these, nothing else
+     does). period_type is RevenueCat's word for the CURRENT period: TRIAL for
+     Apple's free month, NORMAL once it has converted to paid. It is left alone
+     on PRODUCT_CHANGE, where it describes the plan being moved away from. */
+  if (event.period_type && type !== "PRODUCT_CHANGE") row.period_type = String(event.period_type).toUpperCase();
+  if (event.original_transaction_id) row.original_transaction_id = String(event.original_transaction_id);
+
+  /* Whether it will charge at the end of this period. Apple never says so in a
+     field; it is implied by which event arrived. CANCELLATION is turning off
+     auto renew (or a refund), not losing access, which is why status stays
+     active above and this is the column that changes. BILLING_ISSUE and
+     PRODUCT_CHANGE say nothing either way, so they leave it as it was. */
+  const RENEWS: Record<string, boolean> = {
+    INITIAL_PURCHASE: true,
+    RENEWAL: true,
+    UNCANCELLATION: true,
+    CANCELLATION: false,
+    EXPIRATION: false,
+    REFUND: false,
+  };
+  if (type in RENEWS) row.will_renew = RENEWS[type];
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/subscriptions?on_conflict=email`, {
     method: "POST",
