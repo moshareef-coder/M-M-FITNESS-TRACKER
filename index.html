@@ -4938,7 +4938,7 @@
     display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
     border-radius: 18px; padding: 12px 14px; background: var(--panel-2); border: 1px solid var(--border);
   }
-  .ob2-push-ico { width: 34px; height: 34px; border-radius: 9px; background: var(--panel); display: grid; place-items: center; }
+  .ob2-push-ico { width: 34px; height: 34px; border-radius: 8px; flex: none; object-fit: cover; display: block; }
   .ob2-push b { display: block; font-size: 14px; }
   .ob2-push span { font-size: 13.5px; color: var(--muted); }
   .ob2-push small { align-self: start; font-size: 11.5px; color: var(--muted); }
@@ -5022,6 +5022,23 @@
   .ob2-gen-btn:active { transform: scale(.97); }
   .ob2-gen-btn.ob2-pulse { border-radius: 50%; }
   .ob2-gen .ob2-note { text-align: center; justify-content: center; }
+  .ob2-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 0 0 16px; }
+  .ob2-day { min-height: 72px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 0;
+    border: 0; border-radius: 16px; background: transparent; color: var(--muted); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .ob2-day span { font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+  .ob2-day b { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums;
+    transition: background .2s, color .2s; }
+  .ob2-day em { display: flex; gap: 4px; height: 6px; }
+  .ob2-day em i { width: 6px; height: 6px; border-radius: 50%; }
+  .ob2-day em i.lift { background: var(--accent); }
+  .ob2-day em i.cardio { background: #6c9bff; }
+  .ob2-day.on b { background: var(--accent); color: #0b0d10; }
+  .ob2-day:active b { transform: scale(.94); }
+  .ob2-daycard .ob2-wcard-top span:first-child { text-transform: none; letter-spacing: 0; font-size: 13px; }
+  .ob2-daycard.rest .ob2-wcard-name { color: var(--muted); }
+  .ob2-day-plus { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+  .ob2-day-plus span { font-size: 13px; font-weight: 600; color: #6c9bff; }
+  .ob2-week-foot { margin: 12px 0 0; }
   .ob2-weeklist { border: 1px solid var(--border); background: var(--panel); border-radius: 16px; padding: 4px 14px; margin: 0 0 12px; }
   .ob2-wl-row { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14.5px; }
   .ob2-wl-row:last-child { border-bottom: none; }
@@ -10693,6 +10710,10 @@ function showFatal(what) {
 }
 
 window.addEventListener("error", (e) => {
+  /* The browser's "ResizeObserver loop" notice is not an error: it says one
+     resize was delivered on the next frame instead of this one, nothing
+     failed. It has no filename (line 0), and it put a red banner on Home. */
+  if (/^ResizeObserver loop/.test(e.message || "")) return;
   const where = e.filename ? ` (line ${e.lineno})` : "";
   showFatal((e.message || "") + where + firstAppFrame(e.error));
 });
@@ -15939,6 +15960,7 @@ function ob2CompactWeek(res, d, sty) {
     return TRAIN_STYLES.find((t) => t.id === sess.style)?.label || sess.style;
   };
   let days;
+  const liftAt = (n) => ({ lift: n % Math.max(1, lifts.length) });
   /* The days they picked on the days screen are the lifting days: composeWeek
      takes lift true or false per day, the same pin the app's week builder
      uses for a day it has already decided. Slot i is the day after today
@@ -15949,17 +15971,30 @@ function ob2CompactWeek(res, d, sty) {
     const out = sty.composeWeek(st, Array.from({ length: 7 }, (_, i) => ({ key: i, lift: picked && st.resistance ? picked.includes(wdOf(i)) : null })),
       { liftCount: st.resistance ? (d.days_per_week || null) : 0, window: 7, seed: Number(todayStr().replace(/-/g, "")) });
     let li = 0;
-    days = out.days.map((day) => day.sessions.map((sess) => sess.kind === "resistance" ? (lifts[li++ % Math.max(1, lifts.length)] || "Lifting") : labelOf(sess)));
+    days = out.days.map((day) => day.sessions.map((sess) => sess.kind === "resistance" ? liftAt(li++) : labelOf(sess)));
   } else {
     const on = picked || OB2_SPREAD[d.days_per_week || lifts.length || 3] || OB2_SPREAD[3];
     let li = 0;
-    days = Array.from({ length: 7 }, (_, i) => (on.includes(wdOf(i)) ? [lifts[li++ % Math.max(1, lifts.length)] || "Workout"] : []));
+    days = Array.from({ length: 7 }, (_, i) => (on.includes(wdOf(i)) ? [liftAt(li++)] : []));
   }
+  /* A lifting session is { lift: n }, n being its place in `plans`, so the
+     preview's day strip can show that day's own exercises. The first one is
+     the real first workout (`first`); the rest are the plan's day templates. */
   const week = days.map((items, i) => {
     const date = shiftDate(todayStr(), i + 1);
-    return { day: OB2_WEEKDAYS[ob2DayIdx(date)], items };
+    return {
+      day: OB2_WEEKDAYS[ob2DayIdx(date)], date,
+      items: items.map((it) => (typeof it === "object" ? (lifts[it.lift] || "Lifting") : it)),
+      lift: items.find((it) => typeof it === "object")?.lift ?? null,
+      cardio: items.filter((it) => typeof it === "string"),
+    };
   });
-  return { first, week };
+  const plans = (res?.plan?.week || []).map((w) => ({
+    focus: w.name || w.focus || "Lifting", minutes: w.estimatedMinutes || w.totalMinutes || null,
+    items: (w.exercises || []).slice(0, 6).map((e) => ({ name: e.name, sets: e.sets, reps: e.reps, w: e.weight > 0 ? e.weight : 0 })),
+    total: (w.exercises || []).length,
+  }));
+  return { first, week, plans };
 }
 
 /* The first session, shrunk to what the preview draws, so the draft does not
@@ -16007,9 +16042,11 @@ let OB2_PURCHASE_DONE = false;
    is a common rejection. One switch, so dropping it is a one-line change if
    Mo decides to take that risk. */
 const PAYWALL_SHOW_PRICE = true;
-/* The day 28 stop promises a reminder. The server side of it is being built
-   separately; until it ships the stop stays hidden rather than promising
-   something nothing sends. Flip to true the day the push goes live. */
+/* The reminder stop, a week before the charge. The server side is on branch
+   onboarding/trial-reminder (it still sends two days before and has to move
+   to seven). Until it ships the stop stays hidden in the real app rather than
+   promising something nothing sends; the sandbox shows it so Mo can see it.
+   Flip to true the day the push goes live. */
 const TRIAL_REMINDER_LIVE = false;
 function ob2AddPeriod(date, n, unit) {
   const d = new Date(date);
@@ -16031,7 +16068,8 @@ function ob2Terms() {
   const n = intro?.periodNumberOfUnits || 1;
   const unit = String(intro?.periodUnit || "MONTH").toLowerCase();
   const end = ob2AddPeriod(new Date(), n, unit);
-  const remind = new Date(end.getTime() - 2 * 86400000);
+  /* Mo, 2026-10-07: the reminder goes a week before the charge, not two days. */
+  const remind = new Date(end.getTime() - 7 * 86400000);
   const span = `${n} ${unit}${n === 1 ? "" : "s"}`;
   return {
     free, price, end: ob2Short(end), remind: ob2Short(remind),
@@ -16059,7 +16097,7 @@ function ob2PayHTML(d) {
       <div><b>${escapeHtml(when)}</b><p>${escapeHtml(what)}</p></div></li>`;
   return `<ol class="ob2-tl3" id="ob2Tl">
       ${stop("star", "Today", `Everything unlocks for you and ${them}: workouts built for you, your week planned together, what to train next, and your progress and records.`, "on")}
-      ${t.free && TRIAL_REMINDER_LIVE ? stop("bell", t.remind, "I'll remind you your trial is ending.") : ""}
+      ${t.free && (TRIAL_REMINDER_LIVE || window.__SANDBOX) ? stop("bell", t.remind, `I'll send you a reminder. Your trial ends ${t.end}.`) : ""}
       ${t.free ? stop("calendar", t.end, "Your plan starts. Cancel anytime before.") : ""}
     </ol>`;
 }
@@ -16173,7 +16211,7 @@ function ob2WireWeek(state, want, onChange) {
 /* The real push sample: send-nudges' evening nudge, word for word. */
 function ob2PushSampleHTML(who) {
   return `<div class="ob2-push">
-      <span class="ob2-push-ico">${robotFaceSVG(26)}</span>
+      <img class="ob2-push-ico" src="icon-192.png" alt="" />
       <div><b>${escapeHtml(who)} trained today</b><span>Your turn. There is still time.</span></div>
       <small>6:00 PM</small>
     </div>`;
@@ -17447,7 +17485,7 @@ build: { ch: 5, render(d, ui) {
       setTimeout(() => { if (home) home.insertBefore(scrim, after); }, 360);
       /* Closed with its X: they stay here and can press it again. */
       if (cancelled) { if ($("ob2GenBtn")) $("ob2GenBtn").disabled = false; return; }
-      ui.next({ preview: out?.first || null, week: out?.week || null });
+      ui.next({ preview: out?.first || null, week: out?.week || null, plans: out?.plans || null });
     };
   } },
 
@@ -17455,17 +17493,47 @@ build: { ch: 5, render(d, ui) {
     const p = d.preview;
     const days = d.days_per_week || 3, mins = d.session_minutes || 45;
     const regions = (d.focus_regions || []).map((id) => FOCUS_REGIONS.find((r) => r.id === id)?.label).filter(Boolean);
-    const lift = (e) => `${e.sets} x ${e.reps}${e.w ? ` at ${e.w} lb` : ""}`;
-    const card = p ? `<div class="ob2-wcard">
-        <div class="ob2-wcard-top"><span>Session 1</span>${p.minutes ? `<span>about ${p.minutes} min</span>` : ""}</div>
+    /* Mo, 2026-10-07: the seven-row table and the separate Session 1 card
+       read like a spreadsheet. Now the way Apple Fitness, Runna and Equinox
+       show a week: a strip of the seven days across the top, a dot under each
+       day that has something on it, and the tapped day's session underneath.
+       It opens on the first day with a session. */
+    const week = Array.isArray(d.week) ? d.week : [];
+    const plans = Array.isArray(d.plans) ? d.plans : [];
+    const firstLift = week.findIndex((w) => w.lift != null);
+    const sessionFor = (i) => {
+      const w = week[i];
+      if (!w || w.lift == null) return null;
+      return i === firstLift && p && p.kind === "lift" ? p : (plans[w.lift] || null);
+    };
+    const dayCard = (i) => {
+      const w = week[i];
+      if (!w) return "";
+      const when = w.date ? new Date(w.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }) : w.day;
+      const s = sessionFor(i), cardio = w.cardio || (w.lift == null ? w.items || [] : []);
+      if (!s && !cardio.length) return `<div class="ob2-wcard ob2-daycard rest"><div class="ob2-wcard-top"><span>${escapeHtml(when)}</span></div>
+        <b class="ob2-wcard-name">Rest day</b><p class="ob2-note">Recovery is where the work turns into muscle.</p></div>`;
+      const name = s ? s.focus : cardio.join(" + ");
+      return `<div class="ob2-wcard ob2-daycard"><div class="ob2-wcard-top"><span>${escapeHtml(when)}</span>${s?.minutes ? `<span>about ${s.minutes} min</span>` : ""}</div>
+        <b class="ob2-wcard-name">${escapeHtml(name)}</b>
+        ${s && cardio.length ? `<div class="ob2-day-plus">${cardio.map((c) => `<span>+ ${escapeHtml(c)}</span>`).join("")}</div>` : ""}
+        ${s?.items?.length ? `<ol>${s.items.map((e) => `<li><span>${escapeHtml(e.name)}</span><small>${e.sets} x ${e.reps}${e.w ? ` at ${e.w} lb` : ""}</small></li>`).join("")}</ol>` : ""}
+        ${s && s.total > (s.items || []).length ? `<p class="ob2-note">and ${s.total - s.items.length} more</p>` : ""}
+        ${!s ? `<p class="ob2-note">Your pace. Logged in the app like everything else.</p>` : ""}
+      </div>`;
+    };
+    const strip = week.length ? `<div class="ob2-days" role="tablist">${week.map((w, i) => {
+        const dt = w.date ? new Date(w.date + "T12:00:00") : null;
+        const dots = `${w.lift != null ? `<i class="lift"></i>` : ""}${(w.cardio || []).length ? `<i class="cardio"></i>` : ""}`;
+        return `<button type="button" role="tab" class="ob2-day" data-day="${i}" aria-label="${escapeHtml(w.day)}">
+          <span>${escapeHtml(w.day.slice(0, 1))}</span><b>${dt ? dt.getDate() : ""}</b><em>${dots}</em></button>`;
+      }).join("")}</div><div id="ob2DayCard"></div>`
+      : (p ? `<div class="ob2-wcard"><div class="ob2-wcard-top"><span>Session 1</span>${p.minutes ? `<span>about ${p.minutes} min</span>` : ""}</div>
         <b class="ob2-wcard-name">${escapeHtml(p.focus)}</b>
-        ${p.items.length ? `<ol>${p.items.map((e, i) => `<li><span>${escapeHtml(e.name)}</span>${i < 2 || e.w ? `<small>${lift(e)}</small>` : `<small>${e.sets} x ${e.reps}</small>`}</li>`).join("")}</ol>` : ""}
-        ${p.total > p.items.length ? `<p class="ob2-note">and ${p.total - p.items.length} more</p>` : ""}
-        ${p.cue ? `<p class="ob2-note">${escapeHtml(p.cue)}</p>` : ""}
-        ${p.items.length && !p.items.some((e) => e.w) ? `<p class="ob2-note">No starting weights yet. Pick one you could lift 12 times; it learns from what you log.</p>` : ""}
-      </div>`
+        ${p.items.length ? `<ol>${p.items.map((e) => `<li><span>${escapeHtml(e.name)}</span><small>${e.sets} x ${e.reps}</small></li>`).join("")}</ol>` : ""}</div>`
       : `<div class="ob2-wcard"><b class="ob2-wcard-name">Your first session</b>
-        <p class="ob2-note">It gets built the moment you open the app, from everything you just told us.</p></div>`;
+        <p class="ob2-note">It gets built the moment you open the app, from everything you just told us.</p></div>`);
+    const noWeights = (p?.items?.length && !p.items.some((e) => e.w)) || plans.length;
     /* Path B: the two weeks side by side, theirs as it is really planned
        (their ai_workouts for the next seven days), or a plain sentence when
        nothing is planned yet. Ours is a count and a length, because the days
@@ -17487,18 +17555,23 @@ build: { ch: 5, render(d, ui) {
       regions.length && `Extra sets for: ${regions.join(", ")}`,
       `${days} days, ${mins} minutes`, d.skip_stretching === true ? "No warm-up" : "Warm-up and cool-down",
     ].filter(Boolean);
-    /* The week the button built: one row per day, what is on it. */
-    const weekRows = Array.isArray(d.week) && d.week.length ? `<div class="ob2-weeklist">${d.week.map((w) => `<div class="ob2-wl-row${w.items.length ? "" : " rest"}">
-        <b>${escapeHtml(w.day)}</b><span>${w.items.length ? w.items.map(escapeHtml).join(" + ") : "Rest"}</span></div>`).join("")}</div>` : "";
     ui.paint({
       title: d.path === "b" ? `You and ${ob2Partner(d)}, week 1.` : `Your week 1${ob2Name(d) ? `, ${ob2Name(d)}` : ""}.`,
-      body: `${two}${weekRows}${card}
-        ${regions.length ? `<p class="ob2-note">${icon("target", 14)} Extra sets for ${escapeHtml(regions.join(" and ").toLowerCase())}.</p>` : ""}
+      body: `${two}${strip}
+        ${noWeights ? `<p class="ob2-note ob2-week-foot">Start light. It learns your weights from what you log.</p>` : ""}
         <details class="ob-fold ob2-how"><summary>How did we build this?</summary>
           <div class="ob-fold-in"><ul class="ob-style-bullets">${inputs.map((t) => `<li>${escapeHtml(t)}</li>`).join("")}</ul>
           <p class="ob2-note">Week 1 is built from these alone. From week 2 it reads what you actually lift.</p></div></details>`,
       cta: "Looks good", onNext: () => ui.next(),
     });
+    if (week.length) {
+      const pick = (i) => {
+        document.querySelectorAll(".ob2-day").forEach((b) => { const on = +b.dataset.day === i; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); });
+        $("ob2DayCard").innerHTML = dayCard(i);
+      };
+      document.querySelectorAll(".ob2-day").forEach((b) => { b.onclick = () => pick(+b.dataset.day); });
+      pick(Math.max(0, week.findIndex((w) => (w.items || []).length)));
+    }
   } },
 
   /* The invite, and the only place onboarding mentions a code. It is the
@@ -23508,6 +23581,8 @@ function renderPartnerInviteCard() {
       <span class="home-hire-line">Bring your partner. They&rsquo;re included in your package. I&rsquo;ll watch you both.</span>
     </button>`;
   $("homePartnerCardSay").onclick = () => { skipPartnerCard(); renderPartnerInviteCard(); };
+  const quip = $("homeQuipSlot");
+  if (quip) quip.innerHTML = "";
 }
 
 /* Everything on Home that is written for two people, in one place. Training
@@ -36331,6 +36406,11 @@ function sayHomeQuip() {
     document.getElementById("tab-home")?.classList.remove("bot-between");
     return;
   }
+  /* One robot on Home at a time (Mo, 2026-10-07: two talking heads looked
+     wrong). While he is asking you to bring your partner, that is his line
+     for now; the quip waits until that card is put down. */
+  const pc = document.getElementById("homePartnerCard");
+  if (pc && !pc.classList.contains("hidden") && pc.childElementCount) { slot.replaceChildren(); return; }
   /* Already speaking, or spoke recently: leave him be. */
   if (slot.querySelector(".home-quip")) return;
   if (Date.now() - HOME_QUIP_AT < HOME_QUIP_GAP_MS) return;
