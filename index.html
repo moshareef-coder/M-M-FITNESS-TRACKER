@@ -15793,7 +15793,7 @@ function ob2Paint(id, d, o) {
       <div class="ob2-foot">
         ${o.cta ? `<div class="ob2-navrow">${back ? `<button type="button" class="ob2-backbtn" id="ob2Back" aria-label="Back">${icon("chevronLeft", 22)}</button>` : ""}<button type="button" class="btn-primary" id="ob2Next"${o.ctaOff ? " disabled" : ""}${o.ctaHidden ? " hidden" : ""}>${escapeHtml(o.cta)}</button></div>` : ""}
         ${o.foot || ""}
-        ${!o.cta && back ? `<button type="button" class="btn-ghost ob2-backtext" id="ob2Back">${icon("chevronLeft", 16)} Back</button>` : ""}
+        ${!o.cta && back ? `<div class="ob2-navrow"><button type="button" class="ob2-backbtn" id="ob2Back" aria-label="Back">${icon("chevronLeft", 22)}</button></div>` : ""}
       </div>
     </div>`;
   if ($("ob2Back")) $("ob2Back").onclick = () => { ob2Cleanup(); closeBodyRegionPicker(); ob2Step(id, { ...d, _said: null }, -1); };
@@ -17558,11 +17558,15 @@ build: { ch: 5, render(d, ui) {
        back where it was afterwards. */
     ui.paint({
       title: `That's everything${ob2Name(d) ? `, ${ob2Name(d)}` : ""}. Press it. I've been waiting all day.`,
-      body: `${ob2HeroBot(184)}<div class="wkt-week-gen ob2-gen"><button type="button" class="wkt-btn-solid" id="ob2GenBtn">Generate my week</button></div>`,
+      /* Mo, 2026-10-08: Generate sits in the footer like every other
+         screen's main button, with the square Back on its left, rather than
+         mid-screen with a wide ghost Back under it. */
+      body: ob2HeroBot(184),
+      cta: "Generate my week",
     });
-    $("ob2GenBtn").onclick = async () => {
+    $("ob2Next").onclick = async () => {
       obTrack("build", "generate");
-      $("ob2GenBtn").disabled = true;
+      $("ob2Next").disabled = true;
       const scrim = $("genScrim");
       const home = scrim.parentNode, after = scrim.nextSibling;
       document.body.appendChild(scrim);
@@ -17579,7 +17583,7 @@ build: { ch: 5, render(d, ui) {
       closeGenOverlay();
       setTimeout(() => { if (home) home.insertBefore(scrim, after); }, 360);
       /* Closed with its X: they stay here and can press it again. */
-      if (cancelled) { if ($("ob2GenBtn")) $("ob2GenBtn").disabled = false; return; }
+      if (cancelled) { if ($("ob2Next")) $("ob2Next").disabled = false; return; }
       ui.next({ preview: out?.first || null, week: out?.week || null, plans: out?.plans || null });
     };
   } },
