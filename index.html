@@ -5367,8 +5367,23 @@
   @keyframes ob2BodyOutBack { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(28px,0,0); } }
   @keyframes ob2FootIn { from { opacity: .4; } to { opacity: 1; } }
   /* The banner on the lock screen opening into the app, see the ping screen. */
-  html.ob2-vt-open::view-transition-group(ob2-card) { animation-duration: .44s; animation-timing-function: cubic-bezier(.22,1,.36,1); }
-  html.ob2-vt-open::view-transition-old(ob2-card), html.ob2-vt-open::view-transition-new(ob2-card) { animation-duration: .44s; height: 100%; object-fit: cover; }
+  html.ob2-vt-open::view-transition-group(ob2-card), html.ob2-vt-open::view-transition-group(ob2-live) { animation-duration: .44s; animation-timing-function: cubic-bezier(.22,1,.36,1); }
+  html.ob2-vt-open::view-transition-old(ob2-card), html.ob2-vt-open::view-transition-new(ob2-card),
+  html.ob2-vt-open::view-transition-old(ob2-live), html.ob2-vt-open::view-transition-new(ob2-live) { animation-duration: .44s; height: 100%; object-fit: cover; }
+  /* The live workout invite on the old taste3 screen. Before it opens, the
+     banner sits where the strip will be and the strip and figures wait,
+     invisible but already laid out, so opening moves nothing else. */
+  .ob2-livebox { position: relative; display: flex; flex-direction: column; gap: 12px; flex: 1 0 auto; }
+  .ob2-livebox .ob2-fill { flex: 1 1 0; min-height: 200px; position: relative; }
+  .ob2-livenotif { position: absolute; top: 0; left: 0; right: 0; margin: 0; z-index: 2; box-shadow: 0 12px 32px -14px rgba(0,0,0,.45); animation-delay: 1.4s; }
+  .ob2-livebox.on .ob2-livenotif { display: none; }
+  .ob2-livebox:not(.on) .ob2-livecard, .ob2-livebox:not(.on) .ob2-fill { opacity: 0; }
+  .ob2-livebox.on:not(.calm) .ob2-fill { animation: ob2FootIn .5s ease .15s both; }
+  .ob2-livecard { margin: 0; padding: 12px 0 6px; }
+  .ob2-livecard .tg-hud { margin: 0 12px 4px; }
+  .ob2-livecard .tg-hud-row { background: var(--panel-2); }
+  .ob2-live-tag { display: flex; align-items: center; gap: 8px; margin: 0 16px 10px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ob2-live-tag .rec-dot { animation: none; }
   html.ob2-vt-open::view-transition-old(root) { animation: ob2LockAway .36s cubic-bezier(.4,0,1,1) both; }
   html.ob2-vt-open::view-transition-new(root) { animation: ob2AppUp .44s cubic-bezier(.22,1,.36,1) both; }
   @keyframes ob2LockAway { to { opacity: 0; transform: scale(.94); } }
@@ -15778,6 +15793,28 @@ function renderObV2(id, d) {
    from the other side. Transform and opacity only, 380 ms, nothing that
    makes the page lay out again. Reduced motion gets a straight cut. */
 const ob2Calm = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+/* A banner that becomes the thing it announced: one view transition with the
+   banner and its destination given the same name, so the browser morphs one
+   into the other while everything else crossfades. `change` makes the
+   destination exist; `to` finds it afterwards. No view transitions, or
+   reduced motion: just the change. */
+function ob2Morph(from, to, change, name = "ob2-card") {
+  if (ob2Calm() || !document.startViewTransition || !from) { change(); return; }
+  const root = document.documentElement;
+  from.style.viewTransitionName = name;
+  root.classList.add("ob2-vt-open");
+  let dest = null;
+  const vt = document.startViewTransition(() => {
+    from.style.viewTransitionName = "";
+    change();
+    dest = to();
+    if (dest) dest.style.viewTransitionName = name;
+  });
+  vt.finished.catch(() => {}).finally(() => {
+    root.classList.remove("ob2-vt-open");
+    if (dest) dest.style.viewTransitionName = "";
+  });
+}
 function ob2Handoff(ob, prev, box, dir) {
   const next = ob.querySelector(":scope > .ob-step.ob2");
   if (!next || next === prev) return;
@@ -16711,21 +16748,7 @@ const OB2 = {
        transitions, or with reduced motion, it is the plain step. */
     $("ob2Ping").onclick = () => {
       obTrack("ping", "open");
-      const go = () => ui.next({ pinged: true });
-      if (ob2Calm() || !document.startViewTransition) { go(); return; }
-      const root = document.documentElement;
-      $("ob2Ping").style.viewTransitionName = "ob2-card";
-      root.classList.add("ob2-vt-open");
-      const vt = document.startViewTransition(() => {
-        go();
-        const host = document.querySelector("#onboard .ob2-host");
-        if (host) host.style.viewTransitionName = "ob2-card";
-      });
-      vt.finished.catch(() => {}).finally(() => {
-        root.classList.remove("ob2-vt-open");
-        const host = document.querySelector("#onboard .ob2-host");
-        if (host) host.style.viewTransitionName = "";
-      });
+      ob2Morph($("ob2Ping"), () => document.querySelector("#onboard .ob2-host"), () => ui.next({ pinged: true }));
     };
   } },
 
@@ -16794,31 +16817,99 @@ const OB2 = {
   /* Taste 3, your body. The Rive figure lit by the set from taste 2, the
      muscles from the exercise library the Body tab reads, and the working
      muscles line the session shows under the figure. */
+  /* Mo, 2026-10-08: instead of the lit-up figures after a sample set nobody
+     does any more, "the notification out of nowhere, that hey... you got
+     invited for a live workout. And then boom... a sort of a simulation...
+     this looks like our app." So: a beat in, the invite drops in the way it
+     does on a lock screen, and tapping it (or a moment later on its own) it
+     opens into the app's own train-together strip (tgHudHTML, the same
+     builder the live workout draws) and the app's own body figures, on
+     sample numbers, played once: they log a set, you log one and your
+     muscles light, they log another. Nothing here touches a session, the
+     live presence row or a Live Activity: the real session screen
+     broadcasts the moment it renders (beatLive, pushLiveActivity), so it
+     is these parts of it, not all of it. Continue works from the first
+     frame; reduced motion gets the end state at once. */
   taste3: { ch: 4, render(d, ui) {
     const ex = d.taste_ex || "Push-Up";
+    const them = (d.partner?.name || "").split(" ")[0];
+    const who = them ? escapeHtml(them) : "Partner";
+    const said = them ? `${them}'s live. No pressure. Okay, a little pressure.` : "Your partner's live. No pressure. Okay, a little pressure.";
     ui.paint({
-      title: "That's what that set worked. Every set you log lights you up like this.",
-      body: `${ob2Tag("Your sample set")}
-        <div class="bi-figures ob2-tastefigs" aria-hidden="true">
-          <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Front"></canvas></div>
-          <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Back"></canvas></div>
-        </div>
-        <div class="card ob2-kcard">${workingMusclesHTML(ex, { who: "me", size: "sm", heading: true })}</div>`,
+      title: "Picture a Tuesday. You're about to skip leg day, and then...",
+      body: `<div class="ob2-livebox" id="ob2LiveBox">
+          <button type="button" class="ob2-notif ob2-livenotif" id="ob2LiveNotif">
+            <img class="ob2-notif-icon" src="icon-192.png" alt="" />
+            <span class="ob2-notif-txt">
+              <span class="ob2-notif-row"><b>UNIO</b><span>now</span></span>
+              <span class="ob2-notif-title">${them ? escapeHtml(them) : "Your partner"} invited you to a live workout</span>
+              <span class="ob2-notif-body">Same workout, same time. Tap to join.</span>
+            </span>
+          </button>
+          <div class="card ob2-livecard" id="ob2LiveCard">
+            <div class="ob2-live-tag"><span class="rec-dot"></span>Live together</div>
+            <div class="tg-hud ob2-livehud"><div class="tg-hud-body" id="ob2LiveHud"></div><div class="tg-callout" id="ob2LiveCallout" aria-live="polite"></div></div>
+          </div>
+          <div class="bi-figures ob2-tastefigs ob2-livepart" aria-hidden="true">
+            <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Front"></canvas></div>
+            <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Back"></canvas></div>
+          </div>
+        </div>`,
       cta: "Continue", onNext: () => ui.next(),
     });
+    const box = $("ob2LiveBox");
+    /* The sample: one exercise of three sets, three exercises in all. */
+    const st = { mine: 0, theirs: [], on: null };
+    let mineAv = "", theirAv = "";
+    const draw = () => {
+      if (!$("ob2LiveHud")) return;
+      $("ob2LiveHud").innerHTML = tgHudHTML({
+        mineDone: st.mine, total: 9, theirDone: st.theirs.length, theirTotal: 9, own: false, first: who,
+        mineAv, theirAv, ex: { name: ex, sets: 3 }, onName: st.on, theirsHere: st.theirs,
+      });
+    };
+    Promise.all([avatarHTML(MY_EMAIL, ob2Name(d) || ME || "You", "me", "div"), avatarHTML(null, them || "Partner", "them", "div")])
+      .then(([a, b]) => { mineAv = a; theirAv = b; draw(); }).catch(() => {});
+    draw();
+    let lit = {};
     const sex = d.sex === "Female" ? "Female" : "Male";
     Promise.all([ensureRiveBodyModule(), ob2MusclesFor(ex)]).then(([mod, groups]) => {
       if (!$("ob2T3Front")) return;
-      const lv = {};
-      for (const g of groups.primary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lv[m] = 3;
-      for (const g of groups.secondary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lv[m] = Math.max(lv[m] || 0, 1);
+      for (const g of groups.primary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lit[m] = 3;
+      for (const g of groups.secondary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lit[m] = Math.max(lit[m] || 0, 1);
       OB2_TASTE_FIGS = ["Front", "Back"].map((view) => mod.createBodyHeatmap({
         canvas: $(view === "Front" ? "ob2T3Front" : "ob2T3Back"),
         artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE, intensities: {},
-        onLoad: () => OB2_TASTE_FIGS.forEach((c) => c?.setIntensities({ ...lv })),
+        onLoad: () => { if (st.mine) OB2_TASTE_FIGS.forEach((c) => c?.setIntensities({ ...lit })); },
       }));
       OB2_CLEANUP.push(() => { OB2_TASTE_FIGS.forEach((c) => c?.destroy()); OB2_TASTE_FIGS = []; });
     }).catch((e) => console.warn("onboarding: the body did not load", e));
+
+    const theirSet = (i) => {
+      st.theirs.push({ set_idx: i, reps: 12 }); st.on = ex; draw();
+      const c = $("ob2LiveCallout");
+      if (c) { c.innerHTML = `<b>${who}</b> &middot; ${escapeHtml(ex)} set ${i + 1}, 12 reps`; tgFlashCallout(c); }
+    };
+    const mySet = () => { st.mine += 1; draw(); OB2_TASTE_FIGS.forEach((c) => c?.setIntensities({ ...lit })); };
+    let opened = false;
+    const open = () => {
+      if (opened || !$("ob2LiveBox")) return;
+      opened = true;
+      ob2Morph($("ob2LiveNotif"), () => $("ob2LiveCard"), () => box.classList.add("on"), "ob2-live");
+      ob2Type($("ob2Q"), said);
+      ob2Later(() => theirSet(0), 900);
+      ob2Later(mySet, 2100);
+      ob2Later(() => theirSet(1), 3300);
+    };
+    if (ob2Calm()) {
+      box.classList.add("on", "calm");
+      opened = true;
+      $("ob2Q").textContent = said;
+      theirSet(0); st.mine = 1; theirSet(1);
+      return;
+    }
+    $("ob2LiveNotif").onclick = open;
+    ob2Later(open, 4200);
   } },
 
   /* Required, no Skip, for the reason the old name step gives: ME is read as
@@ -22103,6 +22194,22 @@ async function tgRenderHud() {
   const ex = own ? (theirList.find((e) => last && tgSame(e.name, last.exercise_name)) || theirList[0]) : exs[SESSION.exerciseIndex];
   const first = tgPartnerFirst();
   const theirsHere = ex ? theirs.filter((s) => tgSame(s.exercise_name, ex.name)) : [];
+  const mineAv = await avatarHTML(MY_EMAIL, ME, "me", "div");
+  const theirAv = await avatarHTML(partner, partnerName(), "them", "div");
+  if (token !== TG_RENDER) return;
+  const doneBoth = TG.host_done_at || TG.guest_done_at;
+  root.classList.remove("hidden");
+  hud.innerHTML = tgHudHTML({
+    mineDone, total, theirDone: theirs.length, theirTotal, own, first, mineAv, theirAv, ex,
+    onName: last?.exercise_name || null, theirsHere,
+    finished: !!(doneBoth && !TG[tgAmHost() ? "host_done_at" : "guest_done_at"]),
+  });
+}
+
+/* The strip itself, from plain numbers, so onboarding's live workout demo
+   draws the very same strip on its sample numbers rather than a picture of
+   it. `first` is already escaped (tgFirst). */
+function tgHudHTML({ mineDone, total, theirDone, theirTotal, own, first, mineAv, theirAv, ex, onName, theirsHere = [], finished = false }) {
   const chips = ex ? Array.from({ length: ex.sets || 3 }, (_, i) => {
     const s = theirsHere.find((x) => x.set_idx === i);
     return s ? `<span class="tg-chip done">${s.weight != null ? `${Number(s.weight)}×` : ""}${s.reps ?? "✓"}</span>` : `<span class="tg-chip"></span>`;
@@ -22111,22 +22218,17 @@ async function tgRenderHud() {
     const c = 2 * Math.PI * 25;
     return `<svg class="tg-ring" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="25"/><circle class="fill" cx="28" cy="28" r="25" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - Math.min(1, frac))).toFixed(1)}"/></svg>`;
   };
-  const mineAv = await avatarHTML(MY_EMAIL, ME, "me", "div");
-  const theirAv = await avatarHTML(partner, partnerName(), "them", "div");
-  if (token !== TG_RENDER) return;
-  const doneBoth = TG.host_done_at || TG.guest_done_at;
-  root.classList.remove("hidden");
-  hud.innerHTML = `
+  return `
     <div class="tg-hud-row">
       <div class="tg-p me">${ring(mineDone / total)}${mineAv}<span><b>You</b>${mineDone}/${total} sets</span></div>
       <span class="tg-vs">${own ? "side by side" : "together"}</span>
-      <div class="tg-p them"><span><b>${first}</b>${theirs.length}/${theirTotal} sets</span>${ring(theirs.length / theirTotal)}${theirAv}</div>
+      <div class="tg-p them"><span><b>${first}</b>${theirDone}/${theirTotal} sets</span>${ring(theirDone / theirTotal)}${theirAv}</div>
     </div>
     ${ex ? `<div class="tg-lane">
-      <span class="tg-lane-who">${last ? `${first} is on <b>${escapeHtml(last.exercise_name)}</b>` : `${first} is warming up`}</span>
+      <span class="tg-lane-who">${onName ? `${first} is on <b>${escapeHtml(onName)}</b>` : `${first} is warming up`}</span>
       <span class="tg-chips" aria-label="${first}'s sets on ${escapeHtml(ex.name)}">${chips}</span>
     </div>` : ""}
-    ${doneBoth && !TG[tgAmHost() ? "host_done_at" : "guest_done_at"] ? `<div class="tg-lane"><span class="tg-lane-who"><b>${first} finished.</b> Bring it home.</span></div>` : ""}`;
+    ${finished ? `<div class="tg-lane"><span class="tg-lane-who"><b>${first} finished.</b> Bring it home.</span></div>` : ""}`;
 }
 
 let TG_CALLOUT_T = 0;
@@ -22141,8 +22243,11 @@ function tgCallout(set) {
   box.innerHTML = allIn
     ? `<b>${first} finished ${escapeHtml(set.exercise_name)}</b>`
     : `<b>${first}</b> · ${escapeHtml(set.exercise_name)} set ${set.set_idx + 1}, ${load}`;
-  box.classList.remove("show"); void box.offsetWidth; box.classList.add("show");
+  tgFlashCallout(box);
   sfxPlay("restStart");
+}
+function tgFlashCallout(box) {
+  box.classList.remove("show"); void box.offsetWidth; box.classList.add("show");
   clearTimeout(TG_CALLOUT_T);
   TG_CALLOUT_T = setTimeout(() => box.classList.remove("show"), 3400);
 }
