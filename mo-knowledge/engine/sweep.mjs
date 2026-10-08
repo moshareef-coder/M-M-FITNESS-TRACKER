@@ -515,8 +515,19 @@ function checkPlan(input, plan) {
  * Block A: the exhaustive core
  * ------------------------------------------------------------------ */
 
+/* An opt-in persona laid over every payload, for asking "does the whole matrix
+   still hold for somebody who ticked this". Off by default, so the sweep's own
+   numbers are the numbers they always were. 2026-10-07, for effort.mjs:
+     SWEEP_EXTRA='{"barriers":["consistency"]}' node mo-knowledge/engine/sweep.mjs
+   A cell's own `extra` still wins, because a block that sets a field is asking
+   about that field. buildPlan direct calls (block F) do not see it. */
+const SWEEP_EXTRA = (() => {
+  try { return JSON.parse(process.env.SWEEP_EXTRA || "{}"); } catch { return {}; }
+})();
+
 function payloadFor({ goal, days, history, limitCase, sex, bodyWeight, focusCase, extra = {} }) {
   return {
+    ...SWEEP_EXTRA,
     goal_bubble: goal.goal_bubble,
     goal_child: goal.goal_child,
     challenge_target: days,

@@ -814,6 +814,12 @@ export function toWorkout(plan, dayIndex = 0) {
        minute plan delivered in 45. Additive; the app's own timer stays the
        fallback when the field is absent. */
     restSec: e.restSec ?? null,
+    /* Where every working set stops, as reps in reserve: 3, 2 or 1 (effort.mjs).
+       Always present now; 2 is what the engine always meant. `lastSetRir` is
+       present only on the one set a high effort week takes to failure, and
+       absent otherwise, the same convention as `volumeCut` below. */
+    rir: e.rir ?? 2,
+    ...(e.lastSetRir != null ? { lastSetRir: e.lastSetRir } : {}),
     /* Present only on a week the plateau answer cut the sets, and absent
        otherwise rather than false, so every plan built before it existed is
        the object it was. The app stores `exercises` verbatim into
@@ -1072,6 +1078,12 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
            line only carries the number, for the same reason `limits` is
            normalised in one place rather than in two. */
         sessionMinutes: payload.session_minutes ?? null,
+        /* profiles.effort_pref and profiles.barriers, the two onboarding answers
+           that were asked and stored and read by nothing. effort.mjs normalises
+           both and decides what each may change; absent is medium and no
+           barrier, which is the plan everybody had before. */
+        effort: payload.effort_pref ?? null,
+        barriers: payload.barriers ?? [],
       },
       logs,
       /* The two arguments this file forgot, and the cost of forgetting them was
@@ -1332,6 +1344,10 @@ export function generateFromPayload(rawPayload = {}, { today = new Date(), inclu
            the stand-ins still in their block, and the accessory turns. The
            sentences already travel in `notes`; this is the structure. */
         rotation: plan.rotation ?? null,
+        /* What effort the week runs at, what was asked, and what held it back
+           if anything did, plus which barriers changed the plan. Sentences for
+           the barriers that did something travel in `notes`. */
+        effort: plan.effort ?? null,
         volume: {
           byGroup: plan.weeklyVolume ?? {},
           under: plan.volumeNotes?.under ?? [],

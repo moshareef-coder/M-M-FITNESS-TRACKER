@@ -38,6 +38,7 @@ import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
 import { STYLE_KEYS, readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, refusalNote, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX, FREQUENCY_LEVELS, FREQUENCY_DAYS, frequencyForDays, normalizeFrequency, composeWeek } from "./styles.mjs";
+import { resolveEffort, effectiveEffort, normalizeBarriers, failureSafe, EFFORT_RIR } from "./effort.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -5775,4 +5776,161 @@ test("the single generated day prefers the style due more often, once the dial w
     { today: new Date("2026-10-03T09:00:00") });
   assert.equal(out.meta.styles.honoured, true);
   assert.deepEqual(out.meta.styles.frequency, { running: "most", yoga: "rare" }, "the answer is reported back, so a screen can say it");
+});
+
+/* ---- effort and barriers (effort.mjs), 2026-10-07 ----
+   One test per knob. The pinned clock and the logs dated off it rather than off
+   the wall clock, because a test whose logs drift into its own future is the
+   kind that starts failing a month later for no reason anybody changed. */
+const EFFORT_TODAY = new Date("2026-10-07T12:00:00");
+const effortDay = (n) => { const d = new Date(EFFORT_TODAY); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+const effortLogs = () => {
+  const out = [];
+  for (let i = 1; i <= 12; i++) for (const [n, w] of [["Machine Chest Press", 100], ["Lat Pulldown", 90], ["Leg Press", 200]]) {
+    out.push({ entry_date: effortDay(-i * 2), exercise_name: n, weight: w, reps: 10, sets: 3 });
+  }
+  return out;
+};
+const effortBase = { goal_bubble: "build-muscle", challenge_target: 4, sex: "Male", current_weight: 180, train_styles: ["lifting"] };
+const effortRun = (extra = {}, today = EFFORT_TODAY) => generateFromPayload({ ...effortBase, ...extra }, { today, includePlan: true });
+const allExercises = (out) => out.plan.week.flatMap((d) => d.exercises);
+const stripRir = (out) => JSON.stringify(out.plan.week.map((d) => d.exercises.map(({ rir, ...e }) => e)));
+
+test("effort: no answer and medium are the plan the engine always built, now saying RIR 2", () => {
+  const none = effortRun();
+  const medium = effortRun({ effort_pref: "medium" });
+  assert.equal(stripRir(none), stripRir(medium));
+  assert.ok(allExercises(none).every((e) => e.rir === 2 && e.lastSetRir === undefined));
+  assert.ok(none.workout.exercises.every((e) => e.rir === 2 && !("lastSetRir" in e)), "the card carries it, and nothing goes to failure");
+  assert.equal(none.meta.effort.level, "medium");
+});
+
+test("effort: low is RIR 3 on every set and moves no set, rep, rest or movement", () => {
+  const low = effortRun({ effort_pref: "low" });
+  const none = effortRun();
+  assert.ok(allExercises(low).every((e) => e.rir === 3));
+  const shape = (o) => JSON.stringify(allExercises(o).map((e) => [e.name, e.sets, e.reps, e.restSec]));
+  assert.equal(shape(low), shape(none));
+  const firstTime = allExercises(low).find((e) => e.loadBasis === "unknown");
+  assert.match(firstTime.loadNote, /three reps short/, "the first-time instruction is the load prescription, so it says three");
+});
+
+test("effort: high is held at medium for anybody with no logged set", () => {
+  const out = effortRun({ effort_pref: "high" });
+  assert.equal(out.meta.effort.asked, "high");
+  assert.equal(out.meta.effort.level, "medium");
+  assert.equal(out.meta.effort.held, "no-logs");
+  assert.ok(allExercises(out).every((e) => e.rir === 2 && e.lastSetRir === undefined));
+});
+
+test("effort: high with logs is RIR 1, and only machine, cable or isolation accessories take a last set to failure", () => {
+  const out = effortRun({ effort_pref: "high", logs: effortLogs() });
+  assert.equal(out.meta.effort.level, "high");
+  const ex = allExercises(out);
+  assert.ok(ex.every((e) => e.rir === 1));
+  const failed = ex.filter((e) => e.lastSetRir === 0);
+  assert.ok(failed.length > 0, "a high week has failure sets somewhere");
+  for (const e of failed) {
+    assert.notEqual(e.role, "main", `${e.name} is a main lift`);
+    assert.notEqual(e.equipment, "barbell", `${e.name} is a barbell movement`);
+  }
+  /* rpe-autoregulation.md: not to failure on back to back sessions for one group. */
+  const week = out.plan.week;
+  for (let i = 1; i < week.length; i++) {
+    const before = new Set(week[i - 1].exercises.filter((e) => e.lastSetRir === 0).map((e) => e.group));
+    for (const e of week[i].exercises) if (e.lastSetRir === 0) assert.ok(!before.has(e.group), `${e.group} failed two sessions running`);
+  }
+});
+
+test("effort: a lighter week holds high at medium", () => {
+  assert.deepEqual(effectiveEffort("high", { hasLogs: true, lighterWeek: true }), { level: "medium", held: "lighter-week" });
+  assert.deepEqual(effectiveEffort("low", { hasLogs: false, lighterWeek: true }), { level: "low", held: null }, "a cap only ever lands on medium, never raises low");
+  assert.equal(failureSafe({ role: "main", equipment: "machine" }, "push"), false);
+  assert.equal(failureSafe({ role: "accessory", equipment: "dumbbell" }, "isolation"), true);
+  assert.equal(failureSafe({ role: "accessory", equipment: "barbell" }, "hinge"), false);
+});
+
+test("barriers: ids normalise from the app's own spellings and the long ones, in any of the three shapes", () => {
+  assert.deepEqual(normalizeBarriers(["lost", "dont_know", "energy", "low_energy", "nonsense", 4]), ["lost", "energy"]);
+  assert.deepEqual(normalizeBarriers('["bored"]'), ["bored"]);
+  assert.deepEqual(normalizeBarriers(null), []);
+  /* The three that cannot change a plan really do not. */
+  const none = effortRun();
+  const three = effortRun({ barriers: ["busy", "alone", "pain"] });
+  assert.equal(JSON.stringify(none.plan.week), JSON.stringify(three.plan.week));
+});
+
+test("barriers: low energy defaults effort to low, and never overrides an effort they chose", () => {
+  assert.equal(effortRun({ barriers: ["energy"] }).meta.effort.level, "low");
+  assert.equal(effortRun({ barriers: ["energy"] }).meta.effort.source, "barrier");
+  assert.equal(effortRun({ barriers: ["energy"], effort_pref: "medium" }).meta.effort.level, "medium");
+});
+
+test("barriers: consistency gives a new user one short last day, and never a week with fewer sets in any group", () => {
+  let kept = 0;
+  for (const goal_bubble of ["lose-weight", "build-muscle", "get-stronger", "tone-lean-abs", "build-endurance", "feel-better"]) {
+    for (const challenge_target of [3, 4, 5]) {
+      const base = { goal_bubble, challenge_target, sex: "Female", current_weight: 150 };
+      const plain = generateFromPayload(base, { today: EFFORT_TODAY, includePlan: true });
+      const asked = generateFromPayload({ ...base, barriers: ["consistency"] }, { today: EFFORT_TODAY, includePlan: true });
+      for (const [g, v] of Object.entries(plain.plan.weeklyVolume)) {
+        assert.ok((asked.plan.weeklyVolume[g]?.sets ?? 0) >= v.sets, `${goal_bubble} ${challenge_target}d ${g}: ${v.sets} -> ${asked.plan.weeklyVolume[g]?.sets}`);
+      }
+      const e = asked.meta.effort;
+      if (e.shortDayFromStart) {
+        kept++;
+        const week = asked.plan.week;
+        assert.ok(week[week.length - 1].short, "the short day is the last one");
+        assert.equal(week.filter((d) => d.short).length, 1);
+      } else {
+        assert.ok(e.shortDayDeclined.length > 0, "a declined short day names what it would have cost");
+        assert.ok(asked.notes.some((n) => /every day stays full length/.test(n)));
+      }
+    }
+  }
+  assert.ok(kept > 0, "the barrier does something somewhere");
+  /* And the logs take over: once capacity can speak, the seed is gone. */
+  const logged = effortRun({ barriers: ["consistency"], logs: effortLogs() });
+  assert.equal(logged.meta.effort.shortDayFromStart, false);
+});
+
+test("barriers: don't know what to do ranks barbells they have never done behind machines and dumbbells", () => {
+  const count = (o) => allExercises(o).filter((e) => e.equipment === "barbell").length;
+  for (const goal_bubble of ["build-muscle", "get-stronger", "lose-weight"]) {
+    const plain = effortRun({ goal_bubble });
+    const guided = effortRun({ goal_bubble, barriers: ["lost"] });
+    assert.ok(count(guided) <= count(plain), `${goal_bubble}: ${count(plain)} -> ${count(guided)}`);
+  }
+  assert.ok(count(effortRun({ barriers: ["lost"] })) < count(effortRun()), "and on a muscle week it actually moves one");
+  /* A focus is an answer and the barrier only a default: a barbell movement
+     for a group they picked keeps its place. */
+  const glutes = effortRun({ goal_bubble: "get-stronger", challenge_target: 3, focus_groups: ["glutes:2"], barriers: ["lost"] });
+  assert.ok(allExercises(glutes).some((e) => e.group === "glutes"), "the glute focus still has a slot");
+  /* A barbell lift they already log stays theirs. A main lift, because an
+     accessory they know still takes its turn in the rotation. */
+  const logs = effortLogs().concat([1, 3, 5].map((i) => ({ entry_date: effortDay(-i), exercise_name: "Romanian Deadlift", weight: 95, reps: 8, sets: 3 })));
+  const kept = effortRun({ barriers: ["lost"], logs });
+  assert.ok(allExercises(kept).some((e) => e.name === "Romanian Deadlift" && e.role === "main"));
+});
+
+test("barriers: bored turns accessories weekly, lost every four weeks, both together cancel, anchors never move", () => {
+  assert.equal(resolveEffort({ barriers: ["bored"] }).rotationWeeks, 1);
+  assert.equal(resolveEffort({ barriers: ["lost"] }).rotationWeeks, 4);
+  assert.equal(resolveEffort({ barriers: ["bored", "lost"] }).rotationWeeks, null);
+  const logs = effortLogs();
+  const weekOf = (barriers, w) => {
+    const t = new Date(EFFORT_TODAY); t.setDate(t.getDate() + 7 * w);
+    return effortRun({ barriers, logs }, t).plan;
+  };
+  const acc = (p) => p.week.map((d) => d.exercises.filter((e) => e.role !== "main").map((e) => e.name).join()).join("|");
+  const mains = (p) => p.week.map((d) => d.exercises.filter((e) => e.role === "main").map((e) => e.name).join()).join("|");
+  let boredChanges = 0, plainChanges = 0, lostChanges = 0;
+  for (let w = 0; w < 8; w++) {
+    if (acc(weekOf(["bored"], w)) !== acc(weekOf(["bored"], w + 1))) boredChanges++;
+    if (acc(weekOf([], w)) !== acc(weekOf([], w + 1))) plainChanges++;
+    if (acc(weekOf(["lost"], w)) !== acc(weekOf(["lost"], w + 1))) lostChanges++;
+    assert.equal(mains(weekOf(["bored"], w)), mains(weekOf([], w)), "freshness never reaches an anchor");
+  }
+  assert.ok(boredChanges > plainChanges, `bored ${boredChanges} vs default ${plainChanges}`);
+  assert.ok(lostChanges < plainChanges, `lost ${lostChanges} vs default ${plainChanges}`);
 });

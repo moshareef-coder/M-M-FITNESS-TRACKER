@@ -392,6 +392,17 @@ function makePayload(seed) {
         ["swimming"], ["sports", "running"], [r.pick(["rowing", "classes", "hiking"]), "yoga"]]);
   }
   if (r.chance(0.2)) p.avoid = real ? [r.pick(LIB_NAMES)] : r.pick([[r.pick(LIB_NAMES)], LIB_NAMES.slice(0, 200), junk(r), [null, 3, {}]]);
+  /* 2026-10-07: effort and barriers (effort.mjs). Drawn last so every field
+     above keeps the random stream it had and old seeds reproduce the payloads
+     they always did, plus these two. The junk side is the three shapes a text
+     and a text[] column can arrive in, and ids that differ by an underscore. */
+  if (r.chance(0.4)) p.effort_pref = real ? r.pick(["low", "medium", "high"]) : r.pick(["HIGH", " low ", "extreme", "", 3, null, {}, junk(r)]);
+  if (r.chance(0.4)) {
+    const ids = ["busy", "consistency", "alone", "lost", "bored", "pain", "energy"];
+    p.barriers = real
+      ? ids.filter(() => r.chance(0.35))
+      : r.pick([["dont_know", "low_energy"], '["bored","lost"]', "bored", [null, 4, {}], ids.concat(ids), ["Bored"], junk(r)]);
+  }
 
   if (real) return { payload: p, real };
 
@@ -516,6 +527,9 @@ const META_KEYS = new Set([
   "deload", "progression", "volume",
   /* 2026-09-21: what rotated this week and why, CONTRACT.md row `rotation`. */
   "rotation",
+  /* 2026-10-07: what effort the week runs at and what the barriers changed,
+     CONTRACT.md row `effort`. */
+  "effort",
 ]);
 /* Documented in the contract's prose and missing from its table. Warned, not
    failed: the key is deliberate and it is the TABLE that is behind, which is a
@@ -535,6 +549,7 @@ const META_SUBKEYS = {
   progression: ["rule", "detail"],
   volume: ["byGroup", "under", "frequencyCapped"],
   rotation: ["block", "anchors", "held", "accessories"],
+  effort: ["asked", "source", "level", "held", "barriers", "shortDayFromStart", "shortDayDeclined", "guided", "rotationWeeks"],
   styles: ["asked", "picked", "frequency", "resistance", "honoured", "equipmentMissing", "equipmentDeclared", "cardioModes", "flowTrainings", "note"],
 };
 const WORKOUT_KEYS = new Set(["focus", "exercises", "warmup", "cooldown", "rampSets", "cardio", "flow"]);
@@ -550,7 +565,9 @@ const RAMP_SET_KEYS = new Set(["weight", "reps", "restSec", "pct", "cue"]);
 /* `rotatedFor` and `rotatedAt` are the same kind of memory, for a rotation:
    present only on a stand-in, read back by rotationsHeld so the swap is held
    for its block rather than for one week. */
-const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "loadBasis", "note", "swap", "alternatives", "restSec", "volumeCut", "rotatedFor", "rotatedAt"]);
+/* `rir` is on every exercise and `lastSetRir` only on the one set a high effort
+   week takes to failure (effort.mjs, 2026-10-07). */
+const EXERCISE_KEYS = new Set(["name", "sets", "reps", "targetWeight", "loadBasis", "note", "swap", "alternatives", "restSec", "volumeCut", "rotatedFor", "rotatedAt", "rir", "lastSetRir"]);
 /* What a `targetWeight` of 0 is allowed to mean. "your size" is deliberately not
    in here: it was the cold start basis and there is no cold start any more, so a
    row carrying it would be an old prescription path finding its way back. */
@@ -722,6 +739,10 @@ function checkResult(ctx, out, payload) {
     if (typeof e.name !== "string" || !e.name.trim()) fail("exercise-shape", ctx, `name ${stable(e.name)}`);
     else if (!LIB_NAME_SET.has(e.name.trim().toLowerCase())) fail("name-not-in-library", ctx, e.name);
     if (!Number.isInteger(e.sets) || e.sets < 1 || e.sets > 20) fail("sets", ctx, `${e.name} sets ${stable(e.sets)}`);
+    /* Where a set stops: 1 to 3 in reserve, never below 1 on a working set, and
+       the failure set only ever 0. Which lifts may carry it is test.mjs's job. */
+    if (![1, 2, 3].includes(e.rir)) fail("rir", ctx, `${e.name} rir ${stable(e.rir)}`);
+    if ("lastSetRir" in e && e.lastSetRir !== 0) fail("rir", ctx, `${e.name} lastSetRir ${stable(e.lastSetRir)}`);
     if (!Number.isInteger(e.reps) || e.reps < 1 || e.reps > 200) fail("reps", ctx, `${e.name} reps ${stable(e.reps)}`);
     if (typeof e.targetWeight !== "number" || !Number.isFinite(e.targetWeight) || e.targetWeight < 0) {
       fail("target-weight-type", ctx, `${e.name} targetWeight ${stable(e.targetWeight)}`);

@@ -630,13 +630,23 @@ export function returnFactorFor(ageCaution = 0) {
 
 const FIRST_TIME_NOTE =
   "First time on this one: work up to a weight you could stop two reps short of. That becomes your number.";
+/* The same sentence at whatever effort the plan runs at (effort.mjs). At the
+   default it is the sentence above to the byte. With no logged weight this
+   note IS the load prescription, so it is the one place effort reaches a
+   number: the weight they find today at this effort is the history every later
+   load is read from. Once there is history, calibrate.mjs moves the load and
+   effort only says where the set stops. */
+const RIR_WORD = ["zero", "one", "two", "three"];
+const firstTimeNote = (rir) => (rir === 2 || !RIR_WORD[rir]
+  ? FIRST_TIME_NOTE
+  : `First time on this one: work up to a weight you could stop ${RIR_WORD[rir]} rep${rir === 1 ? "" : "s"} short of. That becomes your number.`);
 
 /* `ageCaution` is age.mjs's dial, 0 to 1. It reaches exactly one number in
    this file, the returning restart, and it can only lower it. It does not
    touch the ceiling, the pattern ratios, the cap or the first-time note: those
    are claims about how strong somebody is and age is not allowed to make one.
    Defaults to 0, so a caller that does not pass it gets the file as it was. */
-export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, logs = [], returning = false, calibration = null, ageCaution = 0 }) {
+export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, logs = [], returning = false, calibration = null, ageCaution = 0, rir = 2 }) {
   if (exercise?.equipment === "bodyweight") {
     return { weight: null, basis: "bodyweight", note: "Bodyweight. The progression is the variation, not the load." };
   }
@@ -727,6 +737,6 @@ export function prescribeLoad({ exercise, reps, bodyWeightLb, sex, logs = [], re
      Calibration still reaches this branch, because an exercise nobody has ever
      logged has no history to read and the twice-skipped swap line has to be
      able to be said. */
-  const said = applyCalibration(null, FIRST_TIME_NOTE, calibration, exercise);
+  const said = applyCalibration(null, firstTimeNote(rir), calibration, exercise);
   return { weight: null, basis: "unknown", note: said.note };
 }

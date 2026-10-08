@@ -28,6 +28,7 @@ import { normalizeLimits, applyLimits, allowedEquipment, limitsSummary } from ".
 import { mainGroupsForDay } from "./recovery.mjs";
 import { TIER_MULTIPLIER, TIERS } from "./focus.mjs";
 import { mobilityFor, COOLDOWN_SECONDS, WARMUP_SECONDS, RAMPED_WARMUP_SECONDS } from "./mobility.mjs";
+import { resolveEffort, effectiveEffort, failureSafe, EFFORT_RIR } from "./effort.mjs";
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
@@ -1176,6 +1177,18 @@ const inDefaultPool = (ex, role) =>
 const LOAD_PENALTY = { barbell: 0, machine: 0, bodyweight: 3 };
 const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
 
+/* "I don't know what to do in the gym" (effort.mjs). A barbell is the one
+   implement where not knowing the movement is the whole risk: the path is free,
+   the load is high and the bar does not stop you. A machine fixes the path and a
+   dumbbell is light enough to learn on. 1.5 puts a barbell lift behind a machine
+   or dumbbell movement one level harder (1) and leaves it ahead of one two levels
+   harder (2), so it reorders, it does not ban: where the library has nothing
+   else on a pattern the barbell still wins its slot. And it never outranks the
+   -100 for a lift they already do, so the day they log a squat the squat is
+   theirs again. */
+const GUIDED_BARBELL_PENALTY = 1.5;
+const guidedPenalty = (ex) => (ex.equipment === "barbell" ? GUIDED_BARBELL_PENALTY : 0);
+
 /* Which movements may fill a slot, and in what order.
  *
  * Eligibility is earned, not granted. Three ways a movement may appear:
@@ -1193,7 +1206,7 @@ const loadPenalty = (ex) => LOAD_PENALTY[ex.equipment] ?? 1;
  * earned or what is safe to open with. It only decides which of the movements
  * they were already allowed to see sorts first, and it reads a fact they told
  * us rather than one we guessed. See buildPlan's `declaredEquipment`. */
-function candidates({ groups, pattern, equipment, role = "accessory", earned = null, historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null, hurtOut = null, preferLoadable = false }) {
+function candidates({ groups, pattern, equipment, role = "accessory", earned = null, historyNames = [], preferences = null, prefBudget = null, exclude = null, emphasis = null, barred = null, hurtOut = null, preferLoadable = false, guided = false, guidedSpare = null }) {
   const isEarned = (ex) => Boolean(earned && earned.has(ex.name.toLowerCase()));
   const match = (needPattern) => {
     const pool = [];
@@ -1248,7 +1261,9 @@ function candidates({ groups, pattern, equipment, role = "accessory", earned = n
         return {
           e,
           score: (known.has(e.name.toLowerCase()) ? -100 : 0) + lv
-            + (wantsLoad ? loadPenalty(e) : 0),
+            + (wantsLoad ? loadPenalty(e) : 0)
+            + (guided && !known.has(e.name.toLowerCase())
+              && !(guidedSpare && (e.primary || []).some((g) => guidedSpare(g))) ? guidedPenalty(e) : 0),
         };
       })
       .sort((x, y) => x.score - y.score
@@ -1412,7 +1427,62 @@ export function eligibleMovements({ days = 3, equipment = null, earned = null, l
   return [...out];
 }
 
-export function buildPlan({
+/* The consistency barrier's short day, held to its promise by measurement.
+ *
+ * effort.mjs promises that a barrier never cuts a weekly set, and a short day
+ * can only keep that promise where the full days have room to carry what the
+ * short one no longer does. Often they do not: the time budget and the per
+ * session ceiling are both walls, and measured across the goals the sets the
+ * short day sheds land on a full day that is already at its clock, which trims
+ * them straight back off. Which weeks that happens to is not something a rule
+ * can say in advance, so the week is built both ways and compared, the way
+ * a person would check it: if any muscle group ends the week with fewer sets
+ * than the week without the short day, the short day is declined, the full
+ * week stands, and a note says so. And the same if a full day ends up over the
+ * clock where it was not before: the sets the short day hands on are mostly
+ * main lift sets, which no trim may touch, so the cost can surface as minutes
+ * instead of sets, and the session length they asked for is an answer a
+ * barrier may not override either. The sweep found that one (over-time-budget
+ * up 163 runs with the barrier on every payload) after the sets check was
+ * already passing. Only somebody who ticked the barrier pays for the second
+ * build. */
+export function buildPlan(args = {}) {
+  const first = buildPlanOnce(args);
+  if (!first.effort?.shortDayFromStart) return first;
+  const person = args.person || {};
+  const without = (first.effort.barriers || []).filter((b) => b !== "consistency");
+  const ref = buildPlanOnce({ ...args, person: { ...person, barriers: without } });
+  const lost = Object.keys(ref.weeklyVolume || {})
+    .filter((g) => (first.weeklyVolume?.[g]?.sets ?? 0) < (ref.weeklyVolume[g]?.sets ?? 0));
+  /* A day already over the clock without the short day counts too, when the
+     short day makes it longer still: over by more is not the same answer. And
+     the short day itself, when it misses its own smaller clock: a strength
+     day keeps its long rests and its warm-up however few sets it has, and a
+     "short" day of 51 minutes against a full one of 63 is not the session
+     small enough to never skip that the barrier promised. */
+  const refMinutes = new Map((ref.week || []).map((d) => [d.name, d.estimatedMinutes]));
+  /* The short day is held to its own clock with no tolerance at all, unlike a
+     full day: the tolerance exists so a full session is not gutted to save two
+     minutes, and a short day has nothing to gut. Measured, the tolerance let a
+     strength "short" day come out at 47 minutes beside full days of 44 and 48. */
+  const longer = [
+    ...(first.week || []).filter((d) => d.short && d.estimatedMinutes > d.minutes).map((d) => d.name),
+    ...(first.volumeNotes?.overBudget || [])
+      .filter((o) => o.estimatedMinutes > (refMinutes.get(o.day) ?? Infinity))
+      .map((o) => o.day),
+  ];
+  if (!lost.length && !longer.length) return first;
+  ref.effort = { ...ref.effort, barriers: first.effort.barriers, shortDayDeclined: lost.length ? lost : ["time"] };
+  const list = (xs) => (xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+  ref.dayNotes.push(`You said staying consistent is the hard part. A short last day would have `
+    + (lost.length
+      ? `cost your ${list(lost)} work this week, because the other days have no room to carry it`
+      : `pushed ${list(longer)} past the time you have`)
+    + `, so every day stays full length.`);
+  return ref;
+}
+
+function buildPlanOnce({
   goal, person = {}, logs: rawLogs = [], plans = [], swaps = [], equipment = null, today = new Date(), priorityOverride = null,
   limits = null, avoid = [], declaredEquipment = null,
 } = {}) {
@@ -1422,7 +1492,12 @@ export function buildPlan({
      not filled the field in. Until 2026-09-19 this defaulted to 0, and every
      direct caller of buildPlan, the sweep, the demo, the harnesses, measured
      an engine climbing 10 lb a week on a squat where production gives 5. */
-  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null, ageCaution = 1 } = person;
+  const { bodyWeightLb = null, sex = null, daysAsked = null, sessionMinutes = null, ageCaution = 1, effort: effortAsked = null, barriers = [] } = person;
+  /* How hard they like it and what gets in their way, resolved once into the
+     handful of knobs below. Absent, both are the plan this function always
+     built: medium effort, no barrier. See effort.mjs for what each may touch
+     and, mostly, what it may not. */
+  const effortPlan = resolveEffort({ effort: effortAsked, barriers });
 
   /* A log row is an object or it is not a row. Eight passes in this file, plus
      load.mjs, training-age.mjs, calibrate.mjs and preferences.mjs, read fields
@@ -1573,6 +1648,21 @@ export function buildPlan({
       + `${capacity}. Keeping ${days}, with the last ${days - capacity} kept short, because a `
       + `short session you do beats a full one you skip.`);
   }
+  /* "Hard to stay consistent", from day zero. The block above is the same rule
+     run off the logs, and a new user has none, so it never fired for the one
+     person who just told us it would. Only while there is nothing to measure:
+     the moment capacity says anything, it decides, whichever way. One day and
+     not more, the last one, and only from three days up, because a two day
+     week with one of them short is a one and a half day week. weeklySets moves
+     what the short day does not carry onto the full days, so this is the same
+     week's work in a different shape, not less of it. */
+  let seededShort = false;
+  if (shortFrom == null && capacity == null && effortPlan.shortDayFromStart && days >= 3) {
+    shortFrom = days - 1;
+    seededShort = true;
+    dayNotes.push(`You said staying consistent is the hard part, so the last day of the week is a short one. `
+      + `Same work across the week, one session small enough that you never have a reason to skip it.`);
+  }
   if (trainingAge.returning) {
     dayNotes.push(`Coming back after ${trainingAge.daysSinceLast} days off, so the first block `
       + `is lighter than where you left it. It comes back fast.`);
@@ -1633,7 +1723,12 @@ export function buildPlan({
   const pinnedNames = new Set([...pinnedFor.values()].map((p) => p.to.toLowerCase()));
   /* Which fortnight the accessories are on, and whether rotation applies at
      all: not to a person with nothing on the record. See ROTATION. */
-  const block = (logs.length || (Array.isArray(plans) && plans.length)) ? accessoryBlock(today) : 0;
+  /* "Get bored" turns them every week, "don't know what to do" every four, so
+     the movements somebody is learning stay long enough to be learned. Both
+     are defaults on a calendar nobody chose, so they override nothing. */
+  const block = (logs.length || (Array.isArray(plans) && plans.length))
+    ? accessoryBlock(today, effortPlan.rotationWeeks ? { everyWeeks: effortPlan.rotationWeeks } : {})
+    : 0;
   const rotatedAccessories = [];
   const rotatedAnchors = [];
   /* Stalled lifts already given a stand-in this week, for the no-card case. */
@@ -1789,6 +1884,12 @@ export function buildPlan({
      will not return volume-cut at all when calibration has already backed off,
      so these two can never both be true, and the week can never be cut twice. */
   const backOff = calibration.overall === "back-off" || plateauPlan.summary.action === "volume-cut";
+  /* The effort this week runs at. High is held at medium for anybody with no
+     logged set yet and for any week the engine has already made lighter, the
+     back-off, the plateau cut and the deload: a week built to clear fatigue
+     with its last sets taken to failure is two answers that cancel. */
+  const effortNow = effectiveEffort(effortPlan.level, { hasLogs: logs.length > 0, lighterWeek: backOff || deloadWeek });
+  const rirFor = (isMain) => EFFORT_RIR[effortNow.level][isMain ? "main" : "accessory"];
   /* Was one number for every muscle, keyed on the training level. Now a band
      per muscle and a measured dial saying where in it this week sits. See
      VOLUME_BAND and volumeDial. */
@@ -1903,7 +2004,12 @@ export function buildPlan({
     if (keep && !(kept && mayKeep(kept, slot))) return undefined;
     {
       if (isShort && slot.role !== "main" && ctx.taken >= SHORT_DAY_MIN) return null;
-      const args = { ...slot, earned, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, hurtOut: limitOut, emphasis: P.emphasis, preferLoadable };
+      const args = { ...slot, earned, equipment: kit, role: slot.role, historyNames, preferences, prefBudget, exclude: excludeOut, hurtOut: limitOut, emphasis: P.emphasis, preferLoadable, guided: effortPlan.guided,
+        /* A barrier is a default and a focus is an answer, so the guided
+           ranking leaves alone any movement that trains a group they asked
+           for. Measured: on a strength week with glutes picked, the penalty
+           pushed Hip Thrust off its slot and the focus had nowhere to land. */
+        guidedSpare: effortPlan.guided ? isPriority : null };
       const rankedPool = candidates({ ...args, barred: goalBarred });
       /* A live hold pins its stand-in to the front of this slot. Only the
          stand-in for a lift this slot could have held: the map is keyed on the
@@ -2120,6 +2226,23 @@ export function buildPlan({
       if (g) bag[ledgerGroup(g)] = (bag[ledgerGroup(g)] || 0) + 1;
     }
   }
+  /* The consistency barrier's short day is a promise that the WEEK is the same
+     work in a different shape (effort.mjs), and one shape of week breaks it: a
+     group the split trains only on that last day. A capacity short day pins it
+     at two sets, which is the right answer for somebody whose logs say they
+     will probably miss the day anyway, and the wrong one for somebody who has
+     not missed anything yet: measured, a three day strength week lost half its
+     glute work. So on the seeded short day only, a group with no full day to
+     carry its sets is counted as a full slot and keeps its full share. */
+  const shortKeepsFull = new Set();
+  if (seededShort) {
+    for (const g of Object.keys(shortHits)) {
+      if (fullHits[g]) continue;
+      fullHits[g] = shortHits[g];
+      delete shortHits[g];
+      shortKeepsFull.add(g);
+    }
+  }
 
   /* ---- pass 3: sets, reps and load, now that the week is known ---- */
   /* Which slot an exercise came out of is needed twice after the week is built,
@@ -2238,7 +2361,7 @@ export function buildPlan({
          small however the multipliers landed, and `weeklySets` already took it
          out of the week before dividing what was left. */
       let sets;
-      if (isShort) sets = SHORT_DAY_SETS;
+      if (isShort && !shortKeepsFull.has(ledgerGroup(group))) sets = SHORT_DAY_SETS;
       else {
         /* Indexed by the ledger's key for the same reason the hit counts are:
            the week's core sets are cut once and handed out in order, so an abs
@@ -2254,7 +2377,7 @@ export function buildPlan({
 
       const load = prescribeLoad({
         exercise: pick, reps, bodyWeightLb, sex, logs, returning: trainingAge.returning,
-        calibration: calibration.byExercise, ageCaution,
+        calibration: calibration.byExercise, ageCaution, rir: rirFor(isMain),
       });
       /* load.mjs caps a guess that extrapolated past what the person's size and
          level can support: one logged 200 lb Goblet Squat was producing an 870
@@ -2267,6 +2390,9 @@ export function buildPlan({
       const exercise = {
         name: pick.name, group, equipment: pick.equipment, sets, reps,
         restSec: isMain ? P.restSec : Math.round(P.restSec * 0.7),
+        /* Where each working set stops, as reps in reserve (effort.mjs). 2 is
+           what this engine always meant and never said; now the card can. */
+        rir: rirFor(isMain),
         weight: load.weight, loadBasis: load.basis, loadNote: load.note,
         /* `swap` stays a bare string, because everything already reading it
            expects one. `alternatives` is the same answer with its reasons
@@ -2816,6 +2942,26 @@ export function buildPlan({
     dayNotes.push(`This is a deload week. You have trained ${trainedWeeks} weeks in a row, so this one is about two thirds `
       + `of the sets and a tenth off the weights, same exercises. That is fatigue clearing, not progress stopping: `
       + `next week goes back up.`);
+  }
+
+  /* ---- the one set that goes to failure, on a high effort week ----
+     Last, because every pass above can still change which lifts are on the
+     card. The last set of a machine or isolation accessory, nothing else
+     (effort.mjs, failureSafe). And never on a group that went to failure on
+     the session before: rpe-autoregulation.md, "don't program RPE 9-10 on
+     back-to-back sessions hitting the same muscle group". */
+  if (EFFORT_RIR[effortNow.level].lastSet != null) {
+    let failedBefore = new Set();
+    for (const d of week) {
+      const failedHere = new Set();
+      for (const e of d.exercises) {
+        if (!failureSafe(e, patternFor(EXERCISE_BY_NAME.get(e.name.toLowerCase()) || { name: e.name }))) continue;
+        if (failedBefore.has(e.group)) continue;
+        e.lastSetRir = EFFORT_RIR[effortNow.level].lastSet;
+        failedHere.add(e.group);
+      }
+      failedBefore = failedHere;
+    }
   }
 
   /* Now that the minutes have stopped moving, the second main can have its rung
@@ -3388,6 +3534,20 @@ export function buildPlan({
        took their place; `held` are the stand-ins still in their block; and
        `accessories` are the freshness turns. `block` is the calendar
        fortnight, 0 when rotation is not running for this person. */
+    /* What effort the week runs at and what the barriers changed, so a screen
+       can say "kept at medium until you have logged a session" rather than
+       quietly ignoring a setting. `held` is null, "no-logs" or "lighter-week". */
+    effort: {
+      asked: effortPlan.level,
+      source: effortPlan.source,
+      level: effortNow.level,
+      held: effortNow.held,
+      barriers: effortPlan.barriers,
+      shortDayFromStart: seededShort,
+      shortDayDeclined: [],
+      guided: effortPlan.guided,
+      rotationWeeks: effortPlan.rotationWeeks,
+    },
     rotation: {
       block,
       anchors: rotatedAnchors,
