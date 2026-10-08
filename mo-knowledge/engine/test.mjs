@@ -2816,9 +2816,14 @@ test("a short bodyweight-only day still reaches the four exercise floor when the
   /* Three sessions a week for four weeks, on distinct dates: observedCapacity
      needs eight effective sessions before it will say anything, and then it
      says "about 3", which against five asked shortens the last two days. */
+  /* Dated off the pinned `today` and not the wall clock. With `day()` the logs
+     were four weeks before whatever day the suite ran, which stopped being
+     before 2026-09-10 a month later, and the test started failing with nothing
+     changed. */
+  const pinned = (n) => { const d = new Date(today); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   const logs = [];
   for (let w = 4; w >= 1; w--) for (const s of [0, 2, 4]) {
-    const date = day(-(w * 7 + s));
+    const date = pinned(-(w * 7 + s));
     for (const n of ["Bodyweight Squat", "Push-Up", "Inverted Row"]) logs.push({ entry_date: date, exercise_name: n, sets: 3, reps: 10, weight: 0 });
   }
   const out = generateFromPayload({ goal_bubble: "lose-weight", challenge_target: 5, sex: "Female", current_weight: 150, logs, limits: { hurts: [], missing: ["none"] } }, { today, includePlan: true });
