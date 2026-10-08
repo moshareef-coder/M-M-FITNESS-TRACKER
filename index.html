@@ -4818,6 +4818,13 @@
   .ob2-why { color: var(--muted); font-size: 14.5px; line-height: 1.45; margin: 0 0 4px; }
   .ob2-body { margin-top: 14px; }
   .ob2-foot { display: flex; flex-direction: column; gap: 2px; }
+  .ob2 .ob2-head.ob2-head-c { display: flex; justify-content: center; text-align: center; }
+  .ob2-navrow { display: flex; gap: 8px; align-items: stretch; }
+  .ob2-navrow .btn-primary { flex: 1; width: auto; min-width: 0; margin: 0; }
+  .ob2-backbtn { flex: none; width: 56px; min-height: 48px; display: grid; place-items: center; padding: 0; cursor: pointer;
+    border-radius: 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  .ob2-backbtn:active { transform: scale(.96); }
+  .ob2-backtext { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
   .ob2-foot .btn-ghost { width: 100%; }
   .ob2-choice { margin: 0; }
   .ob2-choice .occ-label { display: flex; align-items: center; gap: 9px; }
@@ -15744,6 +15751,7 @@ function ob2Paint(id, d, o) {
   /* No Skip anywhere, Mo, 2026-10-04. A question with no answer to give has
      its own way on in the screen (Nothing hurts, Keep it balanced, and so on). */
   const skipBtn = "<span></span>";
+  const back = !(first || o.noBack);
   ob.innerHTML = `
     <div class="ob-step ob2${o.wide ? " ob-step-wide" : ""}">
       ${/* Round 4, Mo: "it doesn't really look like our app." So the header is
@@ -15756,17 +15764,12 @@ function ob2Paint(id, d, o) {
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/></svg>
               <span>UNIO</span>
             </div>
-            <div class="ob2-head-r">
-              ${first || o.noBack ? "" : `<button type="button" class="scr-back ob2-back-sm" id="ob2Back" aria-label="Back">${icon("chevronLeft", 20)}</button>`}
-              ${skipBtn}
-            </div>
+            <div class="ob2-head-r">${skipBtn}</div>
           </header>`
-        : `<div class="scr-head ob2-head">
-            ${first || o.noBack ? `<span class="spacer"></span>` : `<button type="button" class="scr-back" id="ob2Back" aria-label="Back">${icon("chevronLeft", 20)}</button>`}
+        : `${/* Mo, 2026-10-07: Back lives at the bottom beside Continue, so the
+              header is the chapter name alone, truly centred (the back button
+              on the left had been pushing it right). */ ""}<div class="scr-head ob2-head ob2-head-c">
             <div class="scr-title">${escapeHtml(OB2_CHAPTER_NAMES[ch] || "")}<small>${count}</small></div>
-            <div class="ob2-head-r">
-              ${skipBtn}
-            </div>
           </div>`}
       ${bar}
       ${o.host === false
@@ -15788,8 +15791,9 @@ function ob2Paint(id, d, o) {
       ${o.why && (o.legal || o.keepWhy) ? `<p class="ob2-why">${escapeHtml(o.why)}</p>` : ""}
       <div class="ob2-body">${o.stage ? `<div class="ob2-stage" id="ob2Stage"></div>` : ""}${o.body || ""}</div>
       <div class="ob2-foot">
-        ${o.cta ? `<button type="button" class="btn-primary" id="ob2Next"${o.ctaOff ? " disabled" : ""}${o.ctaHidden ? " hidden" : ""}>${escapeHtml(o.cta)}</button>` : ""}
+        ${o.cta ? `<div class="ob2-navrow">${back ? `<button type="button" class="ob2-backbtn" id="ob2Back" aria-label="Back">${icon("chevronLeft", 22)}</button>` : ""}<button type="button" class="btn-primary" id="ob2Next"${o.ctaOff ? " disabled" : ""}${o.ctaHidden ? " hidden" : ""}>${escapeHtml(o.cta)}</button></div>` : ""}
         ${o.foot || ""}
+        ${!o.cta && back ? `<button type="button" class="btn-ghost ob2-backtext" id="ob2Back">${icon("chevronLeft", 16)} Back</button>` : ""}
       </div>
     </div>`;
   if ($("ob2Back")) $("ob2Back").onclick = () => { ob2Cleanup(); closeBodyRegionPicker(); ob2Step(id, { ...d, _said: null }, -1); };
