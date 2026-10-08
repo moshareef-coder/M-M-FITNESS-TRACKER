@@ -50392,8 +50392,12 @@ function renderMeasurementsSheet() {
     const input = item.querySelector("input");
     const show = () => { const b = sheet.querySelector(`[data-show="${key}"]`); if (b) b.textContent = input.value || "\u2013"; };
     input.oninput = () => { MEAS_TOUCHED.add(key); show(); };
-    mountLogRuler(item, input, { step: 0.25, label: 1, span: 12, fallback: key === "waist_in" ? 32 : key === "hips_in" ? 38 : key === "chest_in" ? 40 : key === "thigh_in" ? 22 : 13,
-      onPick: () => { MEAS_TOUCHED.add(key); show(); } });
+    /* Weight rides the same sheet on the check-in (CHECKIN_ROWS), and needs
+       the scale's ruler, not the tape's: half-pound steps over 60 lb. */
+    const spec = key === "weight"
+      ? { step: 0.5, label: 5, span: 60, floor: 50, fallback: (typeof currentWeightLb === "function" && currentWeightLb(ME)) || 170 }
+      : { step: 0.25, label: 1, span: 12, fallback: key === "waist_in" ? 32 : key === "hips_in" ? 38 : key === "chest_in" ? 40 : key === "thigh_in" ? 22 : 13 };
+    mountLogRuler(item, input, { ...spec, onPick: () => { MEAS_TOUCHED.add(key); show(); } });
   };
   sheet.querySelectorAll(".meas-tab").forEach((t) => { t.onclick = () => open(t.dataset.tab); });
   const first = sheet.querySelector(".meas-tab");
