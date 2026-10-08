@@ -31,6 +31,12 @@ import { mobilityFor, COOLDOWN_SECONDS, WARMUP_SECONDS, RAMPED_WARMUP_SECONDS } 
 
 const WEIGHTS = TRAININGS.find((t) => t.id === "weight-training");
 const CALIS = TRAININGS.find((t) => t.id === "calisthenics");
+/* Never in a generated plan, whatever the goal or level. Mo, 2026-10-08:
+   "you should never recommend wall handstand holds. Ever." A handstand is a
+   skill with a fall in it, upside down against a wall with no spotter, and
+   the plan was also prescribing the hold as sets of reps. The library keeps
+   them (knowledge/ is not ours) and a person can still add one by hand. */
+const NEVER_PLAN = /handstand/i;
 
 /* Weekly hard sets per muscle group, before the goal's factor and any priority.
  *
@@ -1212,6 +1218,7 @@ function candidates({ groups, pattern, equipment, role = "accessory", earned = n
              both the exact-pattern pass and the loose one, and where that
              leaves nothing the slot goes empty and buildPlan says so. */
           if (barred && barred.has(ex.name.toLowerCase())) continue;
+          if (NEVER_PLAN.test(ex.name)) continue;
           if (needPattern && patternFor(ex) !== pattern) continue;
           pool.push(ex);
         }
