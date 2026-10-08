@@ -4819,6 +4819,9 @@
   .ob2-body { margin-top: 14px; }
   .ob2-foot { display: flex; flex-direction: column; gap: 2px; }
   .ob2 .ob2-head.ob2-head-c { display: flex; justify-content: center; text-align: center; }
+  .ob2 .ob2-head.ob2-head-c { position: relative; }
+  .ob2-topback { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+  .ob2-topback:active { transform: translateY(-50%) scale(.94); }
   .ob2-navrow { display: flex; gap: 8px; align-items: stretch; }
   .ob2-navrow .btn-primary { flex: 1; width: auto; min-width: 0; margin: 0; }
   .ob2-backbtn { flex: none; width: 56px; min-height: 48px; display: grid; place-items: center; padding: 0; cursor: pointer;
@@ -5183,8 +5186,13 @@
      in the middle of it, so a short screen is balanced rather than stacked at
      the top over a band of nothing. A long one is taller than the space and
      simply scrolls with the page: nothing here sets an overflow, which is the
-     scroll trap this app has already fallen into once. */
-  .ob2 > .ob2-body { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 12px; margin-top: 12px; }
+     scroll trap this app has already fallen into once.
+     Mo, 2026-10-08, on a phone: centring is what made the week preview and
+     the styles grid float with a band of nothing above them, so the body now
+     starts right under him and the spare height sits above the button, where
+     a thumb expects air. A screen whose one visual wants the space still
+     takes it, through ob2Fill. */
+  .ob2 > .ob2-body { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; margin-top: 12px; }
   .ob2 > .ob2-body > * { margin-top: 0; margin-bottom: 0; }
   .ob2 > .ob2-foot { margin-top: 0; padding-top: 16px; }
   .ob2-herobot { display: flex; justify-content: center; }
@@ -5254,6 +5262,13 @@
   .ob2-lock-time { text-align: center; color: #fff; font-family: var(--font-display); font-size: 64px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
   .ob2-lockphone .ob2-push { background: rgba(255,255,255,.9); border-color: transparent; color: #111318; }
   .ob2-lockphone .ob2-push span, .ob2-lockphone .ob2-push small { color: rgba(17,19,24,.6); }
+  /* Its own size, centred in the room the screen has (Mo, 2026-10-08: the
+     mock stretched to fill a tall phone was "enormous and empty"). */
+  .ob2 > .ob2-body > .ob2-lockphone { margin-block: auto; }
+  /* The quiet way out under the main button (Not now, I'll invite them
+     later) reads as a text button, not a second bordered button stacked
+     under the first, so the footer is one row and a line, never two bars. */
+  .ob2-foot > .btn-ghost { border-color: transparent; background: none; min-height: 44px; padding-block: 10px; margin-top: 4px; }
   .ob2 .ob2-phones { padding: 8px 0; }
   .ob2 .ob2-phone { width: 128px; height: 236px; }
   .ob2-kcard { margin: 0; }
@@ -5335,9 +5350,51 @@
   @media (min-height: 900px) { .ob2-tastefigs .bi-canvas { height: 330px; } .ob2-tour-stage { height: 300px; } }
   /* Every onboarding screen arrives rather than appears. */
   .ob-step.ob2 { animation: ob2Screen .32s cubic-bezier(.22,1,.36,1) both; }
+  /* The screen change, see ob2Handoff. The new screen's step does not
+     animate as a whole (its header and footer are where the old ones were);
+     its body slides in, the old body slides out the other way. */
+  .ob-step.ob2.ob2-enter { animation: none; }
+  .ob2-enter > .ob2-body { animation: ob2BodyIn .38s cubic-bezier(.22,1,.36,1) both; }
+  .ob2-enter.ob2-back-dir > .ob2-body { animation-name: ob2BodyInBack; }
+  .ob2-enter > .ob2-foot { animation: ob2FootIn .24s ease both; }
+  .ob-step.ob2.ob2-leaving { animation: none; pointer-events: none; z-index: 0; }
+  .ob2-leaving > :not(.ob2-body) { visibility: hidden; }
+  .ob2-leaving > .ob2-body { animation: ob2BodyOut .22s cubic-bezier(.4,0,1,1) both; }
+  .ob2-leaving.ob2-back-dir > .ob2-body { animation-name: ob2BodyOutBack; }
+  @keyframes ob2BodyIn { from { opacity: 0; transform: translate3d(28px,0,0); } to { opacity: 1; transform: none; } }
+  @keyframes ob2BodyInBack { from { opacity: 0; transform: translate3d(-28px,0,0); } to { opacity: 1; transform: none; } }
+  @keyframes ob2BodyOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(-28px,0,0); } }
+  @keyframes ob2BodyOutBack { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(28px,0,0); } }
+  @keyframes ob2FootIn { from { opacity: .4; } to { opacity: 1; } }
+  /* The banner on the lock screen opening into the app, see the ping screen. */
+  html.ob2-vt-open::view-transition-group(ob2-card), html.ob2-vt-open::view-transition-group(ob2-live) { animation-duration: .44s; animation-timing-function: cubic-bezier(.22,1,.36,1); }
+  html.ob2-vt-open::view-transition-old(ob2-card), html.ob2-vt-open::view-transition-new(ob2-card),
+  html.ob2-vt-open::view-transition-old(ob2-live), html.ob2-vt-open::view-transition-new(ob2-live) { animation-duration: .44s; height: 100%; object-fit: cover; }
+  /* The live workout invite on the old taste3 screen. Before it opens, the
+     banner sits where the strip will be and the strip and figures wait,
+     invisible but already laid out, so opening moves nothing else. */
+  .ob2-livebox { position: relative; display: flex; flex-direction: column; gap: 12px; flex: 1 0 auto; }
+  .ob2-livebox .ob2-fill { flex: 1 1 0; min-height: 200px; position: relative; }
+  .ob2-livenotif { position: absolute; top: 0; left: 0; right: 0; margin: 0; z-index: 2; box-shadow: 0 12px 32px -14px rgba(0,0,0,.45); animation-delay: 1.4s; }
+  .ob2-livebox.on .ob2-livenotif { display: none; }
+  .ob2-livebox:not(.on) .ob2-livecard, .ob2-livebox:not(.on) .ob2-fill { opacity: 0; }
+  .ob2-livebox.on:not(.calm) .ob2-fill { animation: ob2FootIn .5s ease .15s both; }
+  .ob2-livecard { margin: 0; padding: 12px 0 6px; }
+  .ob2-livecard .tg-hud { margin: 0 12px 4px; }
+  .ob2-livecard .tg-hud-row { background: var(--panel-2); }
+  .ob2-live-tag { display: flex; align-items: center; gap: 8px; margin: 0 16px 10px; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ob2-live-tag .rec-dot { animation: none; }
+  html.ob2-vt-open::view-transition-old(root) { animation: ob2LockAway .36s cubic-bezier(.4,0,1,1) both; }
+  html.ob2-vt-open::view-transition-new(root) { animation: ob2AppUp .44s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes ob2LockAway { to { opacity: 0; transform: scale(.94); } }
+  @keyframes ob2AppUp { from { opacity: 0; transform: scale(1.04); } }
+  /* The app's own tabs, see switchTab. */
+  .tab-panel.tab-in { animation: tabIn .22s ease-out; }
+  @keyframes tabIn { from { opacity: 0; } }
   @keyframes ob2Screen { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) {
-    .ob-step.ob2, .ob2-notif, .ob-step.ob2.ob2-lock { animation: none; }
+    .ob-step.ob2, .ob2-notif, .ob-step.ob2.ob2-lock, .ob2-enter > .ob2-body, .ob2-enter > .ob2-foot, .tab-panel.tab-in { animation: none; }
+    .ob2-bar b { transition: none; }
   }
   @media (min-height: 900px) {
     .ob2 > .ob2-body { gap: 18px; }
@@ -5409,8 +5466,6 @@
      spilling over the button. */
   .ob2 .ob2-body .ob2-fill:has(> .ob2-minchips) { min-height: 216px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-daysfill) { min-height: 210px; }
-  .ob2 .ob2-body .ob2-fill:has(> .ob2-verdict) { min-height: 300px; }
-  .ob2 .ob2-body .ob2-fill:has(> .ob2-tl3) { min-height: 230px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-duo) { min-height: 260px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-kitgrid) { min-height: 230px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-themes) { min-height: 240px; }
@@ -5447,20 +5502,12 @@
   .ob2 .ob2-daysfill > .ob2-kcard { flex: 1.2 1 0; display: flex; flex-direction: column; min-height: 0; }
   .ob2 .ob2-daysfill .ob2-week { flex: 1 1 0; grid-auto-rows: 1fr; min-height: 0; }
   .ob2 .ob2-fill .ob2-daysfill .ob2-wd { padding: 6px 0; justify-content: center; font-size: clamp(16px, calc(var(--fh) * .05), 28px); }
-  .ob2 .ob2-fill > .ob2-verdict { display: flex; flex-direction: column; overflow: hidden; }
-  .ob2 .ob2-fill .ob2-verdict-h { font-size: clamp(20px, calc(var(--fh) * .05), 28px); }
-  .ob2 .ob2-fill .ob2-verdict-line { font-size: clamp(14.5px, calc(var(--fh) * .034), 18px); }
-  .ob2 .ob2-fill .ob2-vtiles { flex: 1 1 0; grid-auto-rows: 1fr; min-height: 0; }
-  .ob2 .ob2-fill .ob2-vtile { justify-content: center; }
-  .ob2 .ob2-fill .ob2-vtile b, .ob2 .ob2-fill .ob2-vgoal b { font-size: clamp(17px, calc(var(--fh) * .042), 24px); }
   /* Round 10 bug: "On my feet so..." The value wraps to two lines now. */
   .ob2-vtile b, .ob2-vgoal b { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.15; }
   .ob2 .ob2-fill > .ob2-proj { grid-auto-rows: 1fr; }
   .ob2 .ob2-fill .ob2-proj > div { justify-content: center; }
   .ob2 .ob2-fill .ob2-proj b { font-size: clamp(34px, calc(var(--fh) * .2), 72px); }
   .ob2 .ob2-fill .ob2-proj span { font-size: clamp(13px, calc(var(--fh) * .045), 18px); }
-  .ob2 .ob2-fill > .ob2-lockphone { justify-content: center; }
-  .ob2 .ob2-fill .ob2-lock-time { font-size: clamp(64px, calc(var(--fh) * .22), 104px); }
   .ob2 .ob2-fill > .ob2-kitgrid { grid-auto-rows: 1fr; }
   .ob2 .ob2-fill .ob2-kittile { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 0; }
   .ob2 .ob2-fill .ob2-kitpic { width: 90%; height: calc(var(--fh) / 2 - 60px); min-height: 60px; }
@@ -5501,8 +5548,8 @@
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .42s; }
   /* The trial paywall, Strava's layout. */
   .ob2-tl3 { list-style: none; margin: 0; padding: 4px 4px 0; display: flex; flex-direction: column; }
-  .ob2-tl3-stop { position: relative; display: flex; gap: 14px; padding-bottom: 22px; flex: 1 1 auto; }
-  .ob2-tl3-stop:last-child { padding-bottom: 0; flex: 0 0 auto; }
+  .ob2-tl3-stop { position: relative; display: flex; gap: 14px; padding-bottom: 18px; }
+  .ob2-tl3-stop:last-child { padding-bottom: 0; }
   .ob2-tl3-stop::before { content: ""; position: absolute; left: 15px; top: 32px; bottom: 0; width: 3px; border-radius: 2px;
     background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 35%, transparent)); }
   .ob2-tl3-stop:last-child::before { display: none; }
@@ -5511,13 +5558,54 @@
   .ob2-tl3-stop.on .ob2-tl3-dot { background: var(--accent); color: var(--on-accent); }
   .ob2-tl3-stop b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -.01em; margin: 5px 0 3px; }
   .ob2-tl3-stop p { margin: 0; font-size: 14.5px; line-height: 1.45; color: var(--muted); }
-  .ob2 .ob2-fill .ob2-tl3-stop b { font-size: clamp(17px, calc(var(--fh) * .045), 21px); }
-  .ob2 .ob2-fill .ob2-tl3-stop p { font-size: clamp(14.5px, calc(var(--fh) * .036), 17px); }
-  .ob2-paycard { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 16px; margin: 0; }
-  .ob2-pc-h { font-size: 18px; font-weight: 800; text-align: center; letter-spacing: -.01em; }
-  .ob2-pc-note { margin: 0; font-size: 13px; line-height: 1.4; text-align: center; color: var(--text); opacity: .8; }
-  .ob2-paycard .ob2-terms { margin: 0; font-size: 11.5px; }
-  .ob2-paycard .paywall-legal { margin: 0; }
+  /* The price sits on the floor of the body, right over the button it
+     belongs to, however tall the phone. */
+  .ob2 > .ob2-body > .ob2-payhead { margin-top: auto; padding-top: 16px; text-align: center; }
+  .ob2-pc-h { display: block; font-size: 17px; font-weight: 800; text-align: center; letter-spacing: -.01em; }
+  .ob2-payhead .ob2-terms { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+  .ob2-payfine { padding: 12px 8px 0; display: flex; flex-direction: column; gap: 10px; }
+  .ob2-pc-note { margin: 0; font-size: 12.5px; line-height: 1.45; text-align: center; color: var(--muted); }
+  .ob2 .ob2-payfine .paywall-legal { margin: 0; font-size: 13px; }
+  .ob2-payfine .paywall-legal a { display: inline-block; padding: 6px 4px; }
+  /* The pact, see the commit screen. */
+  .ob2-pact { margin: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; text-align: left; }
+  .ob2-pact .hero-kicker { margin: 0; }
+  .ob2-pact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .ob2-pact-list li { display: flex; gap: 12px; align-items: flex-start; font-size: 15.5px; line-height: 1.4; font-weight: 600; color: var(--text); }
+  .ob2-pact-tick { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; margin-top: -1px;
+    border: 1.5px solid var(--border); color: transparent; transition: background-color .2s, border-color .2s, color .2s, transform .25s cubic-bezier(.34,1.56,.64,1); }
+  .ob2-pact-list li.on .ob2-pact-tick { background: var(--accent); border-color: var(--accent); color: var(--on-accent); transform: scale(1.08); }
+  .ob2-pact-seats { display: grid; gap: 10px; padding-top: 12px; border-top: 1px dashed var(--border); }
+  .ob2-seat { display: flex; gap: 10px; align-items: center; min-width: 0; }
+  .ob2-seat > span:last-child { display: grid; min-width: 0; }
+  .ob2-seat b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ob2-seat small { font-size: 12px; line-height: 1.3; color: var(--muted); }
+  .ob2-seat .av { width: 36px; height: 36px; font-size: 12px; margin: 0; border-width: 0; flex: none; }
+  .ob2-seat-empty { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800;
+    border: 1.5px dashed color-mix(in srgb, var(--partner) 55%, var(--border)); color: var(--partner); }
+  .ob2-seat.signed .ob2-seat-empty { border-style: solid; background: var(--partner); color: #fff; }
+  .ob2-pact.signed .ob2-seat.me small { color: var(--accent-ink, var(--accent)); font-weight: 700; }
+  .ob2-hold { position: relative; overflow: hidden; isolation: isolate; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+  /* The fill is the button's own green, darker, sweeping left to right under the label. */
+  .ob2-hold-fill { position: absolute; inset: 0; z-index: -1; transform-origin: 0 50%; transform: scaleX(var(--p, 0));
+    background: color-mix(in srgb, var(--on-accent) 22%, var(--accent)); }
+  .ob2-hold.held { transform: scale(.985); }
+  .ob2-hold.locked { animation: ob2Lock .45s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes ob2Lock { 40% { transform: scale(1.04); } }
+  /* His eyes charge with the hold: dim at rest, full lime when it locks,
+     then one bright flash and a ring off his face. */
+  .ob2-charging .rb-eye { opacity: calc(.22 + .78 * var(--charge, 0)); }
+  .ob2-charging .home-quip-av { position: relative; overflow: visible; }
+  .ob2-locked .rb-eye { opacity: 1; animation: ob2EyeFlash .6s ease-out 1; }
+  @keyframes ob2EyeFlash { 0%, 100% { filter: none; } 30% { filter: brightness(1.8) drop-shadow(0 0 30px var(--accent)); } }
+  .ob2-locked .home-quip-say { position: relative; }
+  .ob2-locked .home-quip-say::before { content: ""; position: absolute; left: 0; top: 0; width: 52px; height: 52px; border-radius: 50%;
+    border: 3px solid var(--accent); pointer-events: none; animation: ob2Ring .7s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes ob2Ring { from { opacity: .9; transform: scale(.6); } to { opacity: 0; transform: scale(2.6); } }
+  @media (prefers-reduced-motion: reduce) {
+    .ob2-hold.locked, .ob2-locked .rb-eye, .ob2-locked .home-quip-say::before { animation: none; }
+    .ob2-pact-tick { transition: none; }
+  }
   /* MacroFactor's pickers: wheels, a ruler, a unit switch. */
   .ob2-units { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--border); }
   .ob2-units button { font: inherit; font-size: 14px; font-weight: 700; border: 0; border-radius: 10px; padding: 10px 6px; background: transparent; color: var(--muted); cursor: pointer; transition: background .2s, color .2s; }
@@ -15608,7 +15696,12 @@ const ob2Ids = (d) => ob2Path(d).filter((e) => typeof e === "string");
 const ob2Live = (d) => ob2Ids(d).filter((id) => OB2[id] && (!OB2[id].when || OB2[id].when(d)));
 const ob2Go = (id, d) => renderOnboardStep("v2:" + id, d);
 
+/* Which way the run is moving, for the screen change: forward unless Back
+   said otherwise. Read once by renderObV2 and reset, so a jump (a summary
+   tile, a resume) slides in the forward direction. */
+let OB2_DIR = 1;
 function ob2Step(id, d, dir) {
+  OB2_DIR = dir < 0 ? -1 : 1;
   const live = ob2Live(d);
   const i = live.indexOf(id);
   const to = live[i + dir];
@@ -15721,8 +15814,65 @@ function renderObV2(id, d) {
     back: () => ob2Step(id, { ...d, _said: null }, -1),
     paint: (o) => ob2Paint(id, d, o),
   };
+  /* Mo, 2026-10-08: "almost everything should have a cool animation...
+     a seamless experience." The screen that is leaving is the same node
+     painting replaced (its canvases keep their last frame), held where it
+     was for a moment while the new one arrives; see ob2Handoff. */
+  const prev = ob.querySelector(":scope > .ob-step.ob2");
+  const prevBox = prev ? prev.getBoundingClientRect() : null;
+  const dir = OB2_DIR; OB2_DIR = 1;
   OB2[id].render(d, ui);
+  ob2Handoff(ob, prev, prevBox, dir);
   window.scrollTo(0, 0);
+}
+
+/* The one screen change every onboarding screen shares. The header and the
+   footer stay put (same chapter title, same Back and main button), his card
+   stays put and simply types his next line, and only the body moves: the old
+   one slides a little the way the run went and fades, the new one slides in
+   from the other side. Transform and opacity only, 380 ms, nothing that
+   makes the page lay out again. Reduced motion gets a straight cut. */
+const ob2Calm = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+/* A banner that becomes the thing it announced: one view transition with the
+   banner and its destination given the same name, so the browser morphs one
+   into the other while everything else crossfades. `change` makes the
+   destination exist; `to` finds it afterwards. No view transitions, or
+   reduced motion: just the change. */
+function ob2Morph(from, to, change, name = "ob2-card") {
+  if (ob2Calm() || !document.startViewTransition || !from) { change(); return; }
+  const root = document.documentElement;
+  from.style.viewTransitionName = name;
+  root.classList.add("ob2-vt-open");
+  let dest = null;
+  const vt = document.startViewTransition(() => {
+    from.style.viewTransitionName = "";
+    change();
+    dest = to();
+    if (dest) dest.style.viewTransitionName = name;
+  });
+  vt.finished.catch(() => {}).finally(() => {
+    root.classList.remove("ob2-vt-open");
+    if (dest) dest.style.viewTransitionName = "";
+  });
+}
+function ob2Handoff(ob, prev, box, dir) {
+  const next = ob.querySelector(":scope > .ob-step.ob2");
+  if (!next || next === prev) return;
+  if (!prev || !box || ob2Calm() || prev.classList.contains("ob2-lock") || next.classList.contains("ob2-lock")) return;
+  next.classList.add("ob2-enter", dir < 0 ? "ob2-back-dir" : "ob2-fwd-dir");
+  /* The old screen, ids stripped so nothing finds it by mistake, inert so
+     nothing can be tapped on it, fixed where it was on screen. */
+  prev.removeAttribute("id");
+  prev.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+  prev.inert = true;
+  prev.setAttribute("aria-hidden", "true");
+  prev.classList.add("ob2-leaving", dir < 0 ? "ob2-back-dir" : "ob2-fwd-dir");
+  Object.assign(prev.style, { position: "fixed", top: box.top + "px", left: box.left + "px", width: box.width + "px", height: box.height + "px", margin: "0" });
+  ob.appendChild(prev);
+  const drop = () => prev.remove();
+  prev.addEventListener("animationend", (e) => { if (e.target.classList?.contains("ob2-body")) drop(); });
+  setTimeout(drop, 500);
+  setTimeout(() => next.classList.remove("ob2-enter", "ob2-back-dir", "ob2-fwd-dir"), 520);
 }
 
 /* The frame every screen shares: back, the step count, his mute, Skip, the
@@ -15745,7 +15895,11 @@ function ob2Paint(id, d, o) {
     bar = `<div class="ob2-bar" aria-hidden="true">${Array.from({ length: OB2_CHAPTER_COUNT }, (_, i) => {
       const n = i + 1;
       const fill = n < ch ? 100 : n > ch ? 0 : Math.round((pos / (inCh.length + 1)) * 100);
-      return `<i><b style="width:${fill}%"></b></i>`;
+      /* The bar is drawn fresh with every screen, so it starts at the width
+         it had a moment ago and is let go to the new one below: the segment
+         grows (or shrinks on Back) instead of jumping. */
+      const was = n === ch && OB2_BAR.ch === ch ? OB2_BAR.fill : fill;
+      return `<i><b${n === ch ? ` data-to="${fill}"` : ""} style="width:${was}%"></b></i>`;
     }).join("")}</div>`;
   }
   const react = o.react === undefined ? d._said : o.react;
@@ -15753,6 +15907,7 @@ function ob2Paint(id, d, o) {
      its own way on in the screen (Nothing hurts, Keep it balanced, and so on). */
   const skipBtn = "<span></span>";
   const back = !(first || o.noBack);
+  const topBack = back && !o.cta;
   ob.innerHTML = `
     <div class="ob-step ob2${o.wide ? " ob-step-wide" : ""}">
       ${/* Round 4, Mo: "it doesn't really look like our app." So the header is
@@ -15769,7 +15924,11 @@ function ob2Paint(id, d, o) {
           </header>`
         : `${/* Mo, 2026-10-07: Back lives at the bottom beside Continue, so the
               header is the chapter name alone, truly centred (the back button
-              on the left had been pushing it right). */ ""}<div class="scr-head ob2-head ob2-head-c">
+              on the left had been pushing it right). Mo, 2026-10-08: a screen
+              with no main button in the footer does not get a lone Back
+              sitting down there by itself; its Back goes up here, top left,
+              out of the flow so the title stays dead centre. */ ""}<div class="scr-head ob2-head ob2-head-c">
+            ${topBack ? `<button type="button" class="ob2-back ob2-topback" id="ob2Back" aria-label="Back">${icon("chevronLeft", 20)}</button>` : ""}
             <div class="scr-title">${escapeHtml(OB2_CHAPTER_NAMES[ch] || "")}<small>${count}</small></div>
           </div>`}
       ${bar}
@@ -15794,7 +15953,6 @@ function ob2Paint(id, d, o) {
       <div class="ob2-foot">
         ${o.cta ? `<div class="ob2-navrow">${back ? `<button type="button" class="ob2-backbtn" id="ob2Back" aria-label="Back">${icon("chevronLeft", 22)}</button>` : ""}<button type="button" class="btn-primary" id="ob2Next"${o.ctaOff ? " disabled" : ""}${o.ctaHidden ? " hidden" : ""}>${escapeHtml(o.cta)}</button></div>` : ""}
         ${o.foot || ""}
-        ${!o.cta && back ? `<div class="ob2-navrow"><button type="button" class="ob2-backbtn" id="ob2Back" aria-label="Back">${icon("chevronLeft", 22)}</button></div>` : ""}
       </div>
     </div>`;
   if ($("ob2Back")) $("ob2Back").onclick = () => { ob2Cleanup(); closeBodyRegionPicker(); ob2Step(id, { ...d, _said: null }, -1); };
@@ -15802,8 +15960,14 @@ function ob2Paint(id, d, o) {
   if (o.host !== false && o.title) {
     ob2Type($("ob2Q"), o.title);
   }
+  const grow = ob.querySelector(".ob2-bar b[data-to]");
+  if (grow) {
+    OB2_BAR = { ch, fill: +grow.dataset.to };
+    requestAnimationFrame(() => requestAnimationFrame(() => { grow.style.width = grow.dataset.to + "%"; }));
+  } else OB2_BAR = { ch, fill: 0 };
   ob2Fill(ob);
 }
+let OB2_BAR = { ch: -1, fill: 0 };
 
 /* Round 10, Mo: "Everything is way too small. Make it fill up the gap."
    The screen's one visual is moved into a box that takes whatever the column
@@ -15815,8 +15979,12 @@ function ob2Paint(id, d, o) {
 const OB2_FILL_KINDS = [
   [".ob2-htrow", "htrow"], [".ob2-dob", "wheels"], [".ob2-weigh", "stretch"], [".ob2-htfig", "fig"], [".ob2-sexfig", "fig"], [".ob2-hurtfigs", "pair"], [".ob2-tastefigs", "pair"],
   [".ob2-tour-stage", "stage"], [".ob2-figstage", "stage"],
-  [".ob2-themes", "stretch"], [".ob2-duo", "stretch"], [".ob2-daysfill", "stretch"], [".ob2-minchips", "stretch"], [".ob2-verdict", "stretch"],
-  [".ob2-proj", "stretch"], [".ob2-lockphone", "stretch"], [".ob2-tl3", "stretch"], [".ob2-kitgrid", "stretch"],
+  [".ob2-themes", "stretch"], [".ob2-duo", "stretch"], [".ob2-daysfill", "stretch"], [".ob2-minchips", "stretch"],
+  [".ob2-proj", "stretch"], [".ob2-kitgrid", "stretch"],
+  /* Not here any more (Mo, 2026-10-08, "everything is cut off"): the
+     summary's verdict card, the trial timeline and the 6 pm lock screen. They
+     are text, and text stretched to fill a tall phone is tiles 180px high and
+     timeline stops a screen apart. They keep their own size now. */
   [".ob2-herobot", "bot"],
 ];
 function ob2Fill(ob) {
@@ -16129,13 +16297,91 @@ function ob2PayHTML(d) {
       ${t.free ? stop("calendar", t.end, "Your plan starts. Cancel anytime before.") : ""}
     </ol>`;
 }
+/* Hold to commit, see the commit screen. Progress p runs 0 to 1 over
+   HOLD_MS while a pointer is down and drains twice as fast when it lifts.
+   Everything it drives is a custom property or a class: the button's fill
+   (transform), the lines ticking in, his eyes (opacity). */
+const OB2_HOLD_MS = 1900;
+function ob2WireHold(ui, n) {
+  const btn = $("ob2Next"), pact = $("ob2Pact"), host = document.querySelector("#onboard .ob2-host");
+  if (!btn || !pact) return;
+  btn.classList.add("ob2-hold");
+  btn.innerHTML = `<span class="ob2-hold-fill" aria-hidden="true"></span><span class="ob2-hold-txt">Hold to commit</span>`;
+  btn.setAttribute("aria-label", "Commit to the pact");
+  host?.classList.add("ob2-charging");
+  const rows = [...pact.querySelectorAll(".ob2-pact-list li")];
+  let p = 0, down = false, last = 0, raf = 0, done = false, ticked = 0;
+  const set = () => {
+    btn.style.setProperty("--p", p.toFixed(3));
+    host?.style.setProperty("--charge", p.toFixed(3));
+    const k = Math.min(n, Math.floor(p * (n + 0.6)));
+    if (k !== ticked) {
+      if (k > ticked) buzz(12);
+      rows.forEach((r, i) => r.classList.toggle("on", i < k));
+      ticked = k;
+    }
+  };
+  const lock = () => {
+    if (done) return;
+    done = true; down = false; cancelAnimationFrame(raf);
+    p = 1; set();
+    rows.forEach((r) => r.classList.add("on"));
+    buzz([30, 50, 70]);
+    btn.classList.add("locked");
+    btn.querySelector(".ob2-hold-txt").textContent = "Locked in";
+    pact.classList.add("signed");
+    if ($("ob2PactMe")) $("ob2PactMe").textContent = "Signed, just now";
+    host?.classList.add("ob2-locked");
+    if ($("ob2Q")) ob2Type($("ob2Q"), "Locked in. I'm holding you to it.");
+    ob2Later(() => ui.next({ committed_at: new Date().toISOString() }), ob2Calm() ? 700 : 1500);
+  };
+  const tick = (t) => {
+    const dt = last ? t - last : 16; last = t;
+    p = Math.max(0, Math.min(1, p + (down ? dt / OB2_HOLD_MS : -2 * dt / OB2_HOLD_MS)));
+    set();
+    if (p >= 1) { lock(); return; }
+    if (down || p > 0) raf = requestAnimationFrame(tick);
+  };
+  const start = (e) => {
+    if (done || (e.button != null && e.button !== 0)) return;
+    e.preventDefault();
+    try { btn.setPointerCapture(e.pointerId); } catch { /* not every pointer can be captured */ }
+    down = true; last = 0; btn.classList.add("held");
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(tick);
+  };
+  const stop = () => { if (!down) return; down = false; btn.classList.remove("held"); };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", stop);
+  btn.addEventListener("pointercancel", stop);
+  btn.addEventListener("lostpointercapture", stop);
+  btn.addEventListener("contextmenu", (e) => e.preventDefault());
+  /* A click with no pointer behind it (detail 0) is Enter, Space or a
+     VoiceOver double tap: that is their press, and it signs. A tap from a
+     finger is a click with detail 1 and is the start of a hold, not a
+     signature. */
+  btn.onclick = (e) => { if (e.detail === 0) lock(); };
+  OB2_CLEANUP.push(() => cancelAnimationFrame(raf));
+}
+
+/* Mo, 2026-10-08: "I don't like where the back button is... copy just looks
+   weird down there." The button used to sit inside a card with four lines of
+   small print packed round it and a lone Back under the card. Now it is the
+   footer every other screen has, the square Back beside the main button,
+   with what the plan costs right above it and what Apple needs said right
+   below it, each with room to breathe. Every line is still on the screen:
+   the trial, the $7.99 a month, when the charge happens, and the Terms,
+   Privacy and Restore links Apple reviews for. */
+function ob2PayHead() {
+  const t = ob2Terms();
+  return `<div class="ob2-payhead">
+      <b class="ob2-pc-h" id="ob2PcH">${escapeHtml(t.free ? t.trial : "Unio Plus")}</b>
+      <p class="ob2-terms" id="ob2Terms">${escapeHtml(t.fine)}</p>
+    </div>`;
+}
 function ob2PayFoot() {
   const t = ob2Terms();
-  return `<div class="card ob2-paycard">
-      <b class="ob2-pc-h" id="ob2PcH">${escapeHtml(t.free ? t.trial : "Unio Plus")}</b>
-      <button type="button" class="btn-primary" id="ob2Next">${escapeHtml(t.cta)}</button>
+  return `<div class="ob2-payfine">
       <p class="ob2-pc-note" id="ob2PcNote"${t.free ? "" : " hidden"}>You won't be charged until ${escapeHtml(t.end)}. Cancel anytime up to 24 hours before it ends.</p>
-      <p class="ob2-terms" id="ob2Terms">${escapeHtml(t.fine)}</p>
       <p class="paywall-legal ob2-legal">
         <a href="#" data-policy="terms.html">Terms</a> &middot; <a href="#" data-policy="privacy.html">Privacy</a> &middot;
         <a href="#" id="ob2Restore">Restore</a>
@@ -16599,7 +16845,17 @@ const OB2 = {
         </button>
         <p class="ob2-lock-hint">Tap the notification</p>
       </div>`;
-    $("ob2Ping").onclick = () => { obTrack("ping", "open"); ui.next({ pinged: true }); };
+    /* Mo, 2026-10-08: "a cooler animation from the first [screen] to
+       actually opening up the app." The notification he taps becomes his
+       card on the next screen: one view transition, the card named on both
+       sides so the browser morphs it from the banner's place and size to
+       the card's, while the lock screen sinks back and the app rises
+       through it, the way iOS opens an app from a banner. Without view
+       transitions, or with reduced motion, it is the plain step. */
+    $("ob2Ping").onclick = () => {
+      obTrack("ping", "open");
+      ob2Morph($("ob2Ping"), () => document.querySelector("#onboard .ob2-host"), () => ui.next({ pinged: true }));
+    };
   } },
 
   /* Unio says hello, in text, and nothing else on the screen asks anything.
@@ -16667,31 +16923,99 @@ const OB2 = {
   /* Taste 3, your body. The Rive figure lit by the set from taste 2, the
      muscles from the exercise library the Body tab reads, and the working
      muscles line the session shows under the figure. */
+  /* Mo, 2026-10-08: instead of the lit-up figures after a sample set nobody
+     does any more, "the notification out of nowhere, that hey... you got
+     invited for a live workout. And then boom... a sort of a simulation...
+     this looks like our app." So: a beat in, the invite drops in the way it
+     does on a lock screen, and tapping it (or a moment later on its own) it
+     opens into the app's own train-together strip (tgHudHTML, the same
+     builder the live workout draws) and the app's own body figures, on
+     sample numbers, played once: they log a set, you log one and your
+     muscles light, they log another. Nothing here touches a session, the
+     live presence row or a Live Activity: the real session screen
+     broadcasts the moment it renders (beatLive, pushLiveActivity), so it
+     is these parts of it, not all of it. Continue works from the first
+     frame; reduced motion gets the end state at once. */
   taste3: { ch: 4, render(d, ui) {
     const ex = d.taste_ex || "Push-Up";
+    const them = (d.partner?.name || "").split(" ")[0];
+    const who = them ? escapeHtml(them) : "Partner";
+    const said = them ? `${them}'s live. No pressure. Okay, a little pressure.` : "Your partner's live. No pressure. Okay, a little pressure.";
     ui.paint({
-      title: "That's what that set worked. Every set you log lights you up like this.",
-      body: `${ob2Tag("Your sample set")}
-        <div class="bi-figures ob2-tastefigs" aria-hidden="true">
-          <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Front"></canvas></div>
-          <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Back"></canvas></div>
-        </div>
-        <div class="card ob2-kcard">${workingMusclesHTML(ex, { who: "me", size: "sm", heading: true })}</div>`,
+      title: "Picture a Tuesday. You're about to skip leg day, and then...",
+      body: `<div class="ob2-livebox" id="ob2LiveBox">
+          <button type="button" class="ob2-notif ob2-livenotif" id="ob2LiveNotif">
+            <img class="ob2-notif-icon" src="icon-192.png" alt="" />
+            <span class="ob2-notif-txt">
+              <span class="ob2-notif-row"><b>UNIO</b><span>now</span></span>
+              <span class="ob2-notif-title">${them ? escapeHtml(them) : "Your partner"} invited you to a live workout</span>
+              <span class="ob2-notif-body">Same workout, same time. Tap to join.</span>
+            </span>
+          </button>
+          <div class="card ob2-livecard" id="ob2LiveCard">
+            <div class="ob2-live-tag"><span class="rec-dot"></span>Live together</div>
+            <div class="tg-hud ob2-livehud"><div class="tg-hud-body" id="ob2LiveHud"></div><div class="tg-callout" id="ob2LiveCallout" aria-live="polite"></div></div>
+          </div>
+          <div class="bi-figures ob2-tastefigs ob2-livepart" aria-hidden="true">
+            <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Front"></canvas></div>
+            <div class="bi-fig"><canvas class="bi-canvas" id="ob2T3Back"></canvas></div>
+          </div>
+        </div>`,
       cta: "Continue", onNext: () => ui.next(),
     });
+    const box = $("ob2LiveBox");
+    /* The sample: one exercise of three sets, three exercises in all. */
+    const st = { mine: 0, theirs: [], on: null };
+    let mineAv = "", theirAv = "";
+    const draw = () => {
+      if (!$("ob2LiveHud")) return;
+      $("ob2LiveHud").innerHTML = tgHudHTML({
+        mineDone: st.mine, total: 9, theirDone: st.theirs.length, theirTotal: 9, own: false, first: who,
+        mineAv, theirAv, ex: { name: ex, sets: 3 }, onName: st.on, theirsHere: st.theirs,
+      });
+    };
+    Promise.all([avatarHTML(MY_EMAIL, ob2Name(d) || ME || "You", "me", "div"), avatarHTML(null, them || "Partner", "them", "div")])
+      .then(([a, b]) => { mineAv = a; theirAv = b; draw(); }).catch(() => {});
+    draw();
+    let lit = {};
     const sex = d.sex === "Female" ? "Female" : "Male";
     Promise.all([ensureRiveBodyModule(), ob2MusclesFor(ex)]).then(([mod, groups]) => {
       if (!$("ob2T3Front")) return;
-      const lv = {};
-      for (const g of groups.primary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lv[m] = 3;
-      for (const g of groups.secondary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lv[m] = Math.max(lv[m] || 0, 1);
+      for (const g of groups.primary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lit[m] = 3;
+      for (const g of groups.secondary) for (const m of mod.APP_GROUP_TO_RIVE_MUSCLES[g] || []) lit[m] = Math.max(lit[m] || 0, 1);
       OB2_TASTE_FIGS = ["Front", "Back"].map((view) => mod.createBodyHeatmap({
         canvas: $(view === "Front" ? "ob2T3Front" : "ob2T3Back"),
         artboardName: `${sex}-${view}`, palette: mod.APP_HEAT_PALETTE, intensities: {},
-        onLoad: () => OB2_TASTE_FIGS.forEach((c) => c?.setIntensities({ ...lv })),
+        onLoad: () => { if (st.mine) OB2_TASTE_FIGS.forEach((c) => c?.setIntensities({ ...lit })); },
       }));
       OB2_CLEANUP.push(() => { OB2_TASTE_FIGS.forEach((c) => c?.destroy()); OB2_TASTE_FIGS = []; });
     }).catch((e) => console.warn("onboarding: the body did not load", e));
+
+    const theirSet = (i) => {
+      st.theirs.push({ set_idx: i, reps: 12 }); st.on = ex; draw();
+      const c = $("ob2LiveCallout");
+      if (c) { c.innerHTML = `<b>${who}</b> &middot; ${escapeHtml(ex)} set ${i + 1}, 12 reps`; tgFlashCallout(c); }
+    };
+    const mySet = () => { st.mine += 1; draw(); OB2_TASTE_FIGS.forEach((c) => c?.setIntensities({ ...lit })); };
+    let opened = false;
+    const open = () => {
+      if (opened || !$("ob2LiveBox")) return;
+      opened = true;
+      ob2Morph($("ob2LiveNotif"), () => $("ob2LiveCard"), () => box.classList.add("on"), "ob2-live");
+      ob2Type($("ob2Q"), said);
+      ob2Later(() => theirSet(0), 900);
+      ob2Later(mySet, 2100);
+      ob2Later(() => theirSet(1), 3300);
+    };
+    if (ob2Calm()) {
+      box.classList.add("on", "calm");
+      opened = true;
+      $("ob2Q").textContent = said;
+      theirSet(0); st.mine = 1; theirSet(1);
+      return;
+    }
+    $("ob2LiveNotif").onclick = open;
+    ob2Later(open, 4200);
   } },
 
   /* Required, no Skip, for the reason the old name step gives: ME is read as
@@ -17760,27 +18084,53 @@ build: { ch: 5, render(d, ui) {
     });
   } },
 
-  /* The promise, the old run's commit screen word for word: three lines and
-     a button that says what it means. Recorded as committed_at, the column
-     the old run writes. */
+  /* The pact. Mo, 2026-10-08: "need this to just be better... really lock
+     that in." So the promise is theirs, written from their own answers (the
+     days, the goal, the partner), and it is sealed by holding the button,
+     the way Alma and Life Reset do it: about two seconds, a fill sweeping
+     the button, each line ticking in as it passes, his eyes charging from
+     dim to full. Let go early and it drains back. At the top it locks: his
+     eyes flash, a ring bursts off him and he says so, then it moves on.
+     Keyboard and VoiceOver activate it with a plain press (a click with no
+     pointer behind it), so nobody has to hold anything they cannot.
+     committed_at is written exactly as before. */
   commit: { ch: 5, render(d, ui) {
     const week = obDaysText(d, d.days_per_week || 3);
+    const goal = d.goal_bubble === "consistent" || !ob2GoalTitle(d.goal_bubble)
+      ? "I'm here to make this a habit. Slow weeks included."
+      : `I'm here to ${ob2GoalTitle(d.goal_bubble).toLowerCase()}. Slow weeks included.`;
+    const lines = [
+      `I show up ${week}, even the days I don't feel like it.`,
+      goal,
+      "I say when it's too much, instead of quietly stopping.",
+    ];
+    /* Their half, said only as far as we know it. */
+    const pName = d.partner?.name ? d.partner.name.split(" ")[0] : null;
+    const seat = d.path === "b" && pName
+      ? (d.partner?.signed ? "Already signed theirs" : "In. Their pact is their own.")
+      : "Signs theirs when they join.";
+    const me = ob2Name(d) || "You";
     ui.paint({
       title: `${ob2Name(d) || "Right"}, this only works if you turn up.`,
-      body: `${ob2HeroBot(164)}<div class="ob-commit ob2-rowcard">
-          <div class="ob-commit-row">${icon("check", 16)}<span>I will show up ${escapeHtml(week)}, even the days I do not feel like it.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I will say when it is too much, instead of quietly stopping.</span></div>
-          <div class="ob-commit-row">${icon("check", 16)}<span>I am allowed a bad week without it being over.</span></div>
+      body: `<div class="card ob2-pact" id="ob2Pact">
+          <div class="hero-kicker">The pact</div>
+          <ol class="ob2-pact-list">${lines.map((t) => `<li><span class="ob2-pact-tick">${icon("check", 14)}</span><span>${escapeHtml(t)}</span></li>`).join("")}</ol>
+          <div class="ob2-pact-seats">
+            <div class="ob2-seat me"><span class="av me">${escapeHtml(initials(me))}</span><span><b>${escapeHtml(me)}</b><small id="ob2PactMe">Hold below to sign</small></span></div>
+            <div class="ob2-seat them${d.partner?.signed ? " signed" : ""}"><span class="ob2-seat-empty">${pName ? escapeHtml(initials(pName)) : icon("plus", 16)}</span><span><b>${escapeHtml(pName || "Your partner")}</b><small>${escapeHtml(seat)}</small></span></div>
+          </div>
         </div>`,
-      cta: "I'm committing to this", onNext: () => ui.next({ committed_at: new Date().toISOString() }),
+      cta: "Hold to commit",
     });
+    ob2WireHold(ui, lines.length);
   } },
 
   /* The paywall, one page: see ob2WirePrice. */
   pay2: { ch: 5, render(d, ui) {
     ui.paint({
       title: ob2Terms().free ? "We're in beta. Your first month's on me." : "One plan. Covers you and your partner. Bargain.",
-      body: ob2PayHTML(d),
+      body: ob2PayHTML(d) + ob2PayHead(),
+      cta: ob2Terms().cta,
       foot: ob2PayFoot(),
     });
     ob2WirePrice(ui, d);
@@ -17806,7 +18156,8 @@ build: { ch: 5, render(d, ui) {
     }
     ui.paint({
       title: ob2Terms().free ? "We're in beta. Your first month's on me." : `One plan. Covers you and ${ob2Partner(d)}. Bargain.`,
-      body: ob2PayHTML(d),
+      body: ob2PayHTML(d) + ob2PayHead(),
+      cta: ob2Terms().cta,
       foot: ob2PayFoot(),
     });
     ob2WirePrice(ui, d);
@@ -17836,6 +18187,8 @@ async function ob2LoadPartner(d) {
       p.goal_bubble = prof.goal_bubble || null;
       p.days = Number.isFinite(prof.challenge_target) ? prof.challenge_target : null;
       p.minutes = Number.isFinite(prof.session_minutes) ? prof.session_minutes : null;
+      /* For the pact's empty seat: only "already signed" when their row says so. */
+      p.signed = !!prof.committed_at;
     }
     const from = todayStr(), to = shiftDate(from, 6);
     const { data: rows } = await sb.from("ai_workouts").select("*").eq("email", p.email)
@@ -19352,7 +19705,18 @@ function switchTab(tab) {
   // no navigation is worse than losing an overlay's state.
   closeAllOverlays();
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
-  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("hidden", p.id !== "tab-" + tab));
+  document.querySelectorAll(".tab-panel").forEach((p) => {
+    const on = p.id === "tab-" + tab;
+    /* A tab that was not showing fades in rather than snapping on (Mo,
+       2026-10-08, the same feel as onboarding). Opacity only: a transform
+       on the panel would make every position: fixed thing inside it (the
+       session bar, sheets) ride along for the 220 ms. */
+    if (on && p.classList.contains("hidden") && !window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+      p.classList.remove("tab-in"); void p.offsetWidth; p.classList.add("tab-in");
+      p.addEventListener("animationend", () => p.classList.remove("tab-in"), { once: true });
+    }
+    p.classList.toggle("hidden", !on);
+  });
   /* Before anything else renders: the figures cannot be paused, only removed,
      and leaving them up is what made every other tab slow. See
      destroyBodyFigures. */
@@ -21963,6 +22327,22 @@ async function tgRenderHud() {
   const ex = own ? (theirList.find((e) => last && tgSame(e.name, last.exercise_name)) || theirList[0]) : exs[SESSION.exerciseIndex];
   const first = tgPartnerFirst();
   const theirsHere = ex ? theirs.filter((s) => tgSame(s.exercise_name, ex.name)) : [];
+  const mineAv = await avatarHTML(MY_EMAIL, ME, "me", "div");
+  const theirAv = await avatarHTML(partner, partnerName(), "them", "div");
+  if (token !== TG_RENDER) return;
+  const doneBoth = TG.host_done_at || TG.guest_done_at;
+  root.classList.remove("hidden");
+  hud.innerHTML = tgHudHTML({
+    mineDone, total, theirDone: theirs.length, theirTotal, own, first, mineAv, theirAv, ex,
+    onName: last?.exercise_name || null, theirsHere,
+    finished: !!(doneBoth && !TG[tgAmHost() ? "host_done_at" : "guest_done_at"]),
+  });
+}
+
+/* The strip itself, from plain numbers, so onboarding's live workout demo
+   draws the very same strip on its sample numbers rather than a picture of
+   it. `first` is already escaped (tgFirst). */
+function tgHudHTML({ mineDone, total, theirDone, theirTotal, own, first, mineAv, theirAv, ex, onName, theirsHere = [], finished = false }) {
   const chips = ex ? Array.from({ length: ex.sets || 3 }, (_, i) => {
     const s = theirsHere.find((x) => x.set_idx === i);
     return s ? `<span class="tg-chip done">${s.weight != null ? `${Number(s.weight)}×` : ""}${s.reps ?? "✓"}</span>` : `<span class="tg-chip"></span>`;
@@ -21971,22 +22351,17 @@ async function tgRenderHud() {
     const c = 2 * Math.PI * 25;
     return `<svg class="tg-ring" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="25"/><circle class="fill" cx="28" cy="28" r="25" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - Math.min(1, frac))).toFixed(1)}"/></svg>`;
   };
-  const mineAv = await avatarHTML(MY_EMAIL, ME, "me", "div");
-  const theirAv = await avatarHTML(partner, partnerName(), "them", "div");
-  if (token !== TG_RENDER) return;
-  const doneBoth = TG.host_done_at || TG.guest_done_at;
-  root.classList.remove("hidden");
-  hud.innerHTML = `
+  return `
     <div class="tg-hud-row">
       <div class="tg-p me">${ring(mineDone / total)}${mineAv}<span><b>You</b>${mineDone}/${total} sets</span></div>
       <span class="tg-vs">${own ? "side by side" : "together"}</span>
-      <div class="tg-p them"><span><b>${first}</b>${theirs.length}/${theirTotal} sets</span>${ring(theirs.length / theirTotal)}${theirAv}</div>
+      <div class="tg-p them"><span><b>${first}</b>${theirDone}/${theirTotal} sets</span>${ring(theirDone / theirTotal)}${theirAv}</div>
     </div>
     ${ex ? `<div class="tg-lane">
-      <span class="tg-lane-who">${last ? `${first} is on <b>${escapeHtml(last.exercise_name)}</b>` : `${first} is warming up`}</span>
+      <span class="tg-lane-who">${onName ? `${first} is on <b>${escapeHtml(onName)}</b>` : `${first} is warming up`}</span>
       <span class="tg-chips" aria-label="${first}'s sets on ${escapeHtml(ex.name)}">${chips}</span>
     </div>` : ""}
-    ${doneBoth && !TG[tgAmHost() ? "host_done_at" : "guest_done_at"] ? `<div class="tg-lane"><span class="tg-lane-who"><b>${first} finished.</b> Bring it home.</span></div>` : ""}`;
+    ${finished ? `<div class="tg-lane"><span class="tg-lane-who"><b>${first} finished.</b> Bring it home.</span></div>` : ""}`;
 }
 
 let TG_CALLOUT_T = 0;
@@ -22001,8 +22376,11 @@ function tgCallout(set) {
   box.innerHTML = allIn
     ? `<b>${first} finished ${escapeHtml(set.exercise_name)}</b>`
     : `<b>${first}</b> · ${escapeHtml(set.exercise_name)} set ${set.set_idx + 1}, ${load}`;
-  box.classList.remove("show"); void box.offsetWidth; box.classList.add("show");
+  tgFlashCallout(box);
   sfxPlay("restStart");
+}
+function tgFlashCallout(box) {
+  box.classList.remove("show"); void box.offsetWidth; box.classList.add("show");
   clearTimeout(TG_CALLOUT_T);
   TG_CALLOUT_T = setTimeout(() => box.classList.remove("show"), 3400);
 }
