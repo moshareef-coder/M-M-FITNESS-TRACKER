@@ -105,7 +105,18 @@ const ALIASES = {
 /* `trainingId` is optional and only matters for the two names that differ by
    library. A caller that knows it is rendering a calisthenics day gets the
    bodyweight Bulgarian split squat; everybody else gets the dumbbell one. */
+/* Taken out of the app, not deleted. Mo, 2026-10-07, after the first Animation
+   Studio review: the ones flagged there come out until they are redone, and the
+   exercise shows its old icon meanwhile (a miss is quiet, see hasMove). Their
+   data stays in the move files, so the studio and the validator still see
+   them, and putting one back is deleting its name here. */
+export const REMOVED_MOVES = new Set([
+  "90/90 Hip Switch", "Archer Pull-Up", "Arm Circles", "Band Shoulder External Rotation",
+  "Brisk Walk", "Clamshell", "Diamond Push-Up", "One-Arm Pull-Up", "Revolved Chair Pose",
+  "Russian Twist", "Suitcase Carry", "Upper Trap Stretch",
+]);
 export const moveFor = (name, trainingId = null) => {
+  if (REMOVED_MOVES.has(name) || REMOVED_MOVES.has(ALIASES[name])) return null;
   if (trainingId && MOVES_BY_LIBRARY[trainingId]) {
     const own = MOVES_BY_LIBRARY[trainingId][name] || MOVES_BY_LIBRARY[trainingId][ALIASES[name]];
     if (own) return own;

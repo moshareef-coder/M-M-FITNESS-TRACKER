@@ -377,21 +377,8 @@ const TORSO_TWISTS = {
   breath: 0.25,
   feet: { R: { ang: 15, len: 0.42, w: 1.32 }, L: { ang: 15, len: 0.42, w: 1.32 } },
   keys: [
-    { // turned left: ribs rotated, the right arm wrapped across the waist and
-      // the left one trailing behind
-      t: 0,
-      root: { x: 70, y: 61.6, rot: 0 },
-      joints: { spineTwist: -42, neckTwist: -18, spine: 0, neck: 0,
-                shoulderR: -48, shoulderL: 18, elbowR: 30, elbowL: 50,
-                wristR: 8, wristL: 8, hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
-    },
-    { // turned right, the mirror of it, hips and feet unmoved
-      t: 1,
-      root: { x: 70, y: 61.6, rot: 0 },
-      joints: { spineTwist: 42, neckTwist: 18, spine: 0, neck: 0,
-                shoulderR: 18, shoulderL: -48, elbowR: 50, elbowL: 30,
-                wristR: 8, wristL: 8, hipR: 5, hipL: 5, kneeR: 3, kneeL: 3 },
-    },
+    {"joints":{"elbowL":21,"elbowR":0,"hipL":5,"hipR":5,"kneeL":3,"kneeR":3,"neck":0,"neckTwist":-18,"shoulderAbdR":-22,"shoulderL":25,"shoulderR":21,"shoulderRotL":-91,"shoulderRotR":53,"spine":0,"spineTwist":-42,"wristL":8,"wristR":8},"root":{"rot":0,"x":70,"y":61.6},"t":0},
+    {"joints":{"elbowL":30,"elbowR":50,"hipL":5,"hipR":5,"kneeL":3,"kneeR":3,"neck":0,"neckTwist":18,"shoulderAbdR":-9,"shoulderL":-48,"shoulderR":23,"spine":0,"spineTwist":42,"wristL":8,"wristR":8},"root":{"rot":0,"x":70,"y":61.6},"t":1},
   ],
 };
 
@@ -1451,18 +1438,8 @@ const KNEES_TO_CHEST_STRETCH = {
   breathRate: 0.8,
   props: [{ type: "mat", x: 8, w: 120 }],
   keys: [
-    { // settled, knees in, back flat
-      t: 0,
-      root: { x: 76, y: 110.5, rot: -90 },
-      joints: { spine: 0, neck: 6, hipR: -112, hipL: -108, kneeR: 100, kneeL: 104 },
-      ik: { wristR: { x: 62.0, y: 90.0, bend: 1 }, wristL: { x: 58.0, y: 94.0, bend: 1 } },
-    },
-    { // drawn a touch closer on the exhale
-      t: 1,
-      root: { x: 76, y: 111.1, rot: -90 },
-      joints: { spine: 2, neck: 8, hipR: -118, hipL: -114, kneeR: 104, kneeL: 108 },
-      ik: { wristR: { x: 60.0, y: 88.0, bend: 1 }, wristL: { x: 56.0, y: 92.0, bend: 1 } },
-    },
+    {"ik":{"wristL":{"bend":1,"x":58,"y":94},"wristR":{"bend":1,"x":62,"y":90}},"joints":{"hipAbdL":25,"hipAbdR":37,"hipL":-63,"hipR":-60,"kneeL":104,"kneeR":100,"neck":6,"spine":0},"root":{"rot":-90,"x":76,"y":110.5},"t":0},
+    {"ik":{"wristL":{"bend":1,"x":68.1,"y":87.9},"wristR":{"bend":1,"x":71.8,"y":90.1}},"joints":{"hipAbdL":-9,"hipAbdR":27,"hipL":-72,"hipR":-71,"kneeL":108,"kneeR":104,"neck":8,"spine":2},"root":{"rot":-90,"x":76,"y":111.1},"t":1},
   ],
 };
 
@@ -1642,24 +1619,8 @@ const STANDING_HAMSTRING_STRETCH = {
   breath: 1.0,
   breathRate: 0.85,
   keys: [
-    { // settled into the hinge, front leg long, back flat
-      t: 0,
-      root: { x: 62, y: 66, rot: 10 },
-      joints: { spine: 38, neck: -12, hipR: 20, kneeR: 2, ankleR: 44 },
-      ik: {
-        ankleL: { x: 56, y: 113.6, bend: -1 },
-        wristR: { x: 90.0, y: 82.0, bend: 1 }, wristL: { x: 85.0, y: 84.0, bend: 1 },
-      },
-    },
-    { // hinges a degree further on the exhale, spine still flat
-      t: 1,
-      root: { x: 61, y: 67, rot: 12 },
-      joints: { spine: 42, neck: -12, hipR: 20, kneeR: 1, ankleR: 46 },
-      ik: {
-        ankleL: { x: 56, y: 113.6, bend: -1 },
-        wristR: { x: 90.2, y: 86.0, bend: 1 }, wristL: { x: 85.2, y: 88.0, bend: 1 },
-      },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":56,"y":113.6},"wristL":{"bend":1,"x":84.9,"y":99.8},"wristR":{"bend":1,"x":80.9,"y":106.5}},"joints":{"ankleR":44,"hipR":7,"kneeR":34,"neck":-12,"spine":58},"root":{"rot":28,"x":62,"y":66},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":56,"y":113.6},"wristL":{"bend":1,"x":85.2,"y":88},"wristR":{"bend":1,"x":90.2,"y":86}},"joints":{"ankleR":46,"hipR":20,"kneeR":1,"neck":-12,"spine":42},"root":{"rot":12,"x":61,"y":67},"t":1},
   ],
 };
 
@@ -1739,24 +1700,8 @@ const BENT_KNEE_CALF_STRETCH = {
   breathRate: 0.85,
   props: [{ type: "wall", x: 116, w: 22 }],
   keys: [
-    { // settled, back knee bent, heel still down
-      t: 0,
-      root: { x: 72, y: 67, rot: 0 },
-      joints: { spine: 14, neck: -8 },
-      ik: {
-        ankleR: { x: 89.7, y: 115, bend: -1 }, ankleL: { x: 47.8, y: 119.4, bend: -1 },
-        wristR: { x: 113, y: 46, bend: 1 }, wristL: { x: 106.9, y: 44.9, bend: 1 },
-      },
-    },
-    { // sinks a little further into the back knee on the exhale
-      t: 1,
-      root: { x: 73, y: 69, rot: 0 },
-      joints: { spine: 14, neck: -9, hipR: 0, hipL: 0, hipAbdR: 0, hipAbdL: 0 },
-      ik: {
-        ankleR: { x: 92.2, y: 115.2, bend: -1 }, ankleL: { x: 47.6, y: 117.7, bend: -1 },
-        wristR: { x: 113, y: 46, bend: 1 }, wristL: { x: 108.3, y: 43.7, bend: 1 },
-      },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":47.8,"y":119.4},"ankleR":{"bend":-1,"pole":[-0.188,-0.664,0.724],"x":87.6,"y":116.6},"wristL":{"bend":1,"x":106.9,"y":44.9},"wristR":{"bend":1,"x":113,"y":46}},"joints":{"neck":-8,"spine":14},"root":{"rot":0,"x":72,"y":67},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":47.6,"y":117.7},"ankleR":{"bend":-1,"x":92.2,"y":115.2},"wristL":{"bend":1,"x":108.3,"y":43.7},"wristR":{"bend":1,"x":113,"y":46}},"joints":{"hipAbdL":0,"hipAbdR":0,"hipL":0,"hipR":0,"neck":-9,"spine":14},"root":{"rot":0,"x":73,"y":69},"t":1},
   ],
 };
 
@@ -1856,24 +1801,8 @@ const DEEP_SQUAT_HOLD = {
   // this one is "as low as you can" with the heels down.
   fit: { k: 1.16, dy: -10 },
   keys: [
-    { // settled at the bottom, heels down, chest tall between the knees
-      t: 0,
-      root: { x: 52, y: 93, rot: 10 },
-      joints: { spine: 11, neck: -6 },
-      ik: {
-        ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 },
-        wristR: { x: 76.5, y: 73.0, bend: 1 }, wristL: { x: 72.5, y: 75.0, bend: 1 },
-      },
-    },
-    { // sinks a fraction on the exhale, heels still down, chest still up
-      t: 1,
-      root: { x: 51, y: 95, rot: 12 },
-      joints: { spine: 13, neck: -7 },
-      ik: {
-        ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 },
-        wristR: { x: 76.6, y: 75.0, bend: 1 }, wristL: { x: 72.6, y: 77.0, bend: 1 },
-      },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":63,"y":113.6},"ankleR":{"bend":-1,"x":68,"y":113.6},"wristL":{"bend":1,"x":72.5,"y":75},"wristR":{"bend":1,"x":76.5,"y":73}},"joints":{"neck":-6,"spine":11},"root":{"rot":10,"x":56,"y":85.3},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":63,"y":113.6},"ankleR":{"bend":-1,"x":68,"y":113.6},"wristL":{"bend":1,"x":72.6,"y":77},"wristR":{"bend":1,"x":76.6,"y":75}},"joints":{"neck":-7,"spine":13},"root":{"rot":12,"x":51,"y":95},"t":1},
   ],
 };
 
@@ -1891,18 +1820,8 @@ const COSSACK_SQUAT = {
   fit: { k: 0.92, dy: 2 },
   feet: { R: { ang: 26, len: 0.38, w: 1.35 }, L: { ang: 150, len: 0.9, w: 1 } },
   keys: [
-    { // standing wide, before the shift
-      t: 0,
-      root: { x: 56, y: 64, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 16, elbowR: 22, shoulderL: 16, elbowL: 22 },
-      ik: { ankleR: { x: 86, y: 113.6, bend: -1 }, ankleL: { x: 14, y: 113.6, bend: -1 } },
-    },
-    { // sunk over the bent leg, other leg long with the toes up
-      t: 1,
-      root: { x: 56, y: 86, rot: 4 },
-      joints: { spine: 6, neck: -4, shoulderR: 34, elbowR: 46, shoulderL: 32, elbowL: 46 },
-      ik: { ankleR: { x: 86, y: 113.6, bend: -1 }, ankleL: { x: 8, y: 112, bend: -1 } },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":14,"y":113.6},"ankleR":{"bend":-1,"x":86,"y":113.6}},"joints":{"elbowL":22,"elbowR":22,"neck":0,"shoulderL":16,"shoulderR":16,"spine":0},"root":{"rot":0,"x":61.8,"y":85.8},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"pole":[0.157,-0.342,0.926],"x":7.3,"y":111.6},"ankleR":{"bend":-1,"x":86,"y":113.6}},"joints":{"elbowL":46,"elbowR":46,"neck":-4,"shoulderL":32,"shoulderR":34,"spine":6},"root":{"rot":4,"x":63.7,"y":102.8},"t":1},
   ],
 };
 
@@ -2087,18 +2006,8 @@ const CHIN_TUCKS = {
   breath: 0.3,
   breathRate: 0.9,
   keys: [
-    { // released, head forward of the shoulders
-      t: 0,
-      root: { x: 66, y: 61.6, rot: 0 },
-      joints: { spine: 10, neck: -13, shoulderR: 4, elbowR: 12, shoulderL: 2, elbowL: 14 },
-      ik: { ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 } },
-    },
-    { // chin slides back and down, back of the neck long
-      t: 1,
-      root: { x: 65, y: 61.6, rot: 0 },
-      joints: { spine: -2, neck: 11, shoulderR: 4, elbowR: 12, shoulderL: 2, elbowL: 14 },
-      ik: { ankleR: { x: 68, y: 113.6, bend: -1 }, ankleL: { x: 63, y: 113.6, bend: -1 } },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":63,"y":113.6},"ankleR":{"bend":-1,"x":68,"y":113.6}},"joints":{"elbowL":14,"elbowR":12,"neck":37,"shoulderL":2,"shoulderR":4,"spine":0},"root":{"rot":0,"x":66,"y":61.6},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":63,"y":113.6},"ankleR":{"bend":-1,"x":68,"y":113.6}},"joints":{"elbowL":14,"elbowR":12,"neck":11,"shoulderL":2,"shoulderR":4,"spine":-2},"root":{"rot":0,"x":65,"y":61.6},"t":1},
   ],
 };
 
@@ -2122,18 +2031,8 @@ const PRONE_SCORPION_STRETCH = {
   fit: { k: 0.82, dy: 4 },
   props: [{ type: "mat", top: true, x: 2, y: -16, w: 136, h: 134 }],
   keys: [
-    { // lying long, arms wide
-      t: 0,
-      root: { x: 70, y: 54, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 92, shoulderL: 92, elbowR: 8, elbowL: 8,
-                hipR: 4, hipL: 4, kneeR: 4, kneeL: 4 },
-    },
-    { // one foot reaches across toward the opposite hand, chest stays down
-      t: 1,
-      root: { x: 70, y: 54, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: 92, shoulderL: 92, elbowR: 8, elbowL: 8,
-                hipR: -52, hipL: 4, kneeR: 78, kneeL: 4 },
-    },
+    {"joints":{"elbowL":8,"elbowR":8,"hipL":4,"hipR":4,"kneeL":4,"kneeR":4,"neck":0,"shoulderL":92,"shoulderR":92,"spine":0},"root":{"rot":0,"x":70,"y":54},"t":0},
+    {"joints":{"elbowL":8,"elbowR":8,"hipL":4,"hipR":-59,"kneeL":4,"kneeR":0,"neck":0,"shoulderL":92,"shoulderR":92,"spine":0},"root":{"rot":0,"x":70,"y":54},"t":1},
   ],
 };
 

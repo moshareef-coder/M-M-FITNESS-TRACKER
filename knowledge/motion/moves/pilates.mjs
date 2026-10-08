@@ -463,22 +463,8 @@ const BRIDGE = {
   breath: 0.22,
   props: [MAT],
   keys: [
-    { // hips down
-      t: 0,
-      root: { x: 62, y: 106, rot: -90 },
-      // The arms are angles rather than pins on purpose: pinned to the mat they
-      // sit closer to the shoulder than an arm's length, and the IK answers that
-      // by bowing the elbow straight down through the floor.
-      joints: { spine: 0, neck: 4, shoulderR: 168, shoulderL: 171, elbowR: 4, elbowL: 4 },
-      ik: { ankleR: { x: 93, y: 113.4, bend: -1 }, ankleL: { x: 89, y: 113.4, bend: -1 } },
-    },
-    { // hips up, weight through the shoulder blades and the feet, and the
-      // shoulder, hip and knee on one line
-      t: 1,
-      root: { x: 62, y: 96, rot: -105 },
-      joints: { spine: 0, neck: 14, shoulderR: 184, shoulderL: 187, elbowR: 4, elbowL: 4 },
-      ik: { ankleR: { x: 93, y: 113.4, bend: -1 }, ankleL: { x: 89, y: 113.4, bend: -1 } },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":89,"y":113.4},"ankleR":{"bend":-1,"x":93,"y":113.4}},"joints":{"elbowL":4,"elbowR":4,"neck":4,"shoulderL":171,"shoulderR":168,"spine":0},"root":{"rot":-90,"x":60.1,"y":106.4},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":89,"y":113.4},"ankleR":{"bend":-1,"x":93,"y":113.4}},"joints":{"elbowL":4,"elbowR":4,"neck":14,"shoulderL":187,"shoulderR":184,"spine":0},"root":{"rot":-105,"x":62,"y":96},"t":1},
   ],
 };
 

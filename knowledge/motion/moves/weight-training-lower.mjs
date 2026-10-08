@@ -149,31 +149,8 @@ const ZERCHER_SQUAT = {
   props: [{ type: "barbell", side: "R", point: "elbow", dx: 9, dy: -2, r: 10, front: true }],
   grip: { R: "fist", L: "fist" },
   keys: [
-    { // stood tall, upper arm hanging at the side, forearm up and the bar in
-      // the crook clear of the belly. The old grip swung the elbow 8 units
-      // BEHIND the torso, which parked the plate inside the abdomen.
-      t: 0,
-      root: { x: 66, y: 61.4, rot: 2 },
-      joints: { spine: 5, neck: -3 },
-      ik: {
-        ...SQUAT_FEET,
-        wristR: { rel: "chest", x: 11, y: 13, bend: 1 },
-        wristL: { rel: "chest", x: 8, y: 14, bend: 1 },
-      },
-    },
-    { // bottom, elbows tracking inside the knees, hip crease level with the
-      // knee and the knee stopping at the toe. Same depth correction as the
-      // other two barbell squats: the old bottom put the knee 4 units past the
-      // toe on a 39 degree shin.
-      t: 1,
-      root: { x: 51, y: 92, rot: 12 },
-      joints: { spine: 13, neck: -7 },
-      ik: {
-        ...SQUAT_FEET,
-        wristR: { rel: "chest", x: 13, y: 11, bend: 1 },
-        wristL: { rel: "chest", x: 10, y: 12, bend: 1 },
-      },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":62,"y":113.4},"ankleR":{"bend":-1,"x":66,"y":113.4},"wristL":{"bend":1,"rel":"chest","x":8,"y":14},"wristR":{"bend":1,"rel":"chest","x":11,"y":13}},"joints":{"neck":-3,"spine":5},"root":{"rot":2,"x":66,"y":61.4},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":62,"y":113.4},"ankleR":{"bend":-1,"x":66,"y":113.4},"wristL":{"bend":1,"pole":[-0.797,0.042,0.602],"rel":"chest","x":10,"y":12},"wristR":{"bend":1,"rel":"chest","x":13,"y":11}},"joints":{"neck":-7,"spine":13},"root":{"rot":12,"x":51,"y":92},"t":1},
   ],
 };
 
@@ -453,36 +430,9 @@ const STIFF_LEG_DEADLIFT = {
     { type: "dumbbell", hold: "follow", side: "R", point: "hand", dx: 1, dy: 4, k: 0.8, front: true },
   ],
   keys: [
-    { // stood tall, bells at the front of the thighs
-      t: 0,
-      root: { x: 66, y: 61.4, rot: 2 },
-      joints: { spine: 2, neck: -2, shoulderR: -4, shoulderL: -4, elbowR: 2, elbowL: 2 },
-      ik: { ...SQUAT_FEET },
-    },
-    { // half way. With the foot pinned and the knee locked the hip rides a
-      // circle 51.5 units from the ankle, and a straight line between the two
-      // ends cuts inside that circle: the knee bent 27 degrees in the middle of
-      // a lift whose whole point is that it does not.
-      t: 0.5,
-      through: true,
-      root: { x: 57, y: 61.7, rot: 17 },
-      joints: { spine: 23, neck: -6, shoulderR: -40, shoulderL: -40, elbowR: 2, elbowL: 2 },
-      ik: { ...SQUAT_FEET, ankleR: { x: 66, y: 113.4, bend: -1, pole: [0.156, -0.891, 0.426] } },
-    },
-    { // bottom, knees all but locked, torso past 70 degrees. The pelvis stays
-      // HIGH and travels back only a little: with the feet pinned, dropping it
-      // the way the Romanian one does is what bends the knee, and a knee as
-      // bent as the Romanian's leaves the two moves telling the same story.
-      // The hips DO still travel: they used to stop 10 units behind the heel
-      // with the torso at 80 degrees, which put the shoulders and both bells a
-      // hand's width past the toes, out over nothing. On a locked leg the hip
-      // rides a circle 51.5 units from the ankle, so 18 back costs only 3 of
-      // height, and the bells then hang over the middle of the foot.
-      t: 1,
-      root: { x: 53.3, y: 63.5, rot: 32 },
-      joints: { spine: 43, neck: -10, shoulderR: -75, shoulderL: -75, elbowR: 2, elbowL: 2 },
-      ik: { ...SQUAT_FEET, ankleR: { x: 66, y: 113.4, bend: -1, pole: [-0.164, -0.665, 0.728] }, ankleL: { x: 62, y: 113.4, bend: -1, pole: [-0.13, -0.688, 0.714] } },
-    },
+    {"ik":{"ankleL":{"bend":-1,"pole":[-0.005,0.194,0.981],"x":62,"y":113.4},"ankleR":{"bend":-1,"pole":[0.004,-0.521,-0.854],"x":66,"y":113.4}},"joints":{"elbowL":2,"elbowR":2,"neck":-2,"shoulderL":-4,"shoulderR":-4,"spine":2},"root":{"rot":2,"x":66,"y":61.4},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":62,"y":113.4},"ankleR":{"bend":-1,"pole":[0.914,-0.068,-0.401],"x":56.9,"y":121.1}},"joints":{"elbowL":2,"elbowR":2,"neck":-6,"shoulderL":-40,"shoulderR":-40,"spine":23},"root":{"rot":17,"x":57,"y":61.7},"t":0.5,"through":true},
+    {"ik":{"ankleL":{"bend":-1,"pole":[-0.13,-0.688,0.714],"x":62,"y":113.4},"ankleR":{"bend":-1,"pole":[-0.164,-0.665,0.728],"x":53.1,"y":117.3}},"joints":{"elbowL":2,"elbowR":2,"neck":-10,"shoulderL":-75,"shoulderR":-75,"spine":43},"root":{"rot":32,"x":53.3,"y":63.5},"t":1},
   ],
 };
 
@@ -1160,24 +1110,8 @@ const CRUNCH = {
   breath: 0.25,
   props: [{ type: "mat", x: 14, w: 110 }],
   keys: [
-    { // down, whole back on the floor
-      t: 0,
-      root: { x: 72, y: 108, rot: -90 },
-      joints: { spine: 0, neck: 5 },
-      ik: {
-        ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
-        wristR: { x: 71.0, y: 100.0, bend: 1 }, wristL: { x: 67.0, y: 101.0, bend: 1 },
-      },
-    },
-    { // top, shoulder blades up, ribs pulled toward the hips, hips still down
-      t: 1,
-      root: { x: 72, y: 108, rot: -90 },
-      joints: { spine: 30, neck: 20 },
-      ik: {
-        ankleR: { x: 100, y: 113.4, bend: -1 }, ankleL: { x: 96, y: 113.4, bend: -1 },
-        wristR: { x: 79.4, y: 94.5, bend: 1 }, wristL: { x: 75.4, y: 95.5, bend: 1 },
-      },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":96,"y":113.4},"ankleR":{"bend":-1,"x":100,"y":113.4},"wristL":{"bend":1,"x":67,"y":101},"wristR":{"bend":1,"x":71,"y":100}},"joints":{"neck":5,"spine":6},"root":{"rot":-90,"x":72,"y":108},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":96,"y":113.4},"ankleR":{"bend":-1,"x":100,"y":113.4},"wristL":{"bend":1,"x":75.4,"y":95.5},"wristR":{"bend":1,"x":79.4,"y":94.5}},"joints":{"neck":20,"spine":30},"root":{"rot":-90,"x":72,"y":108},"t":1},
   ],
 };
 
@@ -1715,24 +1649,8 @@ const SUPERMAN = {
   fit: { k: 0.84, dy: 2 },
   props: [{ type: "mat", x: 8, w: 124 }],
   keys: [
-    { // flat, arms long in front, legs long behind
-      t: 0,
-      root: { x: 70, y: 106, rot: 90 },
-      joints: {
-        spine: 0, neck: -10,
-        hipR: -180, kneeR: 4, ankleR: -78, hipL: -180, kneeL: 6, ankleL: -78,
-      },
-      ik: { wristR: { x: 135.0, y: 108.0, bend: 1 }, wristL: { x: 131.0, y: 109.0, bend: 1 } },
-    },
-    { // chest and feet both lifted, back extended
-      t: 1,
-      root: { x: 70, y: 106, rot: 80 },
-      joints: {
-        spine: -15, neck: -22,
-        hipR: -176, kneeR: 4, ankleR: -78, hipL: -176, kneeL: 6, ankleL: -78,
-      },
-      ik: { wristR: { x: 134.7, y: 94.7, bend: 1 }, wristL: { x: 130.7, y: 95.7, bend: 1 } },
-    },
+    {"ik":{"wristL":{"bend":1,"x":131,"y":109},"wristR":{"bend":1,"x":135,"y":108}},"joints":{"ankleL":-78,"ankleR":-78,"hipL":-188,"hipR":-190,"kneeL":0,"kneeR":0,"neck":-10,"spine":0},"root":{"rot":90,"x":70,"y":106},"t":0},
+    {"ik":{"wristL":{"bend":1,"x":130.7,"y":95.7},"wristR":{"bend":1,"x":134.7,"y":94.7}},"joints":{"ankleL":-78,"ankleR":-78,"hipL":-176,"hipR":-176,"kneeL":6,"kneeR":4,"neck":-22,"spine":-15},"root":{"rot":80,"x":70,"y":106},"t":1},
   ],
 };
 

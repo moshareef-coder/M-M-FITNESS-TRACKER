@@ -926,20 +926,8 @@ export const PISTOL_SQUAT = {
   // eighteen units higher now.
   fit: { k: 0.86, dy: 2 },
   keys: [
-    { // standing on one leg, free leg already lifted out front
-      t: 0,
-      root: { x: 66, y: 62, rot: 4 },
-      joints: { spine: 5, neck: -3, hipL: 65, kneeL: 6, ankleL: 16,
-                shoulderR: 24, elbowR: 16, shoulderL: 20, elbowL: 20 },
-      ik: { ankleR: { x: 70, y: 113.4, bend: -1 } },
-    },
-    { // bottom, hips to the heel, free leg long and level, arms up clear of it
-      t: 1,
-      root: { x: 58, y: 100, rot: 20 },
-      joints: { spine: 14, neck: -8, hipL: 92, kneeL: 4, ankleL: 20,
-                shoulderR: 62, elbowR: 10, shoulderL: 58, elbowL: 14 },
-      ik: { ankleR: { x: 70, y: 113.4, bend: -1 } },
-    },
+    {"ik":{"ankleR":{"bend":-1,"x":70,"y":113.4}},"joints":{"ankleL":16,"elbowL":20,"elbowR":16,"hipAbdL":0,"hipL":56,"kneeL":6,"neck":-3,"shoulderL":20,"shoulderR":24,"spine":5},"root":{"rot":4,"x":66,"y":62},"t":0},
+    {"ik":{"ankleR":{"bend":-1,"x":70,"y":113.4}},"joints":{"ankleL":20,"elbowL":14,"elbowR":10,"hipAbdL":0,"hipL":76,"kneeL":1,"neck":-8,"shoulderL":58,"shoulderR":62,"spine":14},"root":{"rot":20,"x":58,"y":100},"t":1},
   ],
 };
 
@@ -1076,22 +1064,8 @@ export const TUCK_L_SIT = {
   grip: { L: "flat", R: "flat" },
   props: [{ type: "dipBars", x0: 40, x1: 68, y: 92 }],
   keys: [
-    { // set, arms locked behind the hips, knees to the chest, hips off the bars
-      t: 0,
-      root: { x: 71.8, y: 80.98, rot: -4 },
-      joints: { spine: 4, neck: 0, hipL: 122, hipR: 124, kneeL: 128, kneeR: 130,
-                ankleL: -30, ankleR: -30,
-                shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
-      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 58, y: 89.5, bend: 1 } },
-    },
-    { // settle
-      t: 1,
-      root: { x: 71.8, y: 81.13, rot: -3 },
-      joints: { spine: 4, neck: 1, hipL: 120, hipR: 122, kneeL: 126, kneeR: 128,
-                ankleL: -30, ankleR: -30,
-                shoulderGirdleElevL: -4, shoulderGirdleElevR: -4 },
-      ik: { wristR: { x: 60, y: 89, bend: 1 }, wristL: { x: 58, y: 89.5, bend: 1 } },
-    },
+    {"ik":{"wristL":{"bend":1,"x":58,"y":89.5},"wristR":{"bend":1,"x":60,"y":89}},"joints":{"ankleL":-30,"ankleR":-30,"hipAbdL":8,"hipAbdR":0,"hipL":141,"hipR":145,"kneeL":128,"kneeR":130,"neck":0,"shoulderGirdleElevL":-4,"shoulderGirdleElevR":-4,"spine":4},"root":{"rot":-4,"x":71.8,"y":80.98},"t":0},
+    {"ik":{"wristL":{"bend":1,"x":58,"y":89.5},"wristR":{"bend":1,"x":60,"y":89}},"joints":{"ankleL":-30,"ankleR":-30,"hipL":120,"hipR":122,"kneeL":126,"kneeR":128,"neck":1,"shoulderGirdleElevL":-4,"shoulderGirdleElevR":-4,"spine":4},"root":{"rot":-3,"x":71.8,"y":81.13},"t":1},
   ],
 };
 
@@ -1179,28 +1153,9 @@ export const HANGING_LEG_RAISE = {
   // world and the feet keep their clearance.
   props: [{ type: "pullupBar", y: 5.3, x0: 34, x1: 106 }],
   keys: [
-    { // hanging, legs down and still
-      t: 0,
-      root: { x: 70, y: 72.6, rot: -4 },
-      joints: { spine: 2, neck: 0, torsoRoll: 1, hipR: -8, hipL: -10, kneeR: 72, kneeL: 76, ankleR: -24, ankleL: -24 },
-      ik: { wristR: { x: 92.8, y: 5.1, bend: 1 }, wristL: { x: 65, y: 6.3, bend: 1 } },
-    },
-    { // knees come up first, which is the only path that does not sweep the
-      // feet through the floor, and is what a real leg raise looks like anyway
-      t: 0.5,
-      through: true,
-      root: { x: 70, y: 72.8, rot: -2 },
-      joints: { spine: 3, neck: 1, hipL: 50, hipR: 52, kneeL: 118, kneeR: 120,
-                ankleL: -25, ankleR: -25 },
-      ik: { wristR: { x: 70, y: 6.3, bend: 1 }, wristL: { x: 65, y: 6.3, bend: 1 } },
-    },
-    { // legs level with the hips, knees long
-      t: 1,
-      root: { x: 70, y: 73, rot: -4 },
-      joints: { spine: 4, neck: 2, hipL: 92, hipR: 94, kneeL: 6, kneeR: 4,
-                ankleL: -40, ankleR: -40 },
-      ik: { wristR: { x: 70, y: 6.3, bend: 1 }, wristL: { x: 65, y: 6.3, bend: 1 } },
-    },
+    {"ik":{"wristL":{"bend":1,"x":65,"y":6.3},"wristR":{"bend":1,"pole":[-0.16,0.279,-0.947],"x":64.3,"y":-0.6}},"joints":{"ankleL":-24,"ankleR":-24,"hipL":-10,"hipR":-8,"kneeL":76,"kneeR":72,"neck":0,"spine":2,"torsoRoll":1},"root":{"rot":-4,"x":70,"y":72.6},"t":0},
+    {"ik":{"wristL":{"bend":1,"x":65,"y":6.3},"wristR":{"bend":1,"pole":[0.049,0.838,-0.543],"x":64,"y":4.9}},"joints":{"ankleL":-25,"ankleR":-25,"hipL":50,"hipR":52,"kneeL":118,"kneeR":120,"neck":1,"spine":3},"root":{"rot":-2,"x":70,"y":72.8},"t":0.5,"through":true},
+    {"ik":{"wristL":{"bend":1,"x":65,"y":6.3},"wristR":{"bend":1,"pole":[0.039,0.896,-0.443],"x":64.6,"y":4}},"joints":{"ankleL":-40,"ankleR":-40,"hipL":92,"hipR":94,"kneeL":6,"kneeR":4,"neck":2,"spine":4},"root":{"rot":-4,"x":70,"y":73},"t":1},
   ],
 };
 
