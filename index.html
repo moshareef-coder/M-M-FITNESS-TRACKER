@@ -17369,16 +17369,30 @@ days: { ch: 4, render(d, ui) {
       });
       $("ob2Next").disabled = !n;
     };
+    /* He reads the count off the days actually ticked, so tapping a day in
+       the week answers too: Mo, 2026-10-08, 5 days on the strip while he
+       still said "Four" looked broken. */
+    const SAY = {
+      0: "Zero days. Bold strategy. Tap a few.",
+      1: "One day. It counts. Barely.",
+      2: "Two days. Easing in. Nobody ever regretted easing in.",
+      3: "Three. The classic. Rest days in between, I insist.",
+      4: "Four. That's a week somebody actually keeps.",
+      5: "Five. Bold. I'll be the one telling you to take a day off.",
+      6: "Six. Okay, gym rat. I'm keeping one day for rest.",
+      7: "Every day? Even I take a day off, and I'm a robot.",
+    };
+    const sayCount = () => ob2Type($("ob2Q"), SAY[days.length]);
     $("onboard").querySelectorAll("[data-count]").forEach((b) => b.onclick = () => {
       days = spreadOver(ALL, Number(b.dataset.count));
       paint();
-      ob2Type($("ob2Q"), ({ 2: "Two days. Easing in. Nobody ever regretted easing in.", 3: "Three. The classic. Rest days in between, I insist.",
-        4: "Four. That's a week somebody actually keeps.", 5: "Five or more. Bold. I'll be the one telling you to take a day off." })[b.dataset.count]);
+      sayCount();
     });
     $("onboard").querySelectorAll("[data-wd]").forEach((b) => b.onclick = () => {
       const i = Number(b.dataset.wd);
       days = days.includes(i) ? days.filter((x) => x !== i) : [...days, i].sort((x, y) => x - y);
       paint();
+      sayCount();
     });
     paint();
   } },
