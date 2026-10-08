@@ -780,31 +780,9 @@ const CURTSY_LUNGE = {
     { type: "dumbbell", hold: "follow", side: "L", point: "hand", dx: -2, dy: 5, k: 0.8 },
   ],
   keys: [
-    { // stood tall, feet under the hips
-      t: 0,
-      root: { x: 72, y: 61.4, rot: 0 },
-      joints: { spine: 0, neck: 0, shoulderR: -3, elbowR: 4, shoulderL: -3, elbowL: 4,
-                hipL: 0, kneeL: 4 },
-      ik: { ankleR: { x: 78, y: 113.4, bend: -1 } },
-    },
-    { // mid step: the trailing foot is in the AIR on its way across, knee bent
-      // so the toe clears the floor. Without this keyframe the straight line
-      // interpolation between the two ends drags the toe through the ground.
-      t: 0.5,
-      through: true,
-      root: { x: 73, y: 68, rot: 1 },
-      joints: { spine: 3, neck: -1, shoulderR: 5, elbowR: 4, shoulderL: 5, elbowL: 4,
-                hipL: -18, kneeL: 30 },
-      ik: { ankleR: { x: 78, y: 113.4, bend: -1 } },
-    },
-    { // sunk, left thigh swept behind and well past the right leg, toe planted
-      // out past the standing foot, hips still square to the front
-      t: 1,
-      root: { x: 74, y: 74, rot: 2 },
-      joints: { spine: 6, neck: -2, shoulderR: -3, elbowR: 4, shoulderL: -3, elbowL: 4,
-                hipL: -52, kneeL: -20 },
-      ik: { ankleR: { x: 78, y: 113.4, bend: -1 } },
-    },
+    {"ik":{"ankleR":{"bend":-1,"pole":[-0.974,0.227,0.003],"x":78,"y":113.4}},"joints":{"elbowL":4,"elbowR":4,"hipL":0,"kneeL":4,"neck":0,"shoulderL":-3,"shoulderR":-3,"spine":0},"root":{"rot":0,"x":72,"y":61.4},"t":0},
+    {"ik":{"ankleR":{"bend":-1,"pole":[-0.823,0.137,0.552],"x":79.7,"y":123.3}},"joints":{"elbowL":4,"elbowR":4,"hipAbdL":0,"hipL":-12,"kneeL":30,"neck":-1,"shoulderL":5,"shoulderR":5,"spine":3},"root":{"rot":1,"x":73,"y":68},"t":0.5,"through":true},
+    {"ik":{"ankleR":{"bend":-1,"pole":[0.863,-0.503,-0.049],"x":81.7,"y":133.8}},"joints":{"elbowL":4,"elbowR":4,"hipL":-45,"kneeL":0,"neck":-2,"shoulderL":-3,"shoulderR":-3,"spine":6},"root":{"rot":2,"x":75.3,"y":76.4},"t":1},
   ],
 };
 
@@ -1328,24 +1306,8 @@ const AB_WHEEL_ROLLOUT = {
     { type: "artwork", src: "/knowledge/motion/props/ab-wheel.svg", side: "R", point: "hand", dx: 0, dy: 10.2, k: 1, rot: 0 },
   ],
   keys: [
-    { // tucked, wheel under the shoulders
-      t: 0,
-      root: { x: 50, y: 80, rot: 25 },
-      joints: {
-        spine: 30, neck: -12,
-        hipR: -25, kneeR: 90, ankleR: -78, hipL: -25, kneeL: 90, ankleL: -78,
-      },
-      ik: { wristR: { x: 88.5, y: 95.3, bend: 1 }, wristL: { x: 84.5, y: 96.3, bend: 1 } },
-    },
-    { // rolled out, knee to shoulder one long line just off the floor
-      t: 1,
-      root: { x: 74.2, y: 95.1, rot: 20 },
-      joints: {
-        spine: 44, neck: -12,
-        hipR: -84, kneeR: 26, ankleR: -78, hipL: -84, kneeL: 26, ankleL: -78,
-      },
-      ik: { wristR: { x: 120.7, y: 99.6, bend: 1 }, wristL: { x: 116.7, y: 100.6, bend: 1 } },
-    },
+    {"ik":{"wristL":{"bend":1,"x":84.5,"y":96.3},"wristR":{"bend":1,"x":88.5,"y":95.3}},"joints":{"ankleL":-78,"ankleR":-78,"hipL":-25,"hipR":-26,"kneeL":78,"kneeR":82,"neck":-12,"spine":30},"root":{"rot":25,"x":50,"y":80},"t":0},
+    {"ik":{"wristL":{"bend":1,"x":116.7,"y":100.6},"wristR":{"bend":1,"x":120.7,"y":99.6}},"joints":{"ankleL":-78,"ankleR":-78,"hipL":-82,"hipR":-93,"kneeL":17,"kneeR":1,"neck":-12,"spine":44},"root":{"rot":20,"x":74.2,"y":95.1},"t":1},
   ],
 };
 
@@ -1606,32 +1568,8 @@ const BIRD_DOG = {
   fit: { k: 0.9, dy: 4 },
   props: [{ type: "mat", x: 10, w: 120 }],
   keys: [
-    { // neutral quadruped, all four down
-      t: 0,
-      root: { x: 66, y: 84, rot: 90 },
-      joints: {
-        spine: 0, neck: -12, wristR: 86, wristL: 86,
-        hipR: -90, kneeR: 90, ankleR: -78, hipL: -90, kneeL: 90, ankleL: -78,
-      },
-      ik: {
-        wristR: { x: 95, y: 113, bend: 1 }, wristL: { x: 91, y: 113, bend: 1 },
-      },
-    },
-    { // left arm and right leg long, both level with the back. It used to reach
-      // the LEFT arm and the LEFT leg, which is the same side: a bird dog is
-      // opposite limbs, and same-side is the one thing it must not be. Side on
-      // you can only tell by the tone, so the far arm now goes out with the
-      // NEAR leg and the two read as a diagonal.
-      t: 1,
-      root: { x: 66, y: 84, rot: 90 },
-      joints: {
-        spine: 0, neck: -10, wristR: 86, wristL: 0,
-        hipR: -180, kneeR: 4, ankleR: -20, hipL: -90, kneeL: 90, ankleL: -78,
-      },
-      ik: {
-        wristR: { x: 95, y: 113, bend: 1 }, wristL: { x: 127.0, y: 80.0, bend: 1 },
-      },
-    },
+    {"ik":{"wristL":{"bend":1,"x":91,"y":113},"wristR":{"bend":1,"x":95,"y":113}},"joints":{"ankleL":-78,"ankleR":-78,"hipL":-90,"hipR":-90,"kneeL":90,"kneeR":90,"neck":-12,"spine":0,"wristL":86,"wristR":86},"root":{"rot":90,"x":66,"y":84},"t":0},
+    {"ik":{"wristL":{"bend":1,"x":137.4,"y":78.7},"wristR":{"bend":1,"x":95,"y":113}},"joints":{"ankleL":-20,"ankleR":-20,"hipAbdR":0,"hipL":-180,"hipR":-144,"kneeL":4,"kneeR":0,"neck":-10,"spine":0,"wristL":0,"wristR":86},"root":{"rot":90,"x":66,"y":84},"t":1},
   ],
 };
 

@@ -1332,20 +1332,8 @@ const SPHINX_STRETCH = {
   fit: { k: 0.88, dy: 4 },
   props: [{ type: "mat", x: 6, w: 122 }],
   keys: [
-    { // settled on the forearms, front of the body long
-      t: 0,
-      root: { x: 56, y: 108.4, rot: 78 },
-      joints: { spine: -22, neck: -22, hipR: -162, hipL: -162, kneeR: 12, kneeL: 12,
-                ankleR: -40, ankleL: -40, wristR: 40, wristL: 40 },
-      ik: { wristR: { x: 105, y: 113.6, bend: 1 }, wristL: { x: 100, y: 113.6, bend: 1 } },
-    },
-    { // chest lifts a fraction with the breath, hips unmoved
-      t: 1,
-      root: { x: 56, y: 108.4, rot: 76 },
-      joints: { spine: -25, neck: -25, hipR: -160, hipL: -160, kneeR: 12, kneeL: 12,
-                ankleR: -40, ankleL: -40, wristR: 40, wristL: 40 },
-      ik: { wristR: { x: 105, y: 113.6, bend: 1 }, wristL: { x: 100, y: 113.6, bend: 1 } },
-    },
+    {"ik":{"wristL":{"bend":1,"pole":[0.34,0.511,0.789],"x":94.2,"y":112.8},"wristR":{"bend":1,"pole":[0.021,0.055,0.998],"x":93.6,"y":113.6}},"joints":{"ankleL":-40,"ankleR":-40,"hipL":-162,"hipR":-162,"kneeL":12,"kneeR":12,"neck":-22,"spine":-40,"wristL":40,"wristR":40},"root":{"rot":78,"x":61.4,"y":107.6},"t":0},
+    {"ik":{"wristL":{"bend":1,"x":100,"y":113.6},"wristR":{"bend":1,"x":105,"y":113.6}},"joints":{"ankleL":-40,"ankleR":-40,"hipL":-160,"hipR":-160,"kneeL":12,"kneeR":12,"neck":-25,"spine":-25,"wristL":40,"wristR":40},"root":{"rot":76,"x":56,"y":108.4},"t":1},
   ],
 };
 
