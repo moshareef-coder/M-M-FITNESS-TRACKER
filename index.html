@@ -15679,7 +15679,7 @@ const OB2_REACT = {
   stop: (d) => ((d.barriers || []).length ? "Noted. I'll plan around every one of those." : "Nothing? Fine. Overachiever."),
   two: (d) => (d.path === "b" ? "Good. No pressure. Some pressure." : "No pressure. Well, some pressure."),
   theme: (d) => (d.theme === "dark" ? "Dark it is. Very cool of you." : "Light it is. Sunglasses on."),
-  name: (d) => `${ob2Name(d)}. Good name. I'd have gone with something shorter, but I'm a robot.`,
+  name: (d) => `${ob2Name(d)}. Great name. Easy to yell across the gym.`,
   goal: (d) => OB2_GOAL_SAY[d.goal_bubble] || null,
   goal2: (d) => ((d.goal_secondary || []).length ? "Ambitious. I'll pretend I'm not impressed." : "One goal. Focused. Very efficient of you."),
   sex: () => "Drawing you now. Hold still.",
@@ -16869,7 +16869,7 @@ const OB2 = {
   sex: { ch: 2, render(d, ui) {
     let pick = d.sex_asked ? (d.sex || "none") : null;
     ui.paint({
-      title: "I'm about to draw you. Which body should I go with?",
+      title: "Which body should your figure have? It lights up what you train.",
       body: `<div class="ob2-sexfig" aria-hidden="true"><canvas class="bi-canvas" id="ob2SexCanvas"></canvas></div>`
         + ob2ChoiceHTML([{ id: "Male", label: "Male" }, { id: "Female", label: "Female" }, { id: "none", label: "Rather not say" }], pick, { attr: "sex" }),
       cta: "Continue", ctaOff: !pick,
@@ -16877,7 +16877,7 @@ const OB2 = {
     });
     ob2MountSexFigure(pick === "Female" ? "Female" : "Male");
     OB2_CLEANUP.push(() => { OB2_SEX_FIG?.destroy(); OB2_SEX_FIG = null; });
-    const SAY = { Male: "Got it. Hold still, I'm drawing you.", Female: "Got it. Hold still, I'm drawing you. Best side only.", none: "Fair. I don't have one either." };
+    const SAY = { Male: "Got it. Your figure's ready to work.", Female: "Got it. Your figure's ready to work.", none: "Fair. I don't have one either." };
     ob2WireOne("sex", (v) => { pick = v; $("ob2Next").disabled = false; ob2MountSexFigure(v === "Female" ? "Female" : "Male"); ob2Type($("ob2Q"), SAY[v]); });
   } },
 
@@ -17120,7 +17120,24 @@ height: { ch: 2, render(d, ui) {
         ui.next({ train_styles: picked, style_frequency: freq });
       },
     });
-    wireTrainStylePicker($("onboard"), picked, (ids) => { picked = ids; $("ob2Next").disabled = !ids.length; });
+    /* A line for every tick, Mo, 2026-10-08. Untick says the Setup line. */
+    const SAY_ON = {
+      lifting: "The weight room. My favorite room. I can't lift a thing in it.",
+      home: "No gym needed. Your living room just became one. Sorry, living room.",
+      running: "Running. Rather you than me. My knees are hinges.",
+      cycling: "Cycling. Wheels are cheating, but I'll allow it.",
+      walking: "Walking. Underrated. I'm coming anyway, I live in your pocket.",
+      pilates: "Pilates. Core of steel incoming. Mine's just wires.",
+      yoga: "Yoga. I tried once. I'm not built to bend.",
+    };
+    wireTrainStylePicker($("onboard"), picked, (ids) => {
+      const on = ids.find((id) => !picked.includes(id));
+      const off = picked.find((id) => !ids.includes(id));
+      picked = ids;
+      $("ob2Next").disabled = !ids.length;
+      const line = on ? SAY_ON[on] : off ? trainStyleTapLine(off, "off") : null;
+      if (line) ob2Type($("ob2Q"), line);
+    });
   } },
 
   freq: { ch: 3, when: (d) => Array.isArray(d.train_styles) && d.train_styles.length > 1, render(d, ui) {
