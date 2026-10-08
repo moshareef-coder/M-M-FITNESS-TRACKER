@@ -5392,9 +5392,13 @@
   .ob2 .ob2-fill-fig > .ob2-sexfig { display: flex; align-items: flex-end; justify-content: center; }
   .ob2 .ob2-fill-fig .bi-canvas { height: var(--fh); width: min(var(--fw), calc(var(--fh) * .74)); }
   .ob2 .ob2-fill-fig > .ob2-sexfig:not(.ob2-htfig) { align-items: center; }
-  .ob2 .ob2-fill-fig .ob2-htscale { transform: none !important; display: flex; align-items: flex-end; }
-  .ob2 .ob2-fill-fig .ob2-htfig .bi-canvas { height: calc(var(--fh) * var(--hs, .8)); width: min(var(--fw), calc(var(--fh) * var(--hs, .8) * .74));
-    transition: height .35s cubic-bezier(.22,1,.36,1), width .35s cubic-bezier(.22,1,.36,1); }
+  /* Height: the canvas stays at its 7'0" size and the box around it is scaled.
+     Resizing the canvas itself cleared it on every wheel tick (the figure
+     blinked); a transform does not touch clientWidth/Height, so Rive never
+     redraws and the figure just grows and shrinks, live. */
+  .ob2 .ob2-fill-fig .ob2-htscale { display: flex; align-items: flex-end; transform: scale(var(--hs, .8)); transform-origin: 50% 100%;
+    transition: transform .3s cubic-bezier(.22,1,.36,1); will-change: transform; }
+  .ob2 .ob2-fill-fig .ob2-htfig .bi-canvas { height: var(--fh); width: min(var(--fw), calc(var(--fh) * .74)); }
   .ob2 .ob2-fill-pair > .bi-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: center; }
   .ob2 .ob2-fill-pair .bi-canvas { width: 100%; height: var(--fh); }
   .ob2 .ob2-fill-stage > .ob2-figstage, .ob2 .ob2-fill-stage > .ob2-tour-stage { display: flex; }
@@ -5506,9 +5510,9 @@
   .ob2 .ob2-fill-wheels .ob2-wheel-pad { height: calc((min(var(--fh), 308px) - 44px) / 2); }
   .ob2 .ob2-fill-htrow > .ob2-htrow { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 8px; }
   .ob2 .ob2-fill-htrow .ob2-sexfig { display: flex; align-items: flex-end; justify-content: center; height: 100%; }
-  .ob2 .ob2-fill-htrow .ob2-htscale { display: flex; align-items: flex-end; }
-  .ob2 .ob2-fill-htrow .bi-canvas { height: calc(var(--fh) * var(--hs, .8)); width: min(calc(var(--fw) / 2 - 4px), calc(var(--fh) * var(--hs, .8) * .74));
-    transition: height .3s cubic-bezier(.22,1,.36,1), width .3s cubic-bezier(.22,1,.36,1); }
+  .ob2 .ob2-fill-htrow .ob2-htscale { display: flex; align-items: flex-end; transform: scale(var(--hs, .8)); transform-origin: 50% 100%;
+    transition: transform .3s cubic-bezier(.22,1,.36,1); will-change: transform; }
+  .ob2 .ob2-fill-htrow .bi-canvas { height: var(--fh); width: min(calc(var(--fw) / 2 - 4px), calc(var(--fh) * .74)); }
   .ob2 .ob2-fill-htrow .ob2-wheel { align-self: center; height: min(var(--fh), calc(44px * 7)); }
   .ob2 .ob2-fill-htrow .ob2-wheel-pad { height: calc((min(var(--fh), 308px) - 44px) / 2); }
   .ob2-weigh { display: flex; flex-direction: column; justify-content: center; gap: 18px; }
@@ -15527,7 +15531,7 @@ const OB2_PATH_A = [
      "when do you train" screen is gone. */
   "ping", "hello", "theme", "name", "goal", "goal2", "stop", "two",
   "sex", "age", "height", "weight", "target", "activity", "summary",
-  "taste2",
+  { id: "taste2", off: "Mo cut the sample set (2026-10-07). He did not like it." },
   "styles", "freq", "equip", "focus", "hurts", "warmup", "days", "minutes", "projection",
   { id: "proof", off: "No real couple quote or App Store review yet. Back in when there is one; never a made up one." },
   "taste3",
@@ -15538,7 +15542,7 @@ const OB2_PATH_A = [
 const OB2_PATH_B = [
   "accept", "hello", "theme", "name", "goal", "goal2", "stop", "two",
   "sex", "age", "height", "weight", "target", "activity", "summary",
-  "taste2",
+  { id: "taste2", off: "Mo cut the sample set (2026-10-07). He did not like it." },
   "styles", "freq", "equip", "focus", "hurts", "warmup", "days", "minutes",
   "taste3",
   "build", "preview", "beta", "commit", "pay", "notify",
@@ -16826,10 +16830,11 @@ height: { ch: 2, render(d, ui) {
     });
     ob2MountSexFigure(d.sex === "Female" ? "Female" : "Male");
     OB2_CLEANUP.push(() => { OB2_SEX_FIG?.destroy(); OB2_SEX_FIG = null; });
-    /* Truthful: the canvas fills the gap at 7'0" and is height over 84
+    /* Truthful: the figure fills the gap at 7'0" and is height over 84
        inches of that, clamped at 4'6" so it never leaves the frame. The
-       canvas itself is resized, not CSS-scaled (the Rive body sizes its
-       drawing surface off the canvas's on-screen box), and the size eases. */
+       canvas keeps its 7'0" size and its box is CSS-scaled (Rive sizes off
+       clientWidth/Height, which a transform leaves alone), so ticking the
+       wheel never clears the canvas and the figure resizes live. */
     const show = (h) => $("ob2HtScale").style.setProperty("--hs", (Math.max(54, Math.min(84, h)) / 84).toFixed(4));
     const wheel = ob2Wheel($("ob2WH"), labels(), idx(), {
       onLive: (i) => show(fromIdx(i)),
