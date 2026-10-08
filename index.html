@@ -7554,6 +7554,9 @@
   .session-complete { text-align: center; padding: 12px 0 0; }
   .session-complete h3 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; margin: 12px 0 4px; }
   .session-complete p { color: var(--muted); margin: 0 0 4px; font-size: 14px; }
+  /* The Ask AI sheet's four ways out, stacked so each is a full-width thumb target. */
+  .ask-ai-opts { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .ask-ai-opts .btn-secondary { width: 100%; margin: 0; }
   /* A button since the dial became the way into the detail of what was just
      logged, so it carries a button's reset and presses like one. */
   .sc-ring {
@@ -33090,6 +33093,9 @@ async function renderSessionComplete() {
         : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
            <button type="button" class="btn-primary" id="sessionProofBtn">Take proof photo</button>`}
       ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="sessionNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
+      ${/* Only over a session with something in it: a summary of no sets is
+            a prompt asking an assistant to review nothing. */ ""}
+      ${recorded ? `<button type="button" class="btn-secondary" id="sessionAskAiBtn">${icon("wand", 16)} Ask AI about this workout</button>` : ""}
       <button type="button" class="${hasProof ? "btn-primary" : "btn-ghost"}" id="sessionDoneBtn">Done</button>
     </div>`;
 
@@ -33119,6 +33125,7 @@ async function renderSessionComplete() {
     $("sessionProofBtn").onclick = () => $("proofInput").click();
   }
   if (PARTNER_EMAIL) $("sessionNoteBtn").onclick = () => openNoteComposer("workout");
+  if ($("sessionAskAiBtn")) $("sessionAskAiBtn").onclick = () => openAskAiSheet(workoutTextForAi({ durSec, doneCount, total }));
   /* The mark opens what was logged. sessionDate() rather than todayStr() for
      the reason every other reader of this screen uses it: a session that ran
      past midnight still belongs to the day it started on. */
@@ -33156,6 +33163,133 @@ async function sessionDone() {
      plan, so the generator's cached next day is wrong and Home is as stale as
      this tab. */
   await planChangedOn(sessionDate());
+}
+
+/* "Ask AI about this workout": the session as plain text, handed to whichever
+   assistant the person already uses. Nothing here calls a model, so it costs
+   nothing per tap and needs no backend; the text leaves the app only when they
+   choose where it goes.
+
+   The partner is in it as a number and nothing else. Their name and email are
+   theirs, and this text is going to a third party the partner never agreed to
+   share with, so the line says "My partner", never who. */
+const AI_ASK_PROMPT = "Here's my workout from Unio. Tell me what went well, what to adjust next session, and one recovery tip.";
+
+// One exercise as a line: every set that was logged, in the order it was logged.
+function aiExerciseLine(name, rows) {
+  const sets = rows.map((l) => {
+    if (l.duration_min) return [`${l.duration_min} min`, l.distance_mi ? `${l.distance_mi} mi` : ""].filter(Boolean).join(", ");
+    const reps = l.reps != null ? `${l.reps} reps` : "done";
+    const load = l.weight ? ` at ${l.weight} lb` : "";
+    return `${(l.sets || 1) > 1 ? `${l.sets} sets of ` : ""}${reps}${load}`;
+  });
+  return `- ${name}: ${sets.join("; ")}`;
+}
+
+function workoutTextForAi({ durSec, doneCount, total }) {
+  const date = sessionDate();
+  const plan = TODAY_WORKOUT?.exercises || [];
+  const rows = ALL_EXERCISE_LOGS.filter((l) => l.email === MY_EMAIL && l.entry_date === date);
+  const exLines = [];
+  const skipped = [];
+  for (const ex of plan) {
+    const key = (ex.name || "").trim().toLowerCase();
+    const mine = rows.filter((l) => (l.exercise_name || "").trim().toLowerCase() === key);
+    if (mine.length) exLines.push(aiExerciseLine(ex.name, mine));
+    else if (ex.name) skipped.push(ex.name);
+  }
+  const head = [
+    `Workout on ${new Date(date + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}`,
+    `${displayFocus(TODAY_WORKOUT?.focus, plan)}, ${doneCount} of ${total} exercises done`,
+    durSec >= 60 ? `Total time: ${Math.round(durSec / 60)} min` : "",
+  ].filter(Boolean);
+  const week = [`My week: ${gymDaysThisWeek(ME)} of ${weeklyGoalFor(MY_EMAIL)} workouts done`];
+  if (PARTNER_EMAIL) week.push(`My training partner's week: ${gymDaysThisWeek(partnerName())} of ${weeklyGoalFor(PARTNER_EMAIL)} workouts done`);
+  const full = [
+    head.join("\n"),
+    exLines.join("\n"),
+    skipped.length ? `Planned but not done: ${skipped.join(", ")}` : "",
+    week.join("\n"),
+    AI_ASK_PROMPT,
+  ].filter(Boolean).join("\n\n");
+
+  /* A link carries the text in its query string, and somewhere past a couple
+     of thousand characters the assistants and some browsers stop taking it.
+     The link version keeps what an assistant needs most, the sets and the ask,
+     and drops the rest. If even that is too long it loses whole exercises from
+     the end and says how many, rather than cutting a line in half. Copy and
+     Share are not links, so they always get the full text. */
+  const fits = (t) => encodeURIComponent(t).length <= 1800;
+  let forLink = full;
+  if (!fits(full)) {
+    const lines = [...exLines];
+    const build = () => [lines.join("\n") + (lines.length < exLines.length ? `\n(and ${exLines.length - lines.length} more exercises, left out to fit)` : ""), AI_ASK_PROMPT].join("\n\n");
+    while (lines.length > 1 && !fits(build())) lines.pop();
+    forLink = build();
+  }
+  return { full, forLink };
+}
+
+function openAskAiSheet({ full, forLink }) {
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim";
+  scrim.innerHTML = `
+    <div class="pop">
+      <div class="pop-body">
+        <div class="ds-top">
+          <div class="pop-who" style="color:var(--muted)">ASK AI</div>
+          <button type="button" class="ds-x" data-close aria-label="Close">&times;</button>
+        </div>
+        <p class="muted-note">Sends your sets, time and this week's progress. Your partner is in it as a number, never by name.</p>
+        <div class="ask-ai-opts">
+          <button type="button" class="btn-secondary" data-ai="chatgpt">Open ChatGPT</button>
+          <button type="button" class="btn-secondary" data-ai="claude">Open Claude</button>
+          <button type="button" class="btn-secondary" data-ai="copy">Copy to clipboard</button>
+          ${navigator.share ? `<button type="button" class="btn-secondary" data-ai="share">Share...</button>` : ""}
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  scrim.querySelectorAll("[data-close]").forEach((b) => { b.onclick = close; });
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+
+  /* Both calls start inside the tap and before anything is awaited. Safari
+     only lets a page write the clipboard or open a window while it is still
+     handling the gesture, and an await in front of either one loses it. */
+  const copy = () => navigator.clipboard?.writeText(full).then(() => true, () => false) ?? Promise.resolve(false);
+  const openUrl = (url) => {
+    const browser = isNativeApp() && window.Capacitor?.Plugins?.Browser;
+    if (browser) return browser.open({ url, presentationStyle: "popover" }).catch((err) => { console.error("could not open the assistant", err); window.open(url, "_blank", "noopener"); });
+    window.open(url, "_blank", "noopener");
+  };
+  const BASES = { chatgpt: "https://chatgpt.com/?q=", claude: "https://claude.ai/new?q=" };
+
+  scrim.querySelectorAll("[data-ai]").forEach((b) => {
+    b.onclick = async () => {
+      const kind = b.dataset.ai;
+      if (kind === "copy") {
+        close();
+        toast((await copy()) ? "Copied" : "Couldn't copy that");
+        return;
+      }
+      if (kind === "share") {
+        close();
+        try { await navigator.share({ text: full }); }
+        catch (e) { if (e?.name !== "AbortError") { console.error("share failed", e); toast("Could not share that"); } }
+        return;
+      }
+      /* The text goes in the link AND on the clipboard. The ?q= prefill is
+         not a published API on either site: it can be dropped by a sign-in
+         redirect, and either company can retire it without notice. When it
+         does, the person lands on an empty box with the text already copied,
+         which is the fallback rather than a dead end. */
+      const copied = copy();
+      openUrl(BASES[kind] + encodeURIComponent(forLink));
+      close();
+      if (await copied) toast("Copied too. Paste it in if the box is empty");
+    };
+  });
 }
 
 let WORKOUT_MODE = null; // null | "choose" | "manual" | "week" | "recovery" | "review" | "activity"
