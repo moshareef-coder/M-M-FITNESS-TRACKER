@@ -41436,13 +41436,18 @@ async function saveManualWorkout() {
      earlier today leaves the row archived, and an upsert that did not reset
      them wrote the new plan onto it, where loadTodayWorkout can never see it.
      The user got "Workout plan saved" and an empty screen. */
+  /* mobility is cleared for the same reason. Writing over the generated plan
+     kept ITS warm-up, cool-down and ramp sets, so a hand-built push-up and
+     pull-up day opened on "Arm Circles, for your pressing and overhead work"
+     and ended on a pec stretch. A plan built from nothing here has no blocks,
+     which is what a fresh row already got. */
   /* A lift written by hand onto a day that already holds a planned run or a
      class is a SECOND session rather than a replacement for it, which is the
      same rule generating one follows: see nextPlanSlot. */
   const { error } = await upsertPlanRow({
     user_name: ME, email: MY_EMAIL, entry_date: target,
     focus: deriveFocus(MANUAL_DRAFT), exercises: MANUAL_DRAFT,
-    archived: false, completed_at: null,
+    archived: false, completed_at: null, mobility: null,
   }, nextPlanSlot(target, { lifting: true }));
   if (error) { console.error("could not save the manual workout", error); toast("Couldn't save that plan. Try again."); return; }
   PLAN_FOR_DATE = null;
