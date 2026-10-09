@@ -29091,7 +29091,12 @@ async function loadTodayWorkout() {
     .eq("email", MY_EMAIL).eq("entry_date", sessionDate()).eq("archived", false)
     .order("created_at", { ascending: false });
   TODAY_PLANS = (data || []).slice().sort((a, b) => planSlot(a) - planSlot(b));
-  TODAY_WORKOUT = TODAY_PLANS[0] || null;
+  /* The first session of the day is the default, but not while a workout is
+     running on another one. Every set logged reloads, and handing the session
+     the day's first plan halfway through left it counting sets against a
+     different list (a yoga class at slot 0, the lift being trained at 1). */
+  const live = SESSION?.workoutId && TODAY_PLANS.find((p) => p.id === SESSION.workoutId);
+  TODAY_WORKOUT = live || TODAY_PLANS[0] || null;
 }
 
 /* A plan that has just been stood down, taken out of today without going back
@@ -31802,7 +31807,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        reload and redraw Home only, so the workout tab underneath kept
        Thursday's old session on the week strip. */
     await planChangedOn(target, {
-      then: () => { if (isToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+      then: () => { if (isToday) FRESH_PLAN_ID = (TODAY_PLANS.find((p) => planSlot(p) === slot) || TODAY_WORKOUT)?.id || null; },
     });
     /* Mo, 2026-09-18: "I don't want to generate a workout and be able to see
        those options. The second it generates, it takes me to that page." The
@@ -31815,7 +31820,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       await finishGenOverlay();   // three seconds at least, and a full bar
       if (!genCancelled) {
         closeGenOverlay();
-        showPlanScreen(target);
+        showPlanScreen(target, slot);
       }
     }
     /* Answered, so a caller that has to undo something on failure can tell the
@@ -32293,6 +32298,11 @@ function sessionMatchesPlan(saved) {
 function resumeSessionIfAny() {
   if (SESSION) return false;
   const saved = loadSessionFromStorage();
+  /* The plan it was started on, which is not always the day's first: see
+     loadTodayWorkout. Matched against that one or a session on the second
+     session of a day was thrown away on every reload. */
+  const own = saved?.workoutId && TODAY_PLANS.find((p) => p.id === saved.workoutId);
+  if (own) TODAY_WORKOUT = own;
   if (!sessionMatchesPlan(saved)) {
     if (saved) clearSessionStorage();   // stale, belongs to a finished plan
     return false;
@@ -41472,14 +41482,17 @@ async function saveManualWorkout() {
   /* A lift written by hand onto a day that already holds a planned run or a
      class is a SECOND session rather than a replacement for it, which is the
      same rule generating one follows: see nextPlanSlot. */
+  const slot = nextPlanSlot(target, { lifting: true });
   const { error } = await upsertPlanRow({
     user_name: ME, email: MY_EMAIL, entry_date: target,
     focus: deriveFocus(MANUAL_DRAFT), exercises: MANUAL_DRAFT,
     archived: false, completed_at: null, mobility: null,
-  }, nextPlanSlot(target, { lifting: true }));
+  }, slot);
   if (error) { console.error("could not save the manual workout", error); toast("Couldn't save that plan. Try again."); return; }
   PLAN_FOR_DATE = null;
   WORKOUT_MODE = forToday ? null : "week";
+  /* The plan just written, not the day's first session (see showPlanScreen). */
+  if (forToday) PLAN_VIEW_SLOT = slot;
   clearDraft();
   /* Through the one door every plan change goes through. Writing a day by hand
      is as much a rewrite of it as generating one, and this used to reload and
@@ -41487,7 +41500,7 @@ async function saveManualWorkout() {
      generator's cached answer for "which day next" was still the one it gave
      before this row existed. */
   await planChangedOn(target, {
-    then: () => { if (forToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+    then: () => { if (forToday) FRESH_PLAN_ID = (TODAY_PLANS.find((p) => planSlot(p) === slot) || TODAY_WORKOUT)?.id || null; },
   });
   toast(forToday ? "Workout plan saved" : "Added to that day");
 }
@@ -41995,9 +42008,12 @@ function openPlanReview(date) {
    has the same screen in review. The tab is switched to first because a
    generate can be started from the week planner and from the calendar, and
    both of those can be reached with another tab in front. */
-function showPlanScreen(date) {
+/* `slot` is the session on that day to show, when it is not the first: a
+   lift generated beside a planned class lands on slot 1, and showing slot 0
+   after generating it put the class on screen instead of the new plan. */
+function showPlanScreen(date, slot = null) {
   if ($("tab-workout")?.classList.contains("hidden")) switchTab("workout");
-  if (date === sessionDate()) goWorkoutScreen(null);
+  if (date === sessionDate()) goWorkoutScreen(null, slot ? { before: () => { PLAN_VIEW_SLOT = slot; } } : {});
   else openPlanReview(date);
 }
 
@@ -42534,7 +42550,10 @@ function renderPlanPreview(opts) {
   if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
 
   // These three are mutually exclusive depending on how far the workout got.
-  if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
+  /* The plan on THIS screen, which on a day with two sessions is not always
+     TODAY_WORKOUT: opening the lift beside a planned yoga class and tapping
+     Start started the yoga. */
+  if ($("planStartBtn")) $("planStartBtn").onclick = () => { if (!review && plan) TODAY_WORKOUT = plan; startWorkout(); };
   if ($("planStartActBtn")) $("planStartActBtn").onclick = () => startPlannedActivity(plan);
   /* Regenerate overwrites today's row outright, so it says what goes with it.
      There is no undo once the new plan is written. */
