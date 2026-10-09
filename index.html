@@ -20041,6 +20041,7 @@ async function pushWidgetSnapshot() {
       /* He gets the home screen too. A widget redraws rarely, so this is
          whatever he last had to say rather than a running commentary. */
       quip: pickQuip("idle") || "",
+      ...widgetToday(partner, hs),
     };
     /* Redrawing a timeline costs the widget its refresh budget, so this only
        goes over when a number actually moved. His line is deliberately left out
@@ -20053,6 +20054,66 @@ async function pushWidgetSnapshot() {
   } catch (err) {
     console.error("widget snapshot failed", err);
   }
+}
+
+/* What "Today, together" draws on the Home Screen, decided here rather than in
+   Swift. Whether somebody trained today is todayEntryFor().gym, the same test
+   renderHero reads for the rings and bothDone, and the week is
+   currentWeekDates() against entryOn(), the days the hero ring counts. If the
+   widget worked any of this out for itself it would be a second answer, and
+   the day it disagreed with Home is the day neither could be trusted.
+
+   The widget cannot recompute anything once it is drawn, so `day` and
+   `streakHolds` are what let it roll forward on its own at midnight: the day
+   this was true of, and whether the streak survives that night on what is
+   logged now. The rest and held days the streak forgives are counted as
+   holding, which is the same forgiveness sharedDayStreak gives them. */
+function widgetToday(partner, hs) {
+  const week = currentWeekDates();
+  const today = todayStr();
+  const mineToday = todayEntryFor(MY_EMAIL);
+  const theirsToday = partner ? todayEntryFor(PARTNER_EMAIL) : null;
+  const iTrained = !!mineToday?.gym;
+  const theyTrained = !!theirsToday?.gym;
+  const myDays = gymDaysThisWeek(ME);
+  const myTarget = weeklyGoalFor(MY_EMAIL);
+  /* The partner's first name only: the line has about twenty characters to
+     work with on a small widget. */
+  const first = partner ? String(partner).trim().split(/\s+/)[0] : "";
+
+  let stateLine;
+  if (!myTarget) stateLine = "Open Unio to set a goal.";
+  else if (!partner) stateLine = `${myDays} of ${myTarget} this week.`;
+  else if (iTrained && theyTrained) stateLine = "Both done today.";
+  else if (theyTrained) stateLine = mineToday?.rest_day ? `${first} trained. Rest day for you.` : `${first} trained. Your turn.`;
+  else if (iTrained) stateLine = `You trained. ${first}'s turn.`;
+  else if (mineToday?.rest_day) stateLine = "Rest day today.";
+  else stateLine = "Nobody's trained yet today.";
+
+  let streakText = "";
+  let streakHolds = false;
+  if (hs) {
+    streakText = `${hs.n} ${hs.unit}${hs.n === 1 ? "" : "s"}${hs.short === "together" ? " together" : ""}`;
+    const mineOk = iTrained || !!mineToday?.rest_day;
+    const theirsOk = theyTrained || !!theirsToday?.rest_day;
+    /* A week streak only moves when a week closes, so it holds overnight on
+       every night but Sunday's, when the week it is waiting on is judged. */
+    streakHolds = hs.unit === "week" ? week.indexOf(today) < 6
+      : hs.short === "together" ? mineOk && theirsOk
+      : mineOk;
+  }
+
+  return {
+    myInitials: initials(ME || "You"),
+    partnerInitials: partner ? initials(partner) : "",
+    streakText,
+    streakHolds,
+    day: today,
+    todayIndex: week.indexOf(today),
+    myWeek: week.map((d) => !!entryOn(ME, d)?.gym),
+    partnerWeek: partner ? week.map((d) => !!entryOn(partner, d)?.gym) : null,
+    stateLine,
+  };
 }
 
 /* How long ago, the way a person would say it. "Done 24m ago" is the difference
@@ -35756,6 +35817,24 @@ async function drainLockScreenSets() {
      owner claims nothing and takes the rubbish out, which is the whole job on
      this path. */
   const mine = SESSION && !SESSION.finished ? (MY_EMAIL || "") : "";
+  /* An empty owner is a claim that no workout exists, and the native side
+     answers it by throwing the whole queue away. That claim is only true once
+     the workout could have been put back. Before then this ran with SESSION
+     still null and binned every tap: the Lock Screen button wakes the app in
+     the background, the boot that restores the session is still in flight
+     when the person opens it, and the resume signal drains first. The sets
+     were logged on the card and gone from the workout.
+
+     So with no workout in memory, nobody signed in yet, or a saved unfinished
+     workout on disk that loadAll has not restored, this waits. loadAll ends in
+     reconcileNativeSurfaces, which drains again with the session in place, and
+     a session that turns out stale is cleared by resumeSessionIfAny, after
+     which the next drain takes the rubbish out as before. */
+  if (!mine) {
+    if (!MY_EMAIL || !ME) return;
+    const onDisk = loadSessionFromStorage();
+    if (onDisk && !onDisk.finished) return;
+  }
   try {
     /* Load changes from the island go first, so a set logged after a change is
        stamped with the weight that was on screen when it was logged. Drained
