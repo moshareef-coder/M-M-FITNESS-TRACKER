@@ -9862,10 +9862,12 @@ function showFatal(what) {
 }
 
 window.addEventListener("error", (e) => {
+  reviewHold("error");
   const where = e.filename ? ` (line ${e.lineno})` : "";
   showFatal((e.message || "") + where + firstAppFrame(e.error));
 });
 window.addEventListener("unhandledrejection", (e) => {
+  reviewHold("error");
   showFatal((e.reason?.message || String(e.reason)) + firstAppFrame(e.reason));
 });
 
@@ -9890,6 +9892,11 @@ function emptyState(iconName, title, hint) {
 }
 
 function toast(msg) {
+  /* Every failed save in this app ends in a toast that starts the same few
+     ways, so this is the one place that hears about all of them. Apple's
+     rating sheet straight after "Couldn't save" is asking somebody to rate
+     the thing that just let them down. */
+  if (/^(couldn't|could not|can't|not saved|something went wrong)/i.test(String(msg || ""))) reviewHold("failure: " + msg);
   const el = $("toast");
   el.textContent = msg;
   el.classList.add("show");
@@ -15510,11 +15517,12 @@ async function finishOnboarding(data) {
   if (data.weight_lb) await saveBodyReading(todayStr(), { weight: data.weight_lb });
   if (data.goal_key) await setActiveGoal(data);
   applyAccentColors();
-  /* Armed here rather than asked here. Onboarding ends by handing over to
-     either the app or the pairing screen, and interrupting that handover with
-     a permission sheet would put it in front of a screen the person has not
-     seen yet. The flag is spent the first time the app itself is on screen. */
-  try { localStorage.setItem(ASK_PUSH_KEY, "1"); } catch { /* private browsing */ }
+  /* The notification ask used to be armed here and fired on the first Home
+     after setup. 5 of 14 accounts said yes to it: at that point there is no
+     partner to hear about and nothing has happened yet, so the sheet was
+     asking for a reason the person could not see. It now comes after the
+     moments that show the reason (the partner joining, the first finished
+     workout); see maybeAskForPush. */
   /* Nobody asked them about a partner, so nobody may be asked again on the way
      in. The partner step used to set this when somebody chose to carry on
      alone, and taking the step out without setting it dropped every brand new
@@ -15725,11 +15733,11 @@ function showApp() {
        before: the tab reads the profile to decide whether to ask at all, and
        the profile is what loadAll went to fetch. */
     if (LAND_ON_PROGRESS) { LAND_ON_PROGRESS = false; switchTab("progress"); }
-    /* After the dashboard is painted, not before. The sheet is asking for
-       something on behalf of a screen the person should be able to see behind
-       it, and it is deliberately outside the awaited chain so a slow permission
-       answer cannot hold up the launch screen. */
-    maybeAskForPush();
+    /* The notification ask no longer fires on launch: it waits for the
+       partner joining or a finished workout. The flag the old launch ask ran
+       on is dropped, so an install that was armed by an older build does not
+       carry a dead key forever. */
+    try { localStorage.removeItem(ASK_PUSH_KEY); } catch { /* private browsing */ }
   });
 }
 
@@ -17793,8 +17801,13 @@ async function showPairCelebration() {
 
   /* Either way out lands on Progress, where the tour shows them the door to
      their partner's side. Later just skips the message. */
-  const toProgress = () => {
+  const toProgress = async () => {
     el.remove();
+    /* The best reason this app will ever have to ask for notifications is on
+       screen right now: a partner who just arrived, whose workouts are what
+       those notifications are about. Before Progress, so the partner tour
+       that opens there does not land underneath the sheet. */
+    await maybeAskForPush("paired");
     PROGRESS_VIEW = "me";
     PROGRESS_GOAL_LENS = null;
     switchTab("progress");
@@ -18741,9 +18754,17 @@ async function tgShowFinish() {
           : `<button type="button" class="btn-primary" id="tgWatchGo">Watch ${first}</button><button type="button" class="tg-ghost" id="tgDone">Close</button>`}
       </div>
     </div>`;
-  $("tgDone").onclick = () => { el.remove(); if (TG?.status === "done") { TG = null; renderTogetherHome(); } };
+  $("tgDone").onclick = () => {
+    el.remove();
+    if (TG?.status === "done") { TG = null; renderTogetherHome(); }
+    /* Closed from Home (they finished after you had already left the
+       workout) this is the end of the celebration. Closed over your own
+       finish screen it is not, and the ask waits for that screen's Done. */
+    reviewFlush();
+  };
   if ($("tgWatchGo")) $("tgWatchGo").onclick = () => tgShowWatch();
   if (both && !wasBoth) {
+    reviewMoment("together_session");
     sfxPlay("pr");
     buzz([20, 60, 30]);
     setTimeout(() => { const c = el.querySelector(".tg-bonus"); if (c && el.isConnected) confettiBurst(c, 40); }, 250);
@@ -21663,6 +21684,9 @@ function wireHirePitch(root) {
    onboarding, where this screen IS the hire step, Mo wanted it to say what
    skipping means there: "Skip, I'll look around first". */
 function showPaywall({ skipLabel = "Not now" } = {}) {
+  /* Somebody just asked for money. A rating request on the way out of that
+     screen reads as the second half of the same pitch. */
+  reviewHold("paywall");
   /* Second chance to warm the offering, for the case where the fetch at
      configure time failed or had not finished before this screen opened. By
      the time somebody has read the page and reached for Subscribe it is in
@@ -34540,6 +34564,7 @@ function renderSession() {
   const setsDone = SESSION.setsDone[ei];
   if (!ex || !Array.isArray(setsDone)) {
     // Session and plan drifted apart; drop it rather than crash the tab.
+    reviewHold("session dropped");
     SESSION = null;
     clearSessionStorage();
     closeSessionUI();
@@ -35353,6 +35378,9 @@ function playXpSummary() {
 }
 
 async function renderSessionComplete() {
+  /* Taken before finishWorkout banks the day, so the review ask can tell a
+     moment that landed with THIS workout from one that was already true. */
+  const reviewBefore = reviewSnapshot();
   await finishWorkout();
   /* The XP rows are weighted by the library's level for each move, and the
      library is a lazy import. Waited for here so the summary never prints the
@@ -35361,6 +35389,7 @@ async function renderSessionComplete() {
   /* The same test finishWorkout banked on, asked again so the screen and the
      database cannot say different things about the same session. */
   const recorded = sessionRecordedAnything();
+  noteSessionMoments(reviewBefore, recorded);
   const loggedNow = todaysLoggedExerciseNames();
   const total = TODAY_WORKOUT.exercises.length;
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
@@ -35548,6 +35577,9 @@ async function sessionDone() {
      plan, so the generator's cached next day is wrong and Home is as stale as
      this tab. */
   await planChangedOn(sessionDate());
+  /* Out of the workout and past its celebration: the first point at which a
+     sheet of ours or Apple's covers nothing the person is still looking at. */
+  afterSessionAsks();
 }
 
 let WORKOUT_MODE = null; // null | "choose" | "manual" | "week" | "recovery" | "review" | "activity"
@@ -48092,7 +48124,8 @@ async function saveNotifyKind(kind, on, box) {
    been tried, or when it worked. */
 let PUSH_LAST_ERROR = null;
 
-/* Set when onboarding finishes, spent the first time the app is on screen. */
+/* What onboarding used to set to arm the launch ask. Nothing sets it now; it
+   is only read to be removed (see the end of showApp's load). */
 const ASK_PUSH_KEY = "ft_ask_push";
 
 /* Where the privacy policy and support pages are actually readable.
@@ -48129,8 +48162,12 @@ async function openPolicy(page) {
   window.open(url, "_blank", "noopener");
 }
 
-/* What we promise to send, written once and shown in both places that promise
-   it: the sheet that asks, and the Notifications screen in Setup.
+/* What we promise to send, on the Notifications screen in Setup.
+
+   It used to be shown on the ask sheet too. Since 2026-10-08 the sheet says
+   Mo's partner-first sentence instead (pushAskCopy), so the two say different
+   things on purpose and BOTH have to stay true: change what the app sends and
+   check both. The note below is why that matters.
 
    One string rather than two, because the two had already drifted. The Setup
    screen was still promising "only when your partner has trained and you have
@@ -48148,8 +48185,8 @@ async function openPolicy(page) {
    surface whose only job is to be believed. */
 function pushPromise() {
   /* "Your partner" rather than their name, always.
-     This is asked immediately after onboarding, which is before most people
-     have paired with anybody, so the name would rarely be there to use and
+     Setup is open to people who have not paired with anybody, so the name
+     would often not be there to use and
      naming somebody implies they already have one. The same three lines then
      hold for every account, paired or not, and there is no branch that can be
      wrong. */
@@ -48180,37 +48217,238 @@ function pushPromiseHtml() {
    "Not now" here never reaches Apple, and the switch in Setup still works for
    anyone who changes their mind.
 
-   The reason given is the partner's, not ours, because that is the honest one
+   WHEN changed on 2026-10-08. It used to fire on the first Home after
+   onboarding, and 5 of 14 accounts said yes: nobody had a partner yet and
+   nothing had happened, so the reason was invisible. Now it fires at the two
+   moments that show the reason. Right after the partner joins (the pair
+   celebration), and right after a finished workout for anyone not yet asked,
+   which is the first finished workout for somebody training alone and also
+   catches the people who paired before this existed and so never see the
+   celebration again. Whichever comes first spends it, once per phone.
+
+   The reason given is the partner's, by name, because that is the honest one
    and it is also the only notification in the app nobody resents. Someone
    training alone gets a different, true sentence rather than the same one with
-   the name removed. */
-async function maybeAskForPush() {
-  if (!isNativeApp()) return;
-  let armed = null;
-  try { armed = localStorage.getItem(ASK_PUSH_KEY); } catch { return; }
-  if (armed !== "1") return;
+   the name removed: nothing reaches them until somebody trains with them, and
+   the sheet says exactly that.
+
+   Returns true when the sheet was shown, so a caller does not stack Apple's
+   rating sheet on top of the answer. */
+const PUSH_ASKED_KEY = "unio.pushAsked";
+function pushAskSpent() { try { return localStorage.getItem(PUSH_ASKED_KEY) === "1"; } catch { return true; } }
+function spendPushAsk() { try { localStorage.setItem(PUSH_ASKED_KEY, "1"); } catch { /* private browsing: it can ask again, once a launch at most */ } }
+/* Its own function so the sandbox can stand in for a phone. On the website
+   there is no iOS sheet to protect and Unio is app only. */
+function pushAskPlatformOk() { return isNativeApp(); }
+
+/* The copy Mo approved on 2026-10-08, word for word, with the partner's first
+   name in it. The solo line is ours: the same promise, made true for somebody
+   nobody is training with yet. */
+function pushAskCopy() {
+  const first = PARTNER_EMAIL ? (partnerName() || "").split(" ")[0] : "";
+  if (first) {
+    return {
+      heading: `Know when ${first} trains?`,
+      body: `Get a nudge when ${first} finishes a workout, starts one, or cheers you on. Nothing else.`,
+    };
+  }
+  return {
+    heading: "Hear from the people you train with?",
+    body: "Once a partner or a group trains with you, get a nudge when they finish a workout, start one, or cheer you on. Nothing else.",
+  };
+}
+
+async function maybeAskForPush(reason = "") {
+  if (!pushAskPlatformOk() || pushAskSpent()) return false;
+  /* Never over a workout in progress; the next moment will do. */
+  if (SESSION) return false;
+  /* Already on, from an earlier install on this phone. Nothing to ask, and
+     nothing left to spend it on later either. */
+  if (await currentPushSub()) { spendPushAsk(); return false; }
+  /* iOS already said no. "Turn on notifications" would then lead to an error
+     about Settings, which is a promise this sheet cannot keep with one tap. */
+  const push = nativePush();
+  if (push?.checkPermissions) {
+    try {
+      const p = await push.checkPermissions();
+      if (p?.receive === "denied") { spendPushAsk(); return false; }
+    } catch { /* unknown: asking is still the right default */ }
+  }
   /* Spent whatever they answer. Asking twice is how a soft ask becomes the
      thing people close without reading. */
-  try { localStorage.removeItem(ASK_PUSH_KEY); } catch { /* private browsing */ }
-  /* Already on, from an earlier install on this phone. Nothing to ask. */
-  if (await currentPushSub()) return;
-
-  const yes = await askConfirm({
-    heading: "Notifications",
-    /* The whole promise, not just the strongest example of it. Leading with
-       the clip and stopping there would have sold this on one notification and
-       then delivered several, which is how an app teaches people that its
-       permission prompts are not to be believed. */
-    bodyHtml: pushPromiseHtml(),
-    ok: "Turn on notifications",
-    cancel: "Not now",
-  });
-  if (!yes) return;
+  spendPushAsk();
+  const copy = pushAskCopy();
+  const yes = await askConfirm({ ...copy, ok: "Turn on notifications", cancel: "Not now" });
+  if (!yes) return true;
   await enablePush();
   /* Said plainly either way. enablePush already writes the reason it failed to
      the Setup screen, but nobody who answered this sheet is going to Setup to
      read it, so the outcome is said here too. */
   toast(await currentPushSub() ? "Notifications on" : "You can turn these on later in Setup");
+  return true;
+}
+
+/* ---------- Asking for an App Store rating ----------
+
+   Apple's own sheet and nothing else. A screen of ours asking "do you love
+   Unio?" first is what guideline 5.6.1 forbids, and it is also the screen
+   people have learned to close. The work here is all WHEN.
+
+   Apple shows its sheet at most three times in 365 days per person, decides
+   on its own whether to show it at all, and never says which it did. So every
+   ask has to land on a high, and a wasted one is a third of the year's
+   budget. The moments: both of you trained today (your finish is the one that
+   made it a together day), a Train together session where both halves
+   finished, and the workout that hit your weekly target.
+
+   And only for somebody with an opinion worth asking for: three workouts
+   logged, an account at least five days old, not asked on this phone in the
+   last 60 days, never in a workout, and never just after something went
+   wrong (an error, a failed save, a workout that recorded nothing, the
+   paywall). Those set a hold rather than being looked up, because "just
+   after" is about this sitting, not about anything stored.
+
+   The moment is noted when it happens and asked about when the celebration
+   is closed, plus a beat: the finish screen and the together finish are the
+   moment, and Apple's sheet over them would cover the thing it is riding on.
+
+   `var`, not `let`: toast() and the error listeners near the top of this file
+   can run while the script is still being read, and a `let` declared this far
+   down would throw there instead of holding. */
+var REVIEW_PENDING = null;
+var REVIEW_HOLD_AT = 0;
+var REVIEW_HOLD_WHY = "";
+var PUSH_ASK_AFTER_SESSION = false;
+const REVIEW_ASKED_KEY = "unio.reviewAskedAt";
+const REVIEW_GAP_DAYS = 60;
+const REVIEW_MIN_WORKOUTS = 3;
+const REVIEW_MIN_ACCOUNT_DAYS = 5;
+/* Long enough that whatever the closed screen was doing has finished
+   arriving, short enough that it still reads as part of the same moment. */
+const REVIEW_DELAY_MS = 1800;
+/* "Right after" an error or the paywall, as a number. Ten minutes covers the
+   rest of the same sitting without punishing tomorrow for today's bad save. */
+const REVIEW_HOLD_MS = 10 * 60 * 1000;
+
+function reviewHold(why) {
+  REVIEW_HOLD_AT = Date.now();
+  REVIEW_HOLD_WHY = String(why || "").slice(0, 80);
+  REVIEW_PENDING = null;
+}
+
+function reviewMoment(kind) {
+  /* A hold that is still running wins: the moment happened, but it happened
+     next to something that went wrong. */
+  if (REVIEW_HOLD_AT && Date.now() - REVIEW_HOLD_AT < REVIEW_HOLD_MS) return;
+  REVIEW_PENDING = kind;
+}
+
+function reviewAskedAt() {
+  try { return Number(localStorage.getItem(REVIEW_ASKED_KEY)) || 0; } catch { return 0; }
+}
+
+/* What a finished workout is measured against. */
+function reviewSnapshot() {
+  const day = sessionDate();
+  return { day, gym: !!entryOn(ME, day)?.gym, week: gymDaysThisWeek(ME) };
+}
+
+/* Called from the finish screen once the day is banked. Also where the
+   notification ask is armed for somebody who has not been asked yet. */
+function noteSessionMoments(before, recorded) {
+  if (!recorded) {
+    /* Ended with nothing recorded: the nearest thing this app has to a
+       cancelled workout, and the wrong note to ask anybody to rate. */
+    reviewHold("nothing recorded");
+    return;
+  }
+  PUSH_ASK_AFTER_SESSION = true;
+  const nowGym = !!entryOn(ME, before.day)?.gym;
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const target = weeklyGoalFor(MY_EMAIL);
+  if (SESSION?.together) {
+    /* Train together has its own finish, which notes its own moment when both
+       halves are in. Counting the same workout twice here would only matter
+       if the two disagreed, and they would. */
+  } else if (!before.gym && nowGym && partner && entryOn(partner, before.day)?.gym) {
+    reviewMoment("together_day");
+  } else if (before.week < target && gymDaysThisWeek(ME) >= target) {
+    reviewMoment("weekly_target");
+  }
+}
+
+/* null when asking is fine, otherwise why not, in words a log can carry. */
+function reviewBlockedBy() {
+  if (SESSION) return "in a workout";
+  if (REVIEW_HOLD_AT && Date.now() - REVIEW_HOLD_AT < REVIEW_HOLD_MS) return `held: ${REVIEW_HOLD_WHY}`;
+  const last = reviewAskedAt();
+  if (last && Date.now() - last < REVIEW_GAP_DAYS * 86400000) return "asked in the last 60 days";
+  const born = Date.parse(MY_PROFILE?.created_at || "");
+  if (!born) return "account age unknown";
+  if (Date.now() - born < REVIEW_MIN_ACCOUNT_DAYS * 86400000) return "account under 5 days old";
+  const workouts = entriesFor(ME).filter((e) => e.gym).length;
+  if (workouts < REVIEW_MIN_WORKOUTS) return `${workouts} workouts logged`;
+  /* Something else is already asking for their attention. */
+  if (document.querySelector(".pop-scrim, .pc-scrim, .cm-scrim, .tg-scrim, .paywall-scrim, .sheet-scrim:not(.hidden)")) return "another sheet is open";
+  return null;
+}
+
+/* Asks if a moment is waiting and nothing says no. A moment that cannot be
+   asked about now is dropped rather than carried: a rating request an hour
+   later is about nothing. The one exception is still being inside the
+   workout, where the finish screen's own Done will be along in a moment. */
+function reviewFlush() {
+  const kind = REVIEW_PENDING;
+  if (!kind) return;
+  if (SESSION) return;
+  REVIEW_PENDING = null;
+  /* A finish often lands a badge too, and its card is up when this runs.
+     That is the same high, so the ask waits behind it (a beat after it
+     closes) rather than being thrown away, for as long as a person
+     plausibly reads a card. Anything else that says no is final. */
+  let waits = 0;
+  const attempt = () => {
+    const why = reviewBlockedBy();
+    if (why === "another sheet is open" && waits++ < 30) { setTimeout(attempt, 1000); return; }
+    if (why) { console.info(`review ask skipped (${kind}): ${why}`); return; }
+    setTimeout(() => {
+      /* Asked again: a lot can open in under two seconds, a new workout or
+         the paywall among them. */
+      const late = reviewBlockedBy();
+      if (late === "another sheet is open" && waits++ < 30) { setTimeout(attempt, 1000); return; }
+      if (late) { console.info(`review ask skipped (${kind}): ${late}`); return; }
+      /* Recorded whether or not Apple shows anything, because nobody can
+         tell from here which it did, and the 60 days is about how often we
+         ask. */
+      try { localStorage.setItem(REVIEW_ASKED_KEY, String(Date.now())); } catch { /* asks again sooner, Apple still caps it */ }
+      requestStoreReview(kind);
+    }, REVIEW_DELAY_MS);
+  };
+  attempt();
+}
+
+async function requestStoreReview(kind) {
+  const plugin = isNativeApp() && window.Capacitor.Plugins.ReviewBridge;
+  if (!plugin) {
+    console.info(`review ask (${kind}): Apple's rating sheet would open here on the phone`);
+    return;
+  }
+  try { await plugin.requestReview(); }
+  catch (err) { console.warn("review request failed", err); }
+}
+
+/* The way out of a finished workout. Notifications first, because that
+   question is spent once and has the better reason right now; if it was
+   asked, the rating waits for another day rather than stacking a second
+   sheet on the first. */
+async function afterSessionAsks() {
+  if (PUSH_ASK_AFTER_SESSION) {
+    PUSH_ASK_AFTER_SESSION = false;
+    /* A beat for Home to paint under the sheet. */
+    await new Promise((r) => setTimeout(r, 600));
+    if (await maybeAskForPush("finished")) { REVIEW_PENDING = null; return; }
+  }
+  reviewFlush();
 }
 
 async function enablePush() {

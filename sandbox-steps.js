@@ -113,6 +113,43 @@
     return row;
   }
 
+  /* ---------- the two asks, on a pretend phone ----------
+     The notification ask and Apple's rating sheet are both phone only, so in
+     this frame the app's own gates say no. This stands in for the phone at
+     the two places it matters, and nowhere else: the platform check, and the
+     native calls at the very end, which become a toast saying what the phone
+     would show. Every gate in between is the app's real code. */
+  function phoneAsks(w, { pushSpent = false, eligible = true } = {}) {
+    try {
+      w.localStorage.removeItem("unio.reviewAskedAt");
+      if (pushSpent) w.localStorage.setItem("unio.pushAsked", "1"); else w.localStorage.removeItem("unio.pushAsked");
+      w.localStorage.setItem("unio.pairSeen", w.eval("PARTNER_EMAIL") || "none");
+    } catch {}
+    w.pushAskPlatformOk = () => true;
+    w.currentPushSub = async () => null;
+    w.enablePush = async () => { w.toast("iOS asks for permission here on the phone"); };
+    w.requestStoreReview = (kind) => { w.toast(`Apple's rating sheet opens here (${kind.replace("_", " ")})`); };
+    /* Cards left over from the world loading (a badge, or the pair
+       celebration when the last step was a solo one) would make the ask wait
+       behind them, which is right on a phone and confusing here. */
+    w.document.querySelectorAll(".pop-scrim, .pc-scrim").forEach((x) => x.remove());
+    /* An account old enough to be asked, in the app and in the fake database
+       (a finish reloads everything from it). */
+    if (eligible) w.eval(`REVIEW_HOLD_AT = 0; REVIEW_PENDING = null;
+      MY_PROFILE.created_at = new Date(Date.now() - 30 * 86400000).toISOString();
+      for (const r of window.__SANDBOX.db.profiles || []) if ((r.email || "").toLowerCase() === MY_EMAIL) r.created_at = MY_PROFILE.created_at;`);
+  }
+  /* Today not trained yet, so the workout you are about to finish is the one
+     that lands the moment. */
+  function notTrainedToday(w) {
+    w.eval(`for (const e of ALL_ENTRIES) if (e.user_name === ME && e.entry_date === todayStr()) e.gym = false;
+      for (const e of (window.__SANDBOX.db.fit_entries || [])) if ((e.email || "").toLowerCase() === MY_EMAIL && e.entry_date === todayStr()) e.gym = false;`);
+  }
+  function oneShortOfTarget(w) {
+    w.eval(`MY_PROFILE.challenge_target = gymDaysThisWeek(ME) + 1;
+      for (const r of window.__SANDBOX.db.profiles || []) if ((r.email || "").toLowerCase() === MY_EMAIL) r.challenge_target = MY_PROFILE.challenge_target;`);
+  }
+
   /* ---------- the journey ----------
      Grouped the way a person meets the app, not the way the code is laid out.
      `scenario` says which world the step needs; the phone only reloads when
@@ -540,6 +577,41 @@
         s: "What you have hit, what is next",
         note: "The tab we just rewrote. It answers one question, which muscle group to train next, and everything else is supporting detail. The information dots explain the levels and the rings.",
         run: (w) => w.switchTab("body") },
+    ]},
+
+    { group: "Asking at the right moment", note: "The notification ask and Apple's rating sheet. Both are phone only, so these steps stand in for the phone: where iOS or Apple would show their own sheet, a toast says so. Everything that decides whether to ask is the app's real code.", steps: [
+      { t: "Notifications: partner joins", scenario: "paired",
+        s: "Asked on the way out of the celebration",
+        note: "The pair celebration plays, then tap Later or Congratulate Mell. Before Progress opens, the ask appears: 'Know when Mell trains?' with 'Get a nudge when Mell finishes a workout, starts one, or cheers you on. Nothing else.' Turn on notifications shows where iOS would ask; Not now just closes it. Either answer spends it: run the celebration again from 'Partner joins' and it does not come back.",
+        run: (w) => { phoneAsks(w); w.showPairCelebration(); } },
+
+      { t: "Notifications: alone, first workout", scenario: "solo",
+        s: "Asked after Done, solo wording",
+        note: "Somebody training alone is asked after their first finished workout instead. Tick a set, end the workout (pause, hold End), then tap Done on the finish screen. Back on the tab the ask appears with the solo wording: 'Hear from the people you train with?', because nothing reaches them until somebody trains with them. Ending with nothing logged does not ask.",
+        run: (w) => { phoneAsks(w); w.switchTab("workout"); w.startWorkout(); } },
+
+      { t: "Rating: you both trained today", scenario: "paired",
+        s: "Mell trained, your finish makes it both",
+        note: "Mell has trained today and you have not. Tick a set, end the workout, tap Done. About two seconds after you land back on the tab a toast stands in for Apple's rating sheet. Not during the workout, not over the finish screen. Run it again straight away and nothing happens: one ask per 60 days on a phone.",
+        run: (w) => { phoneAsks(w, { pushSpent: true }); notTrainedToday(w); w.switchTab("workout"); w.startWorkout(); } },
+
+      { t: "Rating: weekly target hit", scenario: "solo",
+        s: "This workout completes the week",
+        note: "Your target is set one above what you have done this week, so this workout hits it. Tick a set, end, Done; the stand-in toast follows about two seconds later.",
+        run: (w) => { phoneAsks(w, { pushSpent: true }); notTrainedToday(w); oneShortOfTarget(w); w.switchTab("workout"); w.startWorkout(); } },
+
+      { t: "Rating: Train together finish", scenario: "paired",
+        s: "Both halves done",
+        note: "The shared finish, both of you done. Nothing is asked while it is up; tap Done and the stand-in toast follows about two seconds later.",
+        run: (w) => { phoneAsks(w, { pushSpent: true }); simStop(); quietTours(w); w.switchTab("home");
+          w.eval(`TG = { id: "tg-ask", host_email: MY_EMAIL, guest_email: PARTNER_EMAIL, leader_email: MY_EMAIL, status: "done", mode: "same",
+            host_done_at: new Date().toISOString(), guest_done_at: new Date().toISOString(), started_at: new Date().toISOString(), workout: { exercises: [] } }`);
+          w.tgShowFinish(); } },
+
+      { t: "Rating: not after a failed save", scenario: "paired",
+        s: "Same moment, nothing asked",
+        note: "The same together day as above, right after a save failed (the toast you see first). Finish the workout the same way: no rating toast follows, because a failure in the last ten minutes holds the ask. The paywall, an app error and a workout that recorded nothing hold it the same way.",
+        run: (w) => { phoneAsks(w, { pushSpent: true }); notTrainedToday(w); w.toast("Couldn't save the workout time"); w.switchTab("workout"); w.startWorkout(); } },
     ]},
 
     { group: "Starting from nothing", note: "The three empty worlds the audit could not open. Every one of these is a screen a real new account meets before it meets any of the others.", steps: [
