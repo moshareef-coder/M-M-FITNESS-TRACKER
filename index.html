@@ -30466,13 +30466,25 @@ async function removeCurrentExercise() {
   /* On to the next thing not yet done, looking forward first. */
   let to = SESSION.completed.findIndex((c, i) => i >= ei && !c);
   if (to === -1) to = SESSION.completed.findIndex((c) => !c);
-  SESSION.exerciseIndex = to === -1 ? Math.min(ei, exs.length - 1) : to;
   SESSION.restStartedAt = null;
   stopRestTicker();
   SESSION_LAST_EX = null;
+  toast(`Removed ${name}`);
+  /* Nothing left undone means the workout is over. Landing on a lift that was
+     already banked instead put it back on screen as "Log set 1 of 3", and
+     logging it again wrote it twice. The plan is saved first because the
+     summary reloads it, and a stale row would count the removed lift. */
+  if (to === -1) {
+    if (TODAY_WORKOUT.id) {
+      const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
+      if (error) console.error("removed exercise not saved to the plan", error);
+    }
+    wrapUpLifts();
+    return;
+  }
+  SESSION.exerciseIndex = to;
   saveSessionToStorage();
   renderSession();
-  toast(`Removed ${name}`);
   if (TODAY_WORKOUT.id) {
     const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
     if (error) console.error("removed exercise not saved to the plan", error);
@@ -33852,26 +33864,28 @@ async function doFinishExerciseAndAdvance() {
   // A new lift is on the stage. Said after the render below has put it there.
   if (nextIdx !== -1) setTimeout(() => sayQuip("nextExercise"), 900);
 
-  if (nextIdx === -1) {
-    /* The last lift is banked. If the plan carries a cool-down and it was
-       not skipped for the day, the session ends through it; the summary
-       waits until the holds are done or skipped. Ending early (endWorkoutNow)
-       does not come through here, so someone leaving is never held back. */
-    const mob = planMobility();
-    if (mob && !mob.skippedCooldown && mob.cooldown.length) {
-      SESSION.phase = "cooldown";
-      SESSION.stretchIndex = 0;
-      SESSION.stretchSide = 1;
-      SESSION.stretchStartedAt = Date.now();
-      saveSessionToStorage();
-      renderSession();
-      return;
-    }
-    clearSessionStorage();
-    renderSessionComplete();
-  } else {
+  if (nextIdx === -1) wrapUpLifts();
+  else renderSession();
+}
+
+/* Every lift in the plan is banked. If the plan carries a cool-down and it was
+   not skipped for the day, the session ends through it; the summary waits
+   until the holds are done or skipped. Ending early (endWorkoutNow) does not
+   come through here, so someone leaving is never held back. */
+function wrapUpLifts() {
+  SESSION.exerciseIndex = TODAY_WORKOUT.exercises.length;
+  const mob = planMobility();
+  if (mob && !mob.skippedCooldown && mob.cooldown.length) {
+    SESSION.phase = "cooldown";
+    SESSION.stretchIndex = 0;
+    SESSION.stretchSide = 1;
+    SESSION.stretchStartedAt = Date.now();
+    saveSessionToStorage();
     renderSession();
+    return;
   }
+  clearSessionStorage();
+  renderSessionComplete();
 }
 
 async function logExerciseSilent(name, weight, reps, sets) {
