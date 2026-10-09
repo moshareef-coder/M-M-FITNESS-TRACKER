@@ -35,14 +35,7 @@ hardcodes `verify_jwt: true`, which is what killed every notification between
 The App Review account is seeded and paired (`supabase/seed-app-review.sql`),
 and reporting is reachable from Setup, Safety without needing a clip on screen.
 
-## 1. TestFlight is still serving build 6
-
-To upload a current build I need the **Issuer ID**: App Store Connect, Users
-and Access, Integrations, App Store Connect API, the UUID at the top of that
-page. The key and Key ID are already in place at
-`~/.appstoreconnect/private_keys/AuthKey_4X3J46W9NL.p8`.
-
-## 2. Optional: email alerts for reports
+## 1. Optional: email alerts for reports
 
 Push already alerts you and the queue in Setup, Admin, Reports is where a
 report gets closed. Email starts working with no code change the moment these
@@ -55,30 +48,13 @@ RESEND_FROM="Unio <reports@creativelab1.com>"
 
 Needs a Resend account and creativelab1.com verified there.
 
-## 3. In-app purchase, built but switched off
+## 2. Point the app at trainwithunio.com (next build)
 
-`PAYWALL_ON` in index.html is `false` and everything is unlocked. Nothing is
-gated until all four of these are done, because a live paywall with no product
-behind it is the main feature switched off for everybody, reviewer included.
+`PUBLIC_SITE` in index.html is still `m-m-fitness-tracker.vercel.app`, so shared
+sessions and the privacy link from the sign in screen show the old domain inside
+an app called Unio. trainwithunio.com has `/privacy` and `/terms` since
+2026-10-02, so this is a one line change in the next build.
 
-1. **Paid Applications Agreement** in App Store Connect, Business. Banking and
-   tax forms too. Nothing can be tested in sandbox until this is signed.
-2. **Apple Small Business Program**, same place. 15% instead of 30%. Ten
-   minutes, and the highest value form in the project.
-3. **A RevenueCat account**, then give me the public SDK key.
-4. Apply `supabase/migrations/20260916_subscriptions.sql`.
-
-Then I install `@revenuecat/purchases-capacitor@11` (v13 needs Capacitor 8, we
-are on 7), create the product, wire the webhook and flip the flag.
-
-Agreed: $7.99 a month, covering both people in a pair, paid by one of them.
-Premium is the generator, week planning, body impact, the progress analysis and
-accent colours. Free is everything shared with a partner, manual logging, and
-all of somebody's own history, weigh-ins and photos.
-
-## 4. A domain
-
-`PUBLIC_SITE` in index.html is `m-m-fitness-tracker.vercel.app`. That is what
-people see when a session is shared and what a reviewer sees on the privacy
-link from the sign in screen, inside an app called Unio. It is one constant now,
-so it is a one line change once there is a domain.
+Done and removed 2026-10-02: the Issuer ID (it was already in
+`scripts/release-ios.sh`, and the key reads App Store Connect fine), and the
+in-app purchase setup (1.0 shipped with `PAYWALL_ON = true`).

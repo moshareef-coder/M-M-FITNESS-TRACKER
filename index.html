@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<!-- No zoom. The iOS web view honours maximum-scale and user-scalable, so a pinch,
+     a double tap or a tap into a small text box can no longer leave the app
+     zoomed in and bigger than the phone, which is what made it read as a web
+     page. Safari on the website still lets people pinch, by its own rule. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<!-- Capacitor injects window.Capacitor before the page runs, so the app can mark
+     itself here, before first paint, and the native-only CSS never flashes. -->
+<script data-role="native-flag">if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native");</script>
 <title>Unio</title>
 <meta name="description" content="Train with your partner. Rank up together." />
 <meta name="theme-color" content="#0c0e13" />
@@ -255,6 +262,26 @@
   html {
     overflow-x: hidden;
     overscroll-behavior: none;
+    /* manipulation keeps scrolling and drops double-tap-to-zoom, which also
+       removes the wait iOS adds after a tap while it checks for a second one.
+       No grey flash on tap and no font inflation on rotate: neither happens
+       in a native app. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* In the app, words on buttons and cards are not selectable and a long press
+     does not pop the copy / look up menu, as in any native app. Fields people
+     type in, and anything marked .selectable, keep normal text selection. The
+     website keeps selection everywhere. */
+  html.native body {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+  }
+  html.native input, html.native textarea, html.native [contenteditable="true"], html.native .selectable {
+    -webkit-user-select: text; user-select: text;
+    -webkit-touch-callout: default;
   }
   /* An overlay is up: the page behind it must not move at all. overflow:hidden
      alone does not stop a finger in an iOS web view, and this ships as one, so
@@ -4297,6 +4324,16 @@
   .si-msg { font-size: 12.5px; line-height: 1.45; margin: 12px 0 0; min-height: 18px; color: var(--muted); }
   .si-msg.bad { color: var(--partner-ink); }
   .si-msg.good { color: var(--accent-ink); font-weight: 700; }
+  .hagree-tick { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.45; color: var(--text); margin: 10px 0 0; cursor: pointer; }
+  .hagree-tick input { width: 22px; height: 22px; flex: none; margin: 1px 0 0; accent-color: var(--me); }
+  .hagree a { color: var(--text); text-underline-offset: 2px; }
+  .si-agree { display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: 14px; line-height: 1.45;
+    color: var(--text); margin: 0 0 16px; cursor: pointer; }
+  /* Specific enough to beat the sheet's full-width input styling, which otherwise stretches the box
+     across the row and pushes the sentence off the right edge. */
+  .si-sheet .si-agree input[type="checkbox"] { width: 22px; min-width: 22px; height: 22px; flex: 0 0 22px; margin: 1px 0 0; padding: 0; accent-color: var(--me); }
+  .si-sheet .si-agree span { flex: 1; min-width: 0; }
+  .si-agree a { color: var(--text); text-underline-offset: 2px; }
   .si-legal { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 20px 0 0; max-width: 34ch; }
   .si-legal a { color: var(--muted); text-underline-offset: 2px; }
   .si-pw-wrap { position: relative; width: 100%; }
@@ -7240,7 +7277,9 @@
   label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 4px; }
   input[type="number"], input[type="date"], input[type="text"], textarea, select {
     width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
-    background: var(--panel-2); color: var(--text); font-size: 15.5px; font-family: inherit;
+    /* 16px, not 15.5: iOS zooms into any field under 16px when it is tapped
+       and never zooms back out. */
+    background: var(--panel-2); color: var(--text); font-size: 16px; font-family: inherit;
   }
   textarea { resize: vertical; min-height: 44px; }
   .gym-toggle {
@@ -8636,7 +8675,7 @@
           <option value="Female">Female</option>
           <option value="Rather not say">Rather not say</option>
         </select>
-        <input type="number" id="setupAge" placeholder="Age" min="13" max="100" />
+        <input type="number" id="setupAge" placeholder="Age" min="18" max="100" />
       </div>
       <div class="row2" style="margin-top:10px;">
         <input type="number" id="setupHeightFt" placeholder="Height: feet" min="3" max="8" />
@@ -8808,9 +8847,11 @@
     <div class="card danger-card">
       <h2>Delete account</h2>
       <p class="muted-note" style="margin-top:-6px;">
-        This permanently erases your profile, workouts, weigh-ins, photos and rank.
+        This permanently erases your profile, workouts, weigh-ins, measurements, photos and rank.
         It cannot be undone, and it unpairs your partner.
       </p>
+      <p class="muted-note">If you subscribe, deleting your account does not stop Apple billing you. Cancel first
+        in your iPhone's Settings, under your name then Subscriptions.</p>
       <div id="deleteStep1">
         <button type="button" class="btn-danger" id="deleteAccountBtn">Delete my account</button>
       </div>
@@ -9090,7 +9131,11 @@ function searchExerciseCatalog(query, limit = 8) {
     .slice(0, limit);
 }
 
-const APP_VERSION = "2026.09.25.2";
+const APP_VERSION = "2026.10.04.1";
+/* Bump when the Terms of Use or Privacy Policy change in a way people must agree to again.
+   It is stored on the account (profiles.terms_version) with the moment they agreed. */
+const TERMS_VERSION = "2026-10-04";
+let LIMITS_PRIVATE = false;
 const THEME_KEY = "ft_theme";
 const SOLO_KEY = "ft_solo";
 
@@ -9696,6 +9741,12 @@ function renderSignInScreen(state = {}) {
       </div>
 
       <div class="si-sheet">
+        <!-- A real tick, above the buttons, before any of them works. Small grey "by continuing" text under
+             the buttons is the kind of notice courts have refused to enforce (Berman v. Freedom Financial,
+             9th Cir. 2022), and it never asked anybody's age. The tick is what gets recorded on the account. -->
+        <label class="si-agree"><input type="checkbox" id="siAgree" ${termsTicked() ? "checked" : ""} />
+          <span>I'm 18 or older, and I agree to the <a href="#" data-policy="terms.html">Terms of Use</a> and
+          <a href="#" data-policy="privacy.html">Privacy Policy</a>.</span></label>
         ${isNativeApp() ? `<button type="button" class="btn-apple" id="appleSignInBtn"><svg viewBox="0 0 384 512" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg> Continue with Apple</button>` : ""}
         <button type="button" class="btn-google" id="googleSignInBtn">${icon("google", 20)} Continue with Google</button>
 
@@ -9721,9 +9772,7 @@ function renderSignInScreen(state = {}) {
              that needs its terms agreed to, and the no-tolerance rules live in
              the terms rather than the privacy policy. This is the only screen
              every account passes through. -->
-        <p class="si-legal">By continuing you agree to the
-          <a href="#" data-policy="terms.html">Terms of Use</a> and
-          <a href="#" data-policy="privacy.html">Privacy Policy</a>. Questions go to
+        <p class="si-legal">Unio is for people 18 and over. Questions go to
           <a href="#" data-policy="support.html">support</a>.</p>
       </div>
     </div>`;
@@ -9734,7 +9783,18 @@ function renderSignInScreen(state = {}) {
     el.className = "si-msg " + (tone || "");
   };
 
+  /* Every way in goes through the tick. Ticking is remembered on this device and written to the
+     account once it is signed in (recordTermsAgreement). */
+  const agreed = () => {
+    if ($("siAgree").checked) { noteTermsTick(); return true; }
+    msg("Tick the box first: you need to be 18 or older and agree to the terms.", "bad");
+    $("siAgree").focus();
+    return false;
+  };
+  $("siAgree").onchange = () => { if ($("siAgree").checked) { noteTermsTick(); msg("", ""); } };
+
   if ($("appleSignInBtn")) $("appleSignInBtn").onclick = async () => {
+    if (!agreed()) return;
     const btn = $("appleSignInBtn");
     btn.disabled = true;
     msg("", "");
@@ -9785,6 +9845,7 @@ function renderSignInScreen(state = {}) {
   };
 
   $("googleSignInBtn").onclick = async () => {
+    if (!agreed()) return;
     const btn = $("googleSignInBtn");
     btn.disabled = true;
     msg("Opening Google…", "");
@@ -9860,6 +9921,7 @@ function renderSignInScreen(state = {}) {
   };
 
   $("emailSignInBtn").onclick = async () => {
+    if (!agreed()) return;
     const email = ($("siEmail").value || "").trim();
     const password = $("siPassword").value || "";
     /* Deliberately not a regex that tries to be clever about addresses: the
@@ -10726,7 +10788,7 @@ function obChips(items, selected, attr) {
 const ONBOARD_INTRO = [
   {
     h: "Hi. I'm Unio.",
-    say: "I'm your personal trainer now. I'll build a plan that's yours, and I'll stay on you until it's done.",
+    say: "I'll plan your training now. I'll build a plan that's yours, and I'll stay on you until it's done.",
     btn: "Let's go",
   },
   {
@@ -12925,8 +12987,10 @@ function renderLimitsPage() {
   $("limitsRoot").innerHTML = `
     <div class="card">
       <h2>Does anything hurt?</h2>
-      <p class="muted-note">Tap the body, or tap a chip: they are the same answer. Anything marked is left
-        out of every workout we generate from here on, and each chip says what that costs you.</p>
+      <p class="muted-note">Tap the body, or tap a chip: they are the same answer. We take out what loads
+        anything you mark, warm-ups and stretches included, and each chip says what that costs you. If nothing
+        else can fill a slot, we keep the lightest option and tell you at the top of the plan. This is not
+        medical advice: if something actually hurts, see a doctor or physio before you train it.</p>
       <div class="bi-figures" id="limitsFigures">
         <div class="bi-fig" data-view="Front"><canvas id="limitsFront" class="bi-canvas"></canvas></div>
         <div class="bi-fig" data-view="Back"><canvas id="limitsBack" class="bi-canvas"></canvas></div>
@@ -12943,9 +13007,9 @@ function renderLimitsPage() {
     </div>
     <div class="card">
       <h2>Anything else?</h2>
-      <p class="muted-note">One line, kept as you wrote it and read back to you here. Nothing reads it
-        but a person.</p>
-      <input id="limitsNote" type="text" maxlength="120" placeholder="A condition, a recent surgery, anything" />
+      <p class="muted-note">One line for you to remember by. Unio does not read it and it does not change
+        your plan. If you have a medical condition or recent surgery, check with your doctor before you train.</p>
+      <input id="limitsNote" type="text" maxlength="120" placeholder="A note to yourself" />
     </div>
     <button type="button" class="btn-primary" id="limitsSaveBtn">Save</button>
     <button type="button" class="btn-ghost" id="limitsSkipBtn">Skip for now</button>
@@ -13131,16 +13195,53 @@ function closeLimitsPage() {
   root.innerHTML = "";
 }
 
+/* Agreeing to the terms. The tick on the sign-in screen is remembered on this
+   device, then written to the account the first time loadAll sees the account
+   can hold it (the terms_version and terms_accepted_at columns, added by
+   20261004_terms_and_health_consent.sql). Somebody who signed in before the tick
+   existed is asked once, in a sheet, when the version on their account is not
+   this one. Before that migration runs nothing is written and nobody is asked:
+   asking on every launch because the account cannot remember the answer would
+   be worse than not asking. */
+function termsTicked() {
+  try { return JSON.parse(localStorage.getItem("unio.terms") || "null")?.v === TERMS_VERSION; } catch { return false; }
+}
+function noteTermsTick() {
+  try { localStorage.setItem("unio.terms", JSON.stringify({ v: TERMS_VERSION, at: new Date().toISOString() })); } catch {}
+}
+let TERMS_ASKING = false;
+async function recordTermsAgreement() {
+  if (!MY_PROFILE || !MY_EMAIL || !("terms_version" in MY_PROFILE) || MY_PROFILE.terms_version === TERMS_VERSION || TERMS_ASKING) return;
+  let at = null;
+  try { at = JSON.parse(localStorage.getItem("unio.terms") || "null"); } catch {}
+  if (!at || at.v !== TERMS_VERSION) {
+    TERMS_ASKING = true;
+    const yes = await askConfirm({
+      heading: "We updated our terms",
+      bodyHtml: `Unio is for people 18 and over. Please read the <a href="#" data-policy="terms.html">Terms of Use</a>
+        and <a href="#" data-policy="privacy.html">Privacy Policy</a>, then tap below to keep training.`,
+      ok: "I'm 18+ and I agree",
+      cancel: "Not now",
+    });
+    TERMS_ASKING = false;
+    if (!yes) return;
+    noteTermsTick();
+    at = { v: TERMS_VERSION, at: new Date().toISOString() };
+  }
+  const { error } = await sb.from("profiles").update({ terms_version: at.v, terms_accepted_at: at.at }).eq("email", MY_EMAIL);
+  if (error) { console.error("terms: could not record the agreement", error); return; }
+  MY_PROFILE = { ...MY_PROFILE, terms_version: at.v, terms_accepted_at: at.at };
+}
+
 /* The one writer for profiles.limits, same upsert shape as saveFocusGroups.
    updated_at goes inside the jsonb because the engine does not set it: it is
    there so a limit can be aged the way focus_chosen_at ages a body map pick. */
 async function saveLimits(limits, { quiet = false } = {}) {
-  const { error } = await sb.from("profiles").upsert({
-    email: MY_EMAIL,
-    user_name: ME,
-    limits,
-    updated_at: new Date().toISOString(),
-  });
+  if (!(await ensureHealthAgreements())) return false;
+  /* Into the private table once it exists (see loadAll), the old column until then. */
+  const { error } = LIMITS_PRIVATE
+    ? await sb.from("profile_limits").upsert({ email: MY_EMAIL, limits, updated_at: new Date().toISOString() })
+    : await sb.from("profiles").upsert({ email: MY_EMAIL, user_name: ME, limits, updated_at: new Date().toISOString() });
   if (error) { if (!quiet) toast("That didn't save"); console.error(error); return false; }
   await loadAll();
   return true;
@@ -13286,7 +13387,7 @@ const GOAL_TUNE = {
      joints, into its own column, so Setup > Limits opens on the same answer. */
   "move-better": { kind: "hurts", field: "hurts",
     title: "Does anything hurt?",
-    sub: "Tap it and nothing in the plan loads it, lifts, warm-up and stretches included. Each chip says what that costs. This is not medical advice, and if something actually hurts, see someone about it." },
+    sub: "Tap it and we take out what loads it, warm-up and stretches included. If nothing else can fill a slot, we keep the lightest option and tell you. Each chip says what that costs. This is not medical advice: if something actually hurts, see a doctor or physio before you train it." },
 };
 
 /* Every tuning answer on the draft, as one object keyed by goal. One column
@@ -13784,7 +13885,7 @@ const OB_ROBOT = {
      to measure before anybody had measured anything; this is the promise that
      the question still exists, on the screen where it gets answered. */
   plan: () => "There it is. Your week, in writing. You can track whatever you want in Progress. I'll show you later.",
-  hire: () => "That's your plan. Hire me as your personal trainer and I'll do the rest.",
+  hire: () => "That's your plan. Let me plan your training from here and I'll do the rest.",
   commit: () => "This is the part where I get sincere for one second.",
 };
 
@@ -14146,7 +14247,7 @@ function renderOnboardStep(step, data = {}) {
         </div>
         <label class="ob-lab">Age <span class="ob-opt">for the calorie estimate and the strength standards, both age adjusted</span></label>
         <div class="ob-row">
-          <input id="obAge" type="number" inputmode="numeric" min="13" max="100" placeholder="years" value="${data.age || ""}" />
+          <input id="obAge" type="number" inputmode="numeric" min="18" max="100" placeholder="years" value="${data.age || ""}" />
         </div>
         <label class="ob-lab">Height <span class="ob-opt">for the healthy-weight line and the calorie estimate, not the training</span></label>
         <div class="ob-row">
@@ -14188,9 +14289,11 @@ function renderOnboardStep(step, data = {}) {
     ["obAge", "obFt", "obIn", "obLb"].forEach((id) => { $(id).oninput = refresh; });
     refresh();
     $("aboutNext").onclick = () => {
+      const ageRaw = parseInt($("obAge").value, 10);
+      if (Number.isFinite(ageRaw) && ageRaw < 18) { toast("Unio is for people 18 and over."); $("obAge").focus(); return; }
       const next = {
         ...data,
-        age: clampNum($("obAge").value, 13, 100),
+        age: clampNum($("obAge").value, 18, 100),
         height_in: readHeight(),
         weight_lb: parseFloat($("obLb").value) || null,
         ...(sexPick ? { sex: sexPick === "none" ? null : sexPick, sex_asked: true } : {}),
@@ -14919,6 +15022,10 @@ function finishOnboardingFromDraft(data) {
 let LAND_ON_PROGRESS = false;
 
 async function finishOnboarding(data) {
+  /* The end of onboarding is where weight, limits and the first plan are all written, so it is
+     where the two agreements are asked for anybody who reaches it first. Declining leaves them on
+     the last step, which can be tapped again. */
+  if (!(await ensureHealthAgreements())) return;
   ME = data.name;
   /* Height and weight are asked on the goal weight screen, the one step that
      wants a number, rather than as a stats interrogation before anything is
@@ -15842,6 +15949,13 @@ async function loadAll() {
      rather than an error. Caught by the sandbox walk returning zero rows for
      a fixture that has 77. */
   const LOAD_EMAILS = PARTNER_EMAIL ? [MY_EMAIL, PARTNER_EMAIL] : [MY_EMAIL];
+  /* Which joints hurt, and the note, live in a table only their owner can read
+     (20261004_profile_limits_private.sql). On profiles they rode along with every
+     select("*") a partner's app made, so a partner's phone held the other's pain
+     list without anything on screen saying so. Mine only, beside the batch. Until
+     that migration runs the table is missing, the query errors, and the old column
+     is used exactly as before. */
+  const limitsP = sb.from("profile_limits").select("limits").eq("email", MY_EMAIL).maybeSingle();
   const [entriesRes, bodyRes, exLogRes, profilesRes, plansRes, theirPlansRes, goalsRes, reactRes, badgesRes, swapsRes] = await Promise.all([
     sb.from("fit_entries").select("*").in("email", LOAD_EMAILS).order("entry_date", { ascending: true }),
     /* The weigh-ins and the tape, which a partner's RLS can hold back on its
@@ -15949,6 +16063,12 @@ async function loadAll() {
   ALL_SWAPS = keep(swapsRes, ALL_SWAPS);
   MY_PROFILE = ALL_PROFILES.find((p) => p.email === MY_EMAIL) || MY_PROFILE;
   PARTNER_PROFILE = ALL_PROFILES.find((p) => p.email === PARTNER_EMAIL) || null;
+  const limitsRes = await limitsP;
+  if (!limitsRes.error && MY_PROFILE) {
+    LIMITS_PRIVATE = true;
+    MY_PROFILE = { ...MY_PROFILE, limits: limitsRes.data ? limitsRes.data.limits : (MY_PROFILE.limits ?? null) };
+  }
+  recordTermsAgreement();
   /* After ALL_PROFILES, because a reading on a day with no fit_entries row
      needs a name to sit under, and after ALL_ENTRIES for the obvious reason. */
   ALL_BODY = keep(bodyRes, ALL_BODY);
@@ -16151,6 +16271,7 @@ function mergeBodyReadings() {
    sessions, and a day with nothing on it but a number on the scale is one row
    in one table. */
 async function saveBodyReading(entry_date, patch) {
+  if (!(await ensureHealthAgreements())) return false;
   const row = { email: MY_EMAIL, entry_date, ...bodyFieldsOf(bodyRowFor(MY_EMAIL, entry_date)), ...patch };
   const landed = await safeWrite("body_measurements", "upsert", row, { onConflict: "email,entry_date" });
   if (!landed) applyLocally("body_measurements", row);
@@ -19248,11 +19369,11 @@ function clipRecorderHTML(name) {
       <span class="clip-who">To ${escapeHtml(name)}, training now</span>
     </div>
     <div class="clip-bottom" id="clipControls">
-      <div class="clip-hint" id="clipHint">Up to ${CLIP_SECONDS} seconds. Tap again to stop early.</div>
+      <div class="clip-hint" id="clipHint">Up to ${CLIP_SECONDS} seconds. Film yourself only, nobody else without their OK.</div>
       <button type="button" class="clip-shutter" id="clipShutter" aria-label="Record">
         <svg class="clip-ring" viewBox="0 0 96 96"><circle id="clipRing" cx="48" cy="48" r="44" stroke-dasharray="276.46" stroke-dashoffset="276.46"/></svg>
       </button>
-      <div class="clip-note">Not saved anywhere. They get two watches and it is gone.</div>
+      <div class="clip-note">They get two watches and it is gone, unless it is reported. Then we keep it until the report is handled.</div>
     </div>`;
 }
 
@@ -19734,15 +19855,21 @@ async function reportClip(clip) {
    product, and if the two ever disagree the store wins and we have lied on
    a paywall, so this string and that product are changed together.
 
-   Every identifier around here says premium and every word on the screen says
-   personal trainer, and that is on purpose rather than a rename half done.
+   Every identifier around here says premium and the screen says Unio Plus
+   (2026-10-04: no longer "personal trainer", which promised a trainer's standard
+   of care), and that is on purpose rather than a rename half done.
    IS_PREMIUM, requirePremium, the RevenueCat entitlement "premium", the
    subscriptions table and the App Store product unio_premium_monthly are all
    configured against that word in places this file cannot reach, and renaming
    them here would only make the code disagree with the store. The product is
    what the robot is: you hire him. "Premium" is being kept back for a tier
    above this one, which is the other reason not to spend the word now. */
-const PREMIUM_PRICE = "$7.99";
+/* The fallback only. The store's own price string replaces it the moment the
+   offering arrives (primeOfferings, prefetched at sign-in), because outside the
+   US Apple charges local currency and "$7.99" on a paywall that bills in pounds
+   is a misleading price (guideline 3.1.2). The web build never gets an
+   offering, and only shows the US price it sells at. */
+let PREMIUM_PRICE = "$7.99";
 
 /* One real screenshot per feature, captured from the app itself rather than
    drawn, because a carousel showing something the app does not actually do is
@@ -19811,7 +19938,7 @@ const HIRE_PITCH_LINES = {
   /* `next` went with the pitch on the next-workout card, 2026-09-21: that
      card gates on the Generate button now rather than selling above it. */
   progress: "Hire me and I'll track all of this for you, and show you the line.",
-  generic: "Hire me as your personal trainer and I'll take this from here.",
+  generic: "Let me plan your training and I'll take this from here.",
 };
 
 /* The pitch, in place. Everywhere a paid surface is reached by somebody who
@@ -19878,10 +20005,10 @@ function showPaywall({ skipLabel = "Not now" } = {}) {
       <button type="button" class="paywall-x" data-pay="0" aria-label="Close">&times;</button>
       <div class="paywall-sheet">
           <div class="paywall-head">
-            <div class="paywall-word"><b>UNIO</b> <span>Personal trainer</span></div>
+            <div class="paywall-word"><b>UNIO</b> <span>Plus</span></div>
             <div class="paywall-say">
               ${robotFaceSVG(40, "paywall-say-face")}
-              <span>Hire me as your personal trainer.</span>
+              <span>Let me plan your training.</span>
             </div>
           </div>
           <!-- Swipe through what it actually looks like before reading a word
@@ -19938,7 +20065,7 @@ function showPaywall({ skipLabel = "Not now" } = {}) {
        the only one read out. Everything else here is a price and the legal
        copy Apple require, and a robot reading terms of use aloud is a
        different product. */
-    voice.say("Hire me as your personal trainer.", { from: "paywall", gap: 120000 });
+    voice.say("Let me plan your training.", { from: "paywall", gap: 120000 });
     /* The dots track a scroll position rather than a click handler, because
        the track scrolls by touch and by the arrow-key/trackpad affordances a
        horizontal overflow gets for free, and both need to land on the same
@@ -20060,7 +20187,11 @@ function primeOfferings() {
   const rc = purchasesPlugin();
   if (!rc) return null;
   if (!OFFERINGS_PROMISE) {
-    OFFERINGS_PROMISE = rc.getOfferings().catch((err) => {
+    OFFERINGS_PROMISE = rc.getOfferings().then((o) => {
+      const ps = o?.current?.availablePackages?.[0]?.product?.priceString;
+      if (ps) PREMIUM_PRICE = ps;
+      return o;
+    }).catch((err) => {
       /* Cleared on failure so the next attempt genuinely retries. A rejected
          promise kept here would poison every later purchase with a stale
          error from whenever the network happened to be bad. */
@@ -29450,6 +29581,7 @@ function workoutEnginePayload({ focus = null, avoid = [], sessionMinutes = null,
    and redraws once at the end, and reads the answer off the return value. */
 async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = null, keepFocus: wantFocus = null, limits = null, focusGroups = null, quiet = false, avoidNames = null, slot: wantSlot = null } = {}) {
   if (isCoachedClient()) { toast("Your coach sets your workouts"); return false; }
+  if (!(await ensureHealthAgreements())) return false;
   /* Mo: "the only way I can go back and generate a new workout or do anything
      is if I end that workout." The workout tab already stands in front of
      every button that reaches this, but generating is also reachable from Home
@@ -29978,6 +30110,74 @@ function askConfirm({ heading, body, bodyHtml, ok, cancel = "Keep going" }) {
     });
     scrim.onclick = (e) => { if (e.target === scrim) { scrim.remove(); resolve(false); } };
   });
+}
+
+/* Two agreements, asked once, together, before Unio plans a workout or stores
+   health information for the first time, whichever comes first.
+   - The health warning, which until 2026-10-04 lived only in the terms that
+     almost nobody opens (legal review part 1, fix 4).
+   - Consent to store health information: Washington's My Health My Data Act
+     wants opt-in consent before collecting it, and lets consumers sue without
+     any size threshold (part 2, fix 3). Weight, tape, what hurts and progress
+     photos are all "consumer health data" under it.
+   Two separate ticks rather than one, because they are two different promises.
+   Remembered on the device at once and on the account once the columns exist
+   (20261004_terms_and_health_consent.sql), so a second phone does not ask
+   again. Callers share one pending sheet, so the week builder generating seven
+   days asks once, not seven times. */
+const HEALTH_V = "2026-10-04";
+let HEALTH_PENDING = null;
+function healthAgreed() {
+  if (MY_PROFILE?.health_ack_at && MY_PROFILE?.health_consent_at) return true;
+  try { return JSON.parse(localStorage.getItem("unio.health") || "null")?.v === HEALTH_V; } catch { return false; }
+}
+function ensureHealthAgreements() {
+  if (healthAgreed()) return Promise.resolve(true);
+  if (HEALTH_PENDING) return HEALTH_PENDING;
+  HEALTH_PENDING = new Promise((resolve) => {
+    const scrim = document.createElement("div");
+    scrim.className = "pop-scrim";
+    scrim.innerHTML = `
+      <div class="pop">
+        <div class="pop-body hagree">
+          <div class="ds-top"><div class="pop-who" style="color:var(--muted)">BEFORE YOUR FIRST WORKOUT</div></div>
+          <p class="muted-note">Unio builds plans from what you tell it. It is not a doctor or a personal trainer,
+            and it does not know your medical history.</p>
+          <p class="muted-note">Check with a doctor first if you are pregnant or recently gave birth, have a heart,
+            lung or blood pressure condition, have ever felt chest pain or fainted when exercising, are recovering
+            from surgery or injury, or take medicine that affects your heart rate.</p>
+          <p class="muted-note">Stop straight away if you feel chest pain, dizziness, faintness or sharp pain.</p>
+          <label class="hagree-tick"><input type="checkbox" id="hagRisk" /> <span>I understand, and I train at my own risk.</span></label>
+          <p class="muted-note" style="margin-top:14px">Unio stores health information you give it (your weight,
+            measurements, what hurts, and progress photos) only to plan your training and show your progress. It is
+            never sold. You choose separately what your partner sees, and you can delete it any time in Setup.
+            <a href="#" data-policy="health-data.html">How we handle health data</a></p>
+          <label class="hagree-tick"><input type="checkbox" id="hagData" /> <span>I agree to Unio storing my health information for this.</span></label>
+          <button type="button" class="btn-primary" id="hagOk" disabled style="margin-top:16px;">Agree and continue</button>
+          <button type="button" class="btn-ghost" id="hagNo">Not now</button>
+        </div>
+      </div>`;
+    document.body.appendChild(scrim);
+    const ok = scrim.querySelector("#hagOk");
+    const sync = () => { ok.disabled = !(scrim.querySelector("#hagRisk").checked && scrim.querySelector("#hagData").checked); };
+    scrim.querySelector("#hagRisk").onchange = sync;
+    scrim.querySelector("#hagData").onchange = sync;
+    const done = async (yes) => {
+      scrim.remove(); HEALTH_PENDING = null;
+      if (!yes) { toast("Unio needs both before it can plan your training"); resolve(false); return; }
+      const at = new Date().toISOString();
+      try { localStorage.setItem("unio.health", JSON.stringify({ v: HEALTH_V, at })); } catch {}
+      if (MY_PROFILE && "health_ack_at" in MY_PROFILE) {
+        const { error } = await sb.from("profiles").update({ health_ack_at: at, health_consent_at: at }).eq("email", MY_EMAIL);
+        if (error) console.error("health: could not record the agreement", error);
+        else MY_PROFILE = { ...MY_PROFILE, health_ack_at: at, health_consent_at: at };
+      }
+      resolve(true);
+    };
+    ok.onclick = () => done(true);
+    scrim.querySelector("#hagNo").onclick = () => done(false);
+  });
+  return HEALTH_PENDING;
 }
 
 /* The pause button asks what you meant. Mo did not want an End workout link
@@ -41944,6 +42144,7 @@ async function pickBodyPhoto() {
 }
 
 async function uploadBodyPhoto(file) {
+  if (!(await ensureHealthAgreements())) return;
   $("bodyPhotoStrip").innerHTML = `<div class="proof-uploading"><span class="spinner"></span> Uploading…</div>`;
   /* The goal screen's own row says so too, since that is the one being looked
      at when the photo is taken from there. */
@@ -46241,6 +46442,20 @@ function paintShareGrid(host) {
        row); photos is stored as the one time it was turned ON (its default
        is hidden, so the exception runs the other way). PROGRESS_SHARE_OPT_IN
        is what tells this which keys to store, not the "on" state itself. */
+    /* Turning photos on is the one switch here that cannot be taken back: a
+       photo seen is a photo that can be screenshotted, and progress photos are
+       often taken in underwear. Said at the moment it happens, not in the
+       privacy policy (legal review part 2, fix 6). Cancel repaints from what is
+       stored, so the tile goes back off and nothing is written. */
+    if (live.has("photos") && !progressKeyShared("photos", MY_PROFILE?.progress_hidden)) {
+      const yes = await askConfirm({
+        heading: "Share progress photos",
+        body: "Your partner will see your progress photos. Once they have seen one, we cannot take it back from their memory or their screenshots.",
+        ok: "Share photos",
+        cancel: "Cancel",
+      });
+      if (!yes) { paintShareGrid(host); return; }
+    }
     const nowStored = PROGRESS_SHARE_KEYS.filter((k) =>
       PROGRESS_SHARE_OPT_IN.has(k) ? live.has(k) : !live.has(k));
     const weigh = live.has(SHARE_WEIGH_KEY);
@@ -46416,7 +46631,7 @@ function renderSetupTab() {
          paid: what it costs, that it renews, where to stop it, and the way to
          get it back on another device. */
       const restore = await askConfirm({
-        heading: "Your personal trainer",
+        heading: "Unio Plus",
         body: `${PREMIUM_PRICE} a month, your partner included. It renews every month until you cancel. `
           + `Cancel any time in your iPhone's Settings, under your name then Subscriptions.`,
         ok: "Restore purchase",
@@ -46933,9 +47148,11 @@ async function saveBodyStats() {
   // A blank or zero feet field is "not set", not "three feet tall".
   const feet = Number.isFinite(feetRaw) && feetRaw > 0 ? Math.min(8, Math.max(3, feetRaw)) : 0;
   const inches = clampNum($("setupHeightIn").value, 0, 11, 0);
+  const ageRaw = parseInt($("setupAge").value, 10);
+  if (Number.isFinite(ageRaw) && ageRaw < 18) { toast("Unio is for people 18 and over."); return; }
   const ok = await commitProfile({
     sex: $("setupSex").value || null,
-    age: clampNum($("setupAge").value, 13, 100),
+    age: clampNum($("setupAge").value, 18, 100),
     height_in: (feet || inches) ? feet * 12 + inches : null,
     activity_level: $("setupActivity").value || null,
   }, { toastText: "Saved" });
