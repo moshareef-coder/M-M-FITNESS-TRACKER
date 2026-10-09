@@ -15592,12 +15592,19 @@ function showApp() {
   renderAvatarPair();
   watchTogether();
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
-  $("proofInput").addEventListener("change", (e) => {
+  /* Assigned rather than added, these four. showApp runs again every time a
+     pairing settles (Pair up in Setup, an answered request, Train alone from
+     the waiting screen), and addEventListener with a fresh arrow each time
+     stacks another copy: after one pairing a proof photo uploaded twice and
+     Pair up redeemed the code twice, and every later pass doubled it again.
+     A named function passed to addEventListener is deduplicated by the
+     browser, which is why the lines around these were never affected. */
+  $("proofInput").onchange = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (file) uploadProof(file);
-  });
-  $("setupPairBtn").addEventListener("click", async () => {
+  };
+  $("setupPairBtn").onclick = async () => {
     const code = $("setupPartnerCode").value.trim().toUpperCase();
     if (code.length !== 6) { toast("Codes are 6 characters"); return; }
     const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
@@ -15606,8 +15613,8 @@ function showApp() {
     clearPendingInvite();
     toast(res.partner_name ? `Paired with ${res.partner_name}` : "Paired");
     await checkPartnershipThenEnter();
-  });
-  $("setupShareCodeBtn").addEventListener("click", async () => {
+  };
+  $("setupShareCodeBtn").onclick = async () => {
     const code = MY_PROFILE?.invite_code;
     if (!code) return;
     const text = inviteMessage({ name: ME, goalLabel: MY_PROFILE?.goal }, code);
@@ -15616,7 +15623,7 @@ function showApp() {
     }
     try { await navigator.clipboard.writeText(text); toast("Invite copied"); }
     catch { toast(`Your code is ${code}`); }
-  });
+  };
   // Both of these are the save bar's job now (SET_SAVERS).
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
   $("adminAddEntryBtn").addEventListener("click", adminAddEntry);
@@ -15674,11 +15681,12 @@ function showApp() {
   });
 
   $("addBodyPhotoBtn").addEventListener("click", () => pickBodyPhoto());
-  $("bodyPhotoInput").addEventListener("change", (e) => {
+  // Assigned for the same reason as proofInput above: one photo, one upload.
+  $("bodyPhotoInput").onchange = (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (f) uploadBodyPhoto(f);
-  });
+  };
   document.querySelectorAll("#biPeriod button").forEach((b) => {
     b.addEventListener("click", () => {
       BODY_PERIOD = b.dataset.period;
