@@ -690,7 +690,88 @@ export function styleDayFor(styles, { today = new Date(), minutes = null, askedM
      more than one of a style is spread evenly, not stacked at the front
    Ties break on the seed, which is the week's start date, so the same week
    asked twice is the same week and next week is a different one. */
-export function composeWeek(styles, days, { liftCount = null, window = 7, seed = 0 } = {}) {
+/* ---- a week they laid out themselves ----
+
+   Mo, 2026-10-09: "make them see the whole week, because sometimes they can
+   do yoga or something in a different day. And make them be able to drag and
+   drop everything and adjust the way they want to." Onboarding now lets them
+   move every block, and stores where each landed as profiles.week_layout: a
+   weekday (0 is Monday, the week runs Monday to Sunday everywhere in the app)
+   to the list of style ids on it. This is the one place that decides whether
+   such a layout is still the truth, and composeWeek honours it when it is.
+
+   The rules are composeWeek's own, written down once so the screen that lets
+   them drag and the engine that builds the week cannot disagree about them:
+   one session of each kind on a day, so three at most. */
+export const MAX_SESSIONS_PER_DAY = 3;
+
+/* resistance, cardio or flow, or null for a word this module does not know. */
+export function styleKind(id) {
+  return STYLE_KIND[id]?.kind || null;
+}
+
+/* Why a day's list breaks the rules, or null when it does not. `full` is
+   more than three, `kind` is two of a kind (and names it), `unknown` is a
+   word outside STYLE_KEYS. Said as a reason rather than a boolean because the
+   screen tells the person which rule they hit. */
+export function dayLayoutProblem(list) {
+  const ids = Array.isArray(list) ? list : [];
+  if (ids.length > MAX_SESSIONS_PER_DAY) return { why: "full" };
+  const seen = new Set();
+  for (const id of ids) {
+    const kind = styleKind(id);
+    if (!kind) return { why: "unknown", style: id };
+    if (seen.has(kind)) return { why: "kind", kind, style: id };
+    seen.add(kind);
+  }
+  return null;
+}
+
+/* The layout cleaned, or null when it is not one this week can use as it
+   stands. Null is not an error: it means "place it yourself", which is what
+   composeWeek did before layouts existed, so a stale layout costs nothing
+   worse than the week they would have had anyway.
+
+   Stale is the case that matters. The layout is saved once, at the end of
+   onboarding, and Setup can change the styles or the counts any time after.
+   A layout holding a style they have since unticked, or two runs when the dial
+   now says three, describes a week they no longer asked for, and building it
+   would quietly overrule the newer answer. So a layout is only used while it
+   agrees with the answers it was built from:
+     every style on it is one they still train
+     every day keeps the rules (dayLayoutProblem)
+     a style counted in days (a number in the frequency map) appears exactly
+       that many times; a word is coarser than any layout and is not checked
+     the days holding resistance are `liftCount` of them when that is given,
+       which is days_per_week, the number the app's lifting week is built to */
+export function readLayout(raw, styles, { liftCount = null } = {}) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || !styles?.asked) return null;
+  const picked = new Set(styles.styles || []);
+  const out = {};
+  const counts = {};
+  let liftDays = 0;
+  for (let wd = 0; wd < 7; wd++) {
+    const v = raw[wd] ?? raw[String(wd)] ?? [];
+    if (!Array.isArray(v)) return null;
+    const ids = v.map((x) => (typeof x === "string" ? x.trim().toLowerCase() : null));
+    if (ids.some((id) => !id || !picked.has(id))) return null;
+    if (dayLayoutProblem(ids)) return null;
+    if (ids.some((id) => styleKind(id) === "resistance")) liftDays++;
+    for (const id of ids) counts[id] = (counts[id] || 0) + 1;
+    out[wd] = ids;
+  }
+  for (const k of Object.keys(raw)) if (!/^[0-6]$/.test(String(k))) return null;
+  const freq = styles.frequency || {};
+  for (const s of picked) {
+    if (styleKind(s) === "resistance") continue;
+    if (typeof freq[s] === "number" && (counts[s] || 0) !== freq[s]) return null;
+  }
+  if (liftCount != null && Number.isFinite(Number(liftCount)) && [...picked].some((s) => styleKind(s) === "resistance")
+    && liftDays !== Math.round(Number(liftCount))) return null;
+  return out;
+}
+
+export function composeWeek(styles, days, { liftCount = null, window = 7, seed = 0, layout = null } = {}) {
   const list = (Array.isArray(days) ? days : []).map((d, i) => ({
     i,
     key: d && d.key !== undefined ? d.key : i,
@@ -707,6 +788,45 @@ export function composeWeek(styles, days, { liftCount = null, window = 7, seed =
     dropped,
   });
   if (!n || !styles?.asked) return answer();
+
+  /* A layout they made themselves, when it still holds (readLayout), is the
+     placement, as it stands: nothing is spread, moved or re-counted. Each day
+     names its weekday as `wd`, because the caller's keys are dates and the
+     layout's are weekdays. A day the caller has already decided carries the
+     day: `lift: false` takes no lift whatever the layout says, `lift: true`
+     keeps its lift though the layout has none, and a kind a kept plan already
+     holds is not doubled. Each of those is said in `dropped`, never swallowed.
+     `layout` comes back "used", or "ignored" when one was handed in and could
+     not be, so the app can tell the person their week was re-placed. */
+  const laid = layout ? readLayout(layout, styles, { liftCount }) : null;
+  if (laid && list.every((d) => Number.isInteger(days[d.i]?.wd) && days[d.i].wd >= 0 && days[d.i].wd <= 6)) {
+    for (const d of list) {
+      const wd = days[d.i].wd;
+      let lifted = false;
+      for (const s of laid[wd]) {
+        const kind = STYLE_KIND[s].kind;
+        if (kind === "resistance" && d.lift === false) {
+          dropped.push({ style: s, count: 1, key: d.key, why: "the day was already decided without a lift" });
+          continue;
+        }
+        if (d.has.has(kind)) {
+          dropped.push({ style: s, count: 1, key: d.key, why: `the day already holds a ${kind} session` });
+          continue;
+        }
+        const k = STYLE_KIND[s];
+        d.sessions.push(kind === "cardio" ? { kind, style: s, mode: k.mode }
+          : kind === "flow" ? { kind, style: s, training: k.training }
+          : { kind, style: s });
+        if (kind === "resistance") lifted = true;
+      }
+      if (d.lift === true && !lifted && !d.has.has("resistance")) {
+        const res = (styles.styles || []).find((s) => STYLE_KIND[s]?.kind === "resistance");
+        if (res) d.sessions.unshift({ kind: "resistance", style: res });
+      }
+    }
+    return { ...answer(), layout: "used" };
+  }
+  const ignored = layout ? "ignored" : null;
   const picked = styles.styles || [];
   const freq = styles.frequency || {};
   const resStyles = picked.filter((s) => STYLE_KIND[s]?.kind === "resistance");
@@ -795,7 +915,7 @@ export function composeWeek(styles, days, { liftCount = null, window = 7, seed =
   };
   placeKind("cardio", (d) => d.legs && count(d, "resistance") > 0, null);
   placeKind("flow", null, afterHeavy);
-  return answer();
+  return ignored ? { ...answer(), layout: ignored } : answer();
 }
 
 /* `n` of `list`, evenly spaced, starting a seeded step in so that the same

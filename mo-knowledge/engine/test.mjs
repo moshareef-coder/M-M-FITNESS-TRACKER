@@ -37,7 +37,7 @@ import { JOINTS, JOINT_LOAD, defaultJointLoad, jointLoadFor } from "./joint-load
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
-import { STYLE_KEYS, readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, refusalNote, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX, FREQUENCY_LEVELS, FREQUENCY_DAYS, frequencyForDays, normalizeFrequency, frequencyValue, frequencyDaysOf, composeWeek } from "./styles.mjs";
+import { STYLE_KEYS, readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, refusalNote, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX, FREQUENCY_LEVELS, FREQUENCY_DAYS, frequencyForDays, normalizeFrequency, frequencyValue, frequencyDaysOf, composeWeek, readLayout, dayLayoutProblem, styleKind, MAX_SESSIONS_PER_DAY } from "./styles.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -5648,6 +5648,77 @@ test("an exact count of days is kept as the number, beside the words", () => {
     assert.deepEqual(st.frequency, { lifting: "most", running: "rare" });
   }
   assert.deepEqual([1, 4, 7, "rare", "some", "most", "daily", "x", 0].map(frequencyDaysOf), [1, 4, 7, 1, 3, 5, 7, 0, 0]);
+});
+
+test("a week they laid out themselves is built exactly as laid out", () => {
+  /* Mo, 2026-10-09: they drag every block where they want it in onboarding,
+     and the week the app builds is that week, not a re-spread of it. Lifts on
+     Mon, Tue, Thu, Fri; two runs; yoga on Sunday, a rest day. */
+  const st = readStyles(["lifting", "running", "yoga"], { lifting: 4, running: 2, yoga: 1 });
+  const layout = { 0: ["lifting", "running"], 1: ["lifting"], 2: [], 3: ["lifting", "running"], 4: ["lifting"], 5: [], 6: ["yoga"] };
+  assert.deepEqual(readLayout(layout, st, { liftCount: 4 }), layout);
+  const days = Array.from({ length: 7 }, (_, i) => ({ key: `d${i}`, wd: i }));
+  const out = composeWeek(st, days, { liftCount: 4, layout, seed: 9 });
+  assert.equal(out.layout, "used");
+  assert.deepEqual(out.days.map((d) => d.sessions.map((x) => x.style)), Object.values(layout));
+  assert.deepEqual(out.dropped, []);
+  /* The keys may be strings, the way jsonb hands them back. */
+  const asJson = JSON.parse(JSON.stringify(layout));
+  assert.equal(composeWeek(st, days, { liftCount: 4, layout: asJson }).layout, "used");
+  /* A rest of the week (Thursday on) builds Thursday on, as laid out. */
+  const rest = composeWeek(st, days.slice(3), { liftCount: 4, layout });
+  assert.deepEqual(rest.days.map((d) => d.sessions.map((x) => x.style)), [["lifting", "running"], ["lifting"], [], ["yoga"]]);
+});
+
+test("a layout that no longer matches their answers is ignored, and the week is placed as before", () => {
+  const st = readStyles(["lifting", "running", "yoga"], { lifting: 4, running: 2, yoga: 1 });
+  const ok = { 0: ["lifting", "running"], 1: ["lifting"], 2: [], 3: ["lifting", "running"], 4: ["lifting"], 5: [], 6: ["yoga"] };
+  const days = Array.from({ length: 7 }, (_, i) => ({ key: `d${i}`, wd: i }));
+  const bad = {
+    twoRunsOneDay: { ...ok, 0: ["lifting", "running", "running"], 3: ["lifting"] },
+    yogaAndPilatesish: { ...ok, 6: ["yoga", "yoga"] },
+    countChanged: { ...ok, 3: ["lifting"] },
+    unticked: { ...ok, 5: ["cycling"] },
+    liftsMoved: { ...ok, 4: [] },
+    notAnObject: [["lifting"]],
+    strayKey: { ...ok, 7: [] },
+  };
+  for (const [why, layout] of Object.entries(bad)) {
+    assert.equal(readLayout(layout, st, { liftCount: 4 }), null, why);
+    const out = composeWeek(st, days, { liftCount: 4, layout, seed: 9 });
+    assert.equal(out.layout, "ignored", why);
+    assert.deepEqual(out.days, composeWeek(st, days, { liftCount: 4, seed: 9 }).days, `${why} is the week it always was`);
+  }
+  /* Days without a weekday cannot be matched to a layout, so it is not used. */
+  assert.equal(composeWeek(st, WEEK7(), { liftCount: 4, layout: ok }).layout, "ignored");
+  /* No layout, no flag: the answer has the shape it always had. */
+  assert.equal("layout" in composeWeek(st, days, { liftCount: 4 }), false);
+});
+
+test("a layout gives way to a day the caller already decided, and says so", () => {
+  const st = readStyles(["lifting", "running", "yoga"], { lifting: 4, running: 2, yoga: 1 });
+  const layout = { 0: ["lifting", "running"], 1: ["lifting"], 2: [], 3: ["lifting", "running"], 4: ["lifting"], 5: [], 6: ["yoga"] };
+  const days = Array.from({ length: 7 }, (_, i) => ({ key: `d${i}`, wd: i }));
+  days[1].lift = false;              // no lift Tuesday, whatever the layout says
+  days[2].lift = true;               // a lift already built Wednesday
+  days[3].taken = ["cardio"];        // a kept run on Thursday
+  const out = composeWeek(st, days, { liftCount: 4, layout });
+  assert.equal(out.layout, "used");
+  assert.deepEqual(out.days.map((d) => d.sessions.map((x) => x.style)),
+    [["lifting", "running"], [], ["lifting"], ["lifting"], ["lifting"], [], ["yoga"]]);
+  assert.deepEqual(out.dropped.map((x) => [x.key, x.style]), [["d1", "lifting"], ["d3", "running"]]);
+});
+
+test("the day rules the drag screen shows are composeWeek's own", () => {
+  assert.equal(MAX_SESSIONS_PER_DAY, 3);
+  assert.equal(dayLayoutProblem(["lifting", "running", "yoga"]), null);
+  assert.equal(dayLayoutProblem(["running", "cycling"]).why, "kind");
+  assert.equal(dayLayoutProblem(["yoga", "pilates"]).kind, "flow");
+  assert.equal(dayLayoutProblem(["lifting", "home"]).kind, "resistance");
+  assert.equal(dayLayoutProblem(["lifting", "running", "yoga", "walking"]).why, "full");
+  assert.equal(dayLayoutProblem(["swimming"]).why, "unknown");
+  assert.deepEqual(["lifting", "home", "running", "cycling", "walking", "pilates", "yoga", "rowing"].map(styleKind),
+    ["resistance", "resistance", "cardio", "cardio", "cardio", "flow", "flow", null]);
 });
 
 test("a count of runs and classes is placed exactly, not rounded to a word", () => {
