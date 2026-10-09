@@ -2458,6 +2458,7 @@
   .paywall-price { margin: 0 0 12px; font-size: 14px; line-height: 1.4; }
   .paywall-price b { display: block; color: #fff; font-weight: 700; }
   .paywall-price span { color: rgba(244,246,248,.55); font-size: 13px; }
+  .paywall-price .paywall-trial { display: block; margin: 2px 0 6px; color: var(--accent); font-weight: 600; }
   .paywall-cta { width: 100%; }
   /* Overridden off the app's own ghost button, which is tuned for a light
      panel and disappears on this ground. */
@@ -7626,6 +7627,11 @@
   /* A text action inside a row header: Skip today / Put it back on the plan's
      stretch blocks. A button so it is keyboard reachable, styled as a link so
      it does not compete with the real buttons on the screen. */
+  /* The locked Done: still a button, still says Done, visibly not ready. */
+  .proof-locked { opacity: .42; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .link-btn.proof-skip { align-self: center; margin-top: 2px; color: var(--muted); }
+  @keyframes proofNudge { 0%,100% { transform: none } 25% { transform: translateX(-5px) } 75% { transform: translateX(5px) } }
+  .proof-nudge { animation: proofNudge .28s ease 2; }
   .link-btn {
     background: none; border: 0; padding: 0; margin: 0; color: var(--accent);
     font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
@@ -8261,7 +8267,7 @@
   </div>
 
   <div id="tab-workout" class="tab-panel hidden">
-    <input type="file" id="proofInput" accept="image/*" capture="environment" hidden />
+    <input type="file" id="proofInput" accept="image/*" hidden />
 
     <div class="card" id="workoutCard">
       <h2 id="workoutCardTitle">Today's workout</h2>
@@ -8949,7 +8955,7 @@
          exists" guard as the weigh-ins card next to it, same reason. -->
     <div class="card hidden" id="progressShareCard">
       <h2>What <span id="progressSharePartnerName">your partner</span> sees on Progress</h2>
-      <p class="muted-note" style="margin-top:-4px;">On is shown to them, off holds that one back. Everything starts on except photos, which waits until you turn it on. Weigh-ins covers your weight, your goal weight and your tape together: off, and none of it leaves your account at all.</p>
+      <p class="muted-note" style="margin-top:-4px;">On is shown to them, off holds that one back. Everything starts on except photos, which waits until you turn it on. Your weight and each tape reading have a tile of their own. With all of them off, none of it, your goal weight included, leaves your account at all.</p>
       <div class="trk-grid" id="progressShareGrid"></div>
     </div>
     <div class="card danger-card hidden" id="leavePartnerCard">
@@ -9167,6 +9173,12 @@
       <div id="pushPromiseNote" style="margin-bottom:10px;"></div>
       <button type="button" class="btn-secondary" id="pushToggleBtn">Turn on reminders</button>
       <p class="muted-note" id="pushNote" style="margin-top:8px;"></p>
+    </div>
+    <!-- One switch per kind, built by renderNotifyKinds from NOTIFY_KINDS so
+         the list and the server's spelling of each kind cannot drift. -->
+    <div class="card" id="notifyKindsCard">
+      <h2>What to send</h2>
+      <div id="notifyKinds"></div>
     </div>
     </div>
     <div class="settings-page hidden" id="page-theme">
@@ -9852,10 +9864,12 @@ function showFatal(what) {
 }
 
 window.addEventListener("error", (e) => {
+  reviewHold("error");
   const where = e.filename ? ` (line ${e.lineno})` : "";
   showFatal((e.message || "") + where + firstAppFrame(e.error));
 });
 window.addEventListener("unhandledrejection", (e) => {
+  reviewHold("error");
   showFatal((e.reason?.message || String(e.reason)) + firstAppFrame(e.reason));
 });
 
@@ -9880,6 +9894,11 @@ function emptyState(iconName, title, hint) {
 }
 
 function toast(msg) {
+  /* Every failed save in this app ends in a toast that starts the same few
+     ways, so this is the one place that hears about all of them. Apple's
+     rating sheet straight after "Couldn't save" is asking somebody to rate
+     the thing that just let them down. */
+  if (/^(couldn't|could not|can't|not saved|something went wrong)/i.test(String(msg || ""))) reviewHold("failure: " + msg);
   const el = $("toast");
   el.textContent = msg;
   el.classList.add("show");
@@ -10534,7 +10553,7 @@ let MY_GOAL = null;
    against it and holds the entitlement named premium, the webhook that writes
    the subscriptions table is deployed and was tested with a real event, and
    is_premium() answers for a paid subscription, for a partner's paid
-   subscription, and for the first seven days of any new account. */
+   subscription, and for the first thirty days of any new account (seven until 2026-10-09). */
 const PAYWALL_ON = true;
 
 let IS_PREMIUM = false;
@@ -10554,6 +10573,9 @@ async function refreshPremium() {
     return IS_PREMIUM;
   }
   IS_PREMIUM = data === true;
+  /* Asked alongside, so the paywall and Setup know a free month from a paid
+     plan the first time they draw (trialDaysLeft). */
+  await refreshOwnPlan();
   return IS_PREMIUM;
 }
 let ALL_GOALS = [];
@@ -12317,7 +12339,9 @@ function renderGoalPage() {
 
    It reports what it dropped rather than swallowing it, because "saved" when
    half of it was not saved is the kind of quiet lie this app does not tell. */
-const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency", "progress_hidden"];
+/* notify_off joined the list 2026-10-09 and, unlike the rest, is NOT yet on
+   production: 20261009_notify_prefs_and_cheer.sql is written, not applied. */
+const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency", "progress_hidden", "notify_off"];
 
 async function upsertGoalFields(patch) {
   const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
@@ -15498,11 +15522,12 @@ async function finishOnboarding(data) {
   if (data.weight_lb) await saveBodyReading(todayStr(), { weight: data.weight_lb });
   if (data.goal_key) await setActiveGoal(data);
   applyAccentColors();
-  /* Armed here rather than asked here. Onboarding ends by handing over to
-     either the app or the pairing screen, and interrupting that handover with
-     a permission sheet would put it in front of a screen the person has not
-     seen yet. The flag is spent the first time the app itself is on screen. */
-  try { localStorage.setItem(ASK_PUSH_KEY, "1"); } catch { /* private browsing */ }
+  /* The notification ask used to be armed here and fired on the first Home
+     after setup. 5 of 14 accounts said yes to it: at that point there is no
+     partner to hear about and nothing has happened yet, so the sheet was
+     asking for a reason the person could not see. It now comes after the
+     moments that show the reason (the partner joining, the first finished
+     workout); see maybeAskForPush. */
   /* Nobody asked them about a partner, so nobody may be asked again on the way
      in. The partner step used to set this when somebody chose to carry on
      alone, and taking the step out without setting it dropped every brand new
@@ -15580,12 +15605,19 @@ function showApp() {
   renderAvatarPair();
   watchTogether();
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
-  $("proofInput").addEventListener("change", (e) => {
+  /* Assigned rather than added, these four. showApp runs again every time a
+     pairing settles (Pair up in Setup, an answered request, Train alone from
+     the waiting screen), and addEventListener with a fresh arrow each time
+     stacks another copy: after one pairing a proof photo uploaded twice and
+     Pair up redeemed the code twice, and every later pass doubled it again.
+     A named function passed to addEventListener is deduplicated by the
+     browser, which is why the lines around these were never affected. */
+  $("proofInput").onchange = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (file) uploadProof(file);
-  });
-  $("setupPairBtn").addEventListener("click", async () => {
+  };
+  $("setupPairBtn").onclick = async () => {
     const code = $("setupPartnerCode").value.trim().toUpperCase();
     if (code.length !== 6) { toast("Codes are 6 characters"); return; }
     const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
@@ -15594,8 +15626,8 @@ function showApp() {
     clearPendingInvite();
     toast(res.partner_name ? `Paired with ${res.partner_name}` : "Paired");
     await checkPartnershipThenEnter();
-  });
-  $("setupShareCodeBtn").addEventListener("click", async () => {
+  };
+  $("setupShareCodeBtn").onclick = async () => {
     const code = MY_PROFILE?.invite_code;
     if (!code) return;
     const text = inviteMessage({ name: ME, goalLabel: MY_PROFILE?.goal }, code);
@@ -15604,7 +15636,7 @@ function showApp() {
     }
     try { await navigator.clipboard.writeText(text); toast("Invite copied"); }
     catch { toast(`Your code is ${code}`); }
-  });
+  };
   // Both of these are the save bar's job now (SET_SAVERS).
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
   $("adminAddEntryBtn").addEventListener("click", adminAddEntry);
@@ -15662,11 +15694,12 @@ function showApp() {
   });
 
   $("addBodyPhotoBtn").addEventListener("click", () => pickBodyPhoto());
-  $("bodyPhotoInput").addEventListener("change", (e) => {
+  // Assigned for the same reason as proofInput above: one photo, one upload.
+  $("bodyPhotoInput").onchange = (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (f) uploadBodyPhoto(f);
-  });
+  };
   document.querySelectorAll("#biPeriod button").forEach((b) => {
     b.addEventListener("click", () => {
       BODY_PERIOD = b.dataset.period;
@@ -15713,11 +15746,11 @@ function showApp() {
        before: the tab reads the profile to decide whether to ask at all, and
        the profile is what loadAll went to fetch. */
     if (LAND_ON_PROGRESS) { LAND_ON_PROGRESS = false; switchTab("progress"); }
-    /* After the dashboard is painted, not before. The sheet is asking for
-       something on behalf of a screen the person should be able to see behind
-       it, and it is deliberately outside the awaited chain so a slow permission
-       answer cannot hold up the launch screen. */
-    maybeAskForPush();
+    /* The notification ask no longer fires on launch: it waits for the
+       partner joining or a finished workout. The flag the old launch ask ran
+       on is dropped, so an install that was armed by an older build does not
+       carry a dead key forever. */
+    try { localStorage.removeItem(ASK_PUSH_KEY); } catch { /* private browsing */ }
   });
 }
 
@@ -16657,6 +16690,12 @@ async function saveBodyReading(entry_date, patch) {
 
 /* Last logged weigh-in for a person, used everywhere a calorie/TDEE estimate needs a body weight. */
 function currentWeightLb(name) {
+  /* A partner's weight with Weight switched off in their share sheet is no
+     weight at all here. Everything built on it (a strength level, calories
+     for a session) would otherwise print a number that gives it away: the
+     master switch keeps the rows off this phone, the per reading one does
+     not. */
+  if (PARTNER_PROFILE && name === PARTNER_PROFILE.user_name && viewedHides("weight", true)) return null;
   return entriesFor(name).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
 }
 
@@ -17781,8 +17820,13 @@ async function showPairCelebration() {
 
   /* Either way out lands on Progress, where the tour shows them the door to
      their partner's side. Later just skips the message. */
-  const toProgress = () => {
+  const toProgress = async () => {
     el.remove();
+    /* The best reason this app will ever have to ask for notifications is on
+       screen right now: a partner who just arrived, whose workouts are what
+       those notifications are about. Before Progress, so the partner tour
+       that opens there does not land underneath the sheet. */
+    await maybeAskForPush("paired");
     PROGRESS_VIEW = "me";
     PROGRESS_GOAL_LENS = null;
     switchTab("progress");
@@ -17824,7 +17868,11 @@ function maybeStartPartnerTour() {
 }
 
 function startPartnerTour() {
-  if (document.querySelector(".cm-scrim")) return;
+  /* Not over a sheet or the paywall. A Monday progress reminder lands on
+     Progress with the measurements sheet already open, and the tour sits above
+     every sheet and swallows every tap but Skip, so the sheet the notification
+     was for could not be used. Not marked done, so it waits for the next visit. */
+  if (document.querySelector(".cm-scrim, .sheet-scrim:not(.hidden), .paywall-scrim")) return;
   const first = escapeHtml((partnerName() || "your partner").split(" ")[0]);
   /* Two taps, the two the faces are for: over to them, then back to you. Mo,
      2026-10-04: once they have looked at their partner's side, show them the
@@ -18729,9 +18777,17 @@ async function tgShowFinish() {
           : `<button type="button" class="btn-primary" id="tgWatchGo">Watch ${first}</button><button type="button" class="tg-ghost" id="tgDone">Close</button>`}
       </div>
     </div>`;
-  $("tgDone").onclick = () => { el.remove(); if (TG?.status === "done") { TG = null; renderTogetherHome(); } };
+  $("tgDone").onclick = () => {
+    el.remove();
+    if (TG?.status === "done") { TG = null; renderTogetherHome(); }
+    /* Closed from Home (they finished after you had already left the
+       workout) this is the end of the celebration. Closed over your own
+       finish screen it is not, and the ask waits for that screen's Done. */
+    reviewFlush();
+  };
   if ($("tgWatchGo")) $("tgWatchGo").onclick = () => tgShowWatch();
   if (both && !wasBoth) {
+    reviewMoment("together_session");
     sfxPlay("pr");
     buzz([20, 60, 30]);
     setTimeout(() => { const c = el.querySelector(".tg-bonus"); if (c && el.isConnected) confettiBurst(c, 40); }, 250);
@@ -19740,8 +19796,13 @@ function closeActivityDetail() { $("actDetailScrim").classList.add("hidden"); }
    A bare link dies where fitness actually gets shared, Stories and WhatsApp,
    because nobody taps an unfurled card. A bare image brings nobody back. So we
    send both: the picture people will actually look at, and the URL alongside it
-   for anywhere that accepts one. */
-const SHARE_URL = PUBLIC_SITE;
+   for anywhere that accepts one.
+
+   The marketing site, not PUBLIC_SITE. PUBLIC_SITE serves index.html itself,
+   so a shared workout handed every friend who tapped it the whole app running
+   in a browser, and Unio is an iPhone app only. trainwithunio.com is the page
+   that says what Unio is and where to get it. */
+const SHARE_URL = "https://trainwithunio.com";
 
 /* A canvas font string is not a CSS rule: an unavailable family falls back to
    the browser's default sans without an error, a warning or a visible clue.
@@ -20037,6 +20098,7 @@ async function pushWidgetSnapshot() {
       /* He gets the home screen too. A widget redraws rarely, so this is
          whatever he last had to say rather than a running commentary. */
       quip: pickQuip("idle") || "",
+      ...widgetToday(partner, hs),
     };
     /* Redrawing a timeline costs the widget its refresh budget, so this only
        goes over when a number actually moved. His line is deliberately left out
@@ -20049,6 +20111,66 @@ async function pushWidgetSnapshot() {
   } catch (err) {
     console.error("widget snapshot failed", err);
   }
+}
+
+/* What "Today, together" draws on the Home Screen, decided here rather than in
+   Swift. Whether somebody trained today is todayEntryFor().gym, the same test
+   renderHero reads for the rings and bothDone, and the week is
+   currentWeekDates() against entryOn(), the days the hero ring counts. If the
+   widget worked any of this out for itself it would be a second answer, and
+   the day it disagreed with Home is the day neither could be trusted.
+
+   The widget cannot recompute anything once it is drawn, so `day` and
+   `streakHolds` are what let it roll forward on its own at midnight: the day
+   this was true of, and whether the streak survives that night on what is
+   logged now. The rest and held days the streak forgives are counted as
+   holding, which is the same forgiveness sharedDayStreak gives them. */
+function widgetToday(partner, hs) {
+  const week = currentWeekDates();
+  const today = todayStr();
+  const mineToday = todayEntryFor(MY_EMAIL);
+  const theirsToday = partner ? todayEntryFor(PARTNER_EMAIL) : null;
+  const iTrained = !!mineToday?.gym;
+  const theyTrained = !!theirsToday?.gym;
+  const myDays = gymDaysThisWeek(ME);
+  const myTarget = weeklyGoalFor(MY_EMAIL);
+  /* The partner's first name only: the line has about twenty characters to
+     work with on a small widget. */
+  const first = partner ? String(partner).trim().split(/\s+/)[0] : "";
+
+  let stateLine;
+  if (!myTarget) stateLine = "Open Unio to set a goal.";
+  else if (!partner) stateLine = `${myDays} of ${myTarget} this week.`;
+  else if (iTrained && theyTrained) stateLine = "Both done today.";
+  else if (theyTrained) stateLine = mineToday?.rest_day ? `${first} trained. Rest day for you.` : `${first} trained. Your turn.`;
+  else if (iTrained) stateLine = `You trained. ${first}'s turn.`;
+  else if (mineToday?.rest_day) stateLine = "Rest day today.";
+  else stateLine = "Nobody's trained yet today.";
+
+  let streakText = "";
+  let streakHolds = false;
+  if (hs) {
+    streakText = `${hs.n} ${hs.unit}${hs.n === 1 ? "" : "s"}${hs.short === "together" ? " together" : ""}`;
+    const mineOk = iTrained || !!mineToday?.rest_day;
+    const theirsOk = theyTrained || !!theirsToday?.rest_day;
+    /* A week streak only moves when a week closes, so it holds overnight on
+       every night but Sunday's, when the week it is waiting on is judged. */
+    streakHolds = hs.unit === "week" ? week.indexOf(today) < 6
+      : hs.short === "together" ? mineOk && theirsOk
+      : mineOk;
+  }
+
+  return {
+    myInitials: initials(ME || "You"),
+    partnerInitials: partner ? initials(partner) : "",
+    streakText,
+    streakHolds,
+    day: today,
+    todayIndex: week.indexOf(today),
+    myWeek: week.map((d) => !!entryOn(ME, d)?.gym),
+    partnerWeek: partner ? week.map((d) => !!entryOn(partner, d)?.gym) : null,
+    stateLine,
+  };
 }
 
 /* How long ago, the way a person would say it. "Done 24m ago" is the difference
@@ -21085,10 +21207,16 @@ async function openClipRecorder(toEmail) {
    seconds" and a shutter wired to nothing, with no word about why. */
 function showClipDenied(toEmail) {
   stopClipStream();
+  /* Where the switch actually is. In the iPhone app there is no page and no
+     browser: camera access lives under Settings, Unio, and saying "browser" to
+     somebody who installed an app reads as a website in a wrapper. */
+  const where = isNativeApp()
+    ? "Unio is not allowed to use the camera. Send a video you already have, or turn Camera on in your iPhone's Settings, under Unio, and try again."
+    : "This page is not being allowed to use the camera. Send a video you already have, or allow the camera in your browser settings and try again.";
   $("clipRecStage").innerHTML = `<div class="clip-stage" style="align-items:center;justify-content:center">
       <div class="clip-gone">
         <b>The camera is blocked</b>
-        <span>This page is not being allowed to use the camera. Send a video you already have, or allow the camera in your browser settings and try again.</span>
+        <span>${where}</span>
         <button type="button" class="btn-secondary" id="clipRollBtn" style="margin-top:16px">Choose a video</button>
         <button type="button" class="btn-ghost" id="clipDeniedClose">Not now</button>
       </div>
@@ -21521,6 +21649,35 @@ function hired() {
   return !PAYWALL_ON || IS_PREMIUM;
 }
 
+/* The free month. is_premium() answers yes for the first TRIAL_DAYS of every
+   account (20261004_premium_trial_30_days.sql) and does not say why, so a
+   trial and a paid plan looked the same on screen: Setup said "Hired" and
+   "renews every month until you cancel" to people who never subscribed.
+   The app can tell them apart with what it may already read: its own
+   subscription row (RLS lets you read your own and nobody else's) and the
+   account's own start. A partner's paid plan is invisible here, so somebody
+   covered by their partner reads as on the trial until day 31 and as Hired
+   after; both are true. Keep TRIAL_DAYS equal to the interval in is_premium. */
+const TRIAL_DAYS = 30;
+let OWN_PLAN_ACTIVE = null;   // null until asked
+async function refreshOwnPlan() {
+  if (!PAYWALL_ON || !MY_EMAIL) return;
+  const { data, error } = await sb.from("subscriptions").select("status, expires_at").limit(5);
+  if (error) { console.warn("could not read own subscription", error); return; }
+  OWN_PLAN_ACTIVE = (data || []).some((r) => (r.status === "active" || r.status === "grace")
+    && (!r.expires_at || Date.parse(r.expires_at) > Date.now()));
+}
+/* Whole days left of the free month, or null when it is not the reason this
+   account has premium (paid, expired, or not known yet). */
+function trialDaysLeft() {
+  if (!PAYWALL_ON || OWN_PLAN_ACTIVE !== false) return null;
+  const born = Date.parse(MY_PROFILE?.created_at || "");
+  if (!Number.isFinite(born)) return null;
+  const left = Math.ceil((born + TRIAL_DAYS * 86400000 - Date.now()) / 86400000);
+  return left > 0 ? Math.min(left, TRIAL_DAYS) : null;
+}
+function trialLeftLabel(n) { return n === 1 ? "1 day" : `${n} days`; }
+
 /* Whether the offer has already been turned down in this sitting. Set by the
    hire step in onboarding, read at the end of the tracking run on Progress,
    which is the only other place that would put the full screen up unasked.
@@ -21590,6 +21747,9 @@ function wireHirePitch(root) {
    onboarding, where this screen IS the hire step, Mo wanted it to say what
    skipping means there: "Skip, I'll look around first". */
 function showPaywall({ skipLabel = "Not now" } = {}) {
+  /* Somebody just asked for money. A rating request on the way out of that
+     screen reads as the second half of the same pitch. */
+  reviewHold("paywall");
   /* Second chance to warm the offering, for the case where the fetch at
      configure time failed or had not finished before this screen opened. By
      the time somebody has read the page and reached for Subscribe it is in
@@ -21650,6 +21810,7 @@ function showPaywall({ skipLabel = "Not now" } = {}) {
                  one price and two people each paying it. -->
             <p class="paywall-price">
               <b>${escapeHtml(PREMIUM_PRICE)} a month, your partner included.</b>
+              ${trialDaysLeft() ? `<span class="paywall-trial">${trialDaysLeft() >= TRIAL_DAYS ? `Your first ${TRIAL_DAYS} days are free` : `Free trial, ${escapeHtml(trialLeftLabel(trialDaysLeft()))} left`}. Nothing is charged unless you hire me.</span>` : ""}
               <span>I&rsquo;ll generate your workouts, track your progress, keep your progress photos and follow up with you both.</span>
             </p>
             <button type="button" class="btn-primary paywall-cta" data-pay="1">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
@@ -23011,6 +23172,38 @@ function refreshAfterProofChange() {
   }
 }
 
+/* Mo, 2026-10-09: a workout is finished when there is a photo of it. Done
+   stays locked until one is added, and the way out without one is spelled
+   out ("No photo today") rather than hidden behind a close button. The
+   workout is already banked by now either way: losing a streak because a
+   gym bans phones would teach people to stop logging, not to take photos.
+   The lock is the nudge; the photo is what the partner and the widget see. */
+function proofDoneHTML(id, unlocked) {
+  if (unlocked) return `<button type="button" class="btn-primary" id="${id}">Done</button>`;
+  return `<button type="button" class="btn-primary proof-locked" id="${id}" aria-disabled="true">${icon("lock", 15)} Done</button>
+    <button type="button" class="link-btn proof-skip" id="${id}Skip">No photo today</button>`;
+}
+function wireProofDone(id, unlocked, leave) {
+  const btn = $(id);
+  if (!btn) return;
+  if (unlocked) { btn.onclick = leave; return; }
+  btn.onclick = () => proofGateHolds(btn.closest(".session-complete, .csn-foot")?.querySelector("#sessionProofBtn, #csnProofBtn")?.id);
+  const skip = $(`${id}Skip`);
+  if (skip) skip.onclick = leave;
+}
+/* True when the screen is still waiting on a photo, after pointing at the
+   button that adds one. The close chevron asks this too, or the lock would
+   be one tap away from not being a lock. */
+function proofGateHolds(proofBtnId) {
+  const b = proofBtnId && document.getElementById(proofBtnId);
+  if (!b || !document.querySelector(".proof-locked")) return false;
+  b.scrollIntoView({ block: "center", behavior: "smooth" });
+  b.classList.remove("proof-nudge"); void b.offsetWidth; b.classList.add("proof-nudge");
+  buzz(30);
+  toast("Add a photo first, or tap No photo today");
+  return true;
+}
+
 async function uploadProof(file) {
   toast("Uploading photo…");
   try {
@@ -23737,6 +23930,10 @@ function renderToneHero(on, profile, isPartner) {
   /* Both of these are about a metric, so with no metric left they say nothing
      rather than inviting a measurement the picker was just told not to show. */
   $("toneEmpty").classList.toggle("hidden", !measure || !!series.length);
+  /* An instruction is for the person who can follow it. On a partner's
+     screen it told me to measure myself under their empty chart. */
+  $("toneEmpty").textContent = isPartner
+    ? `Nothing from ${partnerName()} yet.` : "Log a measurement to start the line.";
   if (toneChart) { toneChart.destroy(); toneChart = null; }
   if (series.length) renderToneChart(series, isPartner, measure.unit);
 
@@ -23882,6 +24079,7 @@ function renderToneChart(series, isPartner, unit = "in") {
    from. */
 const LIFT_RANGES = TONE_RANGES;
 let LIFT_PICK = null;
+let LIFT_PICK_FOR = null;
 let LIFT_RANGE = "3M";
 let liftChart = null;
 
@@ -23901,7 +24099,10 @@ function liftScreenLifts(name) {
   /* Seeded first, so a person who has never opened the browser still has five
      starred and a strip that explains itself. */
   if (name === ME && typeof seedPinnedLifts === "function") seedPinnedLifts(name);
-  const pins = typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
+  /* My stars are mine. Read on a partner's strip they picked and starred
+     MY favourite lifts out of THEIR history. */
+  const pins = name !== ME ? firstLoggedLifts(name)
+    : typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
   if (pins.length) {
     const picked = pins
       .map((n) => all.find((l) => liftKey(l.name) === liftKey(n)))
@@ -23968,6 +24169,9 @@ function renderLiftHero(on, profile, isPartner) {
   $("liftTiles").classList.remove("hidden");
   $("liftActions").classList.toggle("hidden", isPartner);
 
+  /* One pick per person: my last lift carried over onto a partner's screen
+     opened theirs on a lift their own phone would not start on. */
+  if (LIFT_PICK_FOR !== name) { LIFT_PICK = null; LIFT_PICK_FOR = name; }
   if (!lifts.some((l) => l.name === LIFT_PICK)) LIFT_PICK = lifts[0].name;
   const pick = LIFT_PICK;
 
@@ -23981,7 +24185,8 @@ function renderLiftHero(on, profile, isPartner) {
   $("liftChips").classList.toggle("hidden", lifts.length < 2);
   $("liftChips").innerHTML = lifts.map((l) =>
     `<button type="button" class="lift-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${
-      isPinnedLift(l.name) ? `<span class="lift-star">${icon("star", 12)}</span>` : ""
+      (isPartner ? firstLoggedLifts(name).some((n) => liftKey(n) === liftKey(l.name)) : isPinnedLift(l.name))
+        ? `<span class="lift-star">${icon("star", 12)}</span>` : ""
     }${escapeHtml(shortLift(l.name))}</button>`).join("");
   $("liftChips").querySelectorAll("[data-lift]").forEach((b) => {
     b.onclick = () => { LIFT_PICK = b.dataset.lift; again(); };
@@ -24149,6 +24354,9 @@ function renderLiftHero(on, profile, isPartner) {
   const elapsed = Math.min(7, Math.max(1, daysBetween(weekStartStr(), todayStr()) + 1));
   const expected = avg * (elapsed / 7);
   const vs = expected > 0 ? Math.round(((thisWeek - expected) / expected) * 100) : null;
+  /* Weekly Volume is its own switch in the share sheet, and this tile is the
+     one place on a partner's lift screen that still drew it. */
+  $("liftVolume").classList.toggle("hidden", viewedHides("volume", isPartner));
   $("liftVolume").innerHTML = `<span class="prog-tile-ico">${icon("bolt", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Weekly Volume</span><span class="prog-tile-val">${fmtVolume(thisWeek)} lb</span><span class="prog-tile-sub">${
       vs == null ? "first week to compare"
@@ -24334,8 +24542,10 @@ function renderBulkHero(on, profile, isPartner) {
      rather than inviting a measurement the picker was just told not to show:
      a range pill over no line is a control of nothing. */
   $("bulkEmpty").classList.toggle("hidden", !m || !!series.length);
-  $("bulkEmpty").textContent = !m ? "" : m.key === "weight"
-    ? "Log a check-in to start the line."
+  /* Log check-in went with the Log progress button at the top, and on a
+     partner's screen there is nothing for me to log at all. */
+  $("bulkEmpty").textContent = !m ? "" : isPartner ? `Nothing from ${partnerName()} yet.`
+    : m.key === "weight" ? "Log a weigh-in to start the line."
     : `Measure your ${m.label.toLowerCase()} to start the line.`;
   if (bulkChart) { bulkChart.destroy(); bulkChart = null; }
   if (series.length) bulkChart = goalLineChart("bulkChart", series, isPartner, m.unit, () => bulkChart);
@@ -26779,10 +26989,10 @@ function renderCardioSaved(stage) {
                <button type="button" class="link-btn" id="csnProofChange">Change photo</button>
              </div>
            </div>`
-        : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
-           <button type="button" class="btn-primary" id="csnProofBtn">Take proof photo</button>`}
+        : `<p class="muted-note">Add a photo to finish this one.</p>
+           <button type="button" class="btn-primary" id="csnProofBtn">${icon("camera", 16)} Add proof photo</button>`}
       ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="csnNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
-      <button type="button" class="${hasProof ? "btn-primary" : "btn-ghost"}" id="csnDoneBtn">Done</button>
+      ${proofDoneHTML("csnDoneBtn", hasProof)}
     </div>`;
   csnPaintRing(stage);
   /* The thumbnail is filled after the signed URL lands rather than pointed at
@@ -26800,8 +27010,8 @@ function renderCardioSaved(stage) {
   if (PARTNER_EMAIL) $("csnNoteBtn").onclick = () => openNoteComposer("workout");
   $("csnRingBtn").onclick = () => openRecap(MY_EMAIL, ME, CSN_DONE.date);
   const leave = () => { CSN_DONE = null; closeCardioSession(); };
-  $("csnX").onclick = leave;
-  $("csnDoneBtn").onclick = leave;
+  $("csnX").onclick = () => { if (!proofGateHolds("csnProofBtn")) leave(); };
+  wireProofDone("csnDoneBtn", hasProof, leave);
 }
 
 /* A session that was running when the app was closed. Loaded into memory and
@@ -27056,7 +27266,8 @@ function renderEnduranceHero(on, profile, isPartner) {
 
   el.querySelector(".chart-wrap").classList.toggle("hidden", !anyMiles);
   $("endEmpty").classList.toggle("hidden", anyMiles);
-  $("endEmpty").textContent = `Log a ${act.one} to start the line.`;
+  $("endEmpty").textContent = isPartner ? `No ${act.one}s from ${partnerName()} yet.`
+    : `Log a ${act.one} to start the line.`;
   if (endChart) { endChart.destroy(); endChart = null; }
   if (anyMiles) renderEnduranceChart(buckets, isPartner);
 
@@ -27108,6 +27319,10 @@ function renderEnduranceHero(on, profile, isPartner) {
   const elapsed = Math.min(7, Math.max(1, daysBetween(weekStartStr(), todayStr()) + 1));
   const expected = avg * (elapsed / 7);
   const pct = expected > 0 ? Math.round(((thisMin - expected) / expected) * 100) : null;
+  /* Cardio minutes and Workouts a week are switches of their own in the
+     share sheet; these two tiles drew them whatever a partner had picked. */
+  $("endMinutes").classList.toggle("hidden", viewedHides("cardio_min", isPartner));
+  $("endConsistency").classList.toggle("hidden", viewedHides("workouts_wk", isPartner));
   $("endMinutes").innerHTML = `<span class="prog-tile-ico">${icon("clock", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Weekly Cardio Minutes</span><span class="prog-tile-val">${thisMin} min</span><span class="prog-tile-sub">${
       pct === null ? "first weeks of cardio" : `${pct >= 0 ? "+" : ""}${pct}% on the last month, so far`}</span></span>`;
@@ -27642,6 +27857,14 @@ function setPinnedLifts(list) {
 const PINNED_SEEDED_KEY = "ft_pinned_seeded";
 function seedPinnedLifts(name) {
   try { if (localStorage.getItem(PINNED_SEEDED_KEY)) return; } catch { return; }
+  const order = firstLoggedLifts(name);
+  if (!order.length) return;
+  setPinnedLifts(order);
+  try { localStorage.setItem(PINNED_SEEDED_KEY, "1"); } catch { /* private browsing */ }
+}
+/* The seed's answer on its own, because a partner's stars live on their
+   phone: this is the nearest this device can get to the strip they see. */
+function firstLoggedLifts(name) {
   const first = new Map();
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || l.weight == null || l.duration_min) continue;
@@ -27651,10 +27874,8 @@ function seedPinnedLifts(name) {
     const seen = first.get(key);
     if (!seen || at < seen.at) first.set(key, { name: l.exercise_name.trim(), at });
   }
-  if (!first.size) return;
-  const order = [...first.values()].sort((a, b) => a.at.localeCompare(b.at)).slice(0, MAX_PINNED_LIFTS);
-  setPinnedLifts(order.map((x) => x.name));
-  try { localStorage.setItem(PINNED_SEEDED_KEY, "1"); } catch { /* private browsing */ }
+  return [...first.values()].sort((a, b) => a.at.localeCompare(b.at))
+    .slice(0, MAX_PINNED_LIFTS).map((x) => x.name);
 }
 
 function isPinnedLift(name) {
@@ -28515,8 +28736,12 @@ function renderWeightChart() {
       ph.id = "weightEmpty";
       card.appendChild(ph);
     }
-    ph.innerHTML = emptyState("trending", "No weigh-ins yet",
-      "Log your weight on the Home tab and your trend line starts here.");
+    /* Home has no scale on it any more: the weigh-in lives behind Log
+       progress at the top of this tab. And on a partner's card the sentence
+       is about them, who cannot be told to log from my phone. */
+    ph.innerHTML = emptyState("trending", "No weigh-ins yet", viewingPartner
+      ? `${partner} has not logged a weigh-in yet.`
+      : "Tap Log progress at the top and your trend line starts here.");
     if (weightChart) { weightChart.destroy(); weightChart = null; }
     return;
   }
@@ -28986,7 +29211,12 @@ async function loadTodayWorkout() {
     .eq("email", MY_EMAIL).eq("entry_date", sessionDate()).eq("archived", false)
     .order("created_at", { ascending: false });
   TODAY_PLANS = (data || []).slice().sort((a, b) => planSlot(a) - planSlot(b));
-  TODAY_WORKOUT = TODAY_PLANS[0] || null;
+  /* The first session of the day is the default, but not while a workout is
+     running on another one. Every set logged reloads, and handing the session
+     the day's first plan halfway through left it counting sets against a
+     different list (a yoga class at slot 0, the lift being trained at 1). */
+  const live = SESSION?.workoutId && TODAY_PLANS.find((p) => p.id === SESSION.workoutId);
+  TODAY_WORKOUT = live || TODAY_PLANS[0] || null;
 }
 
 /* A plan that has just been stood down, taken out of today without going back
@@ -30221,10 +30451,21 @@ function lastLoggedWeight(name) {
 
 async function applySwap(chosen, source) {
   const ctx = SWAP_CTX;
-  const ex = swapTarget();
+  let ex = swapTarget();
   if (!ctx || !ex || !chosen) return;
   const planned = ex.name;
   if (chosen === planned) { closeSwapSheet(); return; }
+  /* Anything the caller has to write under the OLD name goes first, while the
+     row still carries it. The write reloads everything, which hands back a
+     fresh TODAY_WORKOUT, so the row to change is looked up again afterwards
+     rather than mutating the copy that was just thrown away. The sheet closes
+     first so a second tap cannot run this twice. */
+  if (ctx.before) {
+    closeSwapSheet();
+    await ctx.before(ctx.index);
+    ex = ctx.list?.()?.[ctx.index];
+    if (!ex) return;
+  }
 
   /* Sets and reps are the dose the engine chose for the slot, so they stay.
      The load cannot: it was worked out for a different movement. What they
@@ -30294,6 +30535,13 @@ function swapCurrentExercise() {
     index: SESSION.exerciseIndex,
     date: TODAY_WORKOUT.entry_date || todayStr(),
     focus: TODAY_WORKOUT.focus,
+    /* Sets already ticked on the lift being replaced happened. Nothing writes
+       a row until the exercise is banked, and the reset below wiped the ticks,
+       so swapping after two sets of bench threw those two sets away without a
+       word. Banked under the old name first, the same way ending early does. */
+    before: async (i) => {
+      if ((SESSION?.setsDone?.[i] || []).some(Boolean)) await logSetsForExercise(i);
+    },
     after: (i, ex) => {
       /* A movement you have just picked has had nothing done on it, and the
          weight and reps carried over would be the old lift's. Re-seeded from
@@ -30343,13 +30591,25 @@ async function removeCurrentExercise() {
   /* On to the next thing not yet done, looking forward first. */
   let to = SESSION.completed.findIndex((c, i) => i >= ei && !c);
   if (to === -1) to = SESSION.completed.findIndex((c) => !c);
-  SESSION.exerciseIndex = to === -1 ? Math.min(ei, exs.length - 1) : to;
   SESSION.restStartedAt = null;
   stopRestTicker();
   SESSION_LAST_EX = null;
+  toast(`Removed ${name}`);
+  /* Nothing left undone means the workout is over. Landing on a lift that was
+     already banked instead put it back on screen as "Log set 1 of 3", and
+     logging it again wrote it twice. The plan is saved first because the
+     summary reloads it, and a stale row would count the removed lift. */
+  if (to === -1) {
+    if (TODAY_WORKOUT.id) {
+      const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
+      if (error) console.error("removed exercise not saved to the plan", error);
+    }
+    wrapUpLifts();
+    return;
+  }
+  SESSION.exerciseIndex = to;
   saveSessionToStorage();
   renderSession();
-  toast(`Removed ${name}`);
   if (TODAY_WORKOUT.id) {
     const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
     if (error) console.error("removed exercise not saved to the plan", error);
@@ -31667,7 +31927,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        reload and redraw Home only, so the workout tab underneath kept
        Thursday's old session on the week strip. */
     await planChangedOn(target, {
-      then: () => { if (isToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+      then: () => { if (isToday) FRESH_PLAN_ID = (TODAY_PLANS.find((p) => planSlot(p) === slot) || TODAY_WORKOUT)?.id || null; },
     });
     /* Mo, 2026-09-18: "I don't want to generate a workout and be able to see
        those options. The second it generates, it takes me to that page." The
@@ -31680,7 +31940,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       await finishGenOverlay();   // three seconds at least, and a full bar
       if (!genCancelled) {
         closeGenOverlay();
-        showPlanScreen(target);
+        showPlanScreen(target, slot);
       }
     }
     /* Answered, so a caller that has to undo something on failure can tell the
@@ -32158,6 +32418,11 @@ function sessionMatchesPlan(saved) {
 function resumeSessionIfAny() {
   if (SESSION) return false;
   const saved = loadSessionFromStorage();
+  /* The plan it was started on, which is not always the day's first: see
+     loadTodayWorkout. Matched against that one or a session on the second
+     session of a day was thrown away on every reload. */
+  const own = saved?.workoutId && TODAY_PLANS.find((p) => p.id === saved.workoutId);
+  if (own) TODAY_WORKOUT = own;
   if (!sessionMatchesPlan(saved)) {
     if (saved) clearSessionStorage();   // stale, belongs to a finished plan
     return false;
@@ -32684,10 +32949,22 @@ const sfx = { play: sfxPlay };
    somewhere useful" action, so looking back at what you already finished is
    fine. It also does not wrap: the last exercise has no next, and the
    gesture handler rubber-bands there instead of cycling to the first. */
+/* The nearest lift in that direction that is not banked yet, or -1. A banked
+   lift is not somewhere a swipe can land, the same rule jumpToExercise and Up
+   next keep: swiping back onto finished bench put its ticked sets and Next
+   exercise on screen, and Next exercise logged all of them a second time. */
+function stepTarget(dir) {
+  if (!SESSION || !TODAY_WORKOUT?.exercises) return -1;
+  for (let i = SESSION.exerciseIndex + dir; i >= 0 && i < TODAY_WORKOUT.exercises.length; i += dir) {
+    if (!SESSION.completed[i]) return i;
+  }
+  return -1;
+}
+
 function stepExercise(dir) {
   if (!SESSION) return false;
-  const idx = SESSION.exerciseIndex + dir;
-  if (idx < 0 || idx >= TODAY_WORKOUT.exercises.length) return false;
+  const idx = stepTarget(dir);
+  if (idx < 0) return false;
   SESSION.exerciseIndex = idx;
   SESSION.restStartedAt = null;
   stopRestTicker();
@@ -32712,8 +32989,8 @@ function wireSessionSwipe(ei) {
   let lastX = 0, lastT = 0;   // pointercancel carries no usable coordinates
 
   const bounds = () => ({
-    canPrev: ei > 0,
-    canNext: ei < TODAY_WORKOUT.exercises.length - 1,
+    canPrev: stepTarget(-1) >= 0,
+    canNext: stepTarget(1) >= 0,
   });
   const paint = (dx) => {
     const { canPrev, canNext } = bounds();
@@ -33713,7 +33990,9 @@ async function doFinishExerciseAndAdvance() {
   const ex = TODAY_WORKOUT.exercises[ei];
   const doneCount = SESSION.setsDone[ei].filter(Boolean).length;
 
-  if (!(await logSetsForExercise(ei))) {
+  /* Already banked is already in the log. Whatever put a finished lift back
+     on screen, advancing past it must not write it twice. */
+  if (!SESSION.completed[ei] && !(await logSetsForExercise(ei))) {
     await logExerciseSilent(ex.name, SESSION.weights[ei], SESSION.reps[ei], doneCount || ex.sets);
   }
   SESSION.completed[ei] = true;
@@ -33729,26 +34008,28 @@ async function doFinishExerciseAndAdvance() {
   // A new lift is on the stage. Said after the render below has put it there.
   if (nextIdx !== -1) setTimeout(() => sayQuip("nextExercise"), 900);
 
-  if (nextIdx === -1) {
-    /* The last lift is banked. If the plan carries a cool-down and it was
-       not skipped for the day, the session ends through it; the summary
-       waits until the holds are done or skipped. Ending early (endWorkoutNow)
-       does not come through here, so someone leaving is never held back. */
-    const mob = planMobility();
-    if (mob && !mob.skippedCooldown && mob.cooldown.length) {
-      SESSION.phase = "cooldown";
-      SESSION.stretchIndex = 0;
-      SESSION.stretchSide = 1;
-      SESSION.stretchStartedAt = Date.now();
-      saveSessionToStorage();
-      renderSession();
-      return;
-    }
-    clearSessionStorage();
-    renderSessionComplete();
-  } else {
+  if (nextIdx === -1) wrapUpLifts();
+  else renderSession();
+}
+
+/* Every lift in the plan is banked. If the plan carries a cool-down and it was
+   not skipped for the day, the session ends through it; the summary waits
+   until the holds are done or skipped. Ending early (endWorkoutNow) does not
+   come through here, so someone leaving is never held back. */
+function wrapUpLifts() {
+  SESSION.exerciseIndex = TODAY_WORKOUT.exercises.length;
+  const mob = planMobility();
+  if (mob && !mob.skippedCooldown && mob.cooldown.length) {
+    SESSION.phase = "cooldown";
+    SESSION.stretchIndex = 0;
+    SESSION.stretchSide = 1;
+    SESSION.stretchStartedAt = Date.now();
+    saveSessionToStorage();
     renderSession();
+    return;
   }
+  clearSessionStorage();
+  renderSessionComplete();
 }
 
 async function logExerciseSilent(name, weight, reps, sets) {
@@ -34435,6 +34716,7 @@ function renderSession() {
   const setsDone = SESSION.setsDone[ei];
   if (!ex || !Array.isArray(setsDone)) {
     // Session and plan drifted apart; drop it rather than crash the tab.
+    reviewHold("session dropped");
     SESSION = null;
     clearSessionStorage();
     closeSessionUI();
@@ -35248,6 +35530,9 @@ function playXpSummary() {
 }
 
 async function renderSessionComplete() {
+  /* Taken before finishWorkout banks the day, so the review ask can tell a
+     moment that landed with THIS workout from one that was already true. */
+  const reviewBefore = reviewSnapshot();
   await finishWorkout();
   /* The XP rows are weighted by the library's level for each move, and the
      library is a lazy import. Waited for here so the summary never prints the
@@ -35256,6 +35541,7 @@ async function renderSessionComplete() {
   /* The same test finishWorkout banked on, asked again so the screen and the
      database cannot say different things about the same session. */
   const recorded = sessionRecordedAnything();
+  noteSessionMoments(reviewBefore, recorded);
   const loggedNow = todaysLoggedExerciseNames();
   const total = TODAY_WORKOUT.exercises.length;
   const doneCount = TODAY_WORKOUT.exercises.filter((ex) => loggedNow.has(ex.name.toLowerCase())).length;
@@ -35373,10 +35659,10 @@ async function renderSessionComplete() {
            and a proof photo on a day fit_entries never banked would be the
            one thing on the partner's timeline claiming a workout happened. */
         : !recorded ? ""
-        : `<p class="muted-note">One last thing: snap a photo to lock this in.</p>
-           <button type="button" class="btn-primary" id="sessionProofBtn">Take proof photo</button>`}
+        : `<p class="muted-note">Add a photo to finish this one.</p>
+           <button type="button" class="btn-primary" id="sessionProofBtn">${icon("camera", 16)} Add proof photo</button>`}
       ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="sessionNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
-      <button type="button" class="${hasProof ? "btn-primary" : "btn-ghost"}" id="sessionDoneBtn">Done</button>
+      ${proofDoneHTML("sessionDoneBtn", hasProof || !recorded)}
     </div>`;
 
   hydrateAvatars($("sessionBody"));
@@ -35410,7 +35696,7 @@ async function renderSessionComplete() {
      the reason every other reader of this screen uses it: a session that ran
      past midnight still belongs to the day it started on. */
   $("scRingBtn").onclick = () => openRecap(MY_EMAIL, ME, sessionDate());
-  $("sessionDoneBtn").onclick = sessionDone;
+  wireProofDone("sessionDoneBtn", hasProof || !recorded, sessionDone);
 }
 
 /* Leaving the completion screen. Also what the chevron does there, so the two
@@ -35443,6 +35729,9 @@ async function sessionDone() {
      plan, so the generator's cached next day is wrong and Home is as stale as
      this tab. */
   await planChangedOn(sessionDate());
+  /* Out of the workout and past its celebration: the first point at which a
+     sheet of ours or Apple's covers nothing the person is still looking at. */
+  afterSessionAsks();
 }
 
 let WORKOUT_MODE = null; // null | "choose" | "manual" | "week" | "recovery" | "review" | "activity"
@@ -35720,6 +36009,24 @@ async function drainLockScreenSets() {
      owner claims nothing and takes the rubbish out, which is the whole job on
      this path. */
   const mine = SESSION && !SESSION.finished ? (MY_EMAIL || "") : "";
+  /* An empty owner is a claim that no workout exists, and the native side
+     answers it by throwing the whole queue away. That claim is only true once
+     the workout could have been put back. Before then this ran with SESSION
+     still null and binned every tap: the Lock Screen button wakes the app in
+     the background, the boot that restores the session is still in flight
+     when the person opens it, and the resume signal drains first. The sets
+     were logged on the card and gone from the workout.
+
+     So with no workout in memory, nobody signed in yet, or a saved unfinished
+     workout on disk that loadAll has not restored, this waits. loadAll ends in
+     reconcileNativeSurfaces, which drains again with the session in place, and
+     a session that turns out stale is cleared by resumeSessionIfAny, after
+     which the next drain takes the rubbish out as before. */
+  if (!mine) {
+    if (!MY_EMAIL || !ME) return;
+    const onDisk = loadSessionFromStorage();
+    if (onDisk && !onDisk.finished) return;
+  }
   try {
     /* Load changes from the island go first, so a set logged after a change is
        stamped with the weight that was on screen when it was logged. Drained
@@ -35927,7 +36234,7 @@ function openSessionUI() {
 function minimiseSession() {
   // On a finished workout the chevron is the way out, so it means the same as
   // Done rather than re-presenting a banked workout as in progress.
-  if (SESSION?.finished) { sessionDone(); return; }
+  if (SESSION?.finished) { if (proofGateHolds("sessionProofBtn")) return; sessionDone(); return; }
   /* Same for a stretch: there is no clock worth keeping alive underneath and
      no paused screen that would make sense for it, so the chevron ends it. */
   if (SESSION?.standaloneStretch) { endStretchSession(); return; }
@@ -41295,17 +41602,25 @@ async function saveManualWorkout() {
      earlier today leaves the row archived, and an upsert that did not reset
      them wrote the new plan onto it, where loadTodayWorkout can never see it.
      The user got "Workout plan saved" and an empty screen. */
+  /* mobility is cleared for the same reason. Writing over the generated plan
+     kept ITS warm-up, cool-down and ramp sets, so a hand-built push-up and
+     pull-up day opened on "Arm Circles, for your pressing and overhead work"
+     and ended on a pec stretch. A plan built from nothing here has no blocks,
+     which is what a fresh row already got. */
   /* A lift written by hand onto a day that already holds a planned run or a
      class is a SECOND session rather than a replacement for it, which is the
      same rule generating one follows: see nextPlanSlot. */
+  const slot = nextPlanSlot(target, { lifting: true });
   const { error } = await upsertPlanRow({
     user_name: ME, email: MY_EMAIL, entry_date: target,
     focus: deriveFocus(MANUAL_DRAFT), exercises: MANUAL_DRAFT,
-    archived: false, completed_at: null,
-  }, nextPlanSlot(target, { lifting: true }));
+    archived: false, completed_at: null, mobility: null,
+  }, slot);
   if (error) { console.error("could not save the manual workout", error); toast("Couldn't save that plan. Try again."); return; }
   PLAN_FOR_DATE = null;
   WORKOUT_MODE = forToday ? null : "week";
+  /* The plan just written, not the day's first session (see showPlanScreen). */
+  if (forToday) PLAN_VIEW_SLOT = slot;
   clearDraft();
   /* Through the one door every plan change goes through. Writing a day by hand
      is as much a rewrite of it as generating one, and this used to reload and
@@ -41313,7 +41628,7 @@ async function saveManualWorkout() {
      generator's cached answer for "which day next" was still the one it gave
      before this row existed. */
   await planChangedOn(target, {
-    then: () => { if (forToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+    then: () => { if (forToday) FRESH_PLAN_ID = (TODAY_PLANS.find((p) => planSlot(p) === slot) || TODAY_WORKOUT)?.id || null; },
   });
   toast(forToday ? "Workout plan saved" : "Added to that day");
 }
@@ -41821,9 +42136,12 @@ function openPlanReview(date) {
    has the same screen in review. The tab is switched to first because a
    generate can be started from the week planner and from the calendar, and
    both of those can be reached with another tab in front. */
-function showPlanScreen(date) {
+/* `slot` is the session on that day to show, when it is not the first: a
+   lift generated beside a planned class lands on slot 1, and showing slot 0
+   after generating it put the class on screen instead of the new plan. */
+function showPlanScreen(date, slot = null) {
   if ($("tab-workout")?.classList.contains("hidden")) switchTab("workout");
-  if (date === sessionDate()) goWorkoutScreen(null);
+  if (date === sessionDate()) goWorkoutScreen(null, slot ? { before: () => { PLAN_VIEW_SLOT = slot; } } : {});
   else openPlanReview(date);
 }
 
@@ -42360,7 +42678,10 @@ function renderPlanPreview(opts) {
   if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
 
   // These three are mutually exclusive depending on how far the workout got.
-  if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
+  /* The plan on THIS screen, which on a day with two sessions is not always
+     TODAY_WORKOUT: opening the lift beside a planned yoga class and tapping
+     Start started the yoga. */
+  if ($("planStartBtn")) $("planStartBtn").onclick = () => { if (!review && plan) TODAY_WORKOUT = plan; startWorkout(); };
   if ($("planStartActBtn")) $("planStartActBtn").onclick = () => startPlannedActivity(plan);
   /* Regenerate overwrites today's row outright, so it says what goes with it.
      There is no undo once the new plan is written. */
@@ -44081,7 +44402,12 @@ async function renderBodyPhotos() {
     strip.innerHTML = emptyState("camera", "No progress photos yet", "One a day. In a month you'll see the difference.");
     return;
   }
+  const who = viewedEmail();
   const urls = await Promise.all(shots.map((s) => signedProofUrl(s.path)));
+  /* Signing takes a round trip. Switch Mo | Mell inside it and the other
+     person's render has already filled this card, so the late answer would
+     paint her photos into his card, with no delete buttons on them. */
+  if (viewedEmail() !== who) return;
   strip.innerHTML = shots.map((s, i) => urls[i]
     ? `<div class="photo-item">
          <img src="${urls[i]}" alt="Progress photo ${escapeHtml(s.taken_on)}" loading="lazy" />
@@ -44406,6 +44732,16 @@ const PROGRESS_SHARE_OPT_IN = new Set(["photos"]);
 function progressKeyShared(key, hiddenList) {
   const present = Array.isArray(hiddenList) && hiddenList.includes(key);
   return PROGRESS_SHARE_OPT_IN.has(key) ? present : !present;
+}
+/* Whether the partner on screen holds this one reading back, master switch
+   included for the body. The goal screens draw tiles of their own (the lift
+   screen's Weekly Volume, the endurance screen's minutes) that never went
+   through the card gate in renderProgressTab, so each one asks this. Always
+   false on your own view: nothing of yours is hidden from you. */
+function viewedHides(key, isPartner) {
+  if (!isPartner) return false;
+  if (BODY_SHARE_KEYS.includes(key) && !partnerSharesBody()) return true;
+  return !progressKeyShared(key, PARTNER_PROFILE?.progress_hidden);
 }
 function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME; }
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
@@ -44877,27 +45213,16 @@ const isTracked = (key, goalId = null, prof = trackedProfile()) => trackedMetric
 const STRIP_METRICS = [{ key: "weight", label: "Weight", unit: "lb" }].concat(MEASUREMENTS);
 function goalStripMetrics(screenKeys, isPartner, goalId = null) {
   const metric = (k) => STRIP_METRICS.find((m) => m.key === k);
-  if (isPartner) {
-    /* A partner's strip cannot ask what they chose to track, because
-       trackedMetrics reads MY_PROFILE and tracked_by_goal is your column and
-       not theirs. It used to answer that by handing back the screen's own
-       keys and stopping there, and NONE of the screen key lists carry weight
-       (TONE_MEASURE_KEYS and BULK_MEASURE_KEYS are tape only). So somebody
-       sharing their weigh-ins still had no Weight chip on their recomp or
-       bulk screen, and therefore no weight chart, no matter what they had
-       switched on. Mo: "right now she has me being able to see her weigh-ins
-       and everything, but I can't see her weight chart."
-
-       The scale rides at the end here the same way it rides at the end of
-       your own strip, and behind partnerSharesBody, which is the switch that
-       governs their whole body: their weight, their goal weight and their
-       tape are one answer, not three. */
-    const keys = screenKeys.includes("weight") || !partnerSharesBody()
-      ? screenKeys
-      : screenKeys.concat("weight");
-    return keys.map(metric).filter(Boolean);
-  }
-  const want = trackedMetrics(goalId);
+  /* A partner's strip is THEIR strip: what they track, in their order, less
+     what they hold back. It used to hand back the screen's own keys, from
+     when trackedMetrics could only read MY_PROFILE, so a partner who hid
+     their Waist (or never measured it) still had a Waist chip here, and with
+     sharing on its chart. trackedMetrics reads the viewed profile now and
+     already drops the body readings they hid one by one; the master switch,
+     which governs their weight and their tape together, is applied on top. */
+  const want = isPartner
+    ? trackedMetrics(goalId, PARTNER_PROFILE).filter((k) => !viewedHides(k, true))
+    : trackedMetrics(goalId);
   return screenKeys.filter((k) => want.includes(k))
     .concat(want.filter((k) => !screenKeys.includes(k)))
     .map(metric).filter(Boolean);
@@ -44911,6 +45236,15 @@ function goalStripMetrics(screenKeys, isPartner, goalId = null) {
    explain the icon by. Through the lens, like every other reader on the tab,
    so it edits the goal being looked at rather than the main one. */
 function nothingTrackedStats(host) {
+  /* On a partner's view the empty strip means they shared none of it, and
+     the button would open MY tracking sheet over THEIR screen. */
+  if (PROGRESS_VIEW === "partner") {
+    host.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">This goal</div>
+      <div class="tone-none">Nothing shared</div>
+    </div>`;
+    return;
+  }
   host.innerHTML = `<div class="wth-now">
     <div class="wth-eyebrow">This goal</div>
     <div class="tone-none">Nothing tracked</div>
@@ -45589,7 +45923,10 @@ async function renderMuscleAnswers(name) {
 
   try {
     const mod = await ensureRiveBodyModule();
-    const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+    /* The body of whoever's muscles these are. It read MY_EMAIL always, so
+       Mell's Getting stronger card drew her on Mo's figure. */
+    const whose = MS_NAME === ME ? MY_EMAIL : PARTNER_EMAIL;
+    const sex = profileFor(whose)?.sex === "Female" ? "Female" : "Male";
     const paint = () => msPaint(mod);
     if (!MS_FRONT || MS_SEX !== sex) {
       MS_FRONT?.destroy(); MS_BACK?.destroy();
@@ -46139,7 +46476,9 @@ function renderProgressEmpty(kind) {
   $("progHeadline").innerHTML =
     emptyState(weightLed ? "trending" : "dumbbell", "Nothing to measure yet",
       weightLed
-        ? "Type your weight in below. One number starts the trend."
+        /* The stepper that used to sit below this went with the Log
+           progress button (#cardWeight .wt-logcard is display none now). */
+        ? "Tap Log progress above. One number starts the trend."
         : "Log one session and this turns into an answer instead of a question.")
     + (weightLed ? "" : `<button type="button" class="btn-primary" id="progFirstAction">Go to today</button>`);
   if (!weightLed) $("progFirstAction").onclick = () => switchTab("home");
@@ -46555,7 +46894,11 @@ function renderProgTiles(kind, isPartner, opts = {}) {
      at all, whatever the tracking picker said. On a partner's view the
      picker is THEIRS (trackedProfile), so they see the row they chose. */
   const chev = `<span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
-  const waistOffered = MEASUREMENTS.some((m) => isTracked(m.key));
+  /* The tile draws the waist and nothing else, so it asks about the waist.
+     Asking about any tape left it showing a partner's waist after they hid
+     it, as long as they still shared their hips. Log progress at the top is
+     the door for the rest of the tape now. */
+  const waistOffered = isTracked("waist_in");
   const waist = $("tileWaist");
   waist.classList.toggle("hidden", !waistOffered);
   if (waistOffered) {
@@ -46940,10 +47283,14 @@ function lastMeasurement(key) {
    whole list. */
 const WEIGHT_ROW = { key: "weight", label: "Weight", unit: "lb" };
 const PROGRESS_LOG_ROWS = [WEIGHT_ROW, ...MEASUREMENTS];
+/* Weight is asked for whether or not this goal tracks it. Filtering it like
+   the tape left somebody tracking only their Waist with a sheet that had no
+   scale in it, which is the half of Mell's report the fallback alone did not
+   cover. Only touched rows are saved, so an untouched weight writes nothing. */
 function measRowsToShow() {
   const rows = MEAS_ROWS || PROGRESS_LOG_ROWS;
-  const filtered = rows.filter((m) => isTracked(m.key, null, MY_PROFILE));
-  return filtered.length ? filtered : [WEIGHT_ROW];
+  const tape = rows.filter((m) => m.key !== "weight" && isTracked(m.key, null, MY_PROFILE));
+  return [WEIGHT_ROW, ...tape];
 }
 /* Whether the top button has anything to log for this person. */
 const progressLogOffered = () => PROGRESS_LOG_ROWS.some((m) => isTracked(m.key, null, MY_PROFILE));
@@ -47089,6 +47436,12 @@ function renderProgressTab() {
      the clock on them, which is exactly what the timeline is careful to
      withhold two taps away. */
   if (!sharing && kind === "endurance") kind = "habit";
+  /* The finer switches, for the two screens that ARE one of them: the lift
+     screen is Best Lifts, the endurance screen is Distance. Held back, the
+     screen goes the way the category switch above sends it, or it shows
+     what was hidden under another heading. */
+  if (kind === "lift" && viewedHides("lifts", isPartner)) kind = "habit";
+  if (kind === "endurance" && viewedHides("distance_wk", isPartner)) kind = "habit";
   /* Every reading left below leads with their body weight, and without it they
      are not readings, they are a heading over a hole. bulk falls to volume
      rather than to habit because tonnage is what Build muscle is measured on
@@ -47109,7 +47462,13 @@ function renderProgressTab() {
      pounds. Where they track nothing, showing up is the only honest headline
      left, which is the same answer Move better gets and for the same reason.
      Your own view only; a partner's screen follows THEIR choices. */
-  if (!isTracked("weight") && (kind === "scale" || kind === "bulk")) {
+  /* A partner who tracks the scale but holds it back still has the Build
+     muscle screen on their own phone, so that is what they get here, less the
+     Weight chip. Read as untracked, it turned their goal into "Lose fat and
+     build muscle", a screen they never see. */
+  const weightHeldBack = isPartner && profile?.share_weigh_ins === true
+    && trackedMetrics(null, { ...profile, progress_hidden: [] }).includes("weight");
+  if (!isTracked("weight") && (kind === "scale" || (kind === "bulk" && !weightHeldBack))) {
     /* "Still tracks a tape measurement", which is what the paragraph above
        says and what the test used to get wrong: it asked whether they track
        ANYTHING, and the recomp screen is built around inches. Now that a goal
@@ -47148,6 +47507,10 @@ function renderProgressTab() {
     if (progressKeyShared(key, profile?.progress_hidden)) continue;
     const card = TRACK_ALL.find((m) => m.key === key)?.card;
     if (card) barred.add(card);
+    /* Getting stronger is Best Lifts drawn on a body: tap a muscle and it
+       names the lift and the load. The category switch above already bars
+       the two together; the finer one has to as well. */
+    if (key === "lifts") barred.add("cardMuscles");
   }
   const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
   /* The cards somebody asked for by name. The picker is the only thing that
@@ -47696,6 +48059,40 @@ async function registerPushHandlers() {
         loadClipInbox().then(() => { try { openNextClip(); } catch {} });
         return;
       }
+      /* A train together invite. Join on the banner is a yes, so it answers
+         the invite rather than opening it for a second tap; a plain tap opens
+         the invite to decide there. Waits for sign-in, because a tap on a
+         killed app lands here before the partner or the session is loaded,
+         and an invite looked up then would read as not there. */
+      if (url.startsWith("/together")) {
+        whenSignedIn(async () => {
+          await loadTogether();
+          const live = TG && TG.status === "invited" && !tgAmHost();
+          if (!live) { if (action !== "decline") toast("That invite has ended"); return; }
+          /* Not now says so, so the person who asked is not left waiting in
+             the lobby for half an hour. Best effort: iOS gives a background
+             action a few seconds, and if that is not enough the invite simply
+             runs out as it would have anyway. */
+          if (action === "decline") { await tgRespond(false); return; }
+          if (action === "join") await tgRespond(true);
+          else renderTogether();
+        });
+        return;
+      }
+      /* The Monday progress reminder lands on the sheet it is asking for. */
+      if (url.startsWith("/progress")) {
+        whenSignedIn(() => {
+          try { switchTab("progress"); } catch {}
+          if (url.startsWith("/progress/log") && typeof openMeasurementsSheet === "function") openMeasurementsSheet();
+        });
+        return;
+      }
+      /* A cheer is read on Home, in the banner, so Home and a fresh look at
+         the banner rather than whatever it showed before the push arrived. */
+      if (url.startsWith("/cheer")) {
+        whenSignedIn(() => { try { switchTab("home"); } catch {} renderEncouragementBanner(); });
+        return;
+      }
       /* Straight into the queue. This banner exists because somebody has a day
          to answer, and landing them on the home tab to go and find it is how a
          day becomes a week. */
@@ -47714,6 +48111,20 @@ async function registerPushHandlers() {
        buttons off for the rest of the session. */
     PUSH_HANDLERS_ON = false;
   }
+}
+
+/* Runs fn once the signed-in profile has loaded, or now if it already has.
+   A notification tapped while the app was killed is delivered during boot,
+   ahead of handleSignedIn, and anything it opens needs the partner and the
+   profile to exist. Gives up quietly after 20 seconds: a tap that cannot land
+   leaves the app wherever it opened, which is what it did before. */
+function whenSignedIn(fn) {
+  const started = Date.now();
+  const tick = () => {
+    if (MY_PROFILE && MY_EMAIL) { Promise.resolve().then(fn).catch((err) => console.error("notification tap failed", err)); return; }
+    if (Date.now() - started < 20000) setTimeout(tick, 250);
+  };
+  tick();
 }
 
 /* APNs hands the token to a listener rather than returning it, so the register
@@ -47853,11 +48264,76 @@ async function renderPushToggle() {
   btn.onclick = sub ? disablePush : enablePush;
 }
 
+/* Every kind of notification this app sends, each with its own switch, Mo
+   2026-10-08. Stored as what is OFF (profiles.notify_off) so a kind added
+   later starts on for everybody, and so a profile from before the column
+   means everything is on. The ids are the server's: send-nudges/plan.ts
+   ALL_KINDS spells them the same way, and every notify function reads the
+   column before sending.
+
+   The "when" line is the promise, so it says the condition and not just the
+   topic: the streak one fires only when a streak is actually about to end,
+   and saying so is what makes leaving it on an easy choice. */
+const NOTIFY_KINDS = [
+  { id: "evening", name: "Your partner trained", why: "6 PM, when they have trained today and you have not." },
+  { id: "started", name: "Your partner started a workout", why: "The moment they start." },
+  { id: "video", name: "Videos from your partner", why: "A clip plays once, so you hear about it straight away." },
+  { id: "cheer", name: "Cheers", why: "When your partner cheers you on. Silent overnight." },
+  { id: "invite", name: "Train together invites", why: "When your partner asks you to train with them." },
+  { id: "streak", name: "Streak about to end", why: "8 PM, for a together streak of 3 days or more, only if it would end tonight." },
+  { id: "recap", name: "Sunday recap", why: "Sunday 7 PM, how the week went for both of you." },
+  { id: "progress", name: "Progress reminders", why: "Monday 8 AM, only when a weigh-in or a progress photo is due." },
+];
+
+function notifyOffList() {
+  const raw = MY_PROFILE?.notify_off;
+  return Array.isArray(raw) ? raw.map((k) => String(k).toLowerCase()) : [];
+}
+
+function renderNotifyKinds() {
+  const root = $("notifyKinds");
+  if (!root) return;
+  const off = new Set(notifyOffList());
+  root.innerHTML = NOTIFY_KINDS.map((k) => `
+    <label class="pref-block pref-row">
+      <span class="pref-txt">
+        <span class="pref-name">${escapeHtml(k.name)}</span>
+        <span class="pref-why">${escapeHtml(k.why)}</span>
+      </span>
+      <input type="checkbox" data-notify-kind="${k.id}"${off.has(k.id) ? "" : " checked"}${MY_PROFILE ? "" : " disabled"} />
+    </label>`).join("")
+    /* The cap is the reason somebody can leave all of these on, so it is said
+       where they decide. */
+    + `<p class="muted-note" style="margin-top:8px;">At most one of the scheduled ones (6 PM, 8 PM, Sunday, Monday) on any day.</p>`;
+  for (const box of root.querySelectorAll("[data-notify-kind]")) {
+    box.onchange = () => saveNotifyKind(box.dataset.notifyKind, box.checked, box);
+  }
+}
+
+/* Saved on the tap, like the other switches in Setup. */
+async function saveNotifyKind(kind, on, box) {
+  const before = notifyOffList();
+  const next = on ? before.filter((k) => k !== kind) : [...new Set([...before, kind])];
+  const { error } = await sb.from("profiles").update({ notify_off: next }).eq("email", MY_EMAIL);
+  if (error) {
+    /* 20261009_notify_prefs_and_cheer.sql adds the column and is written, not
+       applied. Until it is, the write cannot land, and saying "saved" would be
+       a lie about what the server will send, so the switch goes back. */
+    const missing = /notify_off/.test(`${error.message || ""} ${error.details || ""} ${error.hint || ""}`);
+    console.error("could not save notification choice", error);
+    toast(missing ? "These switches aren't stored yet" : "Could not save that");
+    if (box) box.checked = !on;
+    return;
+  }
+  if (MY_PROFILE) MY_PROFILE.notify_off = next;
+}
+
 /* Why the last attempt to turn reminders on did not work. Null when it has not
    been tried, or when it worked. */
 let PUSH_LAST_ERROR = null;
 
-/* Set when onboarding finishes, spent the first time the app is on screen. */
+/* What onboarding used to set to arm the launch ask. Nothing sets it now; it
+   is only read to be removed (see the end of showApp's load). */
 const ASK_PUSH_KEY = "ft_ask_push";
 
 /* Where the privacy policy and support pages are actually readable.
@@ -47894,8 +48370,12 @@ async function openPolicy(page) {
   window.open(url, "_blank", "noopener");
 }
 
-/* What we promise to send, written once and shown in both places that promise
-   it: the sheet that asks, and the Notifications screen in Setup.
+/* What we promise to send, on the Notifications screen in Setup.
+
+   It used to be shown on the ask sheet too. Since 2026-10-08 the sheet says
+   Mo's partner-first sentence instead (pushAskCopy), so the two say different
+   things on purpose and BOTH have to stay true: change what the app sends and
+   check both. The note below is why that matters.
 
    One string rather than two, because the two had already drifted. The Setup
    screen was still promising "only when your partner has trained and you have
@@ -47912,16 +48392,18 @@ async function openPolicy(page) {
    because plain is what reads as safe, and that is the correct instinct for a
    surface whose only job is to be believed. */
 function pushPromise() {
-  /* "Your partner" rather than their name, always.
-     This is asked immediately after onboarding, which is before most people
-     have paired with anybody, so the name would rarely be there to use and
+  /* One line per group of switches in Setup's "What to send", so the list
+     and the switches cannot promise different things.
+     "Your partner" rather than their name, always.
+     Setup is open to people who have not paired with anybody, so the name
+     would often not be there to use and
      naming somebody implies they already have one. The same three lines then
      hold for every account, paired or not, and there is no branch that can be
      wrong. */
   return [
-    "Workout reminders",
-    "Messages from your partner",
-    "Goal milestones",
+    "Your partner's workouts, invites and cheers",
+    "Before a streak breaks, and a Sunday recap",
+    "When a weigh-in or photo is due",
   ];
 }
 
@@ -47945,37 +48427,240 @@ function pushPromiseHtml() {
    "Not now" here never reaches Apple, and the switch in Setup still works for
    anyone who changes their mind.
 
-   The reason given is the partner's, not ours, because that is the honest one
+   WHEN changed on 2026-10-08. It used to fire on the first Home after
+   onboarding, and 5 of 14 accounts said yes: nobody had a partner yet and
+   nothing had happened, so the reason was invisible. Now it fires at the two
+   moments that show the reason. Right after the partner joins (the pair
+   celebration), and right after a finished workout for anyone not yet asked,
+   which is the first finished workout for somebody training alone and also
+   catches the people who paired before this existed and so never see the
+   celebration again. Whichever comes first spends it, once per phone.
+
+   The reason given is the partner's, by name, because that is the honest one
    and it is also the only notification in the app nobody resents. Someone
    training alone gets a different, true sentence rather than the same one with
-   the name removed. */
-async function maybeAskForPush() {
-  if (!isNativeApp()) return;
-  let armed = null;
-  try { armed = localStorage.getItem(ASK_PUSH_KEY); } catch { return; }
-  if (armed !== "1") return;
+   the name removed: nothing reaches them until somebody trains with them, and
+   the sheet says exactly that.
+
+   Returns true when the sheet was shown, so a caller does not stack Apple's
+   rating sheet on top of the answer. */
+const PUSH_ASKED_KEY = "unio.pushAsked";
+function pushAskSpent() { try { return localStorage.getItem(PUSH_ASKED_KEY) === "1"; } catch { return true; } }
+function spendPushAsk() { try { localStorage.setItem(PUSH_ASKED_KEY, "1"); } catch { /* private browsing: it can ask again, once a launch at most */ } }
+/* Its own function so the sandbox can stand in for a phone. On the website
+   there is no iOS sheet to protect and Unio is app only. */
+function pushAskPlatformOk() { return isNativeApp(); }
+
+/* The copy Mo approved on 2026-10-08, with the partner's first name in it.
+   Its last words were "Nothing else.", true that day and false the day the
+   streak, recap and progress reminders shipped beside it, so the promise is
+   now the one Setup keeps: every kind has its own switch there. The solo line is ours: the same promise, made true for somebody
+   nobody is training with yet. */
+function pushAskCopy() {
+  const first = PARTNER_EMAIL ? (partnerName() || "").split(" ")[0] : "";
+  if (first) {
+    return {
+      heading: `Know when ${first} trains?`,
+      body: `Get a nudge when ${first} finishes a workout, starts one, or cheers you on. You pick which in Setup.`,
+    };
+  }
+  return {
+    heading: "Hear from the people you train with?",
+    body: "Once a partner or a group trains with you, get a nudge when they finish a workout, start one, or cheer you on. You pick which in Setup.",
+  };
+}
+
+async function maybeAskForPush(reason = "") {
+  if (!pushAskPlatformOk() || pushAskSpent()) return false;
+  /* Never over a workout in progress; the next moment will do. */
+  if (SESSION) return false;
+  /* Already on, from an earlier install on this phone. Nothing to ask, and
+     nothing left to spend it on later either. */
+  if (await currentPushSub()) { spendPushAsk(); return false; }
+  /* iOS already said no. "Turn on notifications" would then lead to an error
+     about Settings, which is a promise this sheet cannot keep with one tap. */
+  const push = nativePush();
+  if (push?.checkPermissions) {
+    try {
+      const p = await push.checkPermissions();
+      if (p?.receive === "denied") { spendPushAsk(); return false; }
+    } catch { /* unknown: asking is still the right default */ }
+  }
   /* Spent whatever they answer. Asking twice is how a soft ask becomes the
      thing people close without reading. */
-  try { localStorage.removeItem(ASK_PUSH_KEY); } catch { /* private browsing */ }
-  /* Already on, from an earlier install on this phone. Nothing to ask. */
-  if (await currentPushSub()) return;
-
-  const yes = await askConfirm({
-    heading: "Notifications",
-    /* The whole promise, not just the strongest example of it. Leading with
-       the clip and stopping there would have sold this on one notification and
-       then delivered several, which is how an app teaches people that its
-       permission prompts are not to be believed. */
-    bodyHtml: pushPromiseHtml(),
-    ok: "Turn on notifications",
-    cancel: "Not now",
-  });
-  if (!yes) return;
+  spendPushAsk();
+  const copy = pushAskCopy();
+  const yes = await askConfirm({ ...copy, ok: "Turn on notifications", cancel: "Not now" });
+  if (!yes) return true;
   await enablePush();
   /* Said plainly either way. enablePush already writes the reason it failed to
      the Setup screen, but nobody who answered this sheet is going to Setup to
      read it, so the outcome is said here too. */
   toast(await currentPushSub() ? "Notifications on" : "You can turn these on later in Setup");
+  return true;
+}
+
+/* ---------- Asking for an App Store rating ----------
+
+   Apple's own sheet and nothing else. A screen of ours asking "do you love
+   Unio?" first is what guideline 5.6.1 forbids, and it is also the screen
+   people have learned to close. The work here is all WHEN.
+
+   Apple shows its sheet at most three times in 365 days per person, decides
+   on its own whether to show it at all, and never says which it did. So every
+   ask has to land on a high, and a wasted one is a third of the year's
+   budget. The moments: both of you trained today (your finish is the one that
+   made it a together day), a Train together session where both halves
+   finished, and the workout that hit your weekly target.
+
+   And only for somebody with an opinion worth asking for: three workouts
+   logged, an account at least five days old, not asked on this phone in the
+   last 60 days, never in a workout, and never just after something went
+   wrong (an error, a failed save, a workout that recorded nothing, the
+   paywall). Those set a hold rather than being looked up, because "just
+   after" is about this sitting, not about anything stored.
+
+   The moment is noted when it happens and asked about when the celebration
+   is closed, plus a beat: the finish screen and the together finish are the
+   moment, and Apple's sheet over them would cover the thing it is riding on.
+
+   `var`, not `let`: toast() and the error listeners near the top of this file
+   can run while the script is still being read, and a `let` declared this far
+   down would throw there instead of holding. */
+var REVIEW_PENDING = null;
+var REVIEW_HOLD_AT = 0;
+var REVIEW_HOLD_WHY = "";
+var PUSH_ASK_AFTER_SESSION = false;
+const REVIEW_ASKED_KEY = "unio.reviewAskedAt";
+const REVIEW_GAP_DAYS = 60;
+const REVIEW_MIN_WORKOUTS = 3;
+const REVIEW_MIN_ACCOUNT_DAYS = 5;
+/* Long enough that whatever the closed screen was doing has finished
+   arriving, short enough that it still reads as part of the same moment. */
+const REVIEW_DELAY_MS = 1800;
+/* "Right after" an error or the paywall, as a number. Ten minutes covers the
+   rest of the same sitting without punishing tomorrow for today's bad save. */
+const REVIEW_HOLD_MS = 10 * 60 * 1000;
+
+function reviewHold(why) {
+  REVIEW_HOLD_AT = Date.now();
+  REVIEW_HOLD_WHY = String(why || "").slice(0, 80);
+  REVIEW_PENDING = null;
+}
+
+function reviewMoment(kind) {
+  /* A hold that is still running wins: the moment happened, but it happened
+     next to something that went wrong. */
+  if (REVIEW_HOLD_AT && Date.now() - REVIEW_HOLD_AT < REVIEW_HOLD_MS) return;
+  REVIEW_PENDING = kind;
+}
+
+function reviewAskedAt() {
+  try { return Number(localStorage.getItem(REVIEW_ASKED_KEY)) || 0; } catch { return 0; }
+}
+
+/* What a finished workout is measured against. */
+function reviewSnapshot() {
+  const day = sessionDate();
+  return { day, gym: !!entryOn(ME, day)?.gym, week: gymDaysThisWeek(ME) };
+}
+
+/* Called from the finish screen once the day is banked. Also where the
+   notification ask is armed for somebody who has not been asked yet. */
+function noteSessionMoments(before, recorded) {
+  if (!recorded) {
+    /* Ended with nothing recorded: the nearest thing this app has to a
+       cancelled workout, and the wrong note to ask anybody to rate. */
+    reviewHold("nothing recorded");
+    return;
+  }
+  PUSH_ASK_AFTER_SESSION = true;
+  const nowGym = !!entryOn(ME, before.day)?.gym;
+  const partner = PARTNER_EMAIL ? partnerName() : null;
+  const target = weeklyGoalFor(MY_EMAIL);
+  if (SESSION?.together) {
+    /* Train together has its own finish, which notes its own moment when both
+       halves are in. Counting the same workout twice here would only matter
+       if the two disagreed, and they would. */
+  } else if (!before.gym && nowGym && partner && entryOn(partner, before.day)?.gym) {
+    reviewMoment("together_day");
+  } else if (before.week < target && gymDaysThisWeek(ME) >= target) {
+    reviewMoment("weekly_target");
+  }
+}
+
+/* null when asking is fine, otherwise why not, in words a log can carry. */
+function reviewBlockedBy() {
+  if (SESSION) return "in a workout";
+  if (REVIEW_HOLD_AT && Date.now() - REVIEW_HOLD_AT < REVIEW_HOLD_MS) return `held: ${REVIEW_HOLD_WHY}`;
+  const last = reviewAskedAt();
+  if (last && Date.now() - last < REVIEW_GAP_DAYS * 86400000) return "asked in the last 60 days";
+  const born = Date.parse(MY_PROFILE?.created_at || "");
+  if (!born) return "account age unknown";
+  if (Date.now() - born < REVIEW_MIN_ACCOUNT_DAYS * 86400000) return "account under 5 days old";
+  const workouts = entriesFor(ME).filter((e) => e.gym).length;
+  if (workouts < REVIEW_MIN_WORKOUTS) return `${workouts} workouts logged`;
+  /* Something else is already asking for their attention. */
+  if (document.querySelector(".pop-scrim, .pc-scrim, .cm-scrim, .tg-scrim, .paywall-scrim, .sheet-scrim:not(.hidden)")) return "another sheet is open";
+  return null;
+}
+
+/* Asks if a moment is waiting and nothing says no. A moment that cannot be
+   asked about now is dropped rather than carried: a rating request an hour
+   later is about nothing. The one exception is still being inside the
+   workout, where the finish screen's own Done will be along in a moment. */
+function reviewFlush() {
+  const kind = REVIEW_PENDING;
+  if (!kind) return;
+  if (SESSION) return;
+  REVIEW_PENDING = null;
+  /* A finish often lands a badge too, and its card is up when this runs.
+     That is the same high, so the ask waits behind it (a beat after it
+     closes) rather than being thrown away, for as long as a person
+     plausibly reads a card. Anything else that says no is final. */
+  let waits = 0;
+  const attempt = () => {
+    const why = reviewBlockedBy();
+    if (why === "another sheet is open" && waits++ < 30) { setTimeout(attempt, 1000); return; }
+    if (why) { console.info(`review ask skipped (${kind}): ${why}`); return; }
+    setTimeout(() => {
+      /* Asked again: a lot can open in under two seconds, a new workout or
+         the paywall among them. */
+      const late = reviewBlockedBy();
+      if (late === "another sheet is open" && waits++ < 30) { setTimeout(attempt, 1000); return; }
+      if (late) { console.info(`review ask skipped (${kind}): ${late}`); return; }
+      /* Recorded whether or not Apple shows anything, because nobody can
+         tell from here which it did, and the 60 days is about how often we
+         ask. */
+      try { localStorage.setItem(REVIEW_ASKED_KEY, String(Date.now())); } catch { /* asks again sooner, Apple still caps it */ }
+      requestStoreReview(kind);
+    }, REVIEW_DELAY_MS);
+  };
+  attempt();
+}
+
+async function requestStoreReview(kind) {
+  const plugin = isNativeApp() && window.Capacitor.Plugins.ReviewBridge;
+  if (!plugin) {
+    console.info(`review ask (${kind}): Apple's rating sheet would open here on the phone`);
+    return;
+  }
+  try { await plugin.requestReview(); }
+  catch (err) { console.warn("review request failed", err); }
+}
+
+/* The way out of a finished workout. Notifications first, because that
+   question is spent once and has the better reason right now; if it was
+   asked, the rating waits for another day rather than stacking a second
+   sheet on the first. */
+async function afterSessionAsks() {
+  if (PUSH_ASK_AFTER_SESSION) {
+    PUSH_ASK_AFTER_SESSION = false;
+    /* A beat for Home to paint under the sheet. */
+    await new Promise((r) => setTimeout(r, 600));
+    if (await maybeAskForPush("finished")) { REVIEW_PENDING = null; return; }
+  }
+  reviewFlush();
 }
 
 async function enablePush() {
@@ -48130,6 +48815,13 @@ async function leavePartnership() {
   PARTNER_PROFILE = null;
   // Training alone is a real state here, not an unfinished pairing.
   setSolo();
+  /* He stays on Home until tapped, so whatever he last said about the two of
+     you ("Both of you, same day", or the train-together line whose tap now
+     goes nowhere) would still be sitting there over a solo Home. Cleared and
+     his clock reset, so the Home this lands on has him saying something true. */
+  $("homeQuipSlot")?.replaceChildren();
+  $("tab-home")?.classList.remove("bot-between");
+  HOME_QUIP_AT = 0;
   toast("Partnership ended");
   await loadAll();
   closeSettingsPage();
@@ -48219,6 +48911,8 @@ function openSettingsPage(key) {
      comes here to undo a block must not be shown a list from before they made
      it. */
   if (key === "safety") renderSafetyCard();
+  /* Re-read on open: a switch flipped on another phone should show here. */
+  if (key === "notify") renderNotifyKinds();
   window.scrollTo({ top: 0 });
 }
 
@@ -48810,6 +49504,7 @@ function renderSetupTab() {
   renderProgressSharing();
   renderRestChoices();
   renderPushToggle();
+  renderNotifyKinds();
   renderSetupPhoto();
   paintSettingsValues();
 
@@ -48828,9 +49523,15 @@ function renderSetupTab() {
   /* The trainer row. Hired reads as a fact about the account; not hired reads
      as the offer it is, and tapping it is the offer. */
   if ($("setRow-hire")) {
-    $("setHireSub").textContent = hired() ? "Hired" : "Not hired";
+    const paintHire = () => {
+      const t = trialDaysLeft();
+      $("setHireSub").textContent = t ? `Free trial, ${trialLeftLabel(t)} left` : hired() ? "Hired" : "Not hired";
+    };
+    paintHire();
+    if (OWN_PLAN_ACTIVE === null) refreshOwnPlan().then(paintHire);
     $("setRow-hire").onclick = async () => {
       if (!hired()) { await showPaywall(); renderSetupTab(); return; }
+      if (trialDaysLeft()) { await showPaywall({ skipLabel: "Keep my free trial" }); renderSetupTab(); return; }
       /* Everything Apple want a subscriber to be able to find after they have
          paid: what it costs, that it renews, where to stop it, and the way to
          get it back on another device. */
