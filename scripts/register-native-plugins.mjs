@@ -17,7 +17,7 @@ const CONFIG = "ios/App/App/capacitor.config.json";
 
 // Each name is the @objc(...) name on the Swift class, which is what
 // NSClassFromString resolves against.
-const LOCAL_PLUGINS = ["LiveWorkout", "WidgetBridge", "PushEnvironment"];
+const LOCAL_PLUGINS = ["LiveWorkout", "WidgetBridge", "PushEnvironment", "ReviewBridge"];
 
 const config = JSON.parse(readFileSync(CONFIG, "utf8"));
 const list = config.packageClassList ?? [];
