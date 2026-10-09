@@ -47080,10 +47080,14 @@ function lastMeasurement(key) {
    whole list. */
 const WEIGHT_ROW = { key: "weight", label: "Weight", unit: "lb" };
 const PROGRESS_LOG_ROWS = [WEIGHT_ROW, ...MEASUREMENTS];
+/* Weight is asked for whether or not this goal tracks it. Filtering it like
+   the tape left somebody tracking only their Waist with a sheet that had no
+   scale in it, which is the half of Mell's report the fallback alone did not
+   cover. Only touched rows are saved, so an untouched weight writes nothing. */
 function measRowsToShow() {
   const rows = MEAS_ROWS || PROGRESS_LOG_ROWS;
-  const filtered = rows.filter((m) => isTracked(m.key, null, MY_PROFILE));
-  return filtered.length ? filtered : [WEIGHT_ROW];
+  const tape = rows.filter((m) => m.key !== "weight" && isTracked(m.key, null, MY_PROFILE));
+  return [WEIGHT_ROW, ...tape];
 }
 /* Whether the top button has anything to log for this person. */
 const progressLogOffered = () => PROGRESS_LOG_ROWS.some((m) => isTracked(m.key, null, MY_PROFILE));
