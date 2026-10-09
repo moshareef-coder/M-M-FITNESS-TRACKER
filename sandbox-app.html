@@ -5591,7 +5591,7 @@
      spilling over the button. */
   .ob2 .ob2-body .ob2-fill:has(> .ob2-minchips) { min-height: 216px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-daysfill) { min-height: 210px; }
-  .ob2 .ob2-body .ob2-fill:has(> .ob2-duo) { min-height: 260px; }
+  .ob2 .ob2-body .ob2-fill:has(> .ob2-duo) { min-height: 280px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-kitgrid) { min-height: 230px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-themes) { min-height: 240px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-weigh) { min-height: 220px; }
@@ -5799,24 +5799,63 @@
   #onboard .ob2-mincustom input::placeholder { color: var(--muted); font-size: 22px; font-weight: 700; letter-spacing: 0; }
   .ob2-mincustom input::-webkit-outer-spin-button, .ob2-mincustom input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   #onboard .ob2-fill .ob2-mincustom input { font-size: clamp(34px, calc(var(--fh) * .1), 60px); }
-  /* Why two works: two tall bars that grow in. */
-  .ob2-duo { display: flex; flex-direction: column; gap: 14px; padding: 18px 16px; margin: 0; }
-  .ob2-duo-row { flex: 1 1 auto; min-height: 220px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .ob2-duo-col { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-  .ob2-duo-lbl { font-size: 14px; font-weight: 700; text-align: center; color: var(--muted); }
-  .ob2-duo-well { flex: 1 1 auto; display: flex; align-items: flex-end; border-radius: 18px; background: var(--panel-2); min-height: 0; }
-  .ob2-vbar { width: 100%; height: calc(var(--v) * 100%); border-radius: 18px; display: flex; align-items: flex-start; justify-content: center; padding-top: 14px;
-    transform-origin: 50% 100%; animation: ob2BarUp .9s cubic-bezier(.22,1,.36,1) .15s both; }
-  .ob2-vbar b { font-size: 26px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-  .ob2-vbar.off { background: color-mix(in srgb, var(--muted) 30%, var(--panel)); color: var(--text); }
-  .ob2-vbar.on { background: var(--accent); color: var(--on-accent); box-shadow: var(--glow-accent); animation-delay: .35s; }
-  .ob2-duo-col:last-child .ob2-duo-lbl { color: var(--text); }
-  .ob2-duo-line { margin: 0; font-size: 14.5px; text-align: center; color: var(--text); opacity: .85; }
-  .ob2 .ob2-fill .ob2-duo-row { min-height: 0; }
-  .ob2 .ob2-fill .ob2-vbar b { font-size: clamp(26px, calc(var(--fh) * .07), 40px); }
-  .ob2-src { margin: 0; font-size: 11.5px; color: var(--muted); text-align: center; }
-  @keyframes ob2BarUp { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-  @media (prefers-reduced-motion: reduce) { .ob2-vbar { animation: none; } }
+  /* Why two works: two curves that draw in once (Yazio's two line chart). */
+  .ob2-duo { display: flex; flex-direction: column; gap: 10px; padding: 16px 14px 14px; margin: 0; }
+  .ob2-tc { position: relative; flex: 1 1 auto; min-height: 200px; }
+  .ob2 .ob2-fill .ob2-tc { min-height: 0; }
+  .ob2-tc-svg, .ob2-wc-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .ob2-tc-line { fill: none; stroke-width: 3.5; stroke-linecap: round; }
+  .ob2-tc-line.on { stroke: var(--accent); }
+  .ob2-tc-line.off { stroke: color-mix(in srgb, var(--muted) 75%, transparent); stroke-width: 3; }
+  .ob2-tc-dot.on { fill: var(--accent); }
+  .ob2-tc-dot.off { fill: var(--muted); }
+  .ob2-tc-lab { position: absolute; display: flex; flex-direction: column; align-items: flex-end; font-size: 12.5px; font-weight: 650; color: var(--muted); line-height: 1.2; white-space: nowrap; }
+  .ob2-tc-lab b { font: 800 26px/1 var(--font-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); margin-bottom: 3px; }
+  .ob2-tc-lab.on b { color: var(--accent-ink); }
+  .ob2-tc-lab.on { color: var(--text); }
+  .ob2-duo-line { margin: 0; font-size: 14.5px; font-weight: 600; text-align: center; color: var(--text); }
+  .ob2-src { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--muted); text-align: center; }
+  /* Shared by both charts: the faint guides, the axis words, the draw-in. */
+  .ob2-wc-guide { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 5; }
+  .ob2-wc-base { stroke: var(--border); stroke-width: 1; }
+  .ob2-wc-ax { font-size: 11px; font-weight: 650; fill: var(--muted); letter-spacing: .01em; }
+  .ob2-wc-start { fill: var(--panel); stroke: var(--muted); stroke-width: 2.5; }
+  .ob2-wc-halo { fill: var(--accent); opacity: .22; }
+  .ob2-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ob2Draw 1.1s cubic-bezier(.45,0,.2,1) .25s forwards; }
+  .ob2-tc-line.off.ob2-draw { animation-delay: .45s; }
+  .ob2-duo .ob2-tc-area, .ob2-duo .ob2-tc-dot, .ob2-duo .ob2-wc-halo, .ob2-duo .ob2-tc-lab { animation: ob2FadeIn .5s ease 1.2s both; }
+  .ob2-wcard .ob2-wc-area, .ob2-wcard .ob2-wc-end, .ob2-wcard .ob2-wc-halo, .ob2-wcard .ob2-wc-pill, .ob2-wcard .ob2-wc-drop, .ob2-wcard .ob2-wc-when { animation: ob2FadeIn .45s ease 1s both; }
+  .ob2-leaving .ob2-draw, .ob2-leaving .ob2-duo *, .ob2-leaving .ob2-wcard * { animation: none !important; stroke-dashoffset: 0; }
+  @keyframes ob2Draw { to { stroke-dashoffset: 0; } }
+  @keyframes ob2FadeIn { from { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .ob2-draw { animation: none; stroke-dashoffset: 0; }
+    .ob2-duo *, .ob2-wcard * { animation: none !important; }
+  }
+  /* The timeline's weight chart: the card takes what the three paces leave. */
+  .ob2-wcard { padding: 12px 12px 10px; margin: 0; display: flex; }
+  .ob2-wc { position: relative; flex: 1 1 auto; min-height: 170px; }
+  .ob2 .ob2-body .ob2-fill:has(> .ob2-wcard) { min-height: 180px; }
+  .ob2 .ob2-fill .ob2-wc { min-height: 0; }
+  .ob2-wc-line { fill: none; stroke: var(--accent); stroke-width: 3.5; stroke-linecap: round; }
+  .ob2-wc-tail { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 3 5; stroke-linecap: round; opacity: .55; }
+  .ob2-wc-end { fill: var(--accent); }
+  .ob2-wc-now { font-size: 12.5px; font-weight: 700; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .ob2-wc-pill { position: absolute; white-space: nowrap; padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums;
+    background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--accent-ink); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+  .ob2-wc-drop { stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 2 4; opacity: .6; }
+  .ob2-wc-ax.ob2-wc-when { fill: var(--text); font-weight: 750; font-size: 12px; }
+  .ob2-tl-more { display: flex; flex-direction: column; align-items: center; }
+  .ob2-tl-more .ob2-link { padding: 6px 8px; min-height: 40px; text-decoration: underline; text-underline-offset: 3px; }
+  .ob2-tl-more .ob2-link[hidden] { display: none; }
+  .ob2-tl-more .ob2-tl-date { align-self: stretch; }
+  /* The name screen (Yazio's): one big centred field on an underline. */
+  .ob2-namefield { display: flex; justify-content: center; padding: clamp(20px, 6vh, 56px) 8px 0; }
+  #onboard .ob2 input.ob2-nameinput { width: 100%; max-width: 320px; margin: 0; padding: 6px 4px 10px; border: 0; border-bottom: 2px solid var(--border);
+    border-radius: 0; background: transparent; box-shadow: none; outline: 0; text-align: center; color: var(--text); caret-color: var(--accent);
+    font: 800 32px/1.2 var(--font-display); letter-spacing: -.02em; transition: border-color .2s ease; }
+  #onboard .ob2 input.ob2-nameinput:focus { border-bottom-color: var(--accent); }
+  #onboard .ob2 input.ob2-nameinput::placeholder { color: color-mix(in srgb, var(--muted) 55%, transparent); font-weight: 700; }
   .ob2-target-val { flex-direction: column; align-items: center; gap: 6px; }
   .ob2-target-val small { font-size: 14px; font-weight: 700; color: var(--muted); }
   .ob2-weigh-val .ob2-tgnum { display: flex; align-items: baseline; gap: 8px; color: var(--text); font-size: inherit; font-weight: inherit; }
@@ -16157,7 +16196,7 @@ const OB2_FILL_KINDS = [
   [".ob2-htrow", "htrow"], [".ob2-dob", "wheels"], [".ob2-weigh", "stretch"], [".ob2-htfig", "fig"], [".ob2-sexfig", "fig"], [".ob2-hurtfigs", "pair"], [".ob2-tastefigs", "pair"],
   [".ob2-tour-stage", "stage"], [".ob2-figstage", "stage"],
   [".ob2-themes", "stretch"], [".ob2-duo", "stretch"], [".ob2-daysfill", "stretch"], [".ob2-minchips", "stretch"],
-  [".ob2-proj", "stretch"], [".ob2-kitgrid", "stretch"],
+  [".ob2-proj", "stretch"], [".ob2-kitgrid", "stretch"], [".ob2-wcard", "stretch"],
   /* Not here any more (Mo, 2026-10-08, "everything is cut off"): the
      summary's verdict card, the trial timeline and the 6 pm lock screen. They
      are text, and text stretched to fill a tall phone is tiles 180px high.
@@ -16245,19 +16284,180 @@ function ob2WireOne(attr, onPick) {
    loaded; change them there first). Loss: LOSS_RATE.highPct, 1% of
    bodyweight, never above ceilLb 2. Gain: the top of GAIN_RATE.fresh, 1.5%
    of bodyweight a month. `planWeeks` is the pace the engine actually plans
-   on (the middle of each band), which is what "No rush" lands on. */
+   on (the middle of each band), the timeline's Steady; `slowWeeks` is the
+   bottom of the band (LOSS_RATE.lowPct with its 0.5 lb floor, GAIN_RATE.fresh.lo),
+   its Relaxed. Each is kept at least a week past the one before, or a small
+   gap rounds two paces onto the same date. */
 function ob2SafePace(nowLb, goalLb) {
   const gap = Math.abs(goalLb - nowLb);
   const gaining = goalLb > nowLb;
   const cap = gaining ? (nowLb * 0.015) / 4.345 : Math.min(nowLb * 0.01, 2);
   const mid = gaining ? (nowLb * 0.0125) / 4.345 : Math.min(2, Math.max(0.5, nowLb * 0.0075));
-  return { gap, cap, minWeeks: Math.max(1, Math.ceil(gap / cap)), planWeeks: Math.max(1, Math.ceil(gap / mid)) };
+  const low = gaining ? (nowLb * 0.01) / 4.345 : Math.min(2, Math.max(0.5, nowLb * 0.005));
+  const minWeeks = Math.max(1, Math.ceil(gap / cap));
+  const planWeeks = Math.max(minWeeks + 1, Math.ceil(gap / mid));
+  return { gap, cap, minWeeks, planWeeks, slowWeeks: Math.max(planWeeks + 1, Math.ceil(gap / low)) };
 }
 /* "Jan 8", with the year only when it is not this one. */
 function ob2NiceDate(iso) {
   const t = new Date(iso + "T12:00:00");
   const sameYear = t.getFullYear() === new Date(todayStr() + "T12:00:00").getFullYear();
   return t.toLocaleDateString("en-US", sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+}
+
+/* The line chart the timeline screen leads with, Yazio's (Mo's reference):
+   their weight now, the target, the day it lands, one eased curve with a
+   soft fill under it, then flat, because holding it is the point. Drawn in
+   the box's own measured pixels rather than a stretched viewBox, so the
+   dots stay round and the type stays its size on any phone. The two weights
+   and the date are real; the shape between them is an ease and carries no
+   numbers, so it claims nothing. `to` slides the finish line to a new pace. */
+function ob2WeightChart(host, { now, goal, kg, weeks, span, label }) {
+  const gaining = goal > now;
+  const wt = (lb) => (kg ? `${(lb / 2.20462).toFixed(1)} kg` : `${Math.round(lb)} lb`);
+  host.innerHTML = `<svg class="ob2-wc-svg" aria-hidden="true">
+      <defs><linearGradient id="ob2WcFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--accent)" stop-opacity=".30"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/>
+      </linearGradient></defs>
+      <line class="ob2-wc-guide" data-k="g0"/><line class="ob2-wc-guide" data-k="g1"/><line class="ob2-wc-base" data-k="base"/>
+      <path class="ob2-wc-area" data-k="area" fill="url(#ob2WcFill)"/>
+      <path class="ob2-wc-tail" data-k="tail"/>
+      <path class="ob2-wc-line${ob2Calm() ? "" : " ob2-draw"}" data-k="line" pathLength="1"/>
+      <circle class="ob2-wc-start" data-k="d0" r="5"/>
+      <circle class="ob2-wc-halo" data-k="halo" r="11"/><circle class="ob2-wc-end" data-k="d1" r="6"/>
+      <text class="ob2-wc-ax" data-k="ylab" text-anchor="middle">Your weight</text>
+      <text class="ob2-wc-ax" data-k="x0" text-anchor="start">Today</text>
+      <line class="ob2-wc-drop" data-k="drop"/>
+      <text class="ob2-wc-ax ob2-wc-when" data-k="x1" text-anchor="middle"></text>
+      <text class="ob2-wc-now" data-k="nowlab" text-anchor="start">${wt(now)}</text>
+    </svg>
+    <span class="ob2-wc-pill" data-k="pill">${wt(goal)}</span>`;
+  const el = (k) => host.querySelector(`[data-k="${k}"]`);
+  const set = (k, a) => { const e = el(k); for (const n in a) e.setAttribute(n, a[n]); };
+  let at = weeks, sp = span, raf = 0;
+  el("x1").textContent = label;
+  host.setAttribute("aria-label", `From ${wt(now)} today to ${wt(goal)} by ${label}`);
+  const paint = () => {
+    const W = host.clientWidth, H = host.clientHeight;
+    if (!W || !H) return;
+    const L = 26, R = 16, T = 30, B = 26;
+    const pw = W - L - R, ph = H - T - B, base = T + ph;
+    const hi = T + ph * 0.08, lo = T + ph * 0.8;
+    const y0 = gaining ? lo : hi, y1 = gaining ? hi : lo;
+    const x0 = L + 6, x1 = x0 + (pw - 6) * Math.min(1, at / sp), dx = x1 - x0;
+    /* Flat out of today, flat into the target: an ease, the way a body
+       actually settles onto a new number rather than hitting it. */
+    const curve = `M${x0},${y0} C${x0 + dx * 0.4},${y0} ${x0 + dx * 0.52},${y1} ${x1},${y1}`;
+    host.querySelector("svg").setAttribute("viewBox", `0 0 ${W} ${H}`);
+    set("line", { d: curve });
+    set("area", { d: `${curve} L${W - R},${y1} L${W - R},${base} L${x0},${base} Z` });
+    set("tail", { d: `M${x1},${y1} L${W - R},${y1}` });
+    set("g0", { x1: x0, x2: W - R, y1: y0, y2: y0 });
+    set("g1", { x1: x0, x2: W - R, y1: y1, y2: y1 });
+    set("base", { x1: L, x2: W - R, y1: base, y2: base });
+    set("d0", { cx: x0, cy: y0 });
+    set("d1", { cx: x1, cy: y1 });
+    set("halo", { cx: x1, cy: y1 });
+    set("nowlab", { x: x0 - 4, y: gaining ? y0 + 22 : y0 - 12 });
+    set("ylab", { transform: `translate(11 ${T + ph / 2}) rotate(-90)` });
+    set("x0", { x: L, y: H - 6 });
+    /* The date sits on the time axis under the finish, a dashed drop line
+       down to it, kept clear of "Today" and of the card's edge. Mo's
+       reference had the word "Time" there; the date is the time that
+       matters, so it takes the spot. */
+    const half = el("x1").getComputedTextLength() / 2;
+    set("x1", { x: Math.max(L + 44 + half, Math.min(x1, W - R - half)), y: H - 6 });
+    set("drop", { x1: x1, x2: x1, y1: gaining ? y1 + 50 : y1 + 8, y2: base });
+    /* The pill rides above the finish (below it when the finish is the top
+       of the chart), reaching right over the flat tail where the line is
+       not, and pushed back left only as far as the card's edge needs. */
+    const pill = el("pill");
+    pill.style.left = `${Math.max(x0, Math.min(x1 - 18, W - R - pill.offsetWidth))}px`;
+    pill.style.top = `${gaining ? y1 + 14 : y1 - 40}px`;
+  };
+  const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(paint) : null;
+  ro?.observe(host);
+  paint();
+  OB2_CLEANUP.push(() => { ro?.disconnect(); cancelAnimationFrame(raf); });
+  return {
+    to(w, s, lbl) {
+      el("x1").textContent = lbl;
+      host.setAttribute("aria-label", `From ${wt(now)} today to ${wt(goal)} by ${lbl}`);
+      cancelAnimationFrame(raf);
+      if (ob2Calm()) { at = w; sp = s; paint(); return; }
+      const a0 = at, s0 = sp, t0 = performance.now();
+      const step = (t) => {
+        const k = Math.min(1, (t - t0) / 520), e = 1 - Math.pow(1 - k, 3);
+        at = a0 + (w - a0) * e; sp = s0 + (s - s0) * e;
+        paint();
+        if (k < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    },
+  };
+}
+
+/* The partner stat as two curves (Yazio's two line chart, Mo's reference),
+   drawn once in the box's own pixels. HONEST ABOUT WHAT IS MEASURED:
+   Wallace, Raglin and Jastremski (1995) report only where each group ended,
+   6.3% and 43% dropout, so 94% and 57% still training. Both lines start at
+   everyone and end on those two numbers; the shape between is illustrative
+   and carries no labels, and the caption says so. */
+function ob2TwoChart(host, them) {
+  host.innerHTML = `<svg class="ob2-tc-svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="ob2TcOn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".34"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".06"/></linearGradient>
+        <linearGradient id="ob2TcOff" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--muted)" stop-opacity=".22"/><stop offset="1" stop-color="var(--muted)" stop-opacity="0"/></linearGradient>
+      </defs>
+      <line class="ob2-wc-guide" data-k="top"/><line class="ob2-wc-base" data-k="base"/>
+      <path class="ob2-tc-area off" data-k="aOff" fill="url(#ob2TcOff)"/>
+      <path class="ob2-tc-area on" data-k="aOn" fill="url(#ob2TcOn)"/>
+      <path class="ob2-tc-line off${ob2Calm() ? "" : " ob2-draw"}" data-k="lOff" pathLength="1"/>
+      <path class="ob2-tc-line on${ob2Calm() ? "" : " ob2-draw"}" data-k="lOn" pathLength="1"/>
+      <circle class="ob2-wc-start" data-k="d0" r="5"/>
+      <circle class="ob2-tc-dot off" data-k="dOff" r="5.5"/>
+      <circle class="ob2-wc-halo" data-k="halo" r="11"/><circle class="ob2-tc-dot on" data-k="dOn" r="6"/>
+      <text class="ob2-wc-ax" data-k="ylab" text-anchor="middle">Still training</text>
+      <text class="ob2-wc-ax" data-k="x0" text-anchor="start">Joined</text>
+      <text class="ob2-wc-ax" data-k="x1" text-anchor="end">End of program</text>
+    </svg>
+    <span class="ob2-tc-lab on" data-k="tOn"><b>94%</b>With ${escapeHtml(them)}</span>
+    <span class="ob2-tc-lab off" data-k="tOff"><b>57%</b>Alone</span>`;
+  const el = (k) => host.querySelector(`[data-k="${k}"]`);
+  const set = (k, a) => { const e = el(k); for (const n in a) e.setAttribute(n, a[n]); };
+  const paint = () => {
+    const W = host.clientWidth, H = host.clientHeight;
+    if (!W || !H) return;
+    const L = 26, R = 18, T = 14, B = 26;
+    const pw = W - L - R, ph = H - T - B, base = T + ph;
+    const y = (pct) => T + ph * (1 - pct / 100);
+    const x0 = L + 6, x1 = W - R, dx = x1 - x0;
+    /* Alone falls away early and levels off, which is when people quit;
+       together barely dips. Two shapes, two real end points. */
+    const on = `M${x0},${y(100)} C${x0 + dx * 0.45},${y(100)} ${x0 + dx * 0.6},${y(94)} ${x1},${y(94)}`;
+    const off = `M${x0},${y(100)} C${x0 + dx * 0.22},${y(100)} ${x0 + dx * 0.38},${y(57)} ${x1},${y(57)}`;
+    host.querySelector("svg").setAttribute("viewBox", `0 0 ${W} ${H}`);
+    set("lOn", { d: on }); set("lOff", { d: off });
+    /* The lime fill is only the band between the two lines: the people a
+       partner kept training. Alone gets the soft grey under its own line. */
+    set("aOn", { d: `${on} L${x1},${y(57)} C${x0 + dx * 0.38},${y(57)} ${x0 + dx * 0.22},${y(100)} ${x0},${y(100)} Z` });
+    set("aOff", { d: `${off} L${x1},${base} L${x0},${base} Z` });
+    set("top", { x1: x0, x2: x1, y1: y(100), y2: y(100) });
+    set("base", { x1: L, x2: x1, y1: base, y2: base });
+    set("d0", { cx: x0, cy: y(100) });
+    set("dOn", { cx: x1, cy: y(94) }); set("halo", { cx: x1, cy: y(94) });
+    set("dOff", { cx: x1, cy: y(57) });
+    set("ylab", { transform: `translate(11 ${T + ph / 2}) rotate(-90)` });
+    set("x0", { x: L, y: H - 6 }); set("x1", { x: x1, y: H - 6 });
+    /* Each label sits just under the end of its own line, inside the right
+       edge: 94% in the gap between the two, 57% in its own fill. */
+    Object.assign(el("tOn").style, { right: `${R + 12}px`, top: `${y(94) + 9}px` });
+    Object.assign(el("tOff").style, { right: `${R + 12}px`, top: `${y(57) + 9}px` });
+  };
+  const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(paint) : null;
+  ro?.observe(host);
+  paint();
+  OB2_CLEANUP.push(() => ro?.disconnect());
 }
 
 const OB2_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -17463,12 +17663,15 @@ const OB2 = {
     });
   } },
 
-  /* Why two works, back from round 5 in Cal AI's two bar layout. Placed
+  /* Why two works, back from round 5 in Cal AI's two bar layout, and since
+     2026-10-08 Yazio's two curve chart instead (Mo's reference). Placed
      right after the goals: they have just said what they want, and this is
      the one reason the app is built for two. The one outside number in the
      run, and a real one: Wallace, Raglin and Jastremski (1995), couples who
      joined a fitness programme together dropped out at 6.3%, married people
-     who joined alone at 43%. So the bars are who stuck with it, 94% and 57%.
+     who joined alone at 43%. So the lines end on who stuck with it, 94% and
+     57%; the study gives nothing in between, so the curves are drawn as
+     shapes and the source line says they are.
      Nothing about goals reached faster; no study says that. */
   two: { ch: 1, render(d, ui) {
     const b = d.path === "b";
@@ -17476,30 +17679,48 @@ const OB2 = {
     ui.paint({
       title: b ? `You and ${ob2Partner(d)} just made quitting a lot harder.` : "People who train with their partner almost never quit. Alone? Nearly half do.",
       body: `<div class="card ob2-duo">
-          <div class="ob2-duo-row">
-            <div class="ob2-duo-col"><span class="ob2-duo-lbl">Alone</span><div class="ob2-duo-well"><div class="ob2-vbar off" style="--v:.57"><b>57%</b></div></div></div>
-            <div class="ob2-duo-col"><span class="ob2-duo-lbl">With ${escapeHtml(them)}</span><div class="ob2-duo-well"><div class="ob2-vbar on" style="--v:.94"><b>94%</b></div></div></div>
-          </div>
-          <p class="ob2-duo-line">Stuck with their training, from the day they joined.</p>
+          <div class="ob2-tc" id="ob2Tc" role="img" aria-label="Still training at the end of the program: 94% with ${escapeHtml(them)}, 57% alone"></div>
+          <p class="ob2-duo-line">Still training at the end of the program.</p>
         </div>
-        <p class="ob2-src">Wallace, Raglin and Jastremski, 1995</p>`,
+        <p class="ob2-src">End points: Wallace, Raglin and Jastremski, 1995. The curves between are illustrative.</p>`,
       cta: "Continue", onNext: () => ui.next(),
     });
+    ob2TwoChart($("ob2Tc"), them);
   } },
 
+  /* Yazio's name screen, Mo's pick (2026-10-08): the plain question, one big
+     centred field on an underline, nothing else, and the button asleep until
+     there is a name. The hero bust is gone from here; his card at the top is
+     him. The field sits high so a phone keyboard opens under it, and when a
+     short screen's keyboard would still cover it, the page is nudged up by
+     the visual viewport, which is the part of the page the keyboard leaves. */
   name: { ch: 0, render(d, ui) {
     ui.paint({
-      title: "What should I call you?",
-      body: `${ob2HeroBot(164)}<input id="ob2Name" type="text" placeholder="Your name" value="${escapeHtml(d.name || "")}" autocomplete="given-name" maxlength="24" />
-`,
-      cta: "That's me",
+      title: "What's your name?",
+      body: `<div class="ob2-namefield"><input id="ob2Name" class="ob2-nameinput" type="text" placeholder="Your name" value="${escapeHtml(d.name || "")}"
+        autocomplete="given-name" autocapitalize="words" enterkeyhint="done" spellcheck="false" maxlength="24" aria-label="Your name" /></div>`,
+      cta: "That's me", ctaOff: !String(d.name || "").trim(),
       onNext: () => {
         const name = $("ob2Name").value.trim();
-        if (!name) { toast("Enter a name"); return; }
+        if (!name) return;
         ui.next({ name });
       },
     });
-    $("ob2Name").onkeydown = (e) => { if (e.key === "Enter") $("ob2Next").click(); };
+    const input = $("ob2Name");
+    input.oninput = () => { $("ob2Next").disabled = !input.value.trim(); };
+    input.onkeydown = (e) => { if (e.key === "Enter" && input.value.trim()) $("ob2Next").click(); };
+    const vv = window.visualViewport;
+    if (vv) {
+      const fit = () => {
+        if (document.activeElement !== input) return;
+        const r = input.getBoundingClientRect(), room = vv.height + vv.offsetTop - 16;
+        if (r.bottom > room) window.scrollBy(0, r.bottom - room);
+      };
+      vv.addEventListener("resize", fit);
+      OB2_CLEANUP.push(() => vv.removeEventListener("resize", fit));
+    }
+    /* After the screen has slid in, so the field is where it will stay. */
+    ob2Later(() => { if (document.body.contains(input)) input.focus({ preventScroll: true }); }, 450);
   } },
 
   /* Chapter 1. The tiles are GOAL_TILES verbatim, so the ids are exactly the
@@ -17752,17 +17973,21 @@ height: { ch: 2, render(d, ui) {
     });
   } },
 
-  /* Mo, 2026-10-08: "if I do gain or lose, then the next one should be: 'Is
-     there a specific timeline?' ... Just make it very easy." Only for a real
-     gain or loss (the target screen calls within 5 lb maintaining and stores
-     no target). The shared choice list: No rush, three spans each with the
-     date it lands on and what it asks per week, and a date of their own.
-     Nothing faster than the engine's safe ceiling is ever offered
-     (ob2SafePace), so a big gap simply starts at a longer span and he says
-     why. Stored as goal_deadline, which the finish writes to
-     user_goals.target_date, the column the goal already had. The engine is
-     not handed it: today it reads a date only out of the goal's own words,
-     and this screen does not change what it builds. */
+  /* Mo, 2026-10-08: "Is there a specific timeline? ... Just make it very
+     easy." and then, on the first build of it, "would like this to be
+     better." The first build listed No rush above 6, 9 and 12 months, and
+     No rush landed SOONER than all three, while the fastest safe date hid
+     under Pick a date: the list read backwards. So it is three paces now,
+     fastest first, each the engine's own number, and a chart above them
+     (Yazio's, his reference) that moves its finish line to the one picked.
+     Fastest safe is the top of the safe band (ob2SafePace's cap), Steady
+     is the pace the engine plans on, Relaxed the bottom of the band. Only
+     for a real gain or loss: the target screen calls within 5 lb
+     maintaining and stores no target, so this is skipped by `when`, and
+     a non weight goal left at their own weight is the same thing. Stored as
+     goal_deadline, which the finish writes to user_goals.target_date. The
+     engine is not handed it: today it reads a date only out of the goal's
+     own words, and this screen does not change what it builds. */
   timeline: { ch: 2, when: (d) => d.goal_weight_lb > 0 && d.weight_lb > 0 && Math.abs(d.goal_weight_lb - d.weight_lb) > 5, render(d, ui) {
     const now = d.weight_lb, goal = d.goal_weight_lb;
     const pace = ob2SafePace(now, goal);
@@ -17773,61 +17998,77 @@ height: { ch: 2, render(d, ui) {
     const today = todayStr();
     const dateIn = (weeks) => shiftDate(today, weeks * 7);
     const weeksTo = (iso) => Math.max(1, Math.round((new Date(iso + "T12:00:00") - new Date(today + "T12:00:00")) / 604800000));
-    /* Month spans, and only those the safe ceiling allows. When even the
-       longest standard span is too fast, the first offer is the first safe
-       whole month and the next two step out from it. */
-    const MONTHS = [1, 2, 3, 4, 6, 9, 12, 18, 24];
-    const wk = (m) => Math.round(m * 4.345);
-    let spans = MONTHS.filter((m) => wk(m) >= pace.minWeeks).slice(0, 3);
-    if (!spans.length) { const m0 = Math.ceil(pace.minWeeks / 4.345); spans = [m0, m0 + 6, m0 + 12]; }
-    while (spans.length < 3) spans.push(spans[spans.length - 1] + 6);
-    const minDate = dateIn(pace.minWeeks);
-    const opts = [
-      { id: "none", label: "No rush", sub: `A healthy pace, around ${ob2NiceDate(dateIn(pace.planWeeks))}` },
-      ...spans.map((m) => ({ id: `m${m}`, label: m === 1 ? "1 month" : `${m} months`, sub: `By ${ob2NiceDate(dateIn(wk(m)))}, ${per(pace.gap / wk(m))}`, weeks: wk(m) })),
-      { id: "date", label: "Pick a date", sub: `Any day from ${ob2NiceDate(minDate)}` },
-    ];
-    /* What was picked before, read back off the stored date. */
-    let pick = null, date = d.goal_deadline || null;
-    if (date) pick = opts.find((o) => o.weeks && dateIn(o.weeks) === date)?.id || "date";
-    else if (d.goal_deadline === null && "goal_deadline" in d) pick = "none";
     const gaining = goal > now;
+    const PACES = [
+      { id: "fast", label: "Fastest safe", weeks: pace.minWeeks },
+      { id: "steady", label: "Steady", weeks: pace.planWeeks },
+      { id: "relaxed", label: "Relaxed", weeks: pace.slowWeeks },
+    ].map((p) => ({ ...p, date: dateIn(p.weeks), sub: `By ${ob2NiceDate(dateIn(p.weeks))}, ${per(pace.gap / p.weeks)}` }));
+    const minDate = PACES[0].date;
+    /* What was picked before, read back off the stored date. A date that
+       is now too soon (the target moved further away since) is dropped
+       rather than kept: the ceiling outranks an old answer. */
+    let pick = "steady", date = PACES[1].date;
+    if (d.goal_deadline && d.goal_deadline >= minDate) {
+      date = d.goal_deadline;
+      pick = PACES.find((p) => p.date === date)?.id || "date";
+    }
+    const weeksOf = () => (pick === "date" ? weeksTo(date) : PACES.find((p) => p.id === pick).weeks);
+    /* The x axis runs a little past the slowest pace, or past their own
+       date when that is later still, so the line always has its flat tail. */
+    const spanOf = (w) => Math.max(PACES[2].weeks, w) * 1.12;
     ui.paint({
-      title: gaining ? `${gapTxt} to gain. Is there a specific timeline?` : `${gapTxt} to lose. Is there a specific timeline?`,
-      body: `${ob2ChoiceHTML(opts, pick, { attr: "tl" })}
-        <label class="ob2-tl-date${pick === "date" ? "" : " hidden"}" id="ob2TlDateRow"><span>Your date</span>
-          <input type="date" id="ob2TlDate" min="${minDate}" value="${pick === "date" ? date : minDate}" /></label>`,
-      cta: "Continue", ctaOff: !pick, skip: true,
-      onSkip: () => ui.skip({ goal_deadline: null }),
-      onNext: () => ui.next({ goal_deadline: pick === "none" ? null : date }),
+      title: `${gapTxt} to ${gaining ? "gain" : "lose"}. How fast do we go?`,
+      body: `<div class="card ob2-wcard"><div class="ob2-wc" id="ob2Wc"></div></div>
+        ${ob2ChoiceHTML(PACES, pick === "date" ? null : pick, { attr: "tl" })}
+        <div class="ob2-tl-more">
+          <button type="button" class="ob2-link" id="ob2TlMore"${pick === "date" ? " hidden" : ""}>Pick a date instead</button>
+          <label class="ob2-tl-date${pick === "date" ? "" : " hidden"}" id="ob2TlDateRow"><span>Your date</span>
+            <input type="date" id="ob2TlDate" min="${minDate}" value="${pick === "date" ? date : PACES[1].date}" /></label>
+        </div>`,
+      cta: "Continue",
+      onNext: () => ui.next({ goal_deadline: date }),
     });
-    /* His line for a pick, by how hard it leans on the safe ceiling. */
+    const chart = ob2WeightChart($("ob2Wc"), { now, goal, kg, weeks: weeksOf(), span: spanOf(weeksOf()), label: ob2NiceDate(date) });
+    const show = () => chart.to(weeksOf(), spanOf(weeksOf()), ob2NiceDate(date));
+    /* His line for a pace, by which of the three it sits nearest, so their
+       own date gets the same voice as the pace it is closest to. Jokes
+       about the robot, never about the body. */
     const lineFor = (weeks) => {
-      const lean = (pace.gap / weeks) / pace.cap;
-      if (lean > 0.85) return gaining ? "The fast lane. Still safe. I'll make sure you eat." : "The fast lane. Still safe, and I'll be watching.";
-      if (lean > 0.55) return "Solid. Steady enough to actually stick.";
-      return "Plenty of runway. Future you is very relaxed about this.";
+      const [f, s, r] = PACES.map((p) => p.weeks);
+      if (weeks < (f + s) / 2) return gaining ? "Fastest safe. Still safe. I'll make sure you eat." : "Fastest safe. Still safe, and I'll be watching.";
+      if (weeks < (s + r) / 2) return "Steady. The one that actually sticks. I'd pick it if I had legs.";
+      return "Relaxed. Plenty of runway. Future you is very calm about this.";
     };
-    /* A gap too big for the short spans is said once, up front. */
-    if (pace.minWeeks > wk(2)) ob2Later(() => ob2Type($("ob2Q"), `${gapTxt} safely takes ${pace.minWeeks} weeks at least, so I skipped the short ones. ${gaining ? "I don't do dirty bulks." : "I don't do crash diets."} I don't even eat.`), 1600);
     ob2WireOne("tl", (v) => {
       pick = v;
-      $("ob2Next").disabled = false;
-      $("ob2TlDateRow").classList.toggle("hidden", v !== "date");
-      if (v === "none") { date = null; ob2Type($("ob2Q"), "No rush. The plan that actually sticks."); return; }
-      if (v === "date") { date = $("ob2TlDate").value || minDate; ob2Type($("ob2Q"), `${ob2NiceDate(date)}. That's ${per(pace.gap / weeksTo(date))}. ${lineFor(weeksTo(date))}`); return; }
-      const o = opts.find((x) => x.id === v);
-      date = dateIn(o.weeks);
-      ob2Type($("ob2Q"), lineFor(o.weeks));
+      date = PACES.find((p) => p.id === v).date;
+      $("ob2TlDateRow").classList.add("hidden");
+      $("ob2TlMore").hidden = false;
+      show();
+      ob2Type($("ob2Q"), lineFor(weeksOf()));
     });
-    $("ob2TlDate").onchange = () => {
+    const takeDate = () => {
       let v = $("ob2TlDate").value;
       /* The picker's min is a suggestion some browsers let a typed date
          past; the ceiling is not. */
-      if (!v || v < minDate) { v = minDate; $("ob2TlDate").value = v; ob2Type($("ob2Q"), `Sooner than ${ob2NiceDate(minDate)} isn't safe. That's the earliest I'll sign.`); }
-      else ob2Type($("ob2Q"), `${ob2NiceDate(v)}. That's ${per(pace.gap / weeksTo(v))}. ${lineFor(weeksTo(v))}`);
-      date = v;
+      const early = !v || v < minDate;
+      if (early) { v = minDate; $("ob2TlDate").value = v; }
+      date = v; pick = "date";
+      $("onboard").querySelectorAll("[data-tl]").forEach((b) => { b.classList.remove("on"); b.setAttribute("aria-pressed", "false"); });
+      show();
+      ob2Type($("ob2Q"), early
+        ? `Sooner than ${ob2NiceDate(minDate)} isn't safe. That's the earliest I'll sign.`
+        : `${ob2NiceDate(v)}. That's ${per(pace.gap / weeksTo(v))}. ${lineFor(weeksTo(v)).split(". ").slice(1).join(". ")}`);
     };
+    $("ob2TlMore").onclick = () => {
+      $("ob2TlMore").hidden = true;
+      $("ob2TlDateRow").classList.remove("hidden");
+      $("ob2TlDate").value = date;
+      takeDate();
+      try { $("ob2TlDate").showPicker?.(); } catch { /* not from this gesture on every browser */ }
+    };
+    $("ob2TlDate").onchange = takeDate;
   } },
 
   /* Three tiles, because profiles.activity_level holds three values. It
