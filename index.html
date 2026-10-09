@@ -8954,7 +8954,7 @@
          exists" guard as the weigh-ins card next to it, same reason. -->
     <div class="card hidden" id="progressShareCard">
       <h2>What <span id="progressSharePartnerName">your partner</span> sees on Progress</h2>
-      <p class="muted-note" style="margin-top:-4px;">On is shown to them, off holds that one back. Everything starts on except photos, which waits until you turn it on. Weigh-ins covers your weight, your goal weight and your tape together: off, and none of it leaves your account at all.</p>
+      <p class="muted-note" style="margin-top:-4px;">On is shown to them, off holds that one back. Everything starts on except photos, which waits until you turn it on. Your weight and each tape reading have a tile of their own. With all of them off, none of it, your goal weight included, leaves your account at all.</p>
       <div class="trk-grid" id="progressShareGrid"></div>
     </div>
     <div class="card danger-card hidden" id="leavePartnerCard">
@@ -16689,6 +16689,12 @@ async function saveBodyReading(entry_date, patch) {
 
 /* Last logged weigh-in for a person, used everywhere a calorie/TDEE estimate needs a body weight. */
 function currentWeightLb(name) {
+  /* A partner's weight with Weight switched off in their share sheet is no
+     weight at all here. Everything built on it (a strength level, calories
+     for a session) would otherwise print a number that gives it away: the
+     master switch keeps the rows off this phone, the per reading one does
+     not. */
+  if (PARTNER_PROFILE && name === PARTNER_PROFILE.user_name && viewedHides("weight", true)) return null;
   return entriesFor(name).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
 }
 
@@ -23923,6 +23929,10 @@ function renderToneHero(on, profile, isPartner) {
   /* Both of these are about a metric, so with no metric left they say nothing
      rather than inviting a measurement the picker was just told not to show. */
   $("toneEmpty").classList.toggle("hidden", !measure || !!series.length);
+  /* An instruction is for the person who can follow it. On a partner's
+     screen it told me to measure myself under their empty chart. */
+  $("toneEmpty").textContent = isPartner
+    ? `Nothing from ${partnerName()} yet.` : "Log a measurement to start the line.";
   if (toneChart) { toneChart.destroy(); toneChart = null; }
   if (series.length) renderToneChart(series, isPartner, measure.unit);
 
@@ -24068,6 +24078,7 @@ function renderToneChart(series, isPartner, unit = "in") {
    from. */
 const LIFT_RANGES = TONE_RANGES;
 let LIFT_PICK = null;
+let LIFT_PICK_FOR = null;
 let LIFT_RANGE = "3M";
 let liftChart = null;
 
@@ -24087,7 +24098,10 @@ function liftScreenLifts(name) {
   /* Seeded first, so a person who has never opened the browser still has five
      starred and a strip that explains itself. */
   if (name === ME && typeof seedPinnedLifts === "function") seedPinnedLifts(name);
-  const pins = typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
+  /* My stars are mine. Read on a partner's strip they picked and starred
+     MY favourite lifts out of THEIR history. */
+  const pins = name !== ME ? firstLoggedLifts(name)
+    : typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
   if (pins.length) {
     const picked = pins
       .map((n) => all.find((l) => liftKey(l.name) === liftKey(n)))
@@ -24154,6 +24168,9 @@ function renderLiftHero(on, profile, isPartner) {
   $("liftTiles").classList.remove("hidden");
   $("liftActions").classList.toggle("hidden", isPartner);
 
+  /* One pick per person: my last lift carried over onto a partner's screen
+     opened theirs on a lift their own phone would not start on. */
+  if (LIFT_PICK_FOR !== name) { LIFT_PICK = null; LIFT_PICK_FOR = name; }
   if (!lifts.some((l) => l.name === LIFT_PICK)) LIFT_PICK = lifts[0].name;
   const pick = LIFT_PICK;
 
@@ -24167,7 +24184,8 @@ function renderLiftHero(on, profile, isPartner) {
   $("liftChips").classList.toggle("hidden", lifts.length < 2);
   $("liftChips").innerHTML = lifts.map((l) =>
     `<button type="button" class="lift-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${
-      isPinnedLift(l.name) ? `<span class="lift-star">${icon("star", 12)}</span>` : ""
+      (isPartner ? firstLoggedLifts(name).some((n) => liftKey(n) === liftKey(l.name)) : isPinnedLift(l.name))
+        ? `<span class="lift-star">${icon("star", 12)}</span>` : ""
     }${escapeHtml(shortLift(l.name))}</button>`).join("");
   $("liftChips").querySelectorAll("[data-lift]").forEach((b) => {
     b.onclick = () => { LIFT_PICK = b.dataset.lift; again(); };
@@ -24335,6 +24353,9 @@ function renderLiftHero(on, profile, isPartner) {
   const elapsed = Math.min(7, Math.max(1, daysBetween(weekStartStr(), todayStr()) + 1));
   const expected = avg * (elapsed / 7);
   const vs = expected > 0 ? Math.round(((thisWeek - expected) / expected) * 100) : null;
+  /* Weekly Volume is its own switch in the share sheet, and this tile is the
+     one place on a partner's lift screen that still drew it. */
+  $("liftVolume").classList.toggle("hidden", viewedHides("volume", isPartner));
   $("liftVolume").innerHTML = `<span class="prog-tile-ico">${icon("bolt", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Weekly Volume</span><span class="prog-tile-val">${fmtVolume(thisWeek)} lb</span><span class="prog-tile-sub">${
       vs == null ? "first week to compare"
@@ -24520,8 +24541,10 @@ function renderBulkHero(on, profile, isPartner) {
      rather than inviting a measurement the picker was just told not to show:
      a range pill over no line is a control of nothing. */
   $("bulkEmpty").classList.toggle("hidden", !m || !!series.length);
-  $("bulkEmpty").textContent = !m ? "" : m.key === "weight"
-    ? "Log a check-in to start the line."
+  /* Log check-in went with the Log progress button at the top, and on a
+     partner's screen there is nothing for me to log at all. */
+  $("bulkEmpty").textContent = !m ? "" : isPartner ? `Nothing from ${partnerName()} yet.`
+    : m.key === "weight" ? "Log a weigh-in to start the line."
     : `Measure your ${m.label.toLowerCase()} to start the line.`;
   if (bulkChart) { bulkChart.destroy(); bulkChart = null; }
   if (series.length) bulkChart = goalLineChart("bulkChart", series, isPartner, m.unit, () => bulkChart);
@@ -27242,7 +27265,8 @@ function renderEnduranceHero(on, profile, isPartner) {
 
   el.querySelector(".chart-wrap").classList.toggle("hidden", !anyMiles);
   $("endEmpty").classList.toggle("hidden", anyMiles);
-  $("endEmpty").textContent = `Log a ${act.one} to start the line.`;
+  $("endEmpty").textContent = isPartner ? `No ${act.one}s from ${partnerName()} yet.`
+    : `Log a ${act.one} to start the line.`;
   if (endChart) { endChart.destroy(); endChart = null; }
   if (anyMiles) renderEnduranceChart(buckets, isPartner);
 
@@ -27294,6 +27318,10 @@ function renderEnduranceHero(on, profile, isPartner) {
   const elapsed = Math.min(7, Math.max(1, daysBetween(weekStartStr(), todayStr()) + 1));
   const expected = avg * (elapsed / 7);
   const pct = expected > 0 ? Math.round(((thisMin - expected) / expected) * 100) : null;
+  /* Cardio minutes and Workouts a week are switches of their own in the
+     share sheet; these two tiles drew them whatever a partner had picked. */
+  $("endMinutes").classList.toggle("hidden", viewedHides("cardio_min", isPartner));
+  $("endConsistency").classList.toggle("hidden", viewedHides("workouts_wk", isPartner));
   $("endMinutes").innerHTML = `<span class="prog-tile-ico">${icon("clock", 18)}</span>
     <span class="prog-tile-body"><span class="prog-tile-title">Weekly Cardio Minutes</span><span class="prog-tile-val">${thisMin} min</span><span class="prog-tile-sub">${
       pct === null ? "first weeks of cardio" : `${pct >= 0 ? "+" : ""}${pct}% on the last month, so far`}</span></span>`;
@@ -27828,6 +27856,14 @@ function setPinnedLifts(list) {
 const PINNED_SEEDED_KEY = "ft_pinned_seeded";
 function seedPinnedLifts(name) {
   try { if (localStorage.getItem(PINNED_SEEDED_KEY)) return; } catch { return; }
+  const order = firstLoggedLifts(name);
+  if (!order.length) return;
+  setPinnedLifts(order);
+  try { localStorage.setItem(PINNED_SEEDED_KEY, "1"); } catch { /* private browsing */ }
+}
+/* The seed's answer on its own, because a partner's stars live on their
+   phone: this is the nearest this device can get to the strip they see. */
+function firstLoggedLifts(name) {
   const first = new Map();
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || l.weight == null || l.duration_min) continue;
@@ -27837,10 +27873,8 @@ function seedPinnedLifts(name) {
     const seen = first.get(key);
     if (!seen || at < seen.at) first.set(key, { name: l.exercise_name.trim(), at });
   }
-  if (!first.size) return;
-  const order = [...first.values()].sort((a, b) => a.at.localeCompare(b.at)).slice(0, MAX_PINNED_LIFTS);
-  setPinnedLifts(order.map((x) => x.name));
-  try { localStorage.setItem(PINNED_SEEDED_KEY, "1"); } catch { /* private browsing */ }
+  return [...first.values()].sort((a, b) => a.at.localeCompare(b.at))
+    .slice(0, MAX_PINNED_LIFTS).map((x) => x.name);
 }
 
 function isPinnedLift(name) {
@@ -28701,8 +28735,12 @@ function renderWeightChart() {
       ph.id = "weightEmpty";
       card.appendChild(ph);
     }
-    ph.innerHTML = emptyState("trending", "No weigh-ins yet",
-      "Log your weight on the Home tab and your trend line starts here.");
+    /* Home has no scale on it any more: the weigh-in lives behind Log
+       progress at the top of this tab. And on a partner's card the sentence
+       is about them, who cannot be told to log from my phone. */
+    ph.innerHTML = emptyState("trending", "No weigh-ins yet", viewingPartner
+      ? `${partner} has not logged a weigh-in yet.`
+      : "Tap Log progress at the top and your trend line starts here.");
     if (weightChart) { weightChart.destroy(); weightChart = null; }
     return;
   }
@@ -44363,7 +44401,12 @@ async function renderBodyPhotos() {
     strip.innerHTML = emptyState("camera", "No progress photos yet", "One a day. In a month you'll see the difference.");
     return;
   }
+  const who = viewedEmail();
   const urls = await Promise.all(shots.map((s) => signedProofUrl(s.path)));
+  /* Signing takes a round trip. Switch Mo | Mell inside it and the other
+     person's render has already filled this card, so the late answer would
+     paint her photos into his card, with no delete buttons on them. */
+  if (viewedEmail() !== who) return;
   strip.innerHTML = shots.map((s, i) => urls[i]
     ? `<div class="photo-item">
          <img src="${urls[i]}" alt="Progress photo ${escapeHtml(s.taken_on)}" loading="lazy" />
@@ -44688,6 +44731,16 @@ const PROGRESS_SHARE_OPT_IN = new Set(["photos"]);
 function progressKeyShared(key, hiddenList) {
   const present = Array.isArray(hiddenList) && hiddenList.includes(key);
   return PROGRESS_SHARE_OPT_IN.has(key) ? present : !present;
+}
+/* Whether the partner on screen holds this one reading back, master switch
+   included for the body. The goal screens draw tiles of their own (the lift
+   screen's Weekly Volume, the endurance screen's minutes) that never went
+   through the card gate in renderProgressTab, so each one asks this. Always
+   false on your own view: nothing of yours is hidden from you. */
+function viewedHides(key, isPartner) {
+  if (!isPartner) return false;
+  if (BODY_SHARE_KEYS.includes(key) && !partnerSharesBody()) return true;
+  return !progressKeyShared(key, PARTNER_PROFILE?.progress_hidden);
 }
 function viewedName() { return PROGRESS_VIEW === "partner" ? partnerName() : ME; }
 function viewedEmail() { return PROGRESS_VIEW === "partner" ? PARTNER_EMAIL : MY_EMAIL; }
@@ -45159,27 +45212,16 @@ const isTracked = (key, goalId = null, prof = trackedProfile()) => trackedMetric
 const STRIP_METRICS = [{ key: "weight", label: "Weight", unit: "lb" }].concat(MEASUREMENTS);
 function goalStripMetrics(screenKeys, isPartner, goalId = null) {
   const metric = (k) => STRIP_METRICS.find((m) => m.key === k);
-  if (isPartner) {
-    /* A partner's strip cannot ask what they chose to track, because
-       trackedMetrics reads MY_PROFILE and tracked_by_goal is your column and
-       not theirs. It used to answer that by handing back the screen's own
-       keys and stopping there, and NONE of the screen key lists carry weight
-       (TONE_MEASURE_KEYS and BULK_MEASURE_KEYS are tape only). So somebody
-       sharing their weigh-ins still had no Weight chip on their recomp or
-       bulk screen, and therefore no weight chart, no matter what they had
-       switched on. Mo: "right now she has me being able to see her weigh-ins
-       and everything, but I can't see her weight chart."
-
-       The scale rides at the end here the same way it rides at the end of
-       your own strip, and behind partnerSharesBody, which is the switch that
-       governs their whole body: their weight, their goal weight and their
-       tape are one answer, not three. */
-    const keys = screenKeys.includes("weight") || !partnerSharesBody()
-      ? screenKeys
-      : screenKeys.concat("weight");
-    return keys.map(metric).filter(Boolean);
-  }
-  const want = trackedMetrics(goalId);
+  /* A partner's strip is THEIR strip: what they track, in their order, less
+     what they hold back. It used to hand back the screen's own keys, from
+     when trackedMetrics could only read MY_PROFILE, so a partner who hid
+     their Waist (or never measured it) still had a Waist chip here, and with
+     sharing on its chart. trackedMetrics reads the viewed profile now and
+     already drops the body readings they hid one by one; the master switch,
+     which governs their weight and their tape together, is applied on top. */
+  const want = isPartner
+    ? trackedMetrics(goalId, PARTNER_PROFILE).filter((k) => !viewedHides(k, true))
+    : trackedMetrics(goalId);
   return screenKeys.filter((k) => want.includes(k))
     .concat(want.filter((k) => !screenKeys.includes(k)))
     .map(metric).filter(Boolean);
@@ -45193,6 +45235,15 @@ function goalStripMetrics(screenKeys, isPartner, goalId = null) {
    explain the icon by. Through the lens, like every other reader on the tab,
    so it edits the goal being looked at rather than the main one. */
 function nothingTrackedStats(host) {
+  /* On a partner's view the empty strip means they shared none of it, and
+     the button would open MY tracking sheet over THEIR screen. */
+  if (PROGRESS_VIEW === "partner") {
+    host.innerHTML = `<div class="wth-now">
+      <div class="wth-eyebrow">This goal</div>
+      <div class="tone-none">Nothing shared</div>
+    </div>`;
+    return;
+  }
   host.innerHTML = `<div class="wth-now">
     <div class="wth-eyebrow">This goal</div>
     <div class="tone-none">Nothing tracked</div>
@@ -45871,7 +45922,10 @@ async function renderMuscleAnswers(name) {
 
   try {
     const mod = await ensureRiveBodyModule();
-    const sex = profileFor(MY_EMAIL)?.sex === "Female" ? "Female" : "Male";
+    /* The body of whoever's muscles these are. It read MY_EMAIL always, so
+       Mell's Getting stronger card drew her on Mo's figure. */
+    const whose = MS_NAME === ME ? MY_EMAIL : PARTNER_EMAIL;
+    const sex = profileFor(whose)?.sex === "Female" ? "Female" : "Male";
     const paint = () => msPaint(mod);
     if (!MS_FRONT || MS_SEX !== sex) {
       MS_FRONT?.destroy(); MS_BACK?.destroy();
@@ -46421,7 +46475,9 @@ function renderProgressEmpty(kind) {
   $("progHeadline").innerHTML =
     emptyState(weightLed ? "trending" : "dumbbell", "Nothing to measure yet",
       weightLed
-        ? "Type your weight in below. One number starts the trend."
+        /* The stepper that used to sit below this went with the Log
+           progress button (#cardWeight .wt-logcard is display none now). */
+        ? "Tap Log progress above. One number starts the trend."
         : "Log one session and this turns into an answer instead of a question.")
     + (weightLed ? "" : `<button type="button" class="btn-primary" id="progFirstAction">Go to today</button>`);
   if (!weightLed) $("progFirstAction").onclick = () => switchTab("home");
@@ -46837,7 +46893,11 @@ function renderProgTiles(kind, isPartner, opts = {}) {
      at all, whatever the tracking picker said. On a partner's view the
      picker is THEIRS (trackedProfile), so they see the row they chose. */
   const chev = `<span class="prog-tile-chev">${icon("chevronRight", 16)}</span>`;
-  const waistOffered = MEASUREMENTS.some((m) => isTracked(m.key));
+  /* The tile draws the waist and nothing else, so it asks about the waist.
+     Asking about any tape left it showing a partner's waist after they hid
+     it, as long as they still shared their hips. Log progress at the top is
+     the door for the rest of the tape now. */
+  const waistOffered = isTracked("waist_in");
   const waist = $("tileWaist");
   waist.classList.toggle("hidden", !waistOffered);
   if (waistOffered) {
@@ -47222,10 +47282,14 @@ function lastMeasurement(key) {
    whole list. */
 const WEIGHT_ROW = { key: "weight", label: "Weight", unit: "lb" };
 const PROGRESS_LOG_ROWS = [WEIGHT_ROW, ...MEASUREMENTS];
+/* Weight is asked for whether or not this goal tracks it. Filtering it like
+   the tape left somebody tracking only their Waist with a sheet that had no
+   scale in it, which is the half of Mell's report the fallback alone did not
+   cover. Only touched rows are saved, so an untouched weight writes nothing. */
 function measRowsToShow() {
   const rows = MEAS_ROWS || PROGRESS_LOG_ROWS;
-  const filtered = rows.filter((m) => isTracked(m.key, null, MY_PROFILE));
-  return filtered.length ? filtered : [WEIGHT_ROW];
+  const tape = rows.filter((m) => m.key !== "weight" && isTracked(m.key, null, MY_PROFILE));
+  return [WEIGHT_ROW, ...tape];
 }
 /* Whether the top button has anything to log for this person. */
 const progressLogOffered = () => PROGRESS_LOG_ROWS.some((m) => isTracked(m.key, null, MY_PROFILE));
@@ -47371,6 +47435,12 @@ function renderProgressTab() {
      the clock on them, which is exactly what the timeline is careful to
      withhold two taps away. */
   if (!sharing && kind === "endurance") kind = "habit";
+  /* The finer switches, for the two screens that ARE one of them: the lift
+     screen is Best Lifts, the endurance screen is Distance. Held back, the
+     screen goes the way the category switch above sends it, or it shows
+     what was hidden under another heading. */
+  if (kind === "lift" && viewedHides("lifts", isPartner)) kind = "habit";
+  if (kind === "endurance" && viewedHides("distance_wk", isPartner)) kind = "habit";
   /* Every reading left below leads with their body weight, and without it they
      are not readings, they are a heading over a hole. bulk falls to volume
      rather than to habit because tonnage is what Build muscle is measured on
@@ -47391,7 +47461,13 @@ function renderProgressTab() {
      pounds. Where they track nothing, showing up is the only honest headline
      left, which is the same answer Move better gets and for the same reason.
      Your own view only; a partner's screen follows THEIR choices. */
-  if (!isTracked("weight") && (kind === "scale" || kind === "bulk")) {
+  /* A partner who tracks the scale but holds it back still has the Build
+     muscle screen on their own phone, so that is what they get here, less the
+     Weight chip. Read as untracked, it turned their goal into "Lose fat and
+     build muscle", a screen they never see. */
+  const weightHeldBack = isPartner && profile?.share_weigh_ins === true
+    && trackedMetrics(null, { ...profile, progress_hidden: [] }).includes("weight");
+  if (!isTracked("weight") && (kind === "scale" || (kind === "bulk" && !weightHeldBack))) {
     /* "Still tracks a tape measurement", which is what the paragraph above
        says and what the test used to get wrong: it asked whether they track
        ANYTHING, and the recomp screen is built around inches. Now that a goal
@@ -47430,6 +47506,10 @@ function renderProgressTab() {
     if (progressKeyShared(key, profile?.progress_hidden)) continue;
     const card = TRACK_ALL.find((m) => m.key === key)?.card;
     if (card) barred.add(card);
+    /* Getting stronger is Best Lifts drawn on a body: tap a muscle and it
+       names the lift and the load. The category switch above already bars
+       the two together; the finer one has to as well. */
+    if (key === "lifts") barred.add("cardMuscles");
   }
   const wanted = (GOAL_CARDS[kind] || GOAL_CARDS.habit).filter((c) => !barred.has(c));
   /* The cards somebody asked for by name. The picker is the only thing that
