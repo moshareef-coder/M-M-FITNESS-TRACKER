@@ -52,6 +52,24 @@ function secretOk(given: string, expected: string) {
    pair their notification. */
 const clamp = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 
+/* The recipient's own switch for this kind, from Setup (profiles.notify_off).
+   That column is behind a migration that is written and not applied; until it
+   is, asking for it fails, and a failure of any kind reads as switched on,
+   which is exactly how this behaved before the switch existed. */
+async function switchedOff(to: string, kind: string): Promise<boolean> {
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?select=notify_off&email=eq.${encodeURIComponent(to)}&limit=1`,
+      { headers: svc },
+    );
+    if (!r.ok) return false;
+    const off = (await r.json())[0]?.notify_off;
+    return Array.isArray(off) && off.map((s: unknown) => String(s).toLowerCase()).includes(kind);
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   const auth = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
   if (!secretOk(auth, CRON_SECRET)) return json({ error: "forbidden" }, 403);
@@ -62,6 +80,7 @@ Deno.serve(async (req) => {
   if (!body || typeof body !== "object") return json({ error: "bad json" }, 400);
   const to = clamp(body.to_email, 254).toLowerCase();
   if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: "to_email required" }, 400);
+  if (await switchedOff(to, "started")) return json({ ok: true, sent: 0, reason: "switched off" });
 
   const trainerName = clamp(body.from_name, 60) || "Your partner";
   const detailsShared = body.details_shared === true;

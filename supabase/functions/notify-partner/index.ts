@@ -1,24 +1,24 @@
-// "Mell sent you a video", the moment she sends it, 2026-09-16.
+// "Mell cheered you on" and "Mell wants to train together", the moment she
+// does it, 2026-10-09.
 //
-// A clip is watched once and then it is gone, and it is sent to somebody who
-// is training right now with their phone face down on a bench. Realtime
-// already covers the case where the app is in front: watchLiveSessions()
-// pushes the row straight into the inbox and the pill appears. This is the
-// other case, which is most of them, and without it a clip sat unseen until
-// the workout happened to be picked back up. A clip nobody sees in time is
-// the same as no clip: by the time they look, the set it was cheering is
-// over.
+// Shaped like notify-clip and for the same reason: an event, not a state, so
+// it is trigger driven rather than waiting for the hourly job. One function
+// for both events because they are the same job (find the other phone, say
+// who and what) and one deploy is one fewer thing to forget.
 //
-// Shaped like notify-live-start and for the same reason: an event, not a
-// state, so it is trigger driven rather than waiting for the hourly job.
+// No permission check here, and the trigger firing is the permission:
+// encouragements has an INSERT policy requiring the sender to be who they say,
+// and together_sessions an INSERT policy requiring the guest to be the host's
+// actual partner. A row existing already proves a pair. This function must
+// never become the place that decides who may be messaged.
 //
-// No permission check here either, and again the trigger firing is the
-// permission: live_clips has an INSERT policy that requires the sender to be
-// the person they claim and the recipient to be their actual partner, so a
-// row existing already proves a pair.
+// What it does decide: the recipient's own switch for this kind
+// (profiles.notify_off) and whether it is the middle of the night where they
+// are. Both are in decide.ts.
 
 import webpush from "npm:web-push@3.6.7";
 import { apnsConfigured, sendApns } from "./apns.ts";
+import { decideEvent } from "./decide.ts";
 
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -46,26 +46,30 @@ function secretOk(given: string, expected: string) {
   return diff === 0;
 }
 
-/* Free text somebody typed into their profile, landing in a payload with a
-   hard size limit. Clamped rather than trusted. */
+/* Free text somebody typed, landing in a payload with a hard size limit.
+   Clamped rather than trusted. */
 const clamp = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 
-/* The recipient's own switch for this kind, from Setup (profiles.notify_off).
-   That column is behind a migration that is written and not applied; until it
-   is, asking for it fails, and a failure of any kind reads as switched on,
-   which is exactly how this behaved before the switch existed. */
-async function switchedOff(to: string, kind: string): Promise<boolean> {
+function localHour(tz: string | null) {
   try {
-    const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/profiles?select=notify_off&email=eq.${encodeURIComponent(to)}&limit=1`,
-      { headers: svc },
-    );
-    if (!r.ok) return false;
-    const off = (await r.json())[0]?.notify_off;
-    return Array.isArray(off) && off.map((s: unknown) => String(s).toLowerCase()).includes(kind);
+    const f = new Intl.DateTimeFormat("en-CA", { timeZone: tz || "UTC", hour: "2-digit", hour12: false });
+    return Number(f.formatToParts(new Date()).find((x) => x.type === "hour")?.value ?? 0) % 24;
   } catch {
-    return false;
+    return new Date().getUTCHours();
   }
+}
+
+/* The recipient's switches and timezone. notify_off is behind a migration that
+   is written and not applied; until it is, asking for it fails the select, so
+   a missing column reads as nothing switched off, which is today's behaviour. */
+async function recipient(to: string): Promise<{ off: Set<string>; tz: string | null }> {
+  const base = `${SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(to)}&limit=1`;
+  let r = await fetch(`${base}&select=timezone,notify_off`, { headers: svc });
+  if (!r.ok) r = await fetch(`${base}&select=timezone`, { headers: svc });
+  if (!r.ok) return { off: new Set(), tz: null };
+  const row = (await r.json())[0] || {};
+  const off = Array.isArray(row.notify_off) ? row.notify_off.map((s: unknown) => String(s).toLowerCase()) : [];
+  return { off: new Set(off), tz: row.timezone || null };
 }
 
 Deno.serve(async (req) => {
@@ -78,19 +82,19 @@ Deno.serve(async (req) => {
   if (!body || typeof body !== "object") return json({ error: "bad json" }, 400);
   const to = clamp(body.to_email, 254).toLowerCase();
   if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: "to_email required" }, 400);
-  if (await switchedOff(to, "video")) return json({ ok: true, sent: 0, reason: "switched off" });
 
-  /* The sender's name is the whole notification. "Somebody sent you a video"
-     is worth nothing to a person deciding whether to pick the phone up mid
-     set, so the trigger looks the name up and a fallback only covers a
-     profile row that somehow has no name on it. */
-  const fromName = clamp(body.from_name, 60) || "Your partner";
-
-  const title = `${fromName} sent you a video`;
-  /* Says the thing that makes it urgent. A clip is one watch and then it is
-     deleted, so "watch it now" is a fact about the feature, not a growth
-     nag. */
-  const body_ = "Watch it now, it plays once.";
+  const who = await recipient(to);
+  const d = decideEvent({
+    kind: clamp(body.kind, 20),
+    fromName: clamp(body.from_name, 60),
+    message: clamp(body.message, 140),
+    request: body.request === true,
+    sessionId: clamp(body.session_id, 64),
+    off: who.off,
+    localHour: localHour(who.tz),
+    nowSec: Date.now() / 1000,
+  });
+  if (!d.send) return json({ ok: true, sent: 0, reason: d.why });
 
   const subsRes = await fetch(
     `${SUPABASE_URL}/rest/v1/push_subscriptions?select=*&email=eq.${encodeURIComponent(to)}&failures=lt.5`,
@@ -116,7 +120,7 @@ Deno.serve(async (req) => {
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        JSON.stringify({ title, body: body_, url: "/clip" }),
+        JSON.stringify({ title: d.title, body: d.body, url: d.url, subtitle: d.subtitle }),
       );
       sent++;
       await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?id=eq.${s.id}`, {
@@ -140,19 +144,9 @@ Deno.serve(async (req) => {
   for (const t of tokens) {
     try {
       const usedEnv = await sendApns(t.token, t.environment, {
-        title,
-        subtitle: "Live clip",
-        body: body_,
-        /* Routed rather than dropped on the home tab: the app opens the clip
-           itself, because the one thing this notification is for is watching
-           it, and making somebody hunt for the pill afterwards wastes the
-           only view they get. */
-        url: "/clip",
-        category: "PARTNER_CLIP",
-        /* Same thread as the live notifications, so a partner's "started
-           training" and the clips that follow it stack into one conversation
-           on the Lock Screen instead of three separate banners. */
-        threadId: "partner",
+        title: d.title, subtitle: d.subtitle, body: d.body, url: d.url,
+        category: d.category, threadId: d.threadId,
+        interruptionLevel: d.interruptionLevel, expiresAt: d.expiresAt,
       });
       sent++;
       const fixed = usedEnv !== t.environment ? { environment: usedEnv } : {};
