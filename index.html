@@ -23842,6 +23842,10 @@ function renderToneHero(on, profile, isPartner) {
   /* Both of these are about a metric, so with no metric left they say nothing
      rather than inviting a measurement the picker was just told not to show. */
   $("toneEmpty").classList.toggle("hidden", !measure || !!series.length);
+  /* An instruction is for the person who can follow it. On a partner's
+     screen it told me to measure myself under their empty chart. */
+  $("toneEmpty").textContent = isPartner
+    ? `Nothing from ${partnerName()} yet.` : "Log a measurement to start the line.";
   if (toneChart) { toneChart.destroy(); toneChart = null; }
   if (series.length) renderToneChart(series, isPartner, measure.unit);
 
@@ -24452,8 +24456,10 @@ function renderBulkHero(on, profile, isPartner) {
      rather than inviting a measurement the picker was just told not to show:
      a range pill over no line is a control of nothing. */
   $("bulkEmpty").classList.toggle("hidden", !m || !!series.length);
-  $("bulkEmpty").textContent = !m ? "" : m.key === "weight"
-    ? "Log a check-in to start the line."
+  /* Log check-in went with the Log progress button at the top, and on a
+     partner's screen there is nothing for me to log at all. */
+  $("bulkEmpty").textContent = !m ? "" : isPartner ? `Nothing from ${partnerName()} yet.`
+    : m.key === "weight" ? "Log a weigh-in to start the line."
     : `Measure your ${m.label.toLowerCase()} to start the line.`;
   if (bulkChart) { bulkChart.destroy(); bulkChart = null; }
   if (series.length) bulkChart = goalLineChart("bulkChart", series, isPartner, m.unit, () => bulkChart);
@@ -27174,7 +27180,8 @@ function renderEnduranceHero(on, profile, isPartner) {
 
   el.querySelector(".chart-wrap").classList.toggle("hidden", !anyMiles);
   $("endEmpty").classList.toggle("hidden", anyMiles);
-  $("endEmpty").textContent = `Log a ${act.one} to start the line.`;
+  $("endEmpty").textContent = isPartner ? `No ${act.one}s from ${partnerName()} yet.`
+    : `Log a ${act.one} to start the line.`;
   if (endChart) { endChart.destroy(); endChart = null; }
   if (anyMiles) renderEnduranceChart(buckets, isPartner);
 
@@ -28643,8 +28650,12 @@ function renderWeightChart() {
       ph.id = "weightEmpty";
       card.appendChild(ph);
     }
-    ph.innerHTML = emptyState("trending", "No weigh-ins yet",
-      "Log your weight on the Home tab and your trend line starts here.");
+    /* Home has no scale on it any more: the weigh-in lives behind Log
+       progress at the top of this tab. And on a partner's card the sentence
+       is about them, who cannot be told to log from my phone. */
+    ph.innerHTML = emptyState("trending", "No weigh-ins yet", viewingPartner
+      ? `${partner} has not logged a weigh-in yet.`
+      : "Tap Log progress at the top and your trend line starts here.");
     if (weightChart) { weightChart.destroy(); weightChart = null; }
     return;
   }
@@ -46296,7 +46307,9 @@ function renderProgressEmpty(kind) {
   $("progHeadline").innerHTML =
     emptyState(weightLed ? "trending" : "dumbbell", "Nothing to measure yet",
       weightLed
-        ? "Type your weight in below. One number starts the trend."
+        /* The stepper that used to sit below this went with the Log
+           progress button (#cardWeight .wt-logcard is display none now). */
+        ? "Tap Log progress above. One number starts the trend."
         : "Log one session and this turns into an answer instead of a question.")
     + (weightLed ? "" : `<button type="button" class="btn-primary" id="progFirstAction">Go to today</button>`);
   if (!weightLed) $("progFirstAction").onclick = () => switchTab("home");
