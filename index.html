@@ -30326,10 +30326,21 @@ function lastLoggedWeight(name) {
 
 async function applySwap(chosen, source) {
   const ctx = SWAP_CTX;
-  const ex = swapTarget();
+  let ex = swapTarget();
   if (!ctx || !ex || !chosen) return;
   const planned = ex.name;
   if (chosen === planned) { closeSwapSheet(); return; }
+  /* Anything the caller has to write under the OLD name goes first, while the
+     row still carries it. The write reloads everything, which hands back a
+     fresh TODAY_WORKOUT, so the row to change is looked up again afterwards
+     rather than mutating the copy that was just thrown away. The sheet closes
+     first so a second tap cannot run this twice. */
+  if (ctx.before) {
+    closeSwapSheet();
+    await ctx.before(ctx.index);
+    ex = ctx.list?.()?.[ctx.index];
+    if (!ex) return;
+  }
 
   /* Sets and reps are the dose the engine chose for the slot, so they stay.
      The load cannot: it was worked out for a different movement. What they
@@ -30399,6 +30410,13 @@ function swapCurrentExercise() {
     index: SESSION.exerciseIndex,
     date: TODAY_WORKOUT.entry_date || todayStr(),
     focus: TODAY_WORKOUT.focus,
+    /* Sets already ticked on the lift being replaced happened. Nothing writes
+       a row until the exercise is banked, and the reset below wiped the ticks,
+       so swapping after two sets of bench threw those two sets away without a
+       word. Banked under the old name first, the same way ending early does. */
+    before: async (i) => {
+      if ((SESSION?.setsDone?.[i] || []).some(Boolean)) await logSetsForExercise(i);
+    },
     after: (i, ex) => {
       /* A movement you have just picked has had nothing done on it, and the
          weight and reps carried over would be the old lift's. Re-seeded from
