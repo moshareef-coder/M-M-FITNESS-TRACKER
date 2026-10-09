@@ -35719,6 +35719,24 @@ async function drainLockScreenSets() {
      owner claims nothing and takes the rubbish out, which is the whole job on
      this path. */
   const mine = SESSION && !SESSION.finished ? (MY_EMAIL || "") : "";
+  /* An empty owner is a claim that no workout exists, and the native side
+     answers it by throwing the whole queue away. That claim is only true once
+     the workout could have been put back. Before then this ran with SESSION
+     still null and binned every tap: the Lock Screen button wakes the app in
+     the background, the boot that restores the session is still in flight
+     when the person opens it, and the resume signal drains first. The sets
+     were logged on the card and gone from the workout.
+
+     So with no workout in memory, nobody signed in yet, or a saved unfinished
+     workout on disk that loadAll has not restored, this waits. loadAll ends in
+     reconcileNativeSurfaces, which drains again with the session in place, and
+     a session that turns out stale is cleared by resumeSessionIfAny, after
+     which the next drain takes the rubbish out as before. */
+  if (!mine) {
+    if (!MY_EMAIL || !ME) return;
+    const onDisk = loadSessionFromStorage();
+    if (onDisk && !onDisk.finished) return;
+  }
   try {
     /* Load changes from the island go first, so a set logged after a change is
        stamped with the weight that was on screen when it was logged. Drained
