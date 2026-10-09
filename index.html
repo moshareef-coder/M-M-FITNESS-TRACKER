@@ -16669,6 +16669,12 @@ async function saveBodyReading(entry_date, patch) {
 
 /* Last logged weigh-in for a person, used everywhere a calorie/TDEE estimate needs a body weight. */
 function currentWeightLb(name) {
+  /* A partner's weight with Weight switched off in their share sheet is no
+     weight at all here. Everything built on it (a strength level, calories
+     for a session) would otherwise print a number that gives it away: the
+     master switch keeps the rows off this phone, the per reading one does
+     not. */
+  if (PARTNER_PROFILE && name === PARTNER_PROFILE.user_name && viewedHides("weight", true)) return null;
   return entriesFor(name).filter((e) => e.weight != null).slice(-1)[0]?.weight ?? null;
 }
 
@@ -24146,9 +24152,7 @@ function renderLiftHero(on, profile, isPartner) {
        whatever it weighs) stays in the lift browser, where somebody has gone
        looking for it: seven lines of explanation beside the number pushed the
        number itself halfway down the card. */
-    /* A level is a multiple of bodyweight, so with the lift on screen it
-       gives away a scale reading the partner held back. */
-    const lvl = viewedHides("weight", isPartner) ? null : strengthLevelFor(name, pick);
+    const lvl = strengthLevelFor(name, pick);
     let side = "";
     if (!lvl) {
       const noStandard = !LIFT_STANDARDS[(pick || "").trim().toLowerCase()];
