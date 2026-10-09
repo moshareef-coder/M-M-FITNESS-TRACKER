@@ -4947,18 +4947,48 @@
   .ob2 .ob2-fq-tiles .ob2-fq-tile b { font-size: 20px; line-height: 1.1; }
   .ob2 .ob2-fq-wcard { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 170px; padding: 14px; }
   .ob2 .ob2-fq-wcard .hero-kicker { margin-bottom: 8px; }
-  .ob2-fq-week { flex: 1 1 auto; display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 6px; min-height: 120px; }
-  .ob2-fq-day { display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 6px 4px; border-radius: 12px; background: var(--panel-2); min-width: 0; }
-  .ob2-fq-day small { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--muted); }
+  .ob2-fq-week { flex: 1 1 auto; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; min-height: 120px; }
+  .ob2-fq-day { display: flex; flex-direction: column; align-items: stretch; gap: 5px; padding: 6px 3px; border-radius: 12px; background: var(--panel-2); min-width: 0;
+    border: 1.5px solid transparent; transition: background .15s, border-color .15s, opacity .15s; -webkit-tap-highlight-color: transparent; }
+  .ob2-fq-day small { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .02em; color: var(--muted); }
+  /* A rest day is the same column, dimmer and dashed, so it reads as open
+     space a block can still go to, not as missing. Mo, 2026-10-09. */
+  .ob2-fq-day.rest { background: transparent; border: 1.5px dashed color-mix(in srgb, var(--border) 85%, transparent); }
+  .ob2-fq-day.rest small { opacity: .6; }
+  /* While a block is held or picked: where it may go glows, where it may
+     not is faded, and the day under the finger is outlined in the accent. */
+  .ob2-fq-week.moving .ob2-fq-day.ok { background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); border-color: color-mix(in srgb, var(--accent) 40%, transparent); border-style: solid; }
+  .ob2-fq-week.moving .ob2-fq-day.no { opacity: .38; }
+  .ob2-fq-week.moving .ob2-fq-day.ok.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--panel-2)); }
+  .ob2-fq-week.moving .ob2-fq-day.no.over { opacity: .55; border-color: color-mix(in srgb, var(--danger, #ef4444) 70%, transparent); border-style: solid; }
   .ob2-fq-stack { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-  .ob2-fq-stack i { flex: 1 1 0; max-height: 64px; min-height: 24px; display: grid; place-items: center; border-radius: 9px;
-    border: 1.5px solid var(--k); background: color-mix(in srgb, var(--k) 22%, transparent); color: var(--k-ink); }
-  .ob2-fq-stack i.new { animation: ob2FqIn .28s cubic-bezier(.22,1,.36,1) both; }
-  .ob2-fq-stack i.k-lift { --k: var(--k-lift); --k-ink: var(--k-lift-ink); }
-  .ob2-fq-stack i.k-cardio { --k: var(--k-cardio); --k-ink: var(--k-cardio-ink); }
-  .ob2-fq-stack i.k-flow { --k: var(--k-flow); --k-ink: var(--k-flow-ink); }
+  .ob2-fq-blk { all: unset; box-sizing: border-box; flex: 1 1 0; max-height: 56px; min-height: 28px; display: grid; place-items: center; border-radius: 9px; cursor: grab;
+    border: 1.5px solid var(--k); background: color-mix(in srgb, var(--k) 22%, transparent); color: var(--k-ink);
+    touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    transition: transform .15s ease, opacity .15s; }
+  .ob2-fq-blk svg { width: 15px; height: 15px; pointer-events: none; }
+  .ob2-fq-blk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ob2-fq-blk:active { transform: scale(.94); }
+  .ob2-fq-blk.src { opacity: .25; }
+  .ob2-fq-blk.sel { outline: 2px solid var(--accent); outline-offset: 2px; transform: scale(1.06); }
+  .ob2-fq-blk.new { animation: ob2FqIn .28s cubic-bezier(.22,1,.36,1) both; }
+  .ob2-fq-blk.k-lift, .ob2-fq-ghost.k-lift { --k: var(--k-lift); --k-ink: var(--k-lift-ink); }
+  .ob2-fq-blk.k-cardio, .ob2-fq-ghost.k-cardio { --k: var(--k-cardio); --k-ink: var(--k-cardio-ink); }
+  .ob2-fq-blk.k-flow, .ob2-fq-ghost.k-flow { --k: var(--k-flow); --k-ink: var(--k-flow-ink); }
+  /* The block in the hand: a copy on the body, lifted (bigger, shadowed),
+     following the finger; it flies to its day on a drop and home on a bounce. */
+  .ob2-fq-ghost { position: fixed; z-index: 9999; pointer-events: none; display: grid; place-items: center; border-radius: 10px; box-sizing: border-box;
+    border: 1.5px solid var(--k); background: color-mix(in srgb, var(--k) 30%, var(--panel)); color: var(--k-ink);
+    box-shadow: 0 14px 30px -8px rgba(0,0,0,.35), 0 4px 10px -4px rgba(0,0,0,.25); transform: scale(1.18); transition: transform .14s ease; }
+  .ob2-fq-ghost svg { width: 17px; height: 17px; }
+  .ob2-fq-ghost.fly { transition: left .22s cubic-bezier(.22,1,.36,1), top .22s cubic-bezier(.22,1,.36,1), transform .22s ease, opacity .22s; transform: scale(1); }
+  .ob2-fq-ghost.home { transition: left .3s cubic-bezier(.34,1.56,.64,1), top .3s cubic-bezier(.34,1.56,.64,1), transform .3s ease; transform: scale(1); }
+  .ob2 .ob2-fq-wcard .ob2-fq-kick { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .ob2 .ob2-fq-wcard .ob2-fq-kick .hero-kicker { margin: 0; }
+  .ob2-fq-kick small { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .ob2 .ob2-fq-tiles .ob2-fq-tile:disabled { opacity: .3; cursor: default; }
   @keyframes ob2FqIn { from { transform: scale(.86); opacity: 0; } to { transform: none; opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .ob2-fq-stack i { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .ob2-fq-blk, .ob2-fq-ghost, .ob2-fq-ghost.fly, .ob2-fq-ghost.home { animation: none; transition: none; } }
   .ob2-fq-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
   .ob2-fq-total { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ob2-fq-key { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 650; color: var(--muted); }
@@ -13520,7 +13550,7 @@ function renderGoalPage() {
 
    It reports what it dropped rather than swallowing it, because "saved" when
    half of it was not saved is the kind of quiet lie this app does not tell. */
-const PENDING_PROFILE_COLUMNS = ["birth_date", "barriers", "effort_pref", "goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency", "progress_hidden"];
+const PENDING_PROFILE_COLUMNS = ["birth_date", "barriers", "effort_pref", "goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency", "progress_hidden", "week_layout"];
 
 async function upsertGoalFields(patch) {
   const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
@@ -13542,6 +13572,9 @@ async function upsertGoalFields(patch) {
        applied, like every migration here, so until the owner runs it this is
        the one column on the Training page a save can lose. */
     droppedFrequency: dropped("style_frequency"),
+    /* The week they laid out by hand, 20261009_week_layout.sql, written and
+       not applied. Without it Generate places the week itself. */
+    droppedLayout: dropped("week_layout"),
   };
 }
 
@@ -16567,11 +16600,118 @@ function ob2FreqCounts(picked, raw, n) {
   const out = {};
   for (const id of picked) {
     if (id === lead || (isResistanceStyle(id) && isResistanceStyle(lead))) { out[id] = n; continue; }
-    const k = freqDays(given[id]);
-    out[id] = Math.max(1, Math.min(n, k || 1));
+    /* Since 2026-10-09 a count may go past their training days, up to seven:
+       the week is the whole week now and yoga on a rest day is allowed. A
+       word from an older draft still meant "of my training days", so it is
+       still held to n. Then each kind has to fit the week, one a day. */
+    const v = given[id];
+    const k = freqDays(v);
+    out[id] = Math.max(1, Math.min(freqCount(v) ? 7 : n, k || 1));
+  }
+  for (const kind of ["cardio", "flow"]) {
+    const mine = picked.filter((id) => ob2Kind(id) === kind);
+    while (mine.reduce((t, id) => t + out[id], 0) > 7) {
+      const big = mine.filter((id) => id !== lead).sort((a, b) => out[b] - out[a])[0];
+      if (!big || out[big] <= 1) break;
+      out[big]--;
+    }
   }
   return out;
 }
+
+/* ---- The week they lay out themselves, Mo, 2026-10-09 ----
+   "Make them see the whole week, because sometimes they can do yoga or
+   something in a different day. And make them be able to drag and drop
+   everything." The freq screen holds the week as seven lists of style ids,
+   Monday first (the app's weeks run Monday to Sunday), saved as week_layout.
+   The rules are composeWeek's (styles.mjs dayLayoutProblem): one session of
+   each kind a day, so three at most. The copy here is for the minute before
+   the engine module has loaded, and says the same thing. */
+const ob2Kind = (id) => (isResistanceStyle(id) ? "resistance" : TRAIN_STYLES.find((t) => t.id === id)?.mod === "flow" ? "flow" : "cardio");
+function ob2DayProblem(ids) {
+  if (ids.length > 3) return { why: "full" };
+  const seen = new Map();
+  for (const id of ids) {
+    const k = ob2Kind(id);
+    if (seen.has(k)) return { why: "kind", kind: k, style: id, with: seen.get(k) };
+    seen.set(k, id);
+  }
+  return null;
+}
+/* Is this style one of the lead's, the sessions whose days ARE the training
+   days (a resistance style riding with a resistance lead counts). */
+const ob2IsLead = (id, lead) => id === lead || (isResistanceStyle(id) && isResistanceStyle(lead));
+/* The days a layout trains on: the ones holding a lead session. */
+const ob2LeadDays = (lay, lead) => lay.map((ids, wd) => (ids.some((id) => ob2IsLead(id, lead)) ? wd : -1)).filter((wd) => wd >= 0);
+/* Where one more `id` goes. Somewhere it is allowed (ob2DayProblem), then a
+   training day before a rest day, then the quietest day, then the day
+   furthest from another of the same style, so two yogas spread rather than
+   stack side by side. -1 when nowhere is allowed. */
+function ob2BestDay(lay, id, lead) {
+  const train = new Set(ob2LeadDays(lay, lead));
+  const same = lay.map((ids, wd) => (ids.includes(id) ? wd : -1)).filter((wd) => wd >= 0);
+  const gap = (wd) => (same.length ? Math.min(...same.map((x) => Math.min(Math.abs(x - wd), 7 - Math.abs(x - wd)))) : 7);
+  let best = -1, bestScore = null;
+  for (let wd = 0; wd < 7; wd++) {
+    if (ob2DayProblem([...lay[wd], id])) continue;
+    const score = [train.has(wd) ? 0 : 1, lay[wd].length, -gap(wd)];
+    const i = bestScore ? score.findIndex((v, j) => v !== bestScore[j]) : -1;
+    if (!bestScore || (i >= 0 && score[i] < bestScore[i])) { best = wd; bestScore = score; }
+  }
+  return best;
+}
+/* Which `id` goes when its count drops: the one sitting closest to another
+   of the same style, then the one on the busiest day, so what is left stays
+   spread and the quiet days stay quiet. */
+function ob2WorstDay(lay, id) {
+  const at = lay.map((ids, wd) => (ids.includes(id) ? wd : -1)).filter((wd) => wd >= 0);
+  if (!at.length) return -1;
+  const near = (wd) => Math.min(7, ...at.filter((x) => x !== wd).map((x) => Math.min(Math.abs(x - wd), 7 - Math.abs(x - wd))));
+  return at.reduce((a, b) => (near(b) < near(a) || (near(b) === near(a) && lay[b].length >= lay[a].length) ? b : a));
+}
+/* The week the screen opens on when they have not laid one out (or the one
+   they had no longer matches their answers): the engine's placement on their
+   training days, as before, and anything a count asks for beyond those days
+   added one block at a time where ob2BestDay says. */
+function ob2DefaultLayout(sty, d, counts, days) {
+  const picked = d.train_styles || [];
+  const lead = ob2FreqLead(picked);
+  const N = days.length;
+  const capped = {};
+  for (const id of picked) capped[id] = Math.min(N, counts[id] || 1);
+  const wk = ob2TrainingWeek(sty, { ...d, style_frequency: capped, week_layout: null }, days);
+  const lay = Array.from({ length: 7 }, (_, wd) => (wk.byDay.get(wd) || []).map((x) => x.style));
+  /* Lead days are exactly their days, whatever the placement did. */
+  for (const wd of days) if (!lay[wd].some((id) => ob2IsLead(id, lead))) lay[wd].unshift(lead);
+  for (const id of picked) {
+    if (ob2IsLead(id, lead)) continue;
+    let have = lay.flat().filter((x) => x === id).length;
+    while (have < counts[id]) { const wd = ob2BestDay(lay, id, lead); if (wd < 0) break; lay[wd].push(id); have++; }
+    while (have > counts[id]) { const wd = ob2WorstDay(lay, id); lay[wd].splice(lay[wd].indexOf(id), 1); have--; }
+  }
+  return lay;
+}
+/* A saved layout as seven lists, or null when it is not this draft's week
+   any more: a style they unticked, a count that moved, different training
+   days, or a day breaking the rules. The engine's readLayout says the same
+   for the real app; this is the screen's copy of it. */
+function ob2LayoutOf(d, counts, days) {
+  const raw = d.week_layout;
+  if (!raw || typeof raw !== "object") return null;
+  const picked = d.train_styles || [];
+  const lead = ob2FreqLead(picked);
+  const lay = Array.from({ length: 7 }, (_, wd) => (Array.isArray(raw[wd]) ? [...raw[wd]] : null));
+  if (lay.some((x) => !x)) return null;
+  if (lay.some((ids) => ids.some((id) => !picked.includes(id)) || ob2DayProblem(ids))) return null;
+  for (const id of picked) {
+    if (ob2IsLead(id, lead)) continue;
+    if (lay.flat().filter((x) => x === id).length !== counts[id]) return null;
+  }
+  const ld = ob2LeadDays(lay, lead);
+  if (ld.length !== days.length || ld.some((wd, i) => wd !== days[i])) return null;
+  return lay;
+}
+const ob2LayoutObj = (lay) => Object.fromEntries(lay.map((ids, wd) => [wd, [...ids]]));
 
 /* Where the week's sessions land, on their training days only. The engine's
    composeWeek when the styles module is loaded, handed exactly those days in
@@ -16584,6 +16724,17 @@ function ob2TrainingWeek(sty, d, trainDays = null) {
   const order = Array.from({ length: 7 }, (_, i) => ob2DayIdx(shiftDate(todayStr(), i + 1))).filter((w) => days.includes(w));
   const picked = Array.isArray(d.train_styles) ? d.train_styles : [];
   const st = sty?.readStyles ? sty.readStyles(picked.length ? picked : null, d.style_frequency || null) : null;
+  /* A week they laid out on the freq screen (week_layout) is the week, all
+     seven days of it, through the engine's own composeWeek so the preview
+     shows exactly what the app's Generate will build. The engine decides
+     whether the layout still holds (readLayout); when it does not, the
+     placement below is the answer, as it was before layouts. */
+  if (st && st.asked && sty.composeWeek && d.week_layout && sty.readLayout) {
+    const all = Array.from({ length: 7 }, (_, i) => ob2DayIdx(shiftDate(todayStr(), i + 1)));
+    const out = sty.composeWeek(st, all.map((w) => ({ key: w, wd: w })),
+      { liftCount: st.resistance ? days.length : null, layout: d.week_layout });
+    if (out.layout === "used") return { byDay: new Map(out.days.map((x) => [x.key, x.sessions])), dropped: out.dropped || [], sketch: false, laid: true };
+  }
   if (st && st.asked && sty.composeWeek) {
     const out = sty.composeWeek(st, order.map((w) => ({ key: w, lift: st.resistance ? true : null })),
       { liftCount: st.resistance ? order.length : null, window: order.length, seed: Number(todayStr().replace(/-/g, "")) });
@@ -18184,7 +18335,7 @@ height: { ch: 2, render(d, ui) {
      placement of exactly those counts on exactly their days. */
   freq: { ch: 4, when: (d) => Array.isArray(d.train_styles) && ob2FreqAsked(d.train_styles).length > 0, render(d, ui) {
     const picked = d.train_styles;
-    const days = ob2TrainDays(d);
+    let days = ob2TrainDays(d);
     const N = days.length;
     const freq = ob2FreqCounts(picked, d.style_frequency, N);
     const lead = ob2FreqLead(picked);
@@ -18192,68 +18343,313 @@ height: { ch: 2, render(d, ui) {
     const asked = ob2FreqAsked(picked);
     const T = (id) => TRAIN_STYLES.find((x) => x.id === id);
     const many = (k) => (k === 1 ? "1 day" : `${k} days`);
+    const label = (id) => T(id)?.label || id;
+    const LONG = OB2_WEEKDAYS_LONG;
+    /* Up to seven now (Mo, 2026-10-09: yoga on a rest day is allowed), but
+       never more than the week can hold of that kind, one a day: running 5
+       leaves cycling 2 at most. */
+    const maxFor = (id) => 7 - picked.filter((x) => x !== id && ob2Kind(x) === ob2Kind(id)).reduce((t, x) => t + (freq[x] || 0), 0);
     ui.paint({
       title: `You train ${N} days. How many of those for each?`,
       body: `<div class="ob2-fq">
           <div class="ob2-fq-lead">
             <span class="ob2-fq-ico">${fixed.map((id) => icon(T(id)?.ico || "dumbbell", 20)).join("")}</span>
-            <span class="ob2-fq-lt"><b>${escapeHtml(fixed.map((id) => T(id)?.label || id).join(" + "))}</b><small>Every training day</small></span>
+            <span class="ob2-fq-lt"><b>${escapeHtml(fixed.map(label).join(" + "))}</b><small>Every training day</small></span>
             <span class="ob2-fq-n"><b>${N}</b><small>${N === 1 ? "day" : "days"}</small></span>
           </div>
           ${asked.map((id) => `<div class="ob2-freq ob2-fq-row k-${isResistanceStyle(id) ? "lift" : T(id)?.mod === "flow" ? "flow" : "cardio"}">
-            <div class="ob2-fq-head"><span class="ob2-freq-l">${icon(T(id)?.ico || "body", 18)}${escapeHtml(T(id)?.label || id)}</span><span class="ob2-fq-val" data-fqv="${id}">${many(freq[id])} a week</span></div>
-            <div class="ob2-fq-tiles" style="--n:${N}" role="radiogroup" aria-label="${escapeHtml(T(id)?.label || id)}, days a week">${Array.from({ length: N }, (_, i) => i + 1).map((k) => `<button type="button" class="ob2-minchip ob2-fq-tile${k === freq[id] ? " on" : ""}" role="radio" data-fs="${id}" data-fv="${k}" aria-checked="${k === freq[id]}" aria-label="${many(k)}"><b>${k}</b></button>`).join("")}</div>
+            <div class="ob2-fq-head"><span class="ob2-freq-l">${icon(T(id)?.ico || "body", 18)}${escapeHtml(label(id))}</span><span class="ob2-fq-val" data-fqv="${id}">${many(freq[id])} a week</span></div>
+            <div class="ob2-fq-tiles" style="--n:7" role="radiogroup" aria-label="${escapeHtml(label(id))}, days a week">${Array.from({ length: 7 }, (_, i) => i + 1).map((k) => `<button type="button" class="ob2-minchip ob2-fq-tile${k === freq[id] ? " on" : ""}" role="radio" data-fs="${id}" data-fv="${k}" aria-checked="${k === freq[id]}" aria-label="${many(k)}"><b>${k}</b></button>`).join("")}</div>
           </div>`).join("")}
-          ${ob2Card("Your week", `<div class="ob2-fq-week" id="ob2FqWeek" style="--n:${N}"></div>
+          <div class="card ob2-kcard ob2-fq-wcard"><div class="ob2-fq-kick"><span class="hero-kicker">Your week</span><small>Hold a block to move it</small></div>
+            <div class="ob2-fq-week" id="ob2FqWeek" role="group" aria-label="Your week, Monday to Sunday"></div>
             <div class="ob2-fq-foot"><span class="ob2-fq-key"><i class="k-lift"></i>Lift<i class="k-cardio"></i>Cardio<i class="k-flow"></i>Class</span><span class="ob2-fq-total" id="ob2FqTotal"></span></div>
-            <p class="ob2-fq-note" id="ob2FqNote" hidden></p>`, "ob2-fq-wcard")}
+            <p class="ob2-fq-note" id="ob2FqNote" hidden></p></div>
         </div>`,
       cta: "Continue", skip: true,
       /* A skip keeps the defaults this screen opened on: every training day
-         for the lead, one day for the rest. Not "sometimes" for all of them
-         any more, the old rule here: three runs on a two day week is more
-         days than they train, the one thing this screen exists to stop. */
-      onSkip: () => ui.skip({ style_frequency: ob2FreqCounts(picked, null, N) }),
-      onNext: () => ui.next({ style_frequency: { ...freq } }),
+         for the lead, one day for the rest, placed by the app, so no layout. */
+      onSkip: () => ui.skip({ style_frequency: ob2FreqCounts(picked, null, N), week_layout: null }),
+      /* What they see is what is saved: the counts, the seven days as laid
+         out, and the training days, which a moved lift changes (days_per_week
+         does not, a move never changes how many). */
+      onNext: () => ui.next({ style_frequency: { ...freq }, week_layout: ob2LayoutObj(lay), week_days: [...days] }),
     });
-    /* The week, from the engine when it is loaded (it is by now, nine times
-       in ten: the styles screen and the preview use it), and from an even
-       spread until then, which the note says is a sketch. */
     let sty = null;
-    /* What each day held last paint, so only a session that just arrived
-       pops in; the rest of the week stays still while one count changes. */
+    /* The layout: theirs from a draft when it still fits these answers, else
+       the default. `touched` stops the engine's late arrival from re-placing
+       a week somebody has already started moving. */
+    let lay = ob2LayoutOf(d, freq, days) || ob2DefaultLayout(sty, d, freq, days);
+    let touched = !!ob2LayoutOf(d, freq, days);
     let prev = null;
+    const added = {};
+    const kindCls = (id) => (ob2Kind(id) === "resistance" ? "lift" : ob2Kind(id));
+    const syncTiles = () => {
+      for (const id of asked) {
+        const max = maxFor(id);
+        $("onboard").querySelectorAll(`[data-fs="${id}"]`).forEach((b) => {
+          const k = Number(b.dataset.fv), on = k === freq[id];
+          b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on));
+          b.disabled = k > max;
+        });
+        const v = $("onboard").querySelector(`[data-fqv="${id}"]`);
+        if (v) v.textContent = `${many(freq[id])} a week`;
+      }
+    };
     const paintWeek = () => {
       const el = $("ob2FqWeek");
       if (!el) return;
-      const wk = ob2TrainingWeek(sty, { ...d, style_frequency: freq }, days);
-      const kindOf = (x) => (x.kind === "resistance" ? "lift" : x.kind === "flow" ? "flow" : "cardio");
-      el.innerHTML = days.map((w) => {
-        const list = wk.byDay.get(w) || [];
-        const was = prev ? prev.get(w) || [] : null;
-        return `<div class="ob2-fq-day"><small>${OB2_WEEKDAYS[w]}</small><span class="ob2-fq-stack">${list.map((x, j) => `<i class="k-${kindOf(x)}${was && was[j] !== x.style ? " new" : ""}" title="${escapeHtml(T(x.style)?.label || x.style)}">${icon(x.kind === "resistance" ? (T(x.style)?.ico || "dumbbell") : (T(x.style)?.ico || "run"), 16)}</i>`).join("")}</span></div>`;
+      const train = new Set(ob2LeadDays(lay, lead));
+      el.innerHTML = lay.map((ids, wd) => {
+        const was = prev ? prev[wd] : null;
+        const rest = !train.has(wd);
+        return `<div class="ob2-fq-day${rest ? " rest" : ""}" data-wd="${wd}" aria-label="${LONG[wd]}${rest ? ", rest day" : ""}"><small>${OB2_WEEKDAYS[wd].slice(0, 2)}</small><span class="ob2-fq-stack">${ids.map((id, j) => `<button type="button" class="ob2-fq-blk k-${kindCls(id)}${was && !was.includes(id) ? " new" : ""}" data-blk="${wd}:${j}" aria-label="${escapeHtml(label(id))} on ${LONG[wd]}. Tap, then tap a day, to move it">${icon(T(id)?.ico || (ob2Kind(id) === "resistance" ? "dumbbell" : "run"), 16)}</button>`).join("")}</span></div>`;
       }).join("");
-      prev = new Map(days.map((w) => [w, (wk.byDay.get(w) || []).map((x) => x.style)]));
-      const total = [...wk.byDay.values()].reduce((n, l) => n + l.length, 0);
-      $("ob2FqTotal").textContent = `${total} sessions${wk.sketch ? ", a sketch" : ""}`;
-      /* Said only when something is true and not already on the strip: a
-         session the week had no room for (two of a kind never share a day,
-         so running and cycling both on every day cannot both fit). */
-      const lost = wk.dropped.map((x) => `${x.count} ${STYLE_WORD[x.style] || x.style} ${x.count === 1 ? "session" : "sessions"} did not fit. Two of a kind never share a day.`);
-      const note = $("ob2FqNote");
-      note.textContent = lost.join(" ");
-      note.hidden = !lost.length;
+      prev = lay.map((ids) => [...ids]);
+      const total = lay.reduce((n, ids) => n + ids.length, 0);
+      $("ob2FqTotal").textContent = `${total} sessions`;
+      wireBlocks();
     };
+    /* ---- moving a block ---- */
+    const SAY_KIND = {
+      resistance: (to) => `${LONG[to]} already has a lift. One a day, I'm strict about it.`,
+      cardio: (to, a, b) => (a === b ? `Two ${STYLE_WORD[a] || a} sessions on ${LONG[to]}? Your knees just filed a complaint.` : `${label(a)} and ${label(b).toLowerCase()} on one day? Pick one. I'm not a triathlon coach.`),
+      flow: (to, a, b) => (a === b ? `${label(a)} twice on ${LONG[to]}? Even I'm not that bendy.` : `${label(a)} and ${label(b).toLowerCase()} on one day? That's just lying down twice.`),
+    };
+    const whyNot = (from, j, to) => {
+      if (from === to) return null;
+      const id = lay[from][j];
+      const p = ob2DayProblem([...lay[to], id]);
+      if (!p) return null;
+      if (p.why === "full") return `Three's the limit on ${LONG[to]}. Even I need a gap in my day.`;
+      const other = lay[to].find((x) => ob2Kind(x) === ob2Kind(id));
+      return SAY_KIND[p.kind](to, id, other);
+    };
+    const move = (from, j, to) => {
+      const id = lay[from][j];
+      const wasRest = !ob2LeadDays(lay, lead).includes(to);
+      lay[from].splice(j, 1);
+      lay[to].push(id);
+      delete added[id];   /* where a count put them is no longer known */
+      /* The lift keeps the top of the day, the order the preview lists it. */
+      lay[to].sort((a, b) => (ob2IsLead(b, lead) ? 1 : 0) - (ob2IsLead(a, lead) ? 1 : 0));
+      touched = true;
+      if (ob2IsLead(id, lead)) {
+        /* A lift onto a rest day trades the two: the count of training days
+           stays days_per_week, and week_days follows the lifts. */
+        days = ob2LeadDays(lay, lead);
+        return `Done. ${LONG[to]} is a ${isResistanceStyle(id) ? "lift" : label(id).toLowerCase()} day now, ${LONG[from]} gets the day off.`;
+      }
+      return wasRest ? `${label(id)} on ${LONG[to]}, a rest day. Active rest. I approve.` : `${label(id)} moved to ${LONG[to]}. Tidy.`;
+    };
+    const weekEl = () => $("ob2FqWeek");
+    const dayEls = () => [...weekEl().querySelectorAll(".ob2-fq-day")];
+    const markTargets = (from, j) => {
+      weekEl().classList.add("moving");
+      dayEls().forEach((el) => {
+        const to = Number(el.dataset.wd);
+        const ok = to === from || !whyNot(from, j, to);
+        el.classList.toggle("ok", ok); el.classList.toggle("no", !ok);
+      });
+    };
+    const clearTargets = () => {
+      const w = weekEl();
+      if (!w) return;
+      w.classList.remove("moving");
+      dayEls().forEach((el) => el.classList.remove("ok", "no", "over"));
+      w.querySelectorAll(".ob2-fq-blk.src, .ob2-fq-blk.sel").forEach((b) => b.classList.remove("src", "sel"));
+    };
+    /* Tries the move and says how it went. True when it landed. */
+    const attempt = (from, j, to) => {
+      if (to === from) return false;
+      const no = whyNot(from, j, to);
+      if (no) { ob2Type($("ob2Q"), no); buzz([12, 40, 12]); return false; }
+      const line = move(from, j, to);
+      buzz(10);
+      paintWeek();
+      ob2Type($("ob2Q"), line);
+      return true;
+    };
+    /* Tap to move, for VoiceOver, switch control and anyone who would
+       rather not hold: tap a block, then tap a day (or the block again to put
+       it down). Same rules, same lines. */
+    let picked1 = null;
+    let swallowUntil = 0;
+    const pick = (from, j, btn) => {
+      clearTargets();
+      picked1 = { from, j };
+      btn.classList.add("sel");
+      markTargets(from, j);
+      ob2Type($("ob2Q"), `${label(lay[from][j])} picked up. Which day?`);
+    };
+    const drop = () => { picked1 = null; clearTargets(); };
+    const onDayTap = (to) => {
+      if (!picked1) return;
+      const { from, j } = picked1;
+      drop();
+      if (to !== from) attempt(from, j, to);
+    };
+    /* Hold to lift, drag, let go. Touch events, not pointer events: Chrome
+       claims a touch as a pan and stops sending pointermove partway through
+       (the sheet gesture learned this, fit-together-sheet-gestures). Until
+       the 250 ms hold has fired nothing is prevented, so a finger that moves
+       first is a page scroll exactly as before. The mouse drags at once. */
+    let drag = null;
+    const HOLD = 250, SLOP = 8;
+    const dayAt = (x, y) => {
+      const el = document.elementFromPoint(x, y)?.closest?.(".ob2-fq-day");
+      return el && weekEl()?.contains(el) ? Number(el.dataset.wd) : null;
+    };
+    const lift = (btn, x, y) => {
+      if (picked1) drop();
+      const [from, j] = btn.dataset.blk.split(":").map(Number);
+      const r = btn.getBoundingClientRect();
+      const g = document.createElement("div");
+      g.className = `ob2-fq-ghost ${[...btn.classList].find((c) => c.startsWith("k-"))}`;
+      g.innerHTML = btn.innerHTML;
+      Object.assign(g.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+      /* On the body, out of reach of any transform on the screen, so its
+         colours are carried over from the block rather than inherited. */
+      const cs = getComputedStyle(btn);
+      g.style.setProperty("--k", cs.getPropertyValue("--k"));
+      g.style.setProperty("--k-ink", cs.getPropertyValue("--k-ink"));
+      document.body.appendChild(g);
+      btn.classList.add("src");
+      drag = { from, j, btn, g, dx: x - r.left, dy: y - r.top, home: r, over: null, live: true };
+      markTargets(from, j);
+      buzz(8);
+    };
+    const follow = (x, y) => {
+      if (!drag?.live) return;
+      drag.g.style.left = `${x - drag.dx}px`;
+      drag.g.style.top = `${y - drag.dy}px`;
+      const to = dayAt(x, y);
+      if (to !== drag.over) {
+        dayEls().forEach((el) => el.classList.toggle("over", Number(el.dataset.wd) === to));
+        drag.over = to;
+      }
+    };
+    const land = (x, y) => {
+      if (!drag?.live) return;
+      const { from, j, g, home } = drag;
+      drag.live = false;
+      swallowUntil = Date.now() + 450;
+      const to = dayAt(x, y);
+      const ok = to != null && to !== from && !whyNot(from, j, to);
+      if (ok) {
+        /* Fly to the foot of that day's stack, then the real block takes
+           over with its arrival pop. */
+        const day = dayEls().find((el) => Number(el.dataset.wd) === to);
+        const st = day.querySelector(".ob2-fq-stack").getBoundingClientRect();
+        const last = day.querySelector(".ob2-fq-blk:last-child")?.getBoundingClientRect();
+        g.classList.add("fly");
+        Object.assign(g.style, { left: `${st.left}px`, top: `${last ? last.bottom + 4 : st.top}px`, width: `${st.width}px` });
+        setTimeout(() => { g.remove(); clearTargets(); attempt(from, j, to); drag = null; }, 220);
+      } else {
+        g.classList.add("home");
+        Object.assign(g.style, { left: `${home.left}px`, top: `${home.top}px` });
+        if (to != null && to !== from) { ob2Type($("ob2Q"), whyNot(from, j, to)); buzz([12, 40, 12]); }
+        setTimeout(() => { g.remove(); clearTargets(); drag = null; }, 300);
+      }
+    };
+    const cancelHold = () => { if (drag && !drag.live && drag.timer) { clearTimeout(drag.timer); drag = null; } };
+    const wireBlocks = () => {
+      weekEl().querySelectorAll(".ob2-fq-blk").forEach((btn) => {
+        btn.addEventListener("touchstart", (e) => {
+          if (drag || e.touches.length > 1) return;
+          const t = e.touches[0];
+          const x0 = t.clientX, y0 = t.clientY;
+          const pending = { timer: setTimeout(() => { if (drag === pending) { drag = null; lift(btn, pending.x, pending.y); } }, HOLD), x: x0, y: y0, x0, y0, live: false };
+          drag = pending;
+        }, { passive: true });
+        btn.addEventListener("contextmenu", (e) => e.preventDefault());
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (Date.now() < swallowUntil) return;
+          const [from, j] = btn.dataset.blk.split(":").map(Number);
+          if (picked1) {
+            if (picked1.from === from && picked1.j === j) { drop(); return; }
+            onDayTap(from);
+            return;
+          }
+          pick(from, j, btn);
+        });
+        btn.addEventListener("pointerdown", (e) => {
+          if (e.pointerType !== "mouse" || e.button !== 0) return;
+          const x0 = e.clientX, y0 = e.clientY;
+          const mv = (ev) => {
+            if (!drag && Math.hypot(ev.clientX - x0, ev.clientY - y0) > 4) lift(btn, x0, y0);
+            if (drag?.live) follow(ev.clientX, ev.clientY);
+          };
+          const up = (ev) => { removeEventListener("pointermove", mv); removeEventListener("pointerup", up); if (drag?.live) land(ev.clientX, ev.clientY); };
+          addEventListener("pointermove", mv); addEventListener("pointerup", up);
+        });
+      });
+      dayEls().forEach((el) => { el.onclick = () => onDayTap(Number(el.dataset.wd)); });
+    };
+    /* One set of document listeners for the screen, removed when it goes. */
+    const onMove = (e) => {
+      if (!drag) return;
+      const t = e.touches[0];
+      if (!drag.live) {
+        /* Moved before the hold fired: that is a scroll, let it be one. */
+        if (Math.hypot(t.clientX - drag.x0, t.clientY - drag.y0) > SLOP) cancelHold();
+        return;
+      }
+      e.preventDefault();
+      follow(t.clientX, t.clientY);
+    };
+    const onEnd = (e) => {
+      if (!drag) return;
+      if (!drag.live) { cancelHold(); return; }
+      const t = e.changedTouches[0];
+      land(t.clientX, t.clientY);
+    };
+    const onCancel = () => {
+      if (!drag) return;
+      if (!drag.live) { cancelHold(); return; }
+      land(-1, -1);   /* off every day, so it goes home */
+    };
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onEnd);
+    document.addEventListener("touchcancel", onCancel);
+    OB2_CLEANUP.push(() => {
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+      document.removeEventListener("touchcancel", onCancel);
+      document.querySelectorAll(".ob2-fq-ghost").forEach((g) => g.remove());
+    });
+    syncTiles();
     paintWeek();
-    ensureStylesModule().then((m) => { if (m?.composeWeek && m?.readStyles) { sty = m; paintWeek(); } });
+    ensureStylesModule().then((m) => {
+      if (!(m?.composeWeek && m?.readStyles)) return;
+      sty = m;
+      if (!touched) { lay = ob2DefaultLayout(sty, d, freq, days); prev = null; paintWeek(); }
+    });
+    /* A count changes the blocks, one at a time, on the best day for it
+       (ob2BestDay) or off the most crowded spot (ob2WorstDay); the rest of
+       the week stays where they put it. A move never changes a count. */
     $("onboard").querySelectorAll("[data-fs]").forEach((b) => b.onclick = () => {
       const id = b.dataset.fs, k = Number(b.dataset.fv);
-      freq[id] = k;
-      $("onboard").querySelectorAll(`[data-fs="${id}"]`).forEach((x) => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-checked", String(on)); });
-      const v = $("onboard").querySelector(`[data-fqv="${id}"]`);
-      if (v) v.textContent = `${many(k)} a week`;
+      if (k > maxFor(id)) return;
+      if (picked1) drop();
+      let have = lay.flat().filter((x) => x === id).length;
+      const mine = added[id] || (added[id] = []);
+      while (have < k) { const wd = ob2BestDay(lay, id, lead); if (wd < 0) break; lay[wd].push(id); mine.push(wd); have++; }
+      while (have > k) {
+        /* Down takes back what up put in first, so 3 to 4 to 3 is the week
+           they had; only then the most crowded spot. A block they dragged
+           somewhere on purpose is the last to go. */
+        let wd = -1;
+        while (mine.length && wd < 0) { const w = mine.pop(); if (lay[w].includes(id)) wd = w; }
+        if (wd < 0) wd = ob2WorstDay(lay, id);
+        lay[wd].splice(lay[wd].indexOf(id), 1); have--;
+      }
+      freq[id] = have;
+      touched = true;
+      syncTiles();
       paintWeek();
-      ob2Type($("ob2Q"), ob2FreqLine(id, k, N));
+      ob2Type($("ob2Q"), ob2FreqLine(id, have, N));
     });
   } },
 
@@ -19908,7 +20304,7 @@ async function finishOnboarding(data) {
   /* Through upsertGoalFields, not straight at the table: goal_secondary is
      behind an unapplied migration, and a first-run setup must not fail on a
      column that does not exist yet. */
-  const { data: saved, error, droppedSecondary, droppedSession, droppedFrequency } = await upsertGoalFields({
+  const { data: saved, error, droppedSecondary, droppedSession, droppedFrequency, droppedLayout } = await upsertGoalFields({
     email: MY_EMAIL,
     user_name: ME,
     focus: data.focus,
@@ -19925,6 +20321,11 @@ async function finishOnboarding(data) {
        value that means exactly what the column's default already means. */
     ...(Array.isArray(data.train_styles) && data.train_styles.length ? { train_styles: data.train_styles } : {}),
     ...(data.style_frequency && Object.keys(data.style_frequency).length ? { style_frequency: data.style_frequency } : {}),
+    /* Where they dragged each session on the freq screen, weekday to style
+       ids. generateTheWeek hands it to composeWeek, which uses it while it
+       still matches their styles and counts (styles.mjs readLayout). Only
+       sent when they laid one out. Pending: 20261009_week_layout.sql. */
+    ...(data.week_layout && typeof data.week_layout === "object" ? { week_layout: data.week_layout } : {}),
     ...(data.goal_tuning ? { goal_tuning: data.goal_tuning } : {}),
     ...(Array.isArray(data.tracked_metrics) ? { tracked_metrics: data.tracked_metrics } : {}),
     ...(data.tracked_by_goal ? { tracked_by_goal: data.tracked_by_goal } : {}),
@@ -19962,6 +20363,7 @@ async function finishOnboarding(data) {
   if (droppedSecondary && (data.goal_secondary || []).length) toast("Your extra goals are not being stored yet.");
   if (droppedSession) toast("Your session length is not being stored yet.");
   if (droppedFrequency) toast("How often you train is not being stored yet.");
+  else if (droppedLayout && data.week_layout) toast("Your week layout is not being stored yet.");
   /* No paywall on the way out, and this is where one used to open: half a
      second after the write, for anybody who had just committed. That was the
      only place onboarding ever said a price. The hire step says it now, two
@@ -43442,6 +43844,8 @@ function weekGenDescriptors(candidates, liftRows) {
     const r = byDate.get(d.date);
     return {
       key: d.date,
+      /* The weekday, Monday 0, so a layout keyed by weekday can find it. */
+      wd: ob2DayIdx(d.date),
       lift: !!(r && r.state === "done"),
       legs: !!(r && r.state === "done" && r.legs),
       heavy: !!(r && r === heavy),
@@ -43644,6 +44048,12 @@ async function generateTheWeek() {
   const lifting = !st || !st.asked || st.resistance;
   const composing = !!(st && st.asked && mod?.composeWeek);
   const perWeek = await weekGenPerWeek();
+  /* The week they laid out by hand in onboarding (profiles.week_layout,
+     weekday to style ids), when it still matches their styles, counts and
+     lifting days. readLayout is the engine's own check, the one composeWeek
+     runs again below; null means place the week as before. */
+  const laidRaw = MY_PROFILE?.week_layout || null;
+  const laid = composing && laidRaw && mod.readLayout ? mod.readLayout(laidRaw, st, { liftCount: perWeek }) : null;
   let want = lifting ? weekGenTarget(open, perWeek) : 0;
   if (lifting && !want && !composing) { toast(`Your ${perWeek} days are already in this week`); return; }
   if (!lifting && !composing) { toast("Nothing ticked in your workouts, so there is nothing to build"); return; }
@@ -43667,7 +44077,11 @@ async function generateTheWeek() {
   }
 
   const liftable = candidates.filter((d) => !d.keep);
-  const days = lifting ? spreadOver(liftable, want) : [];
+  /* With a layout the lifts go on the days it lifts on, in order, as many as
+     the week still owes; without one they are spread as always. */
+  const days = !lifting ? []
+    : laid ? liftable.filter((d) => laid[ob2DayIdx(d.date)].some((id) => mod.styleKind(id) === "resistance")).slice(0, want)
+    : spreadOver(liftable, want);
   if (lifting && !days.length && !composing) { toast("No empty days left this week"); return; }
 
   WEEK_GEN_RUNNING = true;
@@ -43727,8 +44141,12 @@ async function generateTheWeek() {
        through the ticks is gone with the number it counted, since that number
        is a lifting count and there is no lifting. */
     if (composing) {
-      const composed = mod.composeWeek(st, weekGenDescriptors(candidates, rows), { seed: weekGenSeed() });
-      dropped = composed.dropped || [];
+      const composed = mod.composeWeek(st, weekGenDescriptors(candidates, rows),
+        { seed: weekGenSeed(), ...(laid ? { layout: laidRaw, liftCount: perWeek } : {}) });
+      /* A lift the layout wanted on a day that could not take one is already
+         on the card as a lift that was or was not built; only the runs and
+         classes that gave way are news here. */
+      dropped = (composed.dropped || []).filter((x) => mod.styleKind?.(x.style) !== "resistance");
       const extras = [];
       for (const day of composed.days) {
         const d = candidates.find((x) => x.date === day.key);
@@ -43793,7 +44211,10 @@ async function generateTheWeek() {
        honesty: a day that would not build, where each extra session ended up,
        and one this app cannot place until a migration is run. */
     [failed.length ? `${failed.map((r) => r.long).join(", ")} wouldn't build. Try ${failed.length === 1 ? "that one" : "those"} from the day itself.` : "",
-      weekGenPlacedSay(rows, dropped, noRoom, candidates.length)].filter(Boolean).join(" "),
+      weekGenPlacedSay(rows, dropped, noRoom, candidates.length),
+      /* Said when the week they laid out could not be used, so a week that
+         looks different from the one they dragged is explained, not a mystery. */
+      laidRaw && composing && !laid ? "Your workouts changed since you laid out your week, so I placed this one fresh." : ""].filter(Boolean).join(" "),
   );
 }
 
