@@ -4824,8 +4824,11 @@
   .ob2-topback:active { transform: translateY(-50%) scale(.94); }
   .ob2-navrow { display: flex; gap: 8px; align-items: stretch; }
   .ob2-navrow .btn-primary { flex: 1; width: auto; min-width: 0; margin: 0; }
-  .ob2-backbtn { flex: none; width: 56px; min-height: 48px; display: grid; place-items: center; padding: 0; cursor: pointer;
-    border-radius: 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+  /* Previous and Continue split the footer half and half (Mo, 2026-10-08:
+     "easier navigation", always centred). Continue is still the green one. */
+  .ob2-navrow .btn-primary, .ob2-navrow .ob2-backbtn { flex: 1 1 0; }
+  .ob2-backbtn { width: auto; min-width: 0; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; cursor: pointer;
+    font: inherit; font-size: 16px; font-weight: 700; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
   .ob2-backbtn:active { transform: scale(.96); }
   .ob2-backtext { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
   .ob2-foot .btn-ghost { width: 100%; }
@@ -4896,6 +4899,11 @@
   .ob2-sum .ob-inline { flex: none; font-size: 13px; font-weight: 700; cursor: pointer; }
   .ob2-nodial .obs-freq { display: none !important; }
   .ob2-freqs { display: flex; flex-direction: column; gap: 10px; }
+  .ob2-ftiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .ob2-ftiles .ob2-ftile { flex-direction: column; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 2px;
+    min-width: 0; padding: 9px 2px; border-radius: 12px; box-shadow: none; }
+  .ob2-ftiles .ob2-ftile b { font-size: 20px; line-height: 1.1; }
+  .ob2-ftiles .ob2-ftile span { font-size: 11px; line-height: 1.2; white-space: nowrap; }
   .ob2-freq { border: 1px solid var(--border); background: var(--panel); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
   .ob2-freq-l { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; }
   .ob2-freq-l svg { color: var(--accent); }
@@ -15673,7 +15681,7 @@ const OB2_PATH_A = [
   { id: "taste2", off: "Mo cut the sample set (2026-10-07). He did not like it." },
   "styles", "freq", "equip", "focus", "hurts", "warmup", "days", "minutes", "projection",
   { id: "proof", off: "No real couple quote or App Store review yet. Back in when there is one; never a made up one." },
-  "taste3",
+  { id: "taste3", off: "Mo cut the live invite demo for now (2026-10-08). Back in 1.2." },
   "build", "preview",
   { id: "account", off: "Sign-in already happened before onboarding started." },
   "beta", "commit", "pay2", "invite", "notify", "home",
@@ -15683,7 +15691,7 @@ const OB2_PATH_B = [
   "sex", "age", "height", "weight", "target", "activity", "summary",
   { id: "taste2", off: "Mo cut the sample set (2026-10-07). He did not like it." },
   "styles", "freq", "equip", "focus", "hurts", "warmup", "days", "minutes",
-  "taste3",
+  { id: "taste3", off: "Mo cut the live invite demo for now (2026-10-08). Back in 1.2." },
   "build", "preview", "beta", "commit", "pay", "notify",
 ];
 
@@ -15950,7 +15958,7 @@ function ob2Paint(id, d, o) {
       ${o.why && (o.legal || o.keepWhy) ? `<p class="ob2-why">${escapeHtml(o.why)}</p>` : ""}
       <div class="ob2-body">${o.stage ? `<div class="ob2-stage" id="ob2Stage"></div>` : ""}${o.body || ""}</div>
       <div class="ob2-foot">
-        ${o.cta ? `<div class="ob2-navrow">${back ? `<button type="button" class="ob2-backbtn" id="ob2Back" aria-label="Back">${icon("chevronLeft", 22)}</button>` : ""}<button type="button" class="btn-primary" id="ob2Next"${o.ctaOff ? " disabled" : ""}${o.ctaHidden ? " hidden" : ""}>${escapeHtml(o.cta)}</button></div>` : ""}
+        ${o.cta ? `<div class="ob2-navrow">${back ? `<button type="button" class="ob2-backbtn" id="ob2Back">${icon("chevronLeft", 18)}<span>Previous</span></button>` : ""}<button type="button" class="btn-primary" id="ob2Next"${o.ctaOff ? " disabled" : ""}${o.ctaHidden ? " hidden" : ""}>${escapeHtml(o.cta)}</button></div>` : ""}
         ${o.foot || ""}
       </div>
     </div>`;
@@ -17472,7 +17480,11 @@ height: { ch: 2, render(d, ui) {
       title: "How often for each? Be realistic. I'll know.",
       body: `<div class="ob2-freqs">${picked.map((id) => {
           const t = TRAIN_STYLES.find((x) => x.id === id);
-          return `<div class="ob2-freq"><span class="ob2-freq-l">${icon(t?.ico || "body", 18)}${escapeHtml(t?.label || id)}</span>${styleDialHTML(id, freq[id] || "some", true)}</div>`;
+          /* Tiles, the minutes screen's, not a slider (Mo, 2026-10-08: stay on
+             our designs). Days a week big, the word under it. */
+          const cur = freq[id] || "some";
+          return `<div class="ob2-freq"><span class="ob2-freq-l">${icon(t?.ico || "body", 18)}${escapeHtml(t?.label || id)}</span>
+            <div class="ob2-ftiles">${STYLE_FREQ.map((f) => `<button type="button" class="ob2-minchip ob2-ftile${f.id === cur ? " on" : ""}" data-fs="${id}" data-fv="${f.id}" aria-pressed="${f.id === cur}"><b>${f.days}</b><span>${escapeHtml(({ rare: "Rarely", some: "Sometimes", most: "Most days", daily: "Daily" })[f.id] || f.label)}</span></button>`).join("")}</div></div>`;
         }).join("")}</div>
 `,
       cta: "Continue", skip: true,
@@ -17480,8 +17492,12 @@ height: { ch: 2, render(d, ui) {
       onSkip: () => ui.skip({ style_frequency: Object.fromEntries(picked.map((id) => [id, "some"])) }),
       onNext: () => ui.next({ style_frequency: freq }),
     });
-    wireTrainStylePicker($("onboard"), picked, () => true, {
-      freq, onFreq: () => {},
+    $("onboard").querySelectorAll("[data-fs]").forEach((b) => b.onclick = () => {
+      const id = b.dataset.fs, v = b.dataset.fv;
+      freq[id] = v;
+      $("onboard").querySelectorAll(`[data-fs="${id}"]`).forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
+      const line = trainStyleTapLine(id, v);
+      if (line) ob2Type($("ob2Q"), line);
     });
   } },
 
