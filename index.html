@@ -2458,6 +2458,7 @@
   .paywall-price { margin: 0 0 12px; font-size: 14px; line-height: 1.4; }
   .paywall-price b { display: block; color: #fff; font-weight: 700; }
   .paywall-price span { color: rgba(244,246,248,.55); font-size: 13px; }
+  .paywall-price .paywall-trial { display: block; margin: 2px 0 6px; color: var(--accent); font-weight: 600; }
   .paywall-cta { width: 100%; }
   /* Overridden off the app's own ghost button, which is tuned for a light
      panel and disappears on this ground. */
@@ -10571,6 +10572,9 @@ async function refreshPremium() {
     return IS_PREMIUM;
   }
   IS_PREMIUM = data === true;
+  /* Asked alongside, so the paywall and Setup know a free month from a paid
+     plan the first time they draw (trialDaysLeft). */
+  await refreshOwnPlan();
   return IS_PREMIUM;
 }
 let ALL_GOALS = [];
@@ -21638,6 +21642,35 @@ function hired() {
   return !PAYWALL_ON || IS_PREMIUM;
 }
 
+/* The free month. is_premium() answers yes for the first TRIAL_DAYS of every
+   account (20261004_premium_trial_30_days.sql) and does not say why, so a
+   trial and a paid plan looked the same on screen: Setup said "Hired" and
+   "renews every month until you cancel" to people who never subscribed.
+   The app can tell them apart with what it may already read: its own
+   subscription row (RLS lets you read your own and nobody else's) and the
+   account's own start. A partner's paid plan is invisible here, so somebody
+   covered by their partner reads as on the trial until day 31 and as Hired
+   after; both are true. Keep TRIAL_DAYS equal to the interval in is_premium. */
+const TRIAL_DAYS = 30;
+let OWN_PLAN_ACTIVE = null;   // null until asked
+async function refreshOwnPlan() {
+  if (!PAYWALL_ON || !MY_EMAIL) return;
+  const { data, error } = await sb.from("subscriptions").select("status, expires_at").limit(5);
+  if (error) { console.warn("could not read own subscription", error); return; }
+  OWN_PLAN_ACTIVE = (data || []).some((r) => (r.status === "active" || r.status === "grace")
+    && (!r.expires_at || Date.parse(r.expires_at) > Date.now()));
+}
+/* Whole days left of the free month, or null when it is not the reason this
+   account has premium (paid, expired, or not known yet). */
+function trialDaysLeft() {
+  if (!PAYWALL_ON || OWN_PLAN_ACTIVE !== false) return null;
+  const born = Date.parse(MY_PROFILE?.created_at || "");
+  if (!Number.isFinite(born)) return null;
+  const left = Math.ceil((born + TRIAL_DAYS * 86400000 - Date.now()) / 86400000);
+  return left > 0 ? Math.min(left, TRIAL_DAYS) : null;
+}
+function trialLeftLabel(n) { return n === 1 ? "1 day" : `${n} days`; }
+
 /* Whether the offer has already been turned down in this sitting. Set by the
    hire step in onboarding, read at the end of the tracking run on Progress,
    which is the only other place that would put the full screen up unasked.
@@ -21770,6 +21803,7 @@ function showPaywall({ skipLabel = "Not now" } = {}) {
                  one price and two people each paying it. -->
             <p class="paywall-price">
               <b>${escapeHtml(PREMIUM_PRICE)} a month, your partner included.</b>
+              ${trialDaysLeft() ? `<span class="paywall-trial">${trialDaysLeft() >= TRIAL_DAYS ? `Your first ${TRIAL_DAYS} days are free` : `Free trial, ${escapeHtml(trialLeftLabel(trialDaysLeft()))} left`}. Nothing is charged unless you hire me.</span>` : ""}
               <span>I&rsquo;ll generate your workouts, track your progress, keep your progress photos and follow up with you both.</span>
             </p>
             <button type="button" class="btn-primary paywall-cta" data-pay="1">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
@@ -49338,9 +49372,15 @@ function renderSetupTab() {
   /* The trainer row. Hired reads as a fact about the account; not hired reads
      as the offer it is, and tapping it is the offer. */
   if ($("setRow-hire")) {
-    $("setHireSub").textContent = hired() ? "Hired" : "Not hired";
+    const paintHire = () => {
+      const t = trialDaysLeft();
+      $("setHireSub").textContent = t ? `Free trial, ${trialLeftLabel(t)} left` : hired() ? "Hired" : "Not hired";
+    };
+    paintHire();
+    if (OWN_PLAN_ACTIVE === null) refreshOwnPlan().then(paintHire);
     $("setRow-hire").onclick = async () => {
       if (!hired()) { await showPaywall(); renderSetupTab(); return; }
+      if (trialDaysLeft()) { await showPaywall({ skipLabel: "Keep my free trial" }); renderSetupTab(); return; }
       /* Everything Apple want a subscriber to be able to find after they have
          paid: what it costs, that it renews, where to stop it, and the way to
          get it back on another device. */
