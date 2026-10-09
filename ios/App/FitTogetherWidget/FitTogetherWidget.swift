@@ -1,10 +1,10 @@
 import WidgetKit
 import SwiftUI
 
-// The widget draws the same two rings the home screen leads with: you and your
-// partner, days trained against this week's target. It renders whatever the app
-// last handed over through the App Group, because a widget cannot ask the web
-// view anything.
+// The Home Screen families draw "Today, together" (TodayTogether.swift): both
+// of you in your rings, the streak, and what today still needs. Everything is
+// whatever the app last handed over through the App Group, because a widget
+// cannot ask the web view anything.
 //
 // Lock Screen families are drawn monochrome by the system, so blue and coral
 // cannot tell the two of you apart there. Those layouts use position and
@@ -12,38 +12,6 @@ import SwiftUI
 
 private let appGroup = "group.com.creativelab1.fittogether"
 private let payloadKey = "fitTogetherSnapshot"
-
-struct Snapshot: Codable {
-    var myName: String
-    var myDays: Int
-    var myTarget: Int
-    var partnerName: String?
-    var theirDays: Int
-    var theirTarget: Int
-    var streak: Int
-    var streakLabel: String
-    // Decoded with a default so an older payload written before he spoke on
-    // this surface still parses instead of blanking the whole widget.
-    var quip: String = ""
-
-    // What a phone shows before the app has ever been opened, or if the blob
-    // is unreadable. Zeroes are honest here: nothing is known yet.
-    static let empty = Snapshot(
-        myName: "You", myDays: 0, myTarget: 0,
-        partnerName: nil, theirDays: 0, theirTarget: 0,
-        streak: 0, streakLabel: "", quip: ""
-    )
-
-    var myFraction: Double {
-        guard myTarget > 0 else { return 0 }
-        return min(1, Double(myDays) / Double(myTarget))
-    }
-
-    var theirFraction: Double {
-        guard theirTarget > 0 else { return 0 }
-        return min(1, Double(theirDays) / Double(theirTarget))
-    }
-}
 
 func readSnapshot() -> Snapshot {
     guard
@@ -70,49 +38,19 @@ struct Provider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
-        // The app calls reloadAllTimelines whenever a number moves, so this
-        // hourly entry is only a backstop for a week rolling over untouched.
-        let entry = Entry(date: Date(), snapshot: readSnapshot())
-        let next = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date().addingTimeInterval(3600)
-        completion(Timeline(entries: [entry], policy: .after(next)))
-    }
-}
-
-private let meColor = Unio.me
-private let partnerColor = Unio.partner
-
-struct Ring: View {
-    let done: Int
-    let target: Int
-    let color: Color
-    let label: String
-    var diameter: CGFloat = 54
-
-    private var fraction: Double {
-        guard target > 0 else { return 0 }
-        return min(1, Double(done) / Double(target))
-    }
-
-    var body: some View {
-        VStack(spacing: 5) {
-            ZStack {
-                Circle().stroke(color.opacity(0.22), lineWidth: 8)
-                Circle()
-                    .trim(from: 0, to: fraction)
-                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                Text("\(done)")
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
-                    .minimumScaleFactor(0.6)
-            }
-            .frame(width: diameter, height: diameter)
-
-            Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
+        // The app calls reloadAllTimelines whenever a number moves. The one
+        // change nobody reloads for is midnight: "Both done today" is about
+        // yesterday from then on. So the timeline carries a second entry at the
+        // start of tomorrow, which TodayModel rolls forward, and asks again
+        // once it has been shown.
+        let now = Date()
+        let snapshot = readSnapshot()
+        let midnight = Calendar.current.nextDate(
+            after: now, matching: DateComponents(hour: 0, minute: 0, second: 5),
+            matchingPolicy: .nextTime) ?? now.addingTimeInterval(3600)
+        completion(Timeline(entries: [Entry(date: now, snapshot: snapshot),
+                                      Entry(date: midnight, snapshot: snapshot)],
+                            policy: .atEnd))
     }
 }
 
@@ -124,7 +62,9 @@ extension View {
         if #available(iOS 17.0, *) {
             containerBackground(for: .widget) { color }
         } else {
-            background(color)
+            // iOS 17 adds the system's content margins for us; 16 lays the
+            // card out the same way on the phones that do not.
+            padding(16).background(color)
         }
     }
 }
@@ -132,13 +72,6 @@ extension View {
 struct FitTogetherWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: Entry
-
-    private var subtitle: String {
-        let s = entry.snapshot
-        if s.myTarget == 0 { return "Open the app to set a goal" }
-        if s.streak > 0 { return "\(s.streak) \(s.streakLabel)" }
-        return "\(s.myDays) of \(s.myTarget) this week"
-    }
 
     var body: some View {
         switch family {
@@ -150,42 +83,13 @@ struct FitTogetherWidgetView: View {
     }
 
     private var homeView: some View {
-        let s = entry.snapshot
-        return VStack(spacing: family == .systemSmall ? 7 : 9) {
-            HStack(spacing: family == .systemSmall ? 12 : 24) {
-                Ring(done: s.myDays, target: s.myTarget, color: meColor,
-                     label: s.myName, diameter: family == .systemSmall ? 46 : 54)
-                if let partner = s.partnerName {
-                    Ring(done: s.theirDays, target: s.theirTarget, color: partnerColor,
-                         label: partner, diameter: family == .systemSmall ? 46 : 54)
-                }
-            }
-
-            // He carries the line when there is one, and the mark stands in for
-            // him when there is not, so the row never collapses.
-            HStack(spacing: 6) {
-                if s.quip.isEmpty {
-                    UnioMark(size: 15)
-                    Text(subtitle)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                } else {
-                    BotFace(size: 17)
-                    Text(s.quip)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(family == .systemSmall ? 2 : 1)
-                        .minimumScaleFactor(0.75)
-                        .multilineTextAlignment(.leading)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
+        let model = TodayModel(entry.snapshot, at: entry.date)
+        return Group {
+            if family == .systemMedium { TodayMedium(model: model) }
+            else { TodaySmall(model: model) }
         }
-        .padding(family == .systemSmall ? 10 : 14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .widgetBackground(Color(.systemBackground))
+        .environment(\.colorScheme, .dark)
+        .widgetBackground(Unio.ground)
     }
 }
 
@@ -239,8 +143,10 @@ private struct RectangularView: View {
                 personRow(name: partner,
                           done: snapshot.theirDays, target: snapshot.theirTarget,
                           fraction: snapshot.theirFraction, bold: false)
-            } else if snapshot.streak > 0 {
-                Text("\(snapshot.streak) \(snapshot.streakLabel)")
+            } else if !snapshot.streakText.isEmpty || snapshot.streak > 0 {
+                // streakLabel is the badge's stacked caption on Home, so on
+                // its own it read "4 Your streak". streakText is the sentence.
+                Text(snapshot.streakText.isEmpty ? "\(snapshot.streak) \(snapshot.streakLabel)" : snapshot.streakText)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -298,7 +204,7 @@ struct FitTogetherWidget: Widget {
             FitTogetherWidgetView(entry: entry)
         }
         .configurationDisplayName("Unio")
-        .description("You and your partner, this week.")
+        .description("You and your partner: today, and the week so far.")
         .supportedFamilies([
             .systemSmall, .systemMedium,
             .accessoryCircular, .accessoryRectangular, .accessoryInline,
