@@ -15600,12 +15600,19 @@ function showApp() {
   renderAvatarPair();
   watchTogether();
   $("scaleSaveBtn").addEventListener("click", saveScaleEntry);
-  $("proofInput").addEventListener("change", (e) => {
+  /* Assigned rather than added, these four. showApp runs again every time a
+     pairing settles (Pair up in Setup, an answered request, Train alone from
+     the waiting screen), and addEventListener with a fresh arrow each time
+     stacks another copy: after one pairing a proof photo uploaded twice and
+     Pair up redeemed the code twice, and every later pass doubled it again.
+     A named function passed to addEventListener is deduplicated by the
+     browser, which is why the lines around these were never affected. */
+  $("proofInput").onchange = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (file) uploadProof(file);
-  });
-  $("setupPairBtn").addEventListener("click", async () => {
+  };
+  $("setupPairBtn").onclick = async () => {
     const code = $("setupPartnerCode").value.trim().toUpperCase();
     if (code.length !== 6) { toast("Codes are 6 characters"); return; }
     const { data: res, error } = await sb.rpc("redeem_invite_code", { code });
@@ -15614,8 +15621,8 @@ function showApp() {
     clearPendingInvite();
     toast(res.partner_name ? `Paired with ${res.partner_name}` : "Paired");
     await checkPartnershipThenEnter();
-  });
-  $("setupShareCodeBtn").addEventListener("click", async () => {
+  };
+  $("setupShareCodeBtn").onclick = async () => {
     const code = MY_PROFILE?.invite_code;
     if (!code) return;
     const text = inviteMessage({ name: ME, goalLabel: MY_PROFILE?.goal }, code);
@@ -15624,7 +15631,7 @@ function showApp() {
     }
     try { await navigator.clipboard.writeText(text); toast("Invite copied"); }
     catch { toast(`Your code is ${code}`); }
-  });
+  };
   // Both of these are the save bar's job now (SET_SAVERS).
   $("adminGiveXpBtn").addEventListener("click", adminGiveXp);
   $("adminAddEntryBtn").addEventListener("click", adminAddEntry);
@@ -15682,11 +15689,12 @@ function showApp() {
   });
 
   $("addBodyPhotoBtn").addEventListener("click", () => pickBodyPhoto());
-  $("bodyPhotoInput").addEventListener("change", (e) => {
+  // Assigned for the same reason as proofInput above: one photo, one upload.
+  $("bodyPhotoInput").onchange = (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (f) uploadBodyPhoto(f);
-  });
+  };
   document.querySelectorAll("#biPeriod button").forEach((b) => {
     b.addEventListener("click", () => {
       BODY_PERIOD = b.dataset.period;
@@ -17849,7 +17857,11 @@ function maybeStartPartnerTour() {
 }
 
 function startPartnerTour() {
-  if (document.querySelector(".cm-scrim")) return;
+  /* Not over a sheet or the paywall. A Monday progress reminder lands on
+     Progress with the measurements sheet already open, and the tour sits above
+     every sheet and swallows every tap but Skip, so the sheet the notification
+     was for could not be used. Not marked done, so it waits for the next visit. */
+  if (document.querySelector(".cm-scrim, .sheet-scrim:not(.hidden), .paywall-scrim")) return;
   const first = escapeHtml((partnerName() || "your partner").split(" ")[0]);
   /* Two taps, the two the faces are for: over to them, then back to you. Mo,
      2026-10-04: once they have looked at their partner's side, show them the
@@ -19773,8 +19785,13 @@ function closeActivityDetail() { $("actDetailScrim").classList.add("hidden"); }
    A bare link dies where fitness actually gets shared, Stories and WhatsApp,
    because nobody taps an unfurled card. A bare image brings nobody back. So we
    send both: the picture people will actually look at, and the URL alongside it
-   for anywhere that accepts one. */
-const SHARE_URL = PUBLIC_SITE;
+   for anywhere that accepts one.
+
+   The marketing site, not PUBLIC_SITE. PUBLIC_SITE serves index.html itself,
+   so a shared workout handed every friend who tapped it the whole app running
+   in a browser, and Unio is an iPhone app only. trainwithunio.com is the page
+   that says what Unio is and where to get it. */
+const SHARE_URL = "https://trainwithunio.com";
 
 /* A canvas font string is not a CSS rule: an unavailable family falls back to
    the browser's default sans without an error, a warning or a visible clue.
@@ -21179,10 +21196,16 @@ async function openClipRecorder(toEmail) {
    seconds" and a shutter wired to nothing, with no word about why. */
 function showClipDenied(toEmail) {
   stopClipStream();
+  /* Where the switch actually is. In the iPhone app there is no page and no
+     browser: camera access lives under Settings, Unio, and saying "browser" to
+     somebody who installed an app reads as a website in a wrapper. */
+  const where = isNativeApp()
+    ? "Unio is not allowed to use the camera. Send a video you already have, or turn Camera on in your iPhone's Settings, under Unio, and try again."
+    : "This page is not being allowed to use the camera. Send a video you already have, or allow the camera in your browser settings and try again.";
   $("clipRecStage").innerHTML = `<div class="clip-stage" style="align-items:center;justify-content:center">
       <div class="clip-gone">
         <b>The camera is blocked</b>
-        <span>This page is not being allowed to use the camera. Send a video you already have, or allow the camera in your browser settings and try again.</span>
+        <span>${where}</span>
         <button type="button" class="btn-secondary" id="clipRollBtn" style="margin-top:16px">Choose a video</button>
         <button type="button" class="btn-ghost" id="clipDeniedClose">Not now</button>
       </div>
@@ -48607,6 +48630,13 @@ async function leavePartnership() {
   PARTNER_PROFILE = null;
   // Training alone is a real state here, not an unfinished pairing.
   setSolo();
+  /* He stays on Home until tapped, so whatever he last said about the two of
+     you ("Both of you, same day", or the train-together line whose tap now
+     goes nowhere) would still be sitting there over a solo Home. Cleared and
+     his clock reset, so the Home this lands on has him saying something true. */
+  $("homeQuipSlot")?.replaceChildren();
+  $("tab-home")?.classList.remove("bot-between");
+  HOME_QUIP_AT = 0;
   toast("Partnership ended");
   await loadAll();
   closeSettingsPage();
