@@ -10,6 +10,11 @@
 <!-- Capacitor injects window.Capacitor before the page runs, so the app can mark
      itself here, before first paint, and the native-only CSS never flashes. -->
 <script data-role="native-flag">if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native");</script>
+<!-- Somebody who has watched the logo assemble once gets it already assembled
+     from then on, so the launch screen lasts as long as the app takes to be
+     ready rather than a fixed 2.5 s. Here, before first paint, so the mark
+     never starts its entrance only to be cut. See dismissBoot. -->
+<script data-role="boot-seen">try { if (localStorage.getItem("ft_boot_seen")) document.documentElement.classList.add("boot-seen"); } catch { /* private mode: the full entrance */ }</script>
 <title>Unio</title>
 <meta name="description" content="Train with your partner. Rank up together." />
 <meta name="theme-color" content="#0c0e13" />
@@ -242,6 +247,10 @@
     0%, 100% { transform: scale(1); }
     50%      { transform: scale(1.045); }
   }
+  /* Seen it before: the mark is simply there, as for reduced motion, and the
+     fade off it is quicker, because nothing is being revealed any more. */
+  html.boot-seen .boot-mark img, html.boot-seen .boot-word { animation: none; opacity: 1; transform: none; }
+  html.boot-seen #boot { transition-duration: .32s; }
   /* Asked not to move: the mark is simply there, and it still fades out. */
   @media (prefers-reduced-motion: reduce) {
     /* .boot-mark img, not the three layer classes: the base rule that hides
@@ -11089,10 +11098,18 @@ function dismissBoot() {
      the dumbbell landing behind them at 1.16 plus 0.5, the word from 1.52
      taking 0.7. A beat past that lets the finished mark be looked at, which is
      the point of it. */
-  const left = Math.max(0, 2500 - (Date.now() - BOOT_STARTED));
+  /* Mo, 2026-10-08: "everything takes a long time to load." This floor was
+     most of it: the app is ready in a fraction of a second on a warm launch
+     and still sat behind the mark for 2.5 s, plus the fade, every time. The
+     entrance plays in full once per device; after that the mark is drawn
+     assembled (html.boot-seen, set in the head) and comes down as soon as
+     there is something behind it. */
+  const seen = document.documentElement.classList.contains("boot-seen");
+  try { localStorage.setItem("ft_boot_seen", "1"); } catch { /* shows again next time */ }
+  const left = seen ? 0 : Math.max(0, 2500 - (Date.now() - BOOT_STARTED));
   setTimeout(() => {
     boot.classList.add("done");
-    setTimeout(() => boot.remove(), 660);
+    setTimeout(() => boot.remove(), seen ? 340 : 660);
   }, left);
 }
 const BOOT_STARTED = Date.now();
