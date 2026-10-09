@@ -112,7 +112,8 @@ const ALLOWED = new Set(STYLE_KEYS);
 /* ---- how often ----
 
    profiles.style_frequency, written beside train_styles since 2026-09-21: a
-   map from style id to one of four words. Mo's dial, in his order: "every day
+   map from style id to one of four words, or (since 2026-10-08) to an exact
+   count of days, which is what onboarding now writes. Mo's dial, in his order: "every day
    / most days / sometimes / rarely". The numbers are what each word is worth
    in days of a seven day week, and they are deliberately coarse. A person
    asked "how often" answers in words, not integers, and a dial with seven
@@ -134,6 +135,33 @@ export const FREQUENCY_DAYS = Object.freeze({ daily: 7, most: 5, some: 3, rare: 
    days_per_week back into the dial. Not the inverse of FREQUENCY_DAYS, and it
    cannot be: four days is neither three nor five, and "most days" is the
    word a person would use for it. */
+/* What one entry of the map is worth in days of a seven day week, whichever
+   way it was written. Since 2026-10-08 an entry may be an exact count as well
+   as a word: onboarding now asks "you train five days, how many of those for
+   running?" and stores the 2 they tapped, because Mo, on the four word tiles:
+   "you cannot do something daily... if I pick five, it's five days." A count
+   is already the answer and is read as itself; a word is read off the table.
+   Anything else is worth nothing, the same as a word this module does not
+   know. */
+export function frequencyDaysOf(v) {
+  if (typeof v === "number") return Number.isInteger(v) && v >= 1 && v <= 7 ? v : 0;
+  return FREQUENCY_DAYS[v] || 0;
+}
+
+/* One entry, cleaned: a word from FREQUENCY_LEVELS, or a whole count from one
+   to seven (a digit string too, because a jsonb value round tripped through a
+   form arrives as one), or null for anything else. Zero is null and not
+   "never": a style somebody ticked is a style they do, and unticking is how
+   they say they do not. */
+export function frequencyValue(v) {
+  if (typeof v === "number") return Number.isInteger(v) && v >= 1 && v <= 7 ? v : null;
+  if (typeof v !== "string") return null;
+  const t = v.trim().toLowerCase();
+  if (FREQUENCY_LEVELS.includes(t)) return t;
+  if (/^[1-7]$/.test(t)) return Number(t);
+  return null;
+}
+
 export function frequencyForDays(n) {
   const d = Number(n);
   if (!Number.isFinite(d)) return null;
@@ -158,8 +186,13 @@ export function frequencyForDays(n) {
    the difference between "never asked" and "asked, and said sometimes" is a
    recorded answer rather than a guess made here.
 
+   An entry is a word or, since 2026-10-08, an exact count of days from one
+   to seven (frequencyValue), and a count is kept as the number it is: a
+   person who said two runs a week was not asked for a word and should not
+   be rounded into one.
+
    `asked` is true only when the map named at least one picked style with a
-   word this module knows. A typo, an empty object and null all read as never
+   word or a count this module knows. A typo, an empty object and null all read as never
    asked, the same rule normalizeStyles keeps for the list itself. */
 export function normalizeFrequency(raw, styles) {
   const list = Array.isArray(styles) ? styles : [];
@@ -168,8 +201,8 @@ export function normalizeFrequency(raw, styles) {
   const out = {};
   let asked = false;
   list.forEach((s, i) => {
-    const word = typeof given[s] === "string" ? given[s].trim().toLowerCase() : null;
-    if (word && FREQUENCY_LEVELS.includes(word)) { out[s] = word; asked = true; return; }
+    const v = frequencyValue(given[s]);
+    if (v !== null) { out[s] = v; asked = true; return; }
     const main = resistance ? STYLE_KIND[s]?.kind === "resistance" : i === 0;
     out[s] = main ? "most" : "rare";
   });
@@ -598,7 +631,7 @@ export function styleDayFor(styles, { today = new Date(), minutes = null, askedM
     for (const s of styles.styles || []) {
       const k = STYLE_KIND[s];
       const hit = kind === "cardio" ? k?.kind === "cardio" : k?.kind === "flow" && k.training === kind;
-      if (hit) best = Math.max(best, FREQUENCY_DAYS[freq[s]] || 0);
+      if (hit) best = Math.max(best, frequencyDaysOf(freq[s]));
     }
     return Math.max(1, best);
   };
@@ -697,10 +730,13 @@ export function composeWeek(styles, days, { liftCount = null, window = 7, seed =
      mistake this file keeps warning against elsewhere. */
   const liftDays = liftCount != null && Number.isFinite(Number(liftCount))
     ? Math.max(0, Math.round(Number(liftCount)))
-    : resStyles.length ? Math.max(...resStyles.map((s) => FREQUENCY_DAYS[freq[s]] || 0)) : null;
+    : resStyles.length ? Math.max(...resStyles.map((s) => frequencyDaysOf(freq[s]))) : null;
+  /* A count is exact and is not capped here: the screen that asks for it
+     already offers nothing above the training days, and an old word is what
+     the cap above exists for. */
   const daysOf = (s) => {
     if (freq[s] === "daily" && liftDays != null && STYLE_KIND[s]?.kind !== "resistance") return liftDays;
-    return FREQUENCY_DAYS[freq[s]] || 0;
+    return frequencyDaysOf(freq[s]);
   };
   const owed = (per) => {
     if (per <= 0) return 0;

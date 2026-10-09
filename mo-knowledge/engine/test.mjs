@@ -37,7 +37,7 @@ import { JOINTS, JOINT_LOAD, defaultJointLoad, jointLoadFor } from "./joint-load
 import { joinPlanToActual, calibrateExercise, calibrate, stepFor, STEP_ISOLATION, STEP_COMPOUND, STEP_HEAVY } from "./calibrate.mjs";
 import { mapGoal, generateFromPayload, toWorkout, focusDayIndex, nextDayIndex } from "./adapter.mjs";
 import { clientGoals, clientGoalCases, CLIENT_FILE } from "./client-goals.mjs";
-import { STYLE_KEYS, readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, refusalNote, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX, FREQUENCY_LEVELS, FREQUENCY_DAYS, frequencyForDays, normalizeFrequency, composeWeek } from "./styles.mjs";
+import { STYLE_KEYS, readStyles, normalizeStyles, cardioSessionFor, flowSessionFor, styleDayFor, mergeStyleLimits, refusalNote, FLOW_MINUTES_DEFAULT, FLOW_MINUTES_MAX, FREQUENCY_LEVELS, FREQUENCY_DAYS, frequencyForDays, normalizeFrequency, frequencyValue, frequencyDaysOf, composeWeek } from "./styles.mjs";
 import { buildMuscleIndex, muscleRecoveryStates, mainGroupsForDay, dayIsFresh, skipFreshDays, FRESH_HOURS, RECOVERY_HOURS, MIN_CREDIT_SETS } from "./recovery.mjs";
 
 import { TRAININGS } from "../../knowledge/exercise-library/index.mjs";
@@ -5615,7 +5615,7 @@ test("a style with no frequency recorded gets the week it already had", () => {
   /* Both resistance styles are the same session, so both read as the lift. */
   assert.deepEqual(readStyles(["walking", "lifting", "home"]).frequency, { walking: "rare", lifting: "most", home: "most" });
   /* Nonsense is dropped like a typo in the list, and never asked stays empty. */
-  const typo = readStyles(["lifting", "running"], { running: "weekly", lifting: 5 });
+  const typo = readStyles(["lifting", "running"], { running: "weekly", lifting: 9 });
   assert.equal(typo.frequencyAsked, false);
   assert.deepEqual(typo.frequency, { lifting: "most", running: "rare" });
   assert.deepEqual(readStyles(null, { lifting: "daily" }).frequency, {});
@@ -5629,6 +5629,51 @@ test("a style with no frequency recorded gets the week it already had", () => {
   assert.deepEqual(FREQUENCY_DAYS, { daily: 7, most: 5, some: 3, rare: 1 });
   assert.deepEqual([1, 2, 3, 4, 5, 6, 7].map(frequencyForDays), ["rare", "some", "some", "most", "most", "most", "daily"]);
   assert.equal(frequencyForDays("x"), null);
+});
+
+test("an exact count of days is kept as the number, beside the words", () => {
+  /* Onboarding asks "you train five days, how many of those for running?"
+     since 2026-10-08 and stores the count. Mo: "if I pick five, it's five
+     days." Words keep working for every profile written before that. */
+  assert.deepEqual(normalizeFrequency({ lifting: 5, running: 2, pilates: 1 }, ["lifting", "running", "pilates"]),
+    { frequency: { lifting: 5, running: 2, pilates: 1 }, asked: true });
+  /* A digit string is the same count; a word still reads as a word. */
+  assert.deepEqual(normalizeFrequency({ running: " 3 ", yoga: "most" }, ["running", "yoga"]),
+    { frequency: { running: 3, yoga: "most" }, asked: true });
+  /* Out of range, fractional or zero is nonsense, and nonsense is never asked. */
+  for (const bad of [0, 8, 2.5, -1, "0", "8", "two", NaN, true]) {
+    assert.equal(frequencyValue(bad), null, `${String(bad)} is not a frequency`);
+    const st = normalizeFrequency({ running: bad }, ["lifting", "running"]);
+    assert.equal(st.asked, false);
+    assert.deepEqual(st.frequency, { lifting: "most", running: "rare" });
+  }
+  assert.deepEqual([1, 4, 7, "rare", "some", "most", "daily", "x", 0].map(frequencyDaysOf), [1, 4, 7, 1, 3, 5, 7, 0, 0]);
+});
+
+test("a count of runs and classes is placed exactly, not rounded to a word", () => {
+  /* Five training days, two runs, one class: the week holds five lifts, two
+     runs and one class, with nothing said missing. Two is not "sometimes",
+     which would have been three. */
+  const st = readStyles(["lifting", "running", "pilates"], { lifting: 5, running: 2, pilates: 1 });
+  const out = composeWeek(st, WEEK7().slice(0, 5).map((d) => ({ ...d, lift: true })), { liftCount: 5, window: 5, seed: 7 });
+  const all = out.days.flatMap((d) => d.sessions);
+  assert.equal(all.filter((x) => x.kind === "resistance").length, 5);
+  assert.equal(all.filter((x) => x.style === "running").length, 2);
+  assert.equal(all.filter((x) => x.style === "pilates").length, 1);
+  assert.deepEqual(out.dropped, []);
+  /* Every count from one to the training days lands in full, and the two
+     runs are not on adjacent days when the week has room to spread them. */
+  for (let k = 1; k <= 5; k++) {
+    const w = composeWeek(readStyles(["lifting", "running"], { lifting: 5, running: k }),
+      WEEK7().slice(0, 5).map((d) => ({ ...d, lift: true })), { liftCount: 5, window: 5, seed: k });
+    assert.equal(w.days.filter((d) => d.sessions.some((x) => x.kind === "cardio")).length, k);
+  }
+  const two = out.days.map((d, i) => (d.sessions.some((x) => x.style === "running") ? i : -1)).filter((i) => i >= 0);
+  assert.ok(two[1] - two[0] >= 2, `two runs on ${two} sit side by side`);
+  /* On a full seven day week a count is still the count, and the styles day
+     ring weights by it the same way it weights by a word. */
+  const full = composeWeek(st, WEEK7(), { liftCount: 5, seed: 3 });
+  assert.equal(full.days.flatMap((d) => d.sessions).filter((x) => x.style === "running").length, 2);
 });
 
 test("lifting, running and yoga every day is three sessions on every day", () => {
