@@ -16766,7 +16766,12 @@ function ob2Wheel(el, labels, index, { onLive, onChange } = {}) {
   let rows = [...sc.querySelectorAll(".ob2-wheel-row")];
   let shown = -1, cur = index, raf = 0, settle = 0;
   const at = () => Math.max(0, Math.min(rows.length - 1, Math.round(sc.scrollTop / OB2_ROW)));
+  /* A screen that has been left still has this wheel for a moment, sliding
+     out (see ob2Handoff), and moving it re-fires scroll. Its ids are gone by
+     then, so its callbacks would write into nothing, or into the new screen. */
+  const live = () => sc.isConnected && !sc.closest(".ob2-leaving");
   const mark = () => {
+    if (!live()) return;
     const i = at();
     if (i === shown) return;
     rows[shown]?.classList.remove("on");
@@ -16775,7 +16780,7 @@ function ob2Wheel(el, labels, index, { onLive, onChange } = {}) {
     shown = i;
     onLive?.(i);
   };
-  const done = () => { const i = at(); if (i !== cur) { cur = i; onChange?.(i); } };
+  const done = () => { if (!live()) return; const i = at(); if (i !== cur) { cur = i; onChange?.(i); } };
   sc.addEventListener("scroll", () => {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(mark);
     clearTimeout(settle); settle = setTimeout(done, 150);
@@ -16868,10 +16873,14 @@ function ob2Ruler(el, { min, max, step, label }, value, { onLive, onChange, anch
   const at = () => Math.max(0, Math.min(n - 1, Math.round(sc.scrollLeft / OB2_TICK)));
   let cur = idxOf(value), shown = -1, raf = 0, settle = 0;
   const val = (i) => +(min + i * step).toFixed(1);
-  const mark = () => { const i = at(); paintShade(i); if (i !== shown) { shown = i; onLive?.(val(i)); } };
+  /* A screen that has been left still has this ruler for a moment, sliding
+     out (see ob2Handoff), and moving it re-fires scroll. Its ids are gone by
+     then, so its callbacks would write into nothing, or into the new screen. */
+  const live = () => sc.isConnected && !sc.closest(".ob2-leaving");
+  const mark = () => { if (!live()) return; const i = at(); paintShade(i); if (i !== shown) { shown = i; onLive?.(val(i)); } };
   sc.addEventListener("scroll", () => {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(mark);
-    clearTimeout(settle); settle = setTimeout(() => { const i = at(); if (i !== cur) { cur = i; onChange?.(val(i)); } }, 150);
+    clearTimeout(settle); settle = setTimeout(() => { if (!live()) return; const i = at(); if (i !== cur) { cur = i; onChange?.(val(i)); } }, 150);
   }, { passive: true });
   sc.addEventListener("keydown", (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
