@@ -23987,6 +23987,7 @@ function renderToneChart(series, isPartner, unit = "in") {
    from. */
 const LIFT_RANGES = TONE_RANGES;
 let LIFT_PICK = null;
+let LIFT_PICK_FOR = null;
 let LIFT_RANGE = "3M";
 let liftChart = null;
 
@@ -24006,7 +24007,10 @@ function liftScreenLifts(name) {
   /* Seeded first, so a person who has never opened the browser still has five
      starred and a strip that explains itself. */
   if (name === ME && typeof seedPinnedLifts === "function") seedPinnedLifts(name);
-  const pins = typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
+  /* My stars are mine. Read on a partner's strip they picked and starred
+     MY favourite lifts out of THEIR history. */
+  const pins = name !== ME ? firstLoggedLifts(name)
+    : typeof getPinnedLifts === "function" ? getPinnedLifts() : [];
   if (pins.length) {
     const picked = pins
       .map((n) => all.find((l) => liftKey(l.name) === liftKey(n)))
@@ -24073,6 +24077,9 @@ function renderLiftHero(on, profile, isPartner) {
   $("liftTiles").classList.remove("hidden");
   $("liftActions").classList.toggle("hidden", isPartner);
 
+  /* One pick per person: my last lift carried over onto a partner's screen
+     opened theirs on a lift their own phone would not start on. */
+  if (LIFT_PICK_FOR !== name) { LIFT_PICK = null; LIFT_PICK_FOR = name; }
   if (!lifts.some((l) => l.name === LIFT_PICK)) LIFT_PICK = lifts[0].name;
   const pick = LIFT_PICK;
 
@@ -24086,7 +24093,8 @@ function renderLiftHero(on, profile, isPartner) {
   $("liftChips").classList.toggle("hidden", lifts.length < 2);
   $("liftChips").innerHTML = lifts.map((l) =>
     `<button type="button" class="lift-chip${l.name === pick ? " on" : ""}" data-lift="${escapeHtml(l.name)}">${
-      isPinnedLift(l.name) ? `<span class="lift-star">${icon("star", 12)}</span>` : ""
+      (isPartner ? firstLoggedLifts(name).some((n) => liftKey(n) === liftKey(l.name)) : isPinnedLift(l.name))
+        ? `<span class="lift-star">${icon("star", 12)}</span>` : ""
     }${escapeHtml(shortLift(l.name))}</button>`).join("");
   $("liftChips").querySelectorAll("[data-lift]").forEach((b) => {
     b.onclick = () => { LIFT_PICK = b.dataset.lift; again(); };
@@ -27756,6 +27764,14 @@ function setPinnedLifts(list) {
 const PINNED_SEEDED_KEY = "ft_pinned_seeded";
 function seedPinnedLifts(name) {
   try { if (localStorage.getItem(PINNED_SEEDED_KEY)) return; } catch { return; }
+  const order = firstLoggedLifts(name);
+  if (!order.length) return;
+  setPinnedLifts(order);
+  try { localStorage.setItem(PINNED_SEEDED_KEY, "1"); } catch { /* private browsing */ }
+}
+/* The seed's answer on its own, because a partner's stars live on their
+   phone: this is the nearest this device can get to the strip they see. */
+function firstLoggedLifts(name) {
   const first = new Map();
   for (const l of ALL_EXERCISE_LOGS) {
     if (l.user_name !== name || l.weight == null || l.duration_min) continue;
@@ -27765,10 +27781,8 @@ function seedPinnedLifts(name) {
     const seen = first.get(key);
     if (!seen || at < seen.at) first.set(key, { name: l.exercise_name.trim(), at });
   }
-  if (!first.size) return;
-  const order = [...first.values()].sort((a, b) => a.at.localeCompare(b.at)).slice(0, MAX_PINNED_LIFTS);
-  setPinnedLifts(order.map((x) => x.name));
-  try { localStorage.setItem(PINNED_SEEDED_KEY, "1"); } catch { /* private browsing */ }
+  return [...first.values()].sort((a, b) => a.at.localeCompare(b.at))
+    .slice(0, MAX_PINNED_LIFTS).map((x) => x.name);
 }
 
 function isPinnedLift(name) {
