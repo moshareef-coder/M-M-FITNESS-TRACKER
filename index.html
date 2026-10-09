@@ -5580,9 +5580,16 @@
   html.ob2-themefade, html.ob2-themefade * { transition: background-color .42s ease, color .42s ease, border-color .42s ease, fill .42s ease, stroke .42s ease !important; }
   ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .42s; }
   /* The trial paywall, Strava's layout. */
-  .ob2-tl3 { list-style: none; margin: 0; padding: 4px 4px 0; display: flex; flex-direction: column; }
-  .ob2-tl3-stop { position: relative; display: flex; gap: 14px; padding-bottom: 18px; }
-  .ob2-tl3-stop:last-child { padding-bottom: 0; }
+  /* Mo, 2026-10-08: "I don't know why the timeline is so small... spread it
+     out across the page." The list takes the body's spare height and every
+     stop but the last grows by an equal share of it, so the stops sit evenly
+     down the space between his card and the price, and the connector (drawn
+     from a stop's dot to the bottom of that stop) stretches with them. No
+     fixed gaps: the same rule spreads it on a 390x844 and a 440x956, and on
+     a short phone the shares are zero and it is the compact list again. */
+  .ob2-tl3 { list-style: none; margin: 0; padding: 4px 4px 0; display: flex; flex-direction: column; flex: 1 0 auto; }
+  .ob2-tl3-stop { position: relative; display: flex; gap: 14px; padding-bottom: 18px; flex: 1 0 auto; }
+  .ob2-tl3-stop:last-child { padding-bottom: 0; flex: 0 0 auto; }
   .ob2-tl3-stop::before { content: ""; position: absolute; left: 15px; top: 32px; bottom: 0; width: 3px; border-radius: 2px;
     background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 35%, transparent)); }
   .ob2-tl3-stop:last-child::before { display: none; }
@@ -5591,12 +5598,12 @@
   .ob2-tl3-stop.on .ob2-tl3-dot { background: var(--accent); color: var(--on-accent); }
   .ob2-tl3-stop b { display: block; font-size: 17px; font-weight: 800; letter-spacing: -.01em; margin: 5px 0 3px; }
   .ob2-tl3-stop p { margin: 0; font-size: 14.5px; line-height: 1.45; color: var(--muted); }
-  /* The price sits on the floor of the body, right over the button it
-     belongs to, however tall the phone. */
-  .ob2 > .ob2-body > .ob2-payhead { margin-top: auto; padding-top: 16px; text-align: center; }
+  /* The trial's name sits on the floor of the body, right over the button
+     it belongs to; the timeline above has taken the spare height. */
+  .ob2 > .ob2-body > .ob2-payhead { padding-top: 8px; text-align: center; }
   .ob2-pc-h { display: block; font-size: 17px; font-weight: 800; text-align: center; letter-spacing: -.01em; }
-  .ob2-payhead .ob2-terms { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
-  .ob2-payfine { padding: 12px 8px 0; display: flex; flex-direction: column; gap: 10px; }
+  .ob2-payfine .ob2-terms { margin: 0; font-size: 13px; color: var(--muted); }
+  .ob2-payfine { padding: 12px 8px 0; display: flex; flex-direction: column; gap: 8px; }
   .ob2-pc-note { margin: 0; font-size: 12.5px; line-height: 1.45; text-align: center; color: var(--muted); }
   .ob2 .ob2-payfine .paywall-legal { margin: 0; font-size: 13px; }
   .ob2-payfine .paywall-legal a { display: inline-block; padding: 6px 4px; }
@@ -16011,8 +16018,9 @@ const OB2_FILL_KINDS = [
   [".ob2-proj", "stretch"], [".ob2-kitgrid", "stretch"],
   /* Not here any more (Mo, 2026-10-08, "everything is cut off"): the
      summary's verdict card, the trial timeline and the 6 pm lock screen. They
-     are text, and text stretched to fill a tall phone is tiles 180px high and
-     timeline stops a screen apart. They keep their own size now. */
+     are text, and text stretched to fill a tall phone is tiles 180px high.
+     The timeline came back the same day ("spread it out across the page"),
+     but by its own flex rule, see .ob2-tl3, not by being boxed in here. */
   [".ob2-herobot", "bot"],
 ];
 function ob2Fill(ob) {
@@ -16461,21 +16469,22 @@ function ob2WireSign(ui, { onSigned } = {}) {
 /* Mo, 2026-10-08: "I don't like where the back button is... copy just looks
    weird down there." The button used to sit inside a card with four lines of
    small print packed round it and a lone Back under the card. Now it is the
-   footer every other screen has, the square Back beside the main button,
-   with what the plan costs right above it and what Apple needs said right
-   below it, each with room to breathe. Every line is still on the screen:
-   the trial, the $7.99 a month, when the charge happens, and the Terms,
-   Privacy and Restore links Apple reviews for. */
+   footer every other screen has, Previous and the main button half and
+   half, with the trial's name right above it and what Apple needs said right
+   below it. Mo, later the same day: "The 7.99 should be below the Start Free
+   Trial." So under the buttons, in this order: the price and auto-renew
+   line, when the charge happens, then Terms, Privacy and Restore. Every line
+   Apple reviews for (guideline 3.1.2) is still on the screen. */
 function ob2PayHead() {
   const t = ob2Terms();
   return `<div class="ob2-payhead">
       <b class="ob2-pc-h" id="ob2PcH">${escapeHtml(t.free ? t.trial : "Unio Plus")}</b>
-      <p class="ob2-terms" id="ob2Terms">${escapeHtml(t.fine)}</p>
     </div>`;
 }
 function ob2PayFoot() {
   const t = ob2Terms();
   return `<div class="ob2-payfine">
+      <p class="ob2-terms" id="ob2Terms">${escapeHtml(t.fine)}</p>
       <p class="ob2-pc-note" id="ob2PcNote"${t.free ? "" : " hidden"}>You won't be charged until ${escapeHtml(t.end)}. Cancel anytime up to 24 hours before it ends.</p>
       <p class="paywall-legal ob2-legal">
         <a href="#" data-policy="terms.html">Terms</a> &middot; <a href="#" data-policy="privacy.html">Privacy</a> &middot;
