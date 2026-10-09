@@ -10,6 +10,11 @@
 <!-- Capacitor injects window.Capacitor before the page runs, so the app can mark
      itself here, before first paint, and the native-only CSS never flashes. -->
 <script data-role="native-flag">if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add("native");</script>
+<!-- Somebody who has watched the logo assemble once gets it already assembled
+     from then on, so the launch screen lasts as long as the app takes to be
+     ready rather than a fixed 2.5 s. Here, before first paint, so the mark
+     never starts its entrance only to be cut. See dismissBoot. -->
+<script data-role="boot-seen">try { if (localStorage.getItem("ft_boot_seen")) document.documentElement.classList.add("boot-seen"); } catch { /* private mode: the full entrance */ }</script>
 <title>Unio (sandbox)</title>
 <meta name="description" content="Train with your partner. Rank up together." />
 <meta name="theme-color" content="#0c0e13" />
@@ -242,6 +247,10 @@
     0%, 100% { transform: scale(1); }
     50%      { transform: scale(1.045); }
   }
+  /* Seen it before: the mark is simply there, as for reduced motion, and the
+     fade off it is quicker, because nothing is being revealed any more. */
+  html.boot-seen .boot-mark img, html.boot-seen .boot-word { animation: none; opacity: 1; transform: none; }
+  html.boot-seen #boot { transition-duration: .32s; }
   /* Asked not to move: the mark is simply there, and it still fades out. */
   @media (prefers-reduced-motion: reduce) {
     /* .boot-mark img, not the three layer classes: the base rule that hides
@@ -5201,7 +5210,11 @@
     padding: 12px 52px 12px 14px; min-height: 56px; justify-content: center; gap: 2px;
   }
   .ob2 .ob2-choice .ob-choice-card:last-child { border-bottom: 0; }
-  .ob2 .ob2-choice .ob-choice-card:active { transform: none; background: var(--panel-2); }
+  /* Instant feedback under the finger, Mo, 2026-10-08: the row gives a
+     little as it is pressed and the tick pops in when it lands, so a tap
+     answers before anything else on the screen moves. */
+  .ob2 .ob2-choice .ob-choice-card { transition: background .18s ease, transform .12s ease; }
+  .ob2 .ob2-choice .ob-choice-card:active { transform: scale(.985); background: var(--panel-2); transition-duration: 0s; }
   .ob2 .ob2-choice .occ-label { font-size: 15.5px; font-weight: 600; font-family: var(--font-display); letter-spacing: -.01em; gap: 12px; }
   .ob2 .ob2-choice .occ-sub { font-size: 12.5px; }
   .ob2 .ob2-choice .ob2-ico + * { margin-left: 0; }
@@ -5213,8 +5226,16 @@
   }
   .ob2 .ob2-choice .ob-choice-card.on { background: color-mix(in srgb, var(--accent) 7%, transparent); }
   .ob2 .ob2-choice .ob-choice-card.on::after {
+    animation: ob2Tick .26s cubic-bezier(.3,1.6,.5,1) both;
     border-color: var(--accent);
     background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111318' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 14px no-repeat;
+  }
+  /* The leaving screen is re-attached to slide out, which would replay it. */
+  .ob2-leaving .ob2-choice .ob-choice-card.on::after { animation: none; }
+  @keyframes ob2Tick { from { transform: scale(.4); opacity: .4; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .ob2 .ob2-choice .ob-choice-card.on::after { animation: none; }
+    .ob2 .ob2-choice .ob-choice-card:active { transform: none; }
   }
   .ob2 .ob2-grid2 .ob2-choice { display: block; margin-top: 10px; }
   .ob2 .ob2-badge { font-size: 11px; }
@@ -5436,19 +5457,39 @@
   .ob-step.ob2 { animation: ob2Screen .32s cubic-bezier(.22,1,.36,1) both; }
   /* The screen change, see ob2Handoff. The new screen's step does not
      animate as a whole (its header and footer are where the old ones were);
-     its body slides in, the old body slides out the other way. */
-  .ob-step.ob2.ob2-enter { animation: none; }
-  .ob2-enter > .ob2-body { animation: ob2BodyIn .38s cubic-bezier(.22,1,.36,1) both; }
+     its body slides in, the old body slides out the other way.
+     Mo, 2026-10-08, on his phone: "every time I click on a button, it's as
+     if it just refreshes." Two things made it read that way. The step kept
+     .ob2-enter only for 520 ms, and taking it off handed the step back to
+     ob2Screen above, so half a second after every Continue the whole screen
+     dropped to nothing and faded back in: a reload, in all but name.
+     .ob2-handed now stays on for the life of the screen. And the slide was
+     28 px under two bodies drawn on top of each other at full strength, so
+     what you saw was a muddle rather than a move. Now the old body clears
+     out first (180 ms) and the new one glides in behind it from further
+     away, 90 ms later, over 300 ms, so there is a moment where the page is
+     plainly moving. His card stays; only his words change: the old line
+     fades where it was while the new one types in over it. */
+  .ob-step.ob2.ob2-enter, .ob-step.ob2.ob2-handed { animation: none; }
+  #onboard.ob2-moving { overflow-x: clip; }
+  .ob2-enter > .ob2-body { animation: ob2BodyIn .3s cubic-bezier(.22,.9,.3,1) .09s both; }
   .ob2-enter.ob2-back-dir > .ob2-body { animation-name: ob2BodyInBack; }
-  .ob2-enter > .ob2-foot { animation: ob2FootIn .24s ease both; }
+  .ob2-enter > .ob2-host .home-quip-bub { animation: ob2BubIn .26s ease both; }
   .ob-step.ob2.ob2-leaving { animation: none; pointer-events: none; z-index: 0; }
-  .ob2-leaving > :not(.ob2-body) { visibility: hidden; }
-  .ob2-leaving > .ob2-body { animation: ob2BodyOut .22s cubic-bezier(.4,0,1,1) both; }
+  .ob2-leaving > :not(.ob2-body, .ob2-host) { visibility: hidden; }
+  /* His old line, alone: the card around it is the new screen's, under it. */
+  .ob2-leaving > .ob2-host { background: none; border-color: transparent; box-shadow: none; }
+  .ob2-leaving > .ob2-host .home-quip-av, .ob2-leaving > .ob2-host .home-quip-say { background: none; box-shadow: none; }
+  .ob2-leaving > .ob2-host .home-quip-av { visibility: hidden; }
+  .ob2-leaving > .ob2-host .home-quip-bub { animation: ob2BubOut .12s ease both; }
+  .ob2-leaving > .ob2-body { animation: ob2BodyOut .18s cubic-bezier(.4,0,1,1) both; }
   .ob2-leaving.ob2-back-dir > .ob2-body { animation-name: ob2BodyOutBack; }
-  @keyframes ob2BodyIn { from { opacity: 0; transform: translate3d(28px,0,0); } to { opacity: 1; transform: none; } }
-  @keyframes ob2BodyInBack { from { opacity: 0; transform: translate3d(-28px,0,0); } to { opacity: 1; transform: none; } }
-  @keyframes ob2BodyOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(-28px,0,0); } }
-  @keyframes ob2BodyOutBack { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(28px,0,0); } }
+  @keyframes ob2BodyIn { from { opacity: 0; transform: translate3d(56px,0,0); } to { opacity: 1; transform: none; } }
+  @keyframes ob2BodyInBack { from { opacity: 0; transform: translate3d(-56px,0,0); } to { opacity: 1; transform: none; } }
+  @keyframes ob2BodyOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(-44px,0,0); } }
+  @keyframes ob2BodyOutBack { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(44px,0,0); } }
+  @keyframes ob2BubIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes ob2BubOut { to { opacity: 0; } }
   @keyframes ob2FootIn { from { opacity: .4; } to { opacity: 1; } }
   /* The banner on the lock screen opening into the app, see the ping screen. */
   html.ob2-vt-open::view-transition-group(ob2-card), html.ob2-vt-open::view-transition-group(ob2-live) { animation-duration: .44s; animation-timing-function: cubic-bezier(.22,1,.36,1); }
@@ -11110,10 +11151,18 @@ function dismissBoot() {
      the dumbbell landing behind them at 1.16 plus 0.5, the word from 1.52
      taking 0.7. A beat past that lets the finished mark be looked at, which is
      the point of it. */
-  const left = Math.max(0, 2500 - (Date.now() - BOOT_STARTED));
+  /* Mo, 2026-10-08: "everything takes a long time to load." This floor was
+     most of it: the app is ready in a fraction of a second on a warm launch
+     and still sat behind the mark for 2.5 s, plus the fade, every time. The
+     entrance plays in full once per device; after that the mark is drawn
+     assembled (html.boot-seen, set in the head) and comes down as soon as
+     there is something behind it. */
+  const seen = document.documentElement.classList.contains("boot-seen");
+  try { localStorage.setItem("ft_boot_seen", "1"); } catch { /* shows again next time */ }
+  const left = seen ? 0 : Math.max(0, 2500 - (Date.now() - BOOT_STARTED));
   setTimeout(() => {
     boot.classList.add("done");
-    setTimeout(() => boot.remove(), 660);
+    setTimeout(() => boot.remove(), seen ? 340 : 660);
   }, left);
 }
 const BOOT_STARTED = Date.now();
@@ -15977,7 +16026,9 @@ function ob2Handoff(ob, prev, box, dir) {
   const next = ob.querySelector(":scope > .ob-step.ob2");
   if (!next || next === prev) return;
   if (!prev || !box || ob2Calm() || prev.classList.contains("ob2-lock") || next.classList.contains("ob2-lock")) return;
-  next.classList.add("ob2-enter", dir < 0 ? "ob2-back-dir" : "ob2-fwd-dir");
+  /* ob2-handed stays for good: taking the step's animation back off it is
+     what used to replay ob2Screen and blank the whole page at 520 ms. */
+  next.classList.add("ob2-handed", "ob2-enter", dir < 0 ? "ob2-back-dir" : "ob2-fwd-dir");
   /* The old screen, ids stripped so nothing finds it by mistake, inert so
      nothing can be tapped on it, fixed where it was on screen. */
   prev.removeAttribute("id");
@@ -15990,8 +16041,16 @@ function ob2Handoff(ob, prev, box, dir) {
   const drop = () => prev.remove();
   prev.addEventListener("animationend", (e) => { if (e.target.classList?.contains("ob2-body")) drop(); });
   setTimeout(drop, 500);
-  setTimeout(() => next.classList.remove("ob2-enter", "ob2-back-dir", "ob2-fwd-dir"), 520);
+  /* The new body starts 56 px to the side, which made the page 428 px wide
+     for the length of the slide: room to drag it sideways mid-change. */
+  ob.classList.add("ob2-moving");
+  const move = ++OB2_MOVES;
+  setTimeout(() => {
+    next.classList.remove("ob2-enter", "ob2-back-dir", "ob2-fwd-dir");
+    if (move === OB2_MOVES) ob.classList.remove("ob2-moving");
+  }, 520);
 }
+let OB2_MOVES = 0;
 
 /* The frame every screen shares: back, the step count, his mute, Skip, the
    bar, HIM with the question, the "why we ask" line, the body and the
@@ -16902,7 +16961,12 @@ function ob2Wheel(el, labels, index, { onLive, onChange } = {}) {
   let rows = [...sc.querySelectorAll(".ob2-wheel-row")];
   let shown = -1, cur = index, raf = 0, settle = 0;
   const at = () => Math.max(0, Math.min(rows.length - 1, Math.round(sc.scrollTop / OB2_ROW)));
+  /* A screen that has been left still has this wheel for a moment, sliding
+     out (see ob2Handoff), and moving it re-fires scroll. Its ids are gone by
+     then, so its callbacks would write into nothing, or into the new screen. */
+  const live = () => sc.isConnected && !sc.closest(".ob2-leaving");
   const mark = () => {
+    if (!live()) return;
     const i = at();
     if (i === shown) return;
     rows[shown]?.classList.remove("on");
@@ -16911,7 +16975,7 @@ function ob2Wheel(el, labels, index, { onLive, onChange } = {}) {
     shown = i;
     onLive?.(i);
   };
-  const done = () => { const i = at(); if (i !== cur) { cur = i; onChange?.(i); } };
+  const done = () => { if (!live()) return; const i = at(); if (i !== cur) { cur = i; onChange?.(i); } };
   sc.addEventListener("scroll", () => {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(mark);
     clearTimeout(settle); settle = setTimeout(done, 150);
@@ -17004,10 +17068,14 @@ function ob2Ruler(el, { min, max, step, label }, value, { onLive, onChange, anch
   const at = () => Math.max(0, Math.min(n - 1, Math.round(sc.scrollLeft / OB2_TICK)));
   let cur = idxOf(value), shown = -1, raf = 0, settle = 0;
   const val = (i) => +(min + i * step).toFixed(1);
-  const mark = () => { const i = at(); paintShade(i); if (i !== shown) { shown = i; onLive?.(val(i)); } };
+  /* A screen that has been left still has this ruler for a moment, sliding
+     out (see ob2Handoff), and moving it re-fires scroll. Its ids are gone by
+     then, so its callbacks would write into nothing, or into the new screen. */
+  const live = () => sc.isConnected && !sc.closest(".ob2-leaving");
+  const mark = () => { if (!live()) return; const i = at(); paintShade(i); if (i !== shown) { shown = i; onLive?.(val(i)); } };
   sc.addEventListener("scroll", () => {
     cancelAnimationFrame(raf); raf = requestAnimationFrame(mark);
-    clearTimeout(settle); settle = setTimeout(() => { const i = at(); if (i !== cur) { cur = i; onChange?.(val(i)); } }, 150);
+    clearTimeout(settle); settle = setTimeout(() => { if (!live()) return; const i = at(); if (i !== cur) { cur = i; onChange?.(val(i)); } }, 150);
   }, { passive: true });
   sc.addEventListener("keydown", (e) => {
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -17481,15 +17549,30 @@ const OB2 = {
       onSkip: () => ui.skip({ goal_secondary: [] }),
       onNext: () => ui.next({ goal_secondary: picked.map((b) => ({ bubble: b, child: null })) }),
     });
-    const wire = () => $("onboard").querySelectorAll("[data-g2]").forEach((b) => b.onclick = () => {
+    /* Updated in place rather than redrawn: rebuilding the list on every
+       tap threw away the row under the finger mid-press, so the tick could
+       not pop and the whole list blinked. */
+    const sync = () => {
+      const byId = new Map(opts().map((o) => [String(o.id), o]));
+      $("onboard").querySelectorAll("[data-g2]").forEach((b) => {
+        const o = byId.get(b.dataset.g2);
+        if (!o) return;
+        const on = picked.includes(o.id);
+        b.classList.toggle("on", on);
+        b.classList.toggle("ob2-dim", !!o.off);
+        b.setAttribute("aria-pressed", String(on));
+        b.disabled = !!o.off;
+        const sub = b.querySelector(".occ-sub");
+        if (sub && sub.textContent !== o.sub) sub.textContent = o.sub || "";
+      });
+    };
+    $("onboard").querySelectorAll("[data-g2]").forEach((b) => b.onclick = () => {
       const id = b.dataset.g2;
       const adding = !picked.includes(id);
       picked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id].slice(0, MAX);
       if (adding) ob2Type($("ob2Q"), picked.length >= MAX ? "That's two. I'm a robot, not a miracle worker." : "Greedy. I like it.");
-      $("ob2Goal2").innerHTML = ob2ChoiceHTML(opts(), picked, { multi: true, attr: "g2" });
-      wire();
+      sync();
     });
-    wire();
   } },
 
   /* Chapter 2. Him asking, the answers, and nothing under them: Mo, round 9,
