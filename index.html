@@ -5420,6 +5420,7 @@
      plainly moving. His card stays; only his words change: the old line
      fades where it was while the new one types in over it. */
   .ob-step.ob2.ob2-enter, .ob-step.ob2.ob2-handed { animation: none; }
+  #onboard.ob2-moving { overflow-x: clip; }
   .ob2-enter > .ob2-body { animation: ob2BodyIn .3s cubic-bezier(.22,.9,.3,1) .09s both; }
   .ob2-enter.ob2-back-dir > .ob2-body { animation-name: ob2BodyInBack; }
   .ob2-enter > .ob2-host .home-quip-bub { animation: ob2BubIn .26s ease both; }
@@ -15960,8 +15961,16 @@ function ob2Handoff(ob, prev, box, dir) {
   const drop = () => prev.remove();
   prev.addEventListener("animationend", (e) => { if (e.target.classList?.contains("ob2-body")) drop(); });
   setTimeout(drop, 500);
-  setTimeout(() => next.classList.remove("ob2-enter", "ob2-back-dir", "ob2-fwd-dir"), 520);
+  /* The new body starts 56 px to the side, which made the page 428 px wide
+     for the length of the slide: room to drag it sideways mid-change. */
+  ob.classList.add("ob2-moving");
+  const move = ++OB2_MOVES;
+  setTimeout(() => {
+    next.classList.remove("ob2-enter", "ob2-back-dir", "ob2-fwd-dir");
+    if (move === OB2_MOVES) ob.classList.remove("ob2-moving");
+  }, 520);
 }
+let OB2_MOVES = 0;
 
 /* The frame every screen shares: back, the step count, his mute, Skip, the
    bar, HIM with the question, the "why we ask" line, the body and the
