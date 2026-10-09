@@ -5150,7 +5150,11 @@
     padding: 12px 52px 12px 14px; min-height: 56px; justify-content: center; gap: 2px;
   }
   .ob2 .ob2-choice .ob-choice-card:last-child { border-bottom: 0; }
-  .ob2 .ob2-choice .ob-choice-card:active { transform: none; background: var(--panel-2); }
+  /* Instant feedback under the finger, Mo, 2026-10-08: the row gives a
+     little as it is pressed and the tick pops in when it lands, so a tap
+     answers before anything else on the screen moves. */
+  .ob2 .ob2-choice .ob-choice-card { transition: background .18s ease, transform .12s ease; }
+  .ob2 .ob2-choice .ob-choice-card:active { transform: scale(.985); background: var(--panel-2); transition-duration: 0s; }
   .ob2 .ob2-choice .occ-label { font-size: 15.5px; font-weight: 600; font-family: var(--font-display); letter-spacing: -.01em; gap: 12px; }
   .ob2 .ob2-choice .occ-sub { font-size: 12.5px; }
   .ob2 .ob2-choice .ob2-ico + * { margin-left: 0; }
@@ -5162,8 +5166,16 @@
   }
   .ob2 .ob2-choice .ob-choice-card.on { background: color-mix(in srgb, var(--accent) 7%, transparent); }
   .ob2 .ob2-choice .ob-choice-card.on::after {
+    animation: ob2Tick .26s cubic-bezier(.3,1.6,.5,1) both;
     border-color: var(--accent);
     background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111318' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 14px no-repeat;
+  }
+  /* The leaving screen is re-attached to slide out, which would replay it. */
+  .ob2-leaving .ob2-choice .ob-choice-card.on::after { animation: none; }
+  @keyframes ob2Tick { from { transform: scale(.4); opacity: .4; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .ob2 .ob2-choice .ob-choice-card.on::after { animation: none; }
+    .ob2 .ob2-choice .ob-choice-card:active { transform: none; }
   }
   .ob2 .ob2-grid2 .ob2-choice { display: block; margin-top: 10px; }
   .ob2 .ob2-badge { font-size: 11px; }
@@ -17316,15 +17328,30 @@ const OB2 = {
       onSkip: () => ui.skip({ goal_secondary: [] }),
       onNext: () => ui.next({ goal_secondary: picked.map((b) => ({ bubble: b, child: null })) }),
     });
-    const wire = () => $("onboard").querySelectorAll("[data-g2]").forEach((b) => b.onclick = () => {
+    /* Updated in place rather than redrawn: rebuilding the list on every
+       tap threw away the row under the finger mid-press, so the tick could
+       not pop and the whole list blinked. */
+    const sync = () => {
+      const byId = new Map(opts().map((o) => [String(o.id), o]));
+      $("onboard").querySelectorAll("[data-g2]").forEach((b) => {
+        const o = byId.get(b.dataset.g2);
+        if (!o) return;
+        const on = picked.includes(o.id);
+        b.classList.toggle("on", on);
+        b.classList.toggle("ob2-dim", !!o.off);
+        b.setAttribute("aria-pressed", String(on));
+        b.disabled = !!o.off;
+        const sub = b.querySelector(".occ-sub");
+        if (sub && sub.textContent !== o.sub) sub.textContent = o.sub || "";
+      });
+    };
+    $("onboard").querySelectorAll("[data-g2]").forEach((b) => b.onclick = () => {
       const id = b.dataset.g2;
       const adding = !picked.includes(id);
       picked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id].slice(0, MAX);
       if (adding) ob2Type($("ob2Q"), picked.length >= MAX ? "That's two. I'm a robot, not a miracle worker." : "Greedy. I like it.");
-      $("ob2Goal2").innerHTML = ob2ChoiceHTML(opts(), picked, { multi: true, attr: "g2" });
-      wire();
+      sync();
     });
-    wire();
   } },
 
   /* Chapter 2. Him asking, the answers, and nothing under them: Mo, round 9,
