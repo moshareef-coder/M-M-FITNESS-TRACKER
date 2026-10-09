@@ -32819,10 +32819,22 @@ const sfx = { play: sfxPlay };
    somewhere useful" action, so looking back at what you already finished is
    fine. It also does not wrap: the last exercise has no next, and the
    gesture handler rubber-bands there instead of cycling to the first. */
+/* The nearest lift in that direction that is not banked yet, or -1. A banked
+   lift is not somewhere a swipe can land, the same rule jumpToExercise and Up
+   next keep: swiping back onto finished bench put its ticked sets and Next
+   exercise on screen, and Next exercise logged all of them a second time. */
+function stepTarget(dir) {
+  if (!SESSION || !TODAY_WORKOUT?.exercises) return -1;
+  for (let i = SESSION.exerciseIndex + dir; i >= 0 && i < TODAY_WORKOUT.exercises.length; i += dir) {
+    if (!SESSION.completed[i]) return i;
+  }
+  return -1;
+}
+
 function stepExercise(dir) {
   if (!SESSION) return false;
-  const idx = SESSION.exerciseIndex + dir;
-  if (idx < 0 || idx >= TODAY_WORKOUT.exercises.length) return false;
+  const idx = stepTarget(dir);
+  if (idx < 0) return false;
   SESSION.exerciseIndex = idx;
   SESSION.restStartedAt = null;
   stopRestTicker();
@@ -32847,8 +32859,8 @@ function wireSessionSwipe(ei) {
   let lastX = 0, lastT = 0;   // pointercancel carries no usable coordinates
 
   const bounds = () => ({
-    canPrev: ei > 0,
-    canNext: ei < TODAY_WORKOUT.exercises.length - 1,
+    canPrev: stepTarget(-1) >= 0,
+    canNext: stepTarget(1) >= 0,
   });
   const paint = (dx) => {
     const { canPrev, canNext } = bounds();
@@ -33848,7 +33860,9 @@ async function doFinishExerciseAndAdvance() {
   const ex = TODAY_WORKOUT.exercises[ei];
   const doneCount = SESSION.setsDone[ei].filter(Boolean).length;
 
-  if (!(await logSetsForExercise(ei))) {
+  /* Already banked is already in the log. Whatever put a finished lift back
+     on screen, advancing past it must not write it twice. */
+  if (!SESSION.completed[ei] && !(await logSetsForExercise(ei))) {
     await logExerciseSilent(ex.name, SESSION.weights[ei], SESSION.reps[ei], doneCount || ex.sets);
   }
   SESSION.completed[ei] = true;
