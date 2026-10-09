@@ -5385,19 +5385,38 @@
   .ob-step.ob2 { animation: ob2Screen .32s cubic-bezier(.22,1,.36,1) both; }
   /* The screen change, see ob2Handoff. The new screen's step does not
      animate as a whole (its header and footer are where the old ones were);
-     its body slides in, the old body slides out the other way. */
-  .ob-step.ob2.ob2-enter { animation: none; }
-  .ob2-enter > .ob2-body { animation: ob2BodyIn .38s cubic-bezier(.22,1,.36,1) both; }
+     its body slides in, the old body slides out the other way.
+     Mo, 2026-10-08, on his phone: "every time I click on a button, it's as
+     if it just refreshes." Two things made it read that way. The step kept
+     .ob2-enter only for 520 ms, and taking it off handed the step back to
+     ob2Screen above, so half a second after every Continue the whole screen
+     dropped to nothing and faded back in: a reload, in all but name.
+     .ob2-handed now stays on for the life of the screen. And the slide was
+     28 px under two bodies drawn on top of each other at full strength, so
+     what you saw was a muddle rather than a move. Now the old body clears
+     out first (180 ms) and the new one glides in behind it from further
+     away, 90 ms later, over 300 ms, so there is a moment where the page is
+     plainly moving. His card stays; only his words change: the old line
+     fades where it was while the new one types in over it. */
+  .ob-step.ob2.ob2-enter, .ob-step.ob2.ob2-handed { animation: none; }
+  .ob2-enter > .ob2-body { animation: ob2BodyIn .3s cubic-bezier(.22,.9,.3,1) .09s both; }
   .ob2-enter.ob2-back-dir > .ob2-body { animation-name: ob2BodyInBack; }
-  .ob2-enter > .ob2-foot { animation: ob2FootIn .24s ease both; }
+  .ob2-enter > .ob2-host .home-quip-bub { animation: ob2BubIn .26s ease both; }
   .ob-step.ob2.ob2-leaving { animation: none; pointer-events: none; z-index: 0; }
-  .ob2-leaving > :not(.ob2-body) { visibility: hidden; }
-  .ob2-leaving > .ob2-body { animation: ob2BodyOut .22s cubic-bezier(.4,0,1,1) both; }
+  .ob2-leaving > :not(.ob2-body, .ob2-host) { visibility: hidden; }
+  /* His old line, alone: the card around it is the new screen's, under it. */
+  .ob2-leaving > .ob2-host { background: none; border-color: transparent; box-shadow: none; }
+  .ob2-leaving > .ob2-host .home-quip-av, .ob2-leaving > .ob2-host .home-quip-say { background: none; box-shadow: none; }
+  .ob2-leaving > .ob2-host .home-quip-av { visibility: hidden; }
+  .ob2-leaving > .ob2-host .home-quip-bub { animation: ob2BubOut .16s ease both; }
+  .ob2-leaving > .ob2-body { animation: ob2BodyOut .18s cubic-bezier(.4,0,1,1) both; }
   .ob2-leaving.ob2-back-dir > .ob2-body { animation-name: ob2BodyOutBack; }
-  @keyframes ob2BodyIn { from { opacity: 0; transform: translate3d(28px,0,0); } to { opacity: 1; transform: none; } }
-  @keyframes ob2BodyInBack { from { opacity: 0; transform: translate3d(-28px,0,0); } to { opacity: 1; transform: none; } }
-  @keyframes ob2BodyOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(-28px,0,0); } }
-  @keyframes ob2BodyOutBack { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(28px,0,0); } }
+  @keyframes ob2BodyIn { from { opacity: 0; transform: translate3d(56px,0,0); } to { opacity: 1; transform: none; } }
+  @keyframes ob2BodyInBack { from { opacity: 0; transform: translate3d(-56px,0,0); } to { opacity: 1; transform: none; } }
+  @keyframes ob2BodyOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(-44px,0,0); } }
+  @keyframes ob2BodyOutBack { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(44px,0,0); } }
+  @keyframes ob2BubIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes ob2BubOut { to { opacity: 0; } }
   @keyframes ob2FootIn { from { opacity: .4; } to { opacity: 1; } }
   /* The banner on the lock screen opening into the app, see the ping screen. */
   html.ob2-vt-open::view-transition-group(ob2-card), html.ob2-vt-open::view-transition-group(ob2-live) { animation-duration: .44s; animation-timing-function: cubic-bezier(.22,1,.36,1); }
@@ -15897,7 +15916,9 @@ function ob2Handoff(ob, prev, box, dir) {
   const next = ob.querySelector(":scope > .ob-step.ob2");
   if (!next || next === prev) return;
   if (!prev || !box || ob2Calm() || prev.classList.contains("ob2-lock") || next.classList.contains("ob2-lock")) return;
-  next.classList.add("ob2-enter", dir < 0 ? "ob2-back-dir" : "ob2-fwd-dir");
+  /* ob2-handed stays for good: taking the step's animation back off it is
+     what used to replay ob2Screen and blank the whole page at 520 ms. */
+  next.classList.add("ob2-handed", "ob2-enter", dir < 0 ? "ob2-back-dir" : "ob2-fwd-dir");
   /* The old screen, ids stripped so nothing finds it by mistake, inert so
      nothing can be tapped on it, fixed where it was on screen. */
   prev.removeAttribute("id");
