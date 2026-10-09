@@ -5603,7 +5603,10 @@
   .ob2 > .ob2-body > .ob2-payhead { padding-top: 8px; text-align: center; }
   .ob2-pc-h { display: block; font-size: 17px; font-weight: 800; text-align: center; letter-spacing: -.01em; }
   .ob2-payfine .ob2-terms { margin: 0; font-size: 13px; color: var(--muted); }
-  .ob2-payfine { padding: 12px 8px 0; display: flex; flex-direction: column; gap: 8px; }
+  .ob2-payfine { padding: 14px 12px 0; display: flex; flex-direction: column; gap: 6px; text-align: center; }
+  .ob2-fine-deal { margin: 0; font-size: 15px; line-height: 1.4; color: var(--text); }
+  .ob2-fine-deal b { font-weight: 700; }
+  .ob2-fine-terms { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); text-wrap: balance; }
   .ob2-pc-note { margin: 0; font-size: 12.5px; line-height: 1.45; text-align: center; color: var(--muted); }
   .ob2 .ob2-payfine .paywall-legal { margin: 0; font-size: 13px; }
   .ob2-payfine .paywall-legal a { display: inline-block; padding: 6px 4px; }
@@ -16481,11 +16484,22 @@ function ob2PayHead() {
       <b class="ob2-pc-h" id="ob2PcH">${escapeHtml(t.free ? t.trial : "Unio Plus")}</b>
     </div>`;
 }
+/* Mo, 2026-10-08: the small print under the button "looks really weird".
+   Two lines instead of three that each said "cancel anytime": the deal in
+   one plain line (free until when, then what), and the renewal terms under
+   it. Still every point guideline 3.1.2 asks for: price, period, auto-renew,
+   how to cancel and the 24 hour cutoff. */
+function ob2FineHTML(t) {
+  const deal = !PAYWALL_SHOW_PRICE
+    ? (t.free ? `Free until <b>${escapeHtml(t.end)}</b>, then billed monthly.` : "Billed monthly.")
+    : t.free ? `Free until <b>${escapeHtml(t.end)}</b>, then <b>${escapeHtml(t.price)}/month</b>.` : `<b>${escapeHtml(t.price)}/month</b>.`;
+  return `<p class="ob2-fine-deal">${deal}</p>
+      <p class="ob2-fine-terms">Renews automatically. Cancel anytime in Settings${t.free ? ", at least 24 hours before the trial ends" : ""}.</p>`;
+}
 function ob2PayFoot() {
   const t = ob2Terms();
   return `<div class="ob2-payfine">
-      <p class="ob2-terms" id="ob2Terms">${escapeHtml(t.fine)}</p>
-      <p class="ob2-pc-note" id="ob2PcNote"${t.free ? "" : " hidden"}>You won't be charged until ${escapeHtml(t.end)}. Cancel anytime up to 24 hours before it ends.</p>
+      <div id="ob2Fine">${ob2FineHTML(t)}</div>
       <p class="paywall-legal ob2-legal">
         <a href="#" data-policy="terms.html">Terms</a> &middot; <a href="#" data-policy="privacy.html">Privacy</a> &middot;
         <a href="#" id="ob2Restore">Restore</a>
@@ -16517,9 +16531,8 @@ function ob2WirePrice(ui, d) {
   const paint = () => {
     const t = ob2Terms();
     if ($("ob2Next")) $("ob2Next").textContent = t.cta;
-    if ($("ob2Terms")) $("ob2Terms").textContent = t.fine;
+    if ($("ob2Fine")) $("ob2Fine").innerHTML = ob2FineHTML(t);
     if ($("ob2PcH")) $("ob2PcH").textContent = t.free ? t.trial : "Unio Plus";
-    if ($("ob2PcNote")) { $("ob2PcNote").hidden = !t.free; $("ob2PcNote").textContent = `You won't be charged until ${t.end}. Cancel anytime up to 24 hours before it ends.`; }
     if ($("ob2Tl")) $("ob2Tl").outerHTML = ob2PayHTML(OB2_PAY_D || {});
   };
   /* The offering, fetched by configureRevenueCat at sign-in and kept warm. */
