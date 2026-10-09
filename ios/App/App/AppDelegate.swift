@@ -72,7 +72,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             intentIdentifiers: [],
             options: []
         )
-        UNUserNotificationCenter.current().setNotificationCategories([evening, live, clip, report, digest])
+        // Your partner wants to train together, now. Join answers yes and opens
+        // the app into the lobby; Not now declines without opening anything,
+        // so the person asking is told rather than left waiting.
+        let invite = UNNotificationCategory(
+            identifier: "TOGETHER_INVITE",
+            actions: [
+                UNNotificationAction(identifier: "join", title: "Join", options: [.foreground]),
+                UNNotificationAction(identifier: "decline", title: "Not now", options: []),
+            ],
+            intentIdentifiers: [],
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([evening, live, clip, report, digest, invite])
     }
 
     // MARK: - APNs

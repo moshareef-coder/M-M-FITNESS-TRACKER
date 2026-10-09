@@ -9172,6 +9172,12 @@
       <button type="button" class="btn-secondary" id="pushToggleBtn">Turn on reminders</button>
       <p class="muted-note" id="pushNote" style="margin-top:8px;"></p>
     </div>
+    <!-- One switch per kind, built by renderNotifyKinds from NOTIFY_KINDS so
+         the list and the server's spelling of each kind cannot drift. -->
+    <div class="card" id="notifyKindsCard">
+      <h2>What to send</h2>
+      <div id="notifyKinds"></div>
+    </div>
     </div>
     <div class="settings-page hidden" id="page-theme">
       <div class="scr-head">
@@ -12321,7 +12327,9 @@ function renderGoalPage() {
 
    It reports what it dropped rather than swallowing it, because "saved" when
    half of it was not saved is the kind of quiet lie this app does not tell. */
-const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency", "progress_hidden"];
+/* notify_off joined the list 2026-10-09 and, unlike the rest, is NOT yet on
+   production: 20261009_notify_prefs_and_cheer.sql is written, not applied. */
+const PENDING_PROFILE_COLUMNS = ["goal_secondary", "session_minutes", "train_styles", "goal_tuning", "committed_at", "tracked_metrics", "tracked_by_goal", "style_frequency", "progress_hidden", "notify_off"];
 
 async function upsertGoalFields(patch) {
   const { data, error } = await sb.from("profiles").upsert(patch).select().maybeSingle();
@@ -47811,6 +47819,40 @@ async function registerPushHandlers() {
         loadClipInbox().then(() => { try { openNextClip(); } catch {} });
         return;
       }
+      /* A train together invite. Join on the banner is a yes, so it answers
+         the invite rather than opening it for a second tap; a plain tap opens
+         the invite to decide there. Waits for sign-in, because a tap on a
+         killed app lands here before the partner or the session is loaded,
+         and an invite looked up then would read as not there. */
+      if (url.startsWith("/together")) {
+        whenSignedIn(async () => {
+          await loadTogether();
+          const live = TG && TG.status === "invited" && !tgAmHost();
+          if (!live) { if (action !== "decline") toast("That invite has ended"); return; }
+          /* Not now says so, so the person who asked is not left waiting in
+             the lobby for half an hour. Best effort: iOS gives a background
+             action a few seconds, and if that is not enough the invite simply
+             runs out as it would have anyway. */
+          if (action === "decline") { await tgRespond(false); return; }
+          if (action === "join") await tgRespond(true);
+          else renderTogether();
+        });
+        return;
+      }
+      /* The Monday progress reminder lands on the sheet it is asking for. */
+      if (url.startsWith("/progress")) {
+        whenSignedIn(() => {
+          try { switchTab("progress"); } catch {}
+          if (url.startsWith("/progress/log") && typeof openMeasurementsSheet === "function") openMeasurementsSheet();
+        });
+        return;
+      }
+      /* A cheer is read on Home, in the banner, so Home and a fresh look at
+         the banner rather than whatever it showed before the push arrived. */
+      if (url.startsWith("/cheer")) {
+        whenSignedIn(() => { try { switchTab("home"); } catch {} renderEncouragementBanner(); });
+        return;
+      }
       /* Straight into the queue. This banner exists because somebody has a day
          to answer, and landing them on the home tab to go and find it is how a
          day becomes a week. */
@@ -47829,6 +47871,20 @@ async function registerPushHandlers() {
        buttons off for the rest of the session. */
     PUSH_HANDLERS_ON = false;
   }
+}
+
+/* Runs fn once the signed-in profile has loaded, or now if it already has.
+   A notification tapped while the app was killed is delivered during boot,
+   ahead of handleSignedIn, and anything it opens needs the partner and the
+   profile to exist. Gives up quietly after 20 seconds: a tap that cannot land
+   leaves the app wherever it opened, which is what it did before. */
+function whenSignedIn(fn) {
+  const started = Date.now();
+  const tick = () => {
+    if (MY_PROFILE && MY_EMAIL) { Promise.resolve().then(fn).catch((err) => console.error("notification tap failed", err)); return; }
+    if (Date.now() - started < 20000) setTimeout(tick, 250);
+  };
+  tick();
 }
 
 /* APNs hands the token to a listener rather than returning it, so the register
@@ -47966,6 +48022,70 @@ async function renderPushToggle() {
   note.textContent = sub ? "On for this device." : (PUSH_LAST_ERROR || "Off.");
   note.style.color = !sub && PUSH_LAST_ERROR ? "var(--danger, #ff5c5c)" : "";
   btn.onclick = sub ? disablePush : enablePush;
+}
+
+/* Every kind of notification this app sends, each with its own switch, Mo
+   2026-10-08. Stored as what is OFF (profiles.notify_off) so a kind added
+   later starts on for everybody, and so a profile from before the column
+   means everything is on. The ids are the server's: send-nudges/plan.ts
+   ALL_KINDS spells them the same way, and every notify function reads the
+   column before sending.
+
+   The "when" line is the promise, so it says the condition and not just the
+   topic: the streak one fires only when a streak is actually about to end,
+   and saying so is what makes leaving it on an easy choice. */
+const NOTIFY_KINDS = [
+  { id: "evening", name: "Your partner trained", why: "6 PM, when they have trained today and you have not." },
+  { id: "started", name: "Your partner started a workout", why: "The moment they start." },
+  { id: "video", name: "Videos from your partner", why: "A clip plays once, so you hear about it straight away." },
+  { id: "cheer", name: "Cheers", why: "When your partner cheers you on. Silent overnight." },
+  { id: "invite", name: "Train together invites", why: "When your partner asks you to train with them." },
+  { id: "streak", name: "Streak about to end", why: "8 PM, for a together streak of 3 days or more, only if it would end tonight." },
+  { id: "recap", name: "Sunday recap", why: "Sunday 7 PM, how the week went for both of you." },
+  { id: "progress", name: "Progress reminders", why: "Monday 8 AM, only when a weigh-in or a progress photo is due." },
+];
+
+function notifyOffList() {
+  const raw = MY_PROFILE?.notify_off;
+  return Array.isArray(raw) ? raw.map((k) => String(k).toLowerCase()) : [];
+}
+
+function renderNotifyKinds() {
+  const root = $("notifyKinds");
+  if (!root) return;
+  const off = new Set(notifyOffList());
+  root.innerHTML = NOTIFY_KINDS.map((k) => `
+    <label class="pref-block pref-row">
+      <span class="pref-txt">
+        <span class="pref-name">${escapeHtml(k.name)}</span>
+        <span class="pref-why">${escapeHtml(k.why)}</span>
+      </span>
+      <input type="checkbox" data-notify-kind="${k.id}"${off.has(k.id) ? "" : " checked"}${MY_PROFILE ? "" : " disabled"} />
+    </label>`).join("")
+    /* The cap is the reason somebody can leave all of these on, so it is said
+       where they decide. */
+    + `<p class="muted-note" style="margin-top:8px;">At most one of the scheduled ones (6 PM, 8 PM, Sunday, Monday) on any day.</p>`;
+  for (const box of root.querySelectorAll("[data-notify-kind]")) {
+    box.onchange = () => saveNotifyKind(box.dataset.notifyKind, box.checked, box);
+  }
+}
+
+/* Saved on the tap, like the other switches in Setup. */
+async function saveNotifyKind(kind, on, box) {
+  const before = notifyOffList();
+  const next = on ? before.filter((k) => k !== kind) : [...new Set([...before, kind])];
+  const { error } = await sb.from("profiles").update({ notify_off: next }).eq("email", MY_EMAIL);
+  if (error) {
+    /* 20261009_notify_prefs_and_cheer.sql adds the column and is written, not
+       applied. Until it is, the write cannot land, and saying "saved" would be
+       a lie about what the server will send, so the switch goes back. */
+    const missing = /notify_off/.test(`${error.message || ""} ${error.details || ""} ${error.hint || ""}`);
+    console.error("could not save notification choice", error);
+    toast(missing ? "These switches aren't stored yet" : "Could not save that");
+    if (box) box.checked = !on;
+    return;
+  }
+  if (MY_PROFILE) MY_PROFILE.notify_off = next;
 }
 
 /* Why the last attempt to turn reminders on did not work. Null when it has not
@@ -48334,6 +48454,8 @@ function openSettingsPage(key) {
      comes here to undo a block must not be shown a list from before they made
      it. */
   if (key === "safety") renderSafetyCard();
+  /* Re-read on open: a switch flipped on another phone should show here. */
+  if (key === "notify") renderNotifyKinds();
   window.scrollTo({ top: 0 });
 }
 
@@ -48925,6 +49047,7 @@ function renderSetupTab() {
   renderProgressSharing();
   renderRestChoices();
   renderPushToggle();
+  renderNotifyKinds();
   renderSetupPhoto();
   paintSettingsValues();
 

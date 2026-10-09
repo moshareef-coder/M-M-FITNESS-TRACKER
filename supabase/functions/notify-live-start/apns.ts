@@ -66,6 +66,14 @@ export type ApnsPayload = {
   // Notifications sharing a thread stack together instead of forming a pile of
   // separate rows.
   threadId?: string;
+  // "passive" lands in Notification Center without lighting the screen or
+  // making a sound. Used for a cheer that arrives in the middle of the night:
+  // still there in the morning, without waking anybody for it.
+  interruptionLevel?: "passive" | "active";
+  // Unix seconds after which Apple should drop it rather than deliver it late.
+  // A train together invite is dead after half an hour, and a phone that was
+  // off until the evening should not light up with one from the morning.
+  expiresAt?: number;
 };
 
 const HOSTS: Record<string, string> = {
@@ -84,6 +92,7 @@ async function postTo(environment: string, deviceToken: string, payload: ApnsPay
       "apns-topic": TOPIC,
       "apns-push-type": "alert",
       "apns-priority": "10",
+      ...(payload.expiresAt ? { "apns-expiration": String(Math.floor(payload.expiresAt)) } : {}),
     },
     body: JSON.stringify({
       aps: {
@@ -92,11 +101,13 @@ async function postTo(environment: string, deviceToken: string, payload: ApnsPay
           subtitle: payload.subtitle,
           body: payload.body,
         },
-        sound: "default",
+        // No sound at all for a passive one, rather than trusting iOS to
+        // ignore it.
+        sound: payload.interruptionLevel === "passive" ? undefined : "default",
         category: payload.category,
         "thread-id": payload.threadId,
         // Nudges are worth a look, not worth breaking a Focus for.
-        "interruption-level": "active",
+        "interruption-level": payload.interruptionLevel ?? "active",
         "relevance-score": 0.7,
       },
       url: payload.url ?? "/",
