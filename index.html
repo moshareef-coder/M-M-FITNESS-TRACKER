@@ -4908,6 +4908,13 @@
   .ob2-freq-l { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; }
   .ob2-freq-l svg { color: var(--accent); }
   .ob2-freqs + .ob-style-note { margin-top: 14px; }
+  .ob2-tl-date { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 14px;
+    border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); font-weight: 650; }
+  .ob2-tl-date.hidden { display: none; }
+  .ob2-tl-date span { white-space: nowrap; }
+  .ob2-tl-date input { flex: 1 1 auto; max-width: 220px; }
+  .ob2-tl-date input { font: inherit; font-size: 16px; color: var(--text); background: var(--card-fill); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 10px; min-width: 0; color-scheme: light dark; }
   /* The freq screen, 2026-10-08: the lead row is a fact (every training
      day), each other style is a count from 1 to N, and the week underneath
      takes whatever height is left, so the page is the answer, not a form. */
@@ -15774,7 +15781,7 @@ const OB2_PATH_A = [
      and the training days are chosen on the days screen, so the separate
      "when do you train" screen is gone. */
   "ping", "hello", "theme", "name", "goal", "goal2", "stop", "two",
-  "sex", "age", "height", "weight", "target", "activity", "summary",
+  "sex", "age", "height", "weight", "target", "timeline", "activity", "summary",
   { id: "taste2", off: "Mo cut the sample set (2026-10-07). He did not like it." },
   "styles", "equip", "focus", "hurts", "warmup", "days", "freq", "minutes", "projection",
   { id: "proof", off: "No real couple quote or App Store review yet. Back in when there is one; never a made up one." },
@@ -15785,7 +15792,7 @@ const OB2_PATH_A = [
 ];
 const OB2_PATH_B = [
   "accept", "hello", "theme", "name", "goal", "goal2", "stop", "two",
-  "sex", "age", "height", "weight", "target", "activity", "summary",
+  "sex", "age", "height", "weight", "target", "timeline", "activity", "summary",
   { id: "taste2", off: "Mo cut the sample set (2026-10-07). He did not like it." },
   "styles", "equip", "focus", "hurts", "warmup", "days", "freq", "minutes",
   { id: "taste3", off: "Mo cut the live invite demo for now (2026-10-08). Back in 1.2." },
@@ -15885,6 +15892,7 @@ const OB2_REACT = {
   height: () => "Got it. Your figure has been updated. It's thrilled.",
   weight: () => "Noted. Moving on before either of us makes it weird.",
   target: (d) => (d.goal_weight_lb ? "Target locked. I'll keep an eye on it." : "Maintaining. Steady hands."),
+  timeline: (d) => (d.goal_deadline ? `${ob2NiceDate(d.goal_deadline)}. It's in my calendar. I don't have a calendar.` : "No rush. The plan that actually sticks."),
   activity: (d) => (d.activity_level === "Active" ? "On your feet all day. I can work with that." : "Honest. I like honest."),
   styles: (d) => ((d.train_styles || []).length > 1 ? "A variety act. Noted." : "One thing, done properly. Respect."),
   freq: (d) => {
@@ -16170,6 +16178,26 @@ function ob2WireOne(attr, onPick) {
     all.forEach((x) => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
     onPick(b.dataset[attr]);
   });
+}
+
+/* The safe ceiling for a weight goal, in lb a week, the engine's own numbers
+   (goal-engine.mjs, copied because the screen paints before any module is
+   loaded; change them there first). Loss: LOSS_RATE.highPct, 1% of
+   bodyweight, never above ceilLb 2. Gain: the top of GAIN_RATE.fresh, 1.5%
+   of bodyweight a month. `planWeeks` is the pace the engine actually plans
+   on (the middle of each band), which is what "No rush" lands on. */
+function ob2SafePace(nowLb, goalLb) {
+  const gap = Math.abs(goalLb - nowLb);
+  const gaining = goalLb > nowLb;
+  const cap = gaining ? (nowLb * 0.015) / 4.345 : Math.min(nowLb * 0.01, 2);
+  const mid = gaining ? (nowLb * 0.0125) / 4.345 : Math.min(2, Math.max(0.5, nowLb * 0.0075));
+  return { gap, cap, minWeeks: Math.max(1, Math.ceil(gap / cap)), planWeeks: Math.max(1, Math.ceil(gap / mid)) };
+}
+/* "Jan 8", with the year only when it is not this one. */
+function ob2NiceDate(iso) {
+  const t = new Date(iso + "T12:00:00");
+  const sameYear = t.getFullYear() === new Date(todayStr() + "T12:00:00").getFullYear();
+  return t.toLocaleDateString("en-US", sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
 }
 
 const OB2_WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -17622,7 +17650,9 @@ height: { ch: 2, render(d, ui) {
           <div class="ob2-ruler" id="ob2TgRuler"></div>
         </div>`,
       cta: "Continue",
-      onNext: () => ui.next({ goal_weight_lb: dirOf(lb) === "Maintain" ? null : Math.round(lb * 10) / 10 }),
+      /* Maintaining has no finish line, so a deadline from an earlier pass
+         at this screen is dropped with the target. */
+      onNext: () => ui.next(dirOf(lb) === "Maintain" ? { goal_weight_lb: null, goal_deadline: null } : { goal_weight_lb: Math.round(lb * 10) / 10 }),
     });
     ob2Ruler($("ob2TgRuler"), SPEC[unit], toU(lb), {
       anchor: toU(now),
@@ -17636,6 +17666,84 @@ height: { ch: 2, render(d, ui) {
         ob2Type($("ob2Q"), say(lb));
       },
     });
+  } },
+
+  /* Mo, 2026-10-08: "if I do gain or lose, then the next one should be: 'Is
+     there a specific timeline?' ... Just make it very easy." Only for a real
+     gain or loss (the target screen calls within 5 lb maintaining and stores
+     no target). The shared choice list: No rush, three spans each with the
+     date it lands on and what it asks per week, and a date of their own.
+     Nothing faster than the engine's safe ceiling is ever offered
+     (ob2SafePace), so a big gap simply starts at a longer span and he says
+     why. Stored as goal_deadline, which the finish writes to
+     user_goals.target_date, the column the goal already had. The engine is
+     not handed it: today it reads a date only out of the goal's own words,
+     and this screen does not change what it builds. */
+  timeline: { ch: 2, when: (d) => d.goal_weight_lb > 0 && d.weight_lb > 0 && Math.abs(d.goal_weight_lb - d.weight_lb) > 5, render(d, ui) {
+    const now = d.weight_lb, goal = d.goal_weight_lb;
+    const pace = ob2SafePace(now, goal);
+    const kg = d.units?.weight === "kg";
+    /* Two places for a slow kg pace, or a 0.15 and a 0.24 both read 0.2. */
+    const per = (lbWk) => kg ? `${(lbWk / 2.20462).toFixed(lbWk / 2.20462 < 0.5 ? 2 : 1)} kg a week` : `${lbWk.toFixed(1)} lb a week`;
+    const gapTxt = kg ? `${(pace.gap / 2.20462).toFixed(1)} kg` : `${Math.round(pace.gap)} lb`;
+    const today = todayStr();
+    const dateIn = (weeks) => shiftDate(today, weeks * 7);
+    const weeksTo = (iso) => Math.max(1, Math.round((new Date(iso + "T12:00:00") - new Date(today + "T12:00:00")) / 604800000));
+    /* Month spans, and only those the safe ceiling allows. When even the
+       longest standard span is too fast, the first offer is the first safe
+       whole month and the next two step out from it. */
+    const MONTHS = [1, 2, 3, 4, 6, 9, 12, 18, 24];
+    const wk = (m) => Math.round(m * 4.345);
+    let spans = MONTHS.filter((m) => wk(m) >= pace.minWeeks).slice(0, 3);
+    if (!spans.length) { const m0 = Math.ceil(pace.minWeeks / 4.345); spans = [m0, m0 + 6, m0 + 12]; }
+    while (spans.length < 3) spans.push(spans[spans.length - 1] + 6);
+    const minDate = dateIn(pace.minWeeks);
+    const opts = [
+      { id: "none", label: "No rush", sub: `A healthy pace, around ${ob2NiceDate(dateIn(pace.planWeeks))}` },
+      ...spans.map((m) => ({ id: `m${m}`, label: m === 1 ? "1 month" : `${m} months`, sub: `By ${ob2NiceDate(dateIn(wk(m)))}, ${per(pace.gap / wk(m))}`, weeks: wk(m) })),
+      { id: "date", label: "Pick a date", sub: `Any day from ${ob2NiceDate(minDate)}` },
+    ];
+    /* What was picked before, read back off the stored date. */
+    let pick = null, date = d.goal_deadline || null;
+    if (date) pick = opts.find((o) => o.weeks && dateIn(o.weeks) === date)?.id || "date";
+    else if (d.goal_deadline === null && "goal_deadline" in d) pick = "none";
+    const gaining = goal > now;
+    ui.paint({
+      title: gaining ? `${gapTxt} to gain. Is there a specific timeline?` : `${gapTxt} to lose. Is there a specific timeline?`,
+      body: `${ob2ChoiceHTML(opts, pick, { attr: "tl" })}
+        <label class="ob2-tl-date${pick === "date" ? "" : " hidden"}" id="ob2TlDateRow"><span>Your date</span>
+          <input type="date" id="ob2TlDate" min="${minDate}" value="${pick === "date" ? date : minDate}" /></label>`,
+      cta: "Continue", ctaOff: !pick, skip: true,
+      onSkip: () => ui.skip({ goal_deadline: null }),
+      onNext: () => ui.next({ goal_deadline: pick === "none" ? null : date }),
+    });
+    /* His line for a pick, by how hard it leans on the safe ceiling. */
+    const lineFor = (weeks) => {
+      const lean = (pace.gap / weeks) / pace.cap;
+      if (lean > 0.85) return gaining ? "The fast lane. Still safe. I'll make sure you eat." : "The fast lane. Still safe, and I'll be watching.";
+      if (lean > 0.55) return "Solid. Steady enough to actually stick.";
+      return "Plenty of runway. Future you is very relaxed about this.";
+    };
+    /* A gap too big for the short spans is said once, up front. */
+    if (pace.minWeeks > wk(2)) ob2Later(() => ob2Type($("ob2Q"), `${gapTxt} safely takes ${pace.minWeeks} weeks at least, so I skipped the short ones. ${gaining ? "I don't do dirty bulks." : "I don't do crash diets."} I don't even eat.`), 1600);
+    ob2WireOne("tl", (v) => {
+      pick = v;
+      $("ob2Next").disabled = false;
+      $("ob2TlDateRow").classList.toggle("hidden", v !== "date");
+      if (v === "none") { date = null; ob2Type($("ob2Q"), "No rush. The plan that actually sticks."); return; }
+      if (v === "date") { date = $("ob2TlDate").value || minDate; ob2Type($("ob2Q"), `${ob2NiceDate(date)}. That's ${per(pace.gap / weeksTo(date))}. ${lineFor(weeksTo(date))}`); return; }
+      const o = opts.find((x) => x.id === v);
+      date = dateIn(o.weeks);
+      ob2Type($("ob2Q"), lineFor(o.weeks));
+    });
+    $("ob2TlDate").onchange = () => {
+      let v = $("ob2TlDate").value;
+      /* The picker's min is a suggestion some browsers let a typed date
+         past; the ceiling is not. */
+      if (!v || v < minDate) { v = minDate; $("ob2TlDate").value = v; ob2Type($("ob2Q"), `Sooner than ${ob2NiceDate(minDate)} isn't safe. That's the earliest I'll sign.`); }
+      else ob2Type($("ob2Q"), `${ob2NiceDate(v)}. That's ${per(pace.gap / weeksTo(v))}. ${lineFor(weeksTo(v))}`);
+      date = v;
+    };
   } },
 
   /* Three tiles, because profiles.activity_level holds three values. It
@@ -19404,7 +19512,8 @@ function finishOnboardingFromDraft(data) {
     /* The two numbers that turn on every goal-driven surface there is. */
     weight_lb: data.weight_lb || null,
     goal_weight_lb: data.goal_weight_lb || null,
-    goal_by_date: data.goal_by_date || null,
+    /* goal_deadline is the v2 timeline screen's answer, the same thing. */
+    goal_by_date: data.goal_by_date || data.goal_deadline || null,
     /* The only deadline the user ever agrees to, as they set it, not as a
        pace chip they were never shown would have set it. chosenPace and weeks
        used to be read bare here, which does not exist in this function's own
