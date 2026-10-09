@@ -44238,7 +44238,12 @@ async function renderBodyPhotos() {
     strip.innerHTML = emptyState("camera", "No progress photos yet", "One a day. In a month you'll see the difference.");
     return;
   }
+  const who = viewedEmail();
   const urls = await Promise.all(shots.map((s) => signedProofUrl(s.path)));
+  /* Signing takes a round trip. Switch Mo | Mell inside it and the other
+     person's render has already filled this card, so the late answer would
+     paint her photos into his card, with no delete buttons on them. */
+  if (viewedEmail() !== who) return;
   strip.innerHTML = shots.map((s, i) => urls[i]
     ? `<div class="photo-item">
          <img src="${urls[i]}" alt="Progress photo ${escapeHtml(s.taken_on)}" loading="lazy" />
