@@ -4917,13 +4917,6 @@
   .ob2-freq-l { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; }
   .ob2-freq-l svg { color: var(--accent); }
   .ob2-freqs + .ob-style-note { margin-top: 14px; }
-  .ob2-tl-date { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 14px;
-    border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); font-weight: 650; }
-  .ob2-tl-date.hidden { display: none; }
-  .ob2-tl-date span { white-space: nowrap; }
-  .ob2-tl-date input { flex: 1 1 auto; max-width: 220px; }
-  .ob2-tl-date input { font: inherit; font-size: 16px; color: var(--text); background: var(--card-fill); border: 1px solid var(--border);
-    border-radius: 10px; padding: 8px 10px; min-width: 0; color-scheme: light dark; }
   /* The freq screen, 2026-10-08: the lead row is a fact (every training
      day), each other style is a count from 1 to N, and the week underneath
      takes whatever height is left, so the page is the answer, not a form. */
@@ -5875,10 +5868,6 @@
     background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--accent-ink); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
   .ob2-wc-drop { stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 2 4; opacity: .6; }
   .ob2-wc-ax.ob2-wc-when { fill: var(--text); font-weight: 750; font-size: 12px; }
-  .ob2-tl-more { display: flex; flex-direction: column; align-items: center; }
-  .ob2-tl-more .ob2-link { padding: 6px 8px; min-height: 40px; text-decoration: underline; text-underline-offset: 3px; }
-  .ob2-tl-more .ob2-link[hidden] { display: none; }
-  .ob2-tl-more .ob2-tl-date { align-self: stretch; }
   /* The name screen (Yazio's): one big centred field on an underline. */
   .ob2-namefield { display: flex; justify-content: center; padding: clamp(20px, 6vh, 56px) 8px 0; }
   #onboard .ob2 input.ob2-nameinput { width: 100%; max-width: 320px; margin: 0; padding: 6px 4px 10px; border: 0; border-bottom: 2px solid var(--border);
@@ -18159,24 +18148,23 @@ height: { ch: 2, render(d, ui) {
     /* What was picked before, read back off the stored date. A date that
        is now too soon (the target moved further away since) is dropped
        rather than kept: the ceiling outranks an old answer. */
+    /* Three paces and nothing else (Mo, 2026-10-09: the "Pick a date" row
+       looked weird, take it out). An older stored date reads back as the
+       pace it lands nearest. */
     let pick = "steady", date = PACES[1].date;
     if (d.goal_deadline && d.goal_deadline >= minDate) {
-      date = d.goal_deadline;
-      pick = PACES.find((p) => p.date === date)?.id || "date";
+      const w = weeksTo(d.goal_deadline);
+      pick = PACES.reduce((a, b) => (Math.abs(b.weeks - w) < Math.abs(a.weeks - w) ? b : a)).id;
+      date = PACES.find((p) => p.id === pick).date;
     }
-    const weeksOf = () => (pick === "date" ? weeksTo(date) : PACES.find((p) => p.id === pick).weeks);
+    const weeksOf = () => PACES.find((p) => p.id === pick).weeks;
     /* The x axis runs a little past the slowest pace, or past their own
        date when that is later still, so the line always has its flat tail. */
     const spanOf = (w) => Math.max(PACES[2].weeks, w) * 1.12;
     ui.paint({
       title: `${gapTxt} to ${gaining ? "gain" : "lose"}. How fast do we go?`,
       body: `<div class="card ob2-wcard"><div class="ob2-wc" id="ob2Wc"></div></div>
-        ${ob2ChoiceHTML(PACES, pick === "date" ? null : pick, { attr: "tl" })}
-        <div class="ob2-tl-more">
-          <button type="button" class="ob2-link" id="ob2TlMore"${pick === "date" ? " hidden" : ""}>Pick a date instead</button>
-          <label class="ob2-tl-date${pick === "date" ? "" : " hidden"}" id="ob2TlDateRow"><span>Your date</span>
-            <input type="date" id="ob2TlDate" min="${minDate}" value="${pick === "date" ? date : PACES[1].date}" /></label>
-        </div>`,
+        ${ob2ChoiceHTML(PACES, pick, { attr: "tl" })}`,
       cta: "Continue",
       onNext: () => ui.next({ goal_deadline: date }),
     });
@@ -18194,32 +18182,9 @@ height: { ch: 2, render(d, ui) {
     ob2WireOne("tl", (v) => {
       pick = v;
       date = PACES.find((p) => p.id === v).date;
-      $("ob2TlDateRow").classList.add("hidden");
-      $("ob2TlMore").hidden = false;
       show();
       ob2Type($("ob2Q"), lineFor(weeksOf()));
     });
-    const takeDate = () => {
-      let v = $("ob2TlDate").value;
-      /* The picker's min is a suggestion some browsers let a typed date
-         past; the ceiling is not. */
-      const early = !v || v < minDate;
-      if (early) { v = minDate; $("ob2TlDate").value = v; }
-      date = v; pick = "date";
-      $("onboard").querySelectorAll("[data-tl]").forEach((b) => { b.classList.remove("on"); b.setAttribute("aria-pressed", "false"); });
-      show();
-      ob2Type($("ob2Q"), early
-        ? `Sooner than ${ob2NiceDate(minDate)} isn't safe. That's the earliest I'll sign.`
-        : `${ob2NiceDate(v)}. That's ${per(pace.gap / weeksTo(v))}. ${lineFor(weeksTo(v)).split(". ").slice(1).join(". ")}`);
-    };
-    $("ob2TlMore").onclick = () => {
-      $("ob2TlMore").hidden = true;
-      $("ob2TlDateRow").classList.remove("hidden");
-      $("ob2TlDate").value = date;
-      takeDate();
-      try { $("ob2TlDate").showPicker?.(); } catch { /* not from this gesture on every browser */ }
-    };
-    $("ob2TlDate").onchange = takeDate;
   } },
 
   /* Three tiles, because profiles.activity_level holds three values. It
