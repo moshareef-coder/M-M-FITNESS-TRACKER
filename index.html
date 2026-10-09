@@ -29172,7 +29172,12 @@ async function loadTodayWorkout() {
     .eq("email", MY_EMAIL).eq("entry_date", sessionDate()).eq("archived", false)
     .order("created_at", { ascending: false });
   TODAY_PLANS = (data || []).slice().sort((a, b) => planSlot(a) - planSlot(b));
-  TODAY_WORKOUT = TODAY_PLANS[0] || null;
+  /* The first session of the day is the default, but not while a workout is
+     running on another one. Every set logged reloads, and handing the session
+     the day's first plan halfway through left it counting sets against a
+     different list (a yoga class at slot 0, the lift being trained at 1). */
+  const live = SESSION?.workoutId && TODAY_PLANS.find((p) => p.id === SESSION.workoutId);
+  TODAY_WORKOUT = live || TODAY_PLANS[0] || null;
 }
 
 /* A plan that has just been stood down, taken out of today without going back
@@ -30407,10 +30412,21 @@ function lastLoggedWeight(name) {
 
 async function applySwap(chosen, source) {
   const ctx = SWAP_CTX;
-  const ex = swapTarget();
+  let ex = swapTarget();
   if (!ctx || !ex || !chosen) return;
   const planned = ex.name;
   if (chosen === planned) { closeSwapSheet(); return; }
+  /* Anything the caller has to write under the OLD name goes first, while the
+     row still carries it. The write reloads everything, which hands back a
+     fresh TODAY_WORKOUT, so the row to change is looked up again afterwards
+     rather than mutating the copy that was just thrown away. The sheet closes
+     first so a second tap cannot run this twice. */
+  if (ctx.before) {
+    closeSwapSheet();
+    await ctx.before(ctx.index);
+    ex = ctx.list?.()?.[ctx.index];
+    if (!ex) return;
+  }
 
   /* Sets and reps are the dose the engine chose for the slot, so they stay.
      The load cannot: it was worked out for a different movement. What they
@@ -30480,6 +30496,13 @@ function swapCurrentExercise() {
     index: SESSION.exerciseIndex,
     date: TODAY_WORKOUT.entry_date || todayStr(),
     focus: TODAY_WORKOUT.focus,
+    /* Sets already ticked on the lift being replaced happened. Nothing writes
+       a row until the exercise is banked, and the reset below wiped the ticks,
+       so swapping after two sets of bench threw those two sets away without a
+       word. Banked under the old name first, the same way ending early does. */
+    before: async (i) => {
+      if ((SESSION?.setsDone?.[i] || []).some(Boolean)) await logSetsForExercise(i);
+    },
     after: (i, ex) => {
       /* A movement you have just picked has had nothing done on it, and the
          weight and reps carried over would be the old lift's. Re-seeded from
@@ -30529,13 +30552,25 @@ async function removeCurrentExercise() {
   /* On to the next thing not yet done, looking forward first. */
   let to = SESSION.completed.findIndex((c, i) => i >= ei && !c);
   if (to === -1) to = SESSION.completed.findIndex((c) => !c);
-  SESSION.exerciseIndex = to === -1 ? Math.min(ei, exs.length - 1) : to;
   SESSION.restStartedAt = null;
   stopRestTicker();
   SESSION_LAST_EX = null;
+  toast(`Removed ${name}`);
+  /* Nothing left undone means the workout is over. Landing on a lift that was
+     already banked instead put it back on screen as "Log set 1 of 3", and
+     logging it again wrote it twice. The plan is saved first because the
+     summary reloads it, and a stale row would count the removed lift. */
+  if (to === -1) {
+    if (TODAY_WORKOUT.id) {
+      const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
+      if (error) console.error("removed exercise not saved to the plan", error);
+    }
+    wrapUpLifts();
+    return;
+  }
+  SESSION.exerciseIndex = to;
   saveSessionToStorage();
   renderSession();
-  toast(`Removed ${name}`);
   if (TODAY_WORKOUT.id) {
     const { error } = await sb.from("ai_workouts").update({ exercises: exs }).eq("id", TODAY_WORKOUT.id);
     if (error) console.error("removed exercise not saved to the plan", error);
@@ -31853,7 +31888,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
        reload and redraw Home only, so the workout tab underneath kept
        Thursday's old session on the week strip. */
     await planChangedOn(target, {
-      then: () => { if (isToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+      then: () => { if (isToday) FRESH_PLAN_ID = (TODAY_PLANS.find((p) => planSlot(p) === slot) || TODAY_WORKOUT)?.id || null; },
     });
     /* Mo, 2026-09-18: "I don't want to generate a workout and be able to see
        those options. The second it generates, it takes me to that page." The
@@ -31866,7 +31901,7 @@ async function generateWorkout(forDate, { sameAgain = false, sessionMinutes = nu
       await finishGenOverlay();   // three seconds at least, and a full bar
       if (!genCancelled) {
         closeGenOverlay();
-        showPlanScreen(target);
+        showPlanScreen(target, slot);
       }
     }
     /* Answered, so a caller that has to undo something on failure can tell the
@@ -32344,6 +32379,11 @@ function sessionMatchesPlan(saved) {
 function resumeSessionIfAny() {
   if (SESSION) return false;
   const saved = loadSessionFromStorage();
+  /* The plan it was started on, which is not always the day's first: see
+     loadTodayWorkout. Matched against that one or a session on the second
+     session of a day was thrown away on every reload. */
+  const own = saved?.workoutId && TODAY_PLANS.find((p) => p.id === saved.workoutId);
+  if (own) TODAY_WORKOUT = own;
   if (!sessionMatchesPlan(saved)) {
     if (saved) clearSessionStorage();   // stale, belongs to a finished plan
     return false;
@@ -32870,10 +32910,22 @@ const sfx = { play: sfxPlay };
    somewhere useful" action, so looking back at what you already finished is
    fine. It also does not wrap: the last exercise has no next, and the
    gesture handler rubber-bands there instead of cycling to the first. */
+/* The nearest lift in that direction that is not banked yet, or -1. A banked
+   lift is not somewhere a swipe can land, the same rule jumpToExercise and Up
+   next keep: swiping back onto finished bench put its ticked sets and Next
+   exercise on screen, and Next exercise logged all of them a second time. */
+function stepTarget(dir) {
+  if (!SESSION || !TODAY_WORKOUT?.exercises) return -1;
+  for (let i = SESSION.exerciseIndex + dir; i >= 0 && i < TODAY_WORKOUT.exercises.length; i += dir) {
+    if (!SESSION.completed[i]) return i;
+  }
+  return -1;
+}
+
 function stepExercise(dir) {
   if (!SESSION) return false;
-  const idx = SESSION.exerciseIndex + dir;
-  if (idx < 0 || idx >= TODAY_WORKOUT.exercises.length) return false;
+  const idx = stepTarget(dir);
+  if (idx < 0) return false;
   SESSION.exerciseIndex = idx;
   SESSION.restStartedAt = null;
   stopRestTicker();
@@ -32898,8 +32950,8 @@ function wireSessionSwipe(ei) {
   let lastX = 0, lastT = 0;   // pointercancel carries no usable coordinates
 
   const bounds = () => ({
-    canPrev: ei > 0,
-    canNext: ei < TODAY_WORKOUT.exercises.length - 1,
+    canPrev: stepTarget(-1) >= 0,
+    canNext: stepTarget(1) >= 0,
   });
   const paint = (dx) => {
     const { canPrev, canNext } = bounds();
@@ -33899,7 +33951,9 @@ async function doFinishExerciseAndAdvance() {
   const ex = TODAY_WORKOUT.exercises[ei];
   const doneCount = SESSION.setsDone[ei].filter(Boolean).length;
 
-  if (!(await logSetsForExercise(ei))) {
+  /* Already banked is already in the log. Whatever put a finished lift back
+     on screen, advancing past it must not write it twice. */
+  if (!SESSION.completed[ei] && !(await logSetsForExercise(ei))) {
     await logExerciseSilent(ex.name, SESSION.weights[ei], SESSION.reps[ei], doneCount || ex.sets);
   }
   SESSION.completed[ei] = true;
@@ -33915,26 +33969,28 @@ async function doFinishExerciseAndAdvance() {
   // A new lift is on the stage. Said after the render below has put it there.
   if (nextIdx !== -1) setTimeout(() => sayQuip("nextExercise"), 900);
 
-  if (nextIdx === -1) {
-    /* The last lift is banked. If the plan carries a cool-down and it was
-       not skipped for the day, the session ends through it; the summary
-       waits until the holds are done or skipped. Ending early (endWorkoutNow)
-       does not come through here, so someone leaving is never held back. */
-    const mob = planMobility();
-    if (mob && !mob.skippedCooldown && mob.cooldown.length) {
-      SESSION.phase = "cooldown";
-      SESSION.stretchIndex = 0;
-      SESSION.stretchSide = 1;
-      SESSION.stretchStartedAt = Date.now();
-      saveSessionToStorage();
-      renderSession();
-      return;
-    }
-    clearSessionStorage();
-    renderSessionComplete();
-  } else {
+  if (nextIdx === -1) wrapUpLifts();
+  else renderSession();
+}
+
+/* Every lift in the plan is banked. If the plan carries a cool-down and it was
+   not skipped for the day, the session ends through it; the summary waits
+   until the holds are done or skipped. Ending early (endWorkoutNow) does not
+   come through here, so someone leaving is never held back. */
+function wrapUpLifts() {
+  SESSION.exerciseIndex = TODAY_WORKOUT.exercises.length;
+  const mob = planMobility();
+  if (mob && !mob.skippedCooldown && mob.cooldown.length) {
+    SESSION.phase = "cooldown";
+    SESSION.stretchIndex = 0;
+    SESSION.stretchSide = 1;
+    SESSION.stretchStartedAt = Date.now();
+    saveSessionToStorage();
     renderSession();
+    return;
   }
+  clearSessionStorage();
+  renderSessionComplete();
 }
 
 async function logExerciseSilent(name, weight, reps, sets) {
@@ -41507,17 +41563,25 @@ async function saveManualWorkout() {
      earlier today leaves the row archived, and an upsert that did not reset
      them wrote the new plan onto it, where loadTodayWorkout can never see it.
      The user got "Workout plan saved" and an empty screen. */
+  /* mobility is cleared for the same reason. Writing over the generated plan
+     kept ITS warm-up, cool-down and ramp sets, so a hand-built push-up and
+     pull-up day opened on "Arm Circles, for your pressing and overhead work"
+     and ended on a pec stretch. A plan built from nothing here has no blocks,
+     which is what a fresh row already got. */
   /* A lift written by hand onto a day that already holds a planned run or a
      class is a SECOND session rather than a replacement for it, which is the
      same rule generating one follows: see nextPlanSlot. */
+  const slot = nextPlanSlot(target, { lifting: true });
   const { error } = await upsertPlanRow({
     user_name: ME, email: MY_EMAIL, entry_date: target,
     focus: deriveFocus(MANUAL_DRAFT), exercises: MANUAL_DRAFT,
-    archived: false, completed_at: null,
-  }, nextPlanSlot(target, { lifting: true }));
+    archived: false, completed_at: null, mobility: null,
+  }, slot);
   if (error) { console.error("could not save the manual workout", error); toast("Couldn't save that plan. Try again."); return; }
   PLAN_FOR_DATE = null;
   WORKOUT_MODE = forToday ? null : "week";
+  /* The plan just written, not the day's first session (see showPlanScreen). */
+  if (forToday) PLAN_VIEW_SLOT = slot;
   clearDraft();
   /* Through the one door every plan change goes through. Writing a day by hand
      is as much a rewrite of it as generating one, and this used to reload and
@@ -41525,7 +41589,7 @@ async function saveManualWorkout() {
      generator's cached answer for "which day next" was still the one it gave
      before this row existed. */
   await planChangedOn(target, {
-    then: () => { if (forToday) FRESH_PLAN_ID = TODAY_WORKOUT?.id || null; },
+    then: () => { if (forToday) FRESH_PLAN_ID = (TODAY_PLANS.find((p) => planSlot(p) === slot) || TODAY_WORKOUT)?.id || null; },
   });
   toast(forToday ? "Workout plan saved" : "Added to that day");
 }
@@ -42033,9 +42097,12 @@ function openPlanReview(date) {
    has the same screen in review. The tab is switched to first because a
    generate can be started from the week planner and from the calendar, and
    both of those can be reached with another tab in front. */
-function showPlanScreen(date) {
+/* `slot` is the session on that day to show, when it is not the first: a
+   lift generated beside a planned class lands on slot 1, and showing slot 0
+   after generating it put the class on screen instead of the new plan. */
+function showPlanScreen(date, slot = null) {
   if ($("tab-workout")?.classList.contains("hidden")) switchTab("workout");
-  if (date === sessionDate()) goWorkoutScreen(null);
+  if (date === sessionDate()) goWorkoutScreen(null, slot ? { before: () => { PLAN_VIEW_SLOT = slot; } } : {});
   else openPlanReview(date);
 }
 
@@ -42572,7 +42639,10 @@ function renderPlanPreview(opts) {
   if ($("planTimeBackBtn")) $("planTimeBackBtn").onclick = restoreSessionBudget;
 
   // These three are mutually exclusive depending on how far the workout got.
-  if ($("planStartBtn")) $("planStartBtn").onclick = startWorkout;
+  /* The plan on THIS screen, which on a day with two sessions is not always
+     TODAY_WORKOUT: opening the lift beside a planned yoga class and tapping
+     Start started the yoga. */
+  if ($("planStartBtn")) $("planStartBtn").onclick = () => { if (!review && plan) TODAY_WORKOUT = plan; startWorkout(); };
   if ($("planStartActBtn")) $("planStartActBtn").onclick = () => startPlannedActivity(plan);
   /* Regenerate overwrites today's row outright, so it says what goes with it.
      There is no undo once the new plan is written. */
