@@ -1,16 +1,17 @@
 // What a partner event turns into on the other phone, or why it turns into
 // nothing. Pure, so scripts/notify-plan-test.mjs can run it under node.
 //
-// Two events, both things the partner just DID, so neither is capped the way
+// Three events, all things the partner just DID, so none is capped the way
 // the scheduled kinds are: a cheer and a train together invite are messages
 // from a person, and holding one back to protect a daily budget would be the
 // app deciding a partner has talked enough. What limits them instead is the
 // trigger (one push per burst) and each person's own switch in Setup.
 
 export type EventIn = {
-  kind: string;                 // "cheer" | "invite"
+  kind: string;                 // "cheer" | "invite" | "finish"
   fromName: string;
-  message?: string;
+  message?: string;             // a cheer's words, or a finish's caption
+  workout?: string;             // finish: what they finished, "" when private
   request?: boolean;            // an invite that asks to join THEIR workout
   sessionId?: string;
   off: Set<string>;
@@ -69,6 +70,25 @@ export function decideEvent(e: EventIn): EventOut {
       threadId: "partner",
       interruptionLevel: "active",
       expiresAt: e.nowSec + INVITE_TTL_SEC,
+    };
+  }
+  /* "Mell just finished Full body A", 2026-10-10. The caption she typed on
+     the finish screen is the body, in quotes like a cheer; without one the
+     body is the nudge the evening reminder makes, said now instead of at six.
+     Quietened overnight the same way a cheer is: a late finish is news for
+     the morning, not a reason to light up a bedside table. Tapping it opens
+     the app, which shows her "finished" card. */
+  if (e.kind === "finish") {
+    if (e.off.has("finish")) return { send: false, why: "finish switched off" };
+    const what = String(e.workout ?? "").trim().slice(0, 60);
+    const said = String(e.message ?? "").trim().slice(0, 140);
+    return {
+      send: true,
+      title: what ? `${from} just finished ${what}` : `${from} just finished a workout`,
+      body: said ? `“${said}”` : "Your turn.",
+      url: "/finished",
+      threadId: "partner",
+      interruptionLevel: isQuiet(e.localHour) ? "passive" : "active",
     };
   }
   return { send: false, why: `unknown kind ${e.kind}` };

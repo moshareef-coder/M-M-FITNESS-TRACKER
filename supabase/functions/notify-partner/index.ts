@@ -1,5 +1,5 @@
 // "Mell cheered you on" and "Mell wants to train together", the moment she
-// does it, 2026-10-09.
+// does it, 2026-10-09. "Mell just finished Full body A", 2026-10-10.
 //
 // Shaped like notify-clip and for the same reason: an event, not a state, so
 // it is trigger driven rather than waiting for the hourly job. One function
@@ -15,6 +15,15 @@
 // What it does decide: the recipient's own switch for this kind
 // (profiles.notify_off) and whether it is the middle of the night where they
 // are. Both are in decide.ts.
+//
+// The finish kind is the one that waits. The trigger fires the moment the
+// workout is banked, which is BEFORE the finish screen's proof photo and its
+// caption, and the caption is the best part of the banner. So it answers at
+// once and keeps going in the background (EdgeRuntime.waitUntil: a request
+// held open past ~100s is cut by the proxy and the run dies with it, the
+// supabase-100s trap), watching the day's row for the caption for up to
+// FINISH_WAIT_MS, then sends with it or with "Your turn." If the workout_at
+// stamp moves on meanwhile, a second finish happened and that one speaks.
 
 import webpush from "npm:web-push@3.6.7";
 import { apnsConfigured, sendApns } from "./apns.ts";
@@ -72,35 +81,15 @@ async function recipient(to: string): Promise<{ off: Set<string>; tz: string | n
   return { off: new Set(off), tz: row.timezone || null };
 }
 
-Deno.serve(async (req) => {
-  const auth = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
-  if (!secretOk(auth, CRON_SECRET)) return json({ error: "forbidden" }, 403);
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return json({ error: "VAPID keys not configured" }, 500);
-
-  let body: any;
-  try { body = await req.json(); } catch { return json({ error: "bad json" }, 400); }
-  if (!body || typeof body !== "object") return json({ error: "bad json" }, 400);
-  const to = clamp(body.to_email, 254).toLowerCase();
-  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: "to_email required" }, 400);
-
-  const who = await recipient(to);
-  const d = decideEvent({
-    kind: clamp(body.kind, 20),
-    fromName: clamp(body.from_name, 60),
-    message: clamp(body.message, 140),
-    request: body.request === true,
-    sessionId: clamp(body.session_id, 64),
-    off: who.off,
-    localHour: localHour(who.tz),
-    nowSec: Date.now() / 1000,
-  });
-  if (!d.send) return json({ ok: true, sent: 0, reason: d.why });
-
+/* Every phone and browser the recipient has, told the same thing. Dead
+   endpoints are dropped, failing ones counted, so a phone that changed hands
+   stops being written to. */
+async function deliver(to: string, d: Extract<ReturnType<typeof decideEvent>, { send: true }>) {
   const subsRes = await fetch(
     `${SUPABASE_URL}/rest/v1/push_subscriptions?select=*&email=eq.${encodeURIComponent(to)}&failures=lt.5`,
     { headers: svc },
   );
-  if (!subsRes.ok) return json({ error: `could not read subscriptions: ${subsRes.status}` }, 500);
+  if (!subsRes.ok) return { error: `could not read subscriptions: ${subsRes.status}` };
   const subs = await subsRes.json();
 
   let tokens: any[] = [];
@@ -111,7 +100,7 @@ Deno.serve(async (req) => {
     );
     if (tokRes.ok) tokens = await tokRes.json();
   }
-  if (!subs.length && !tokens.length) return json({ ok: true, sent: 0, dropped: 0, reason: "no subscription" });
+  if (!subs.length && !tokens.length) return { ok: true, sent: 0, dropped: 0, reason: "no subscription" };
 
   webpush.setVapidDetails(CONTACT, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -167,6 +156,114 @@ Deno.serve(async (req) => {
       }
     }
   }
+  return { ok: true, sent, dropped };
+}
 
-  return json({ ok: true, sent, dropped });
+/* ---- finish ---- */
+const FINISH_WAIT_MS = 100_000;
+const FINISH_POLL_MS = 8_000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sameInstant = (a: unknown, b: unknown) => {
+  const x = Date.parse(String(a ?? "")), y = Date.parse(String(b ?? ""));
+  return Number.isFinite(x) && Number.isFinite(y) && x === y;
+};
+/* Words the app never shows as a workout's name (PLACEHOLDER_FOCUS). */
+const PLACEHOLDER_FOCUS = new Set(["", "custom", "custom workout", "workout", "manual", "manual workout"]);
+
+async function dayRow(from: string, date: string) {
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/fit_entries?select=note,workout_at,gym&email=eq.${encodeURIComponent(from)}&entry_date=eq.${date}&limit=1`,
+    { headers: svc },
+  );
+  return r.ok ? ((await r.json())[0] ?? null) : null;
+}
+
+async function finishJob(body: any, to: string) {
+  const from = clamp(body.from_email, 254).toLowerCase();
+  const date = clamp(body.entry_date, 10);
+  const at = clamp(body.workout_at, 40);
+  const before = clamp(body.note_before, 140);
+  if (!from || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !at) return;
+
+  const who = await recipient(to);
+  // Switched off: nothing to wait for.
+  if (who.off.has("finish")) return;
+
+  let caption = "";
+  for (let waited = 0; waited <= FINISH_WAIT_MS; waited += FINISH_POLL_MS) {
+    const row = await dayRow(from, date);
+    if (row && !sameInstant(row.workout_at, at)) return;   // a newer finish speaks instead
+    const note = String(row?.note ?? "").trim();
+    if (note && note !== before) { caption = note; break; }
+    if (waited + FINISH_POLL_MS > FINISH_WAIT_MS) break;
+    await sleep(FINISH_POLL_MS);
+  }
+
+  const profRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?select=user_name,share_workout_details&email=eq.${encodeURIComponent(from)}&limit=1`,
+    { headers: svc },
+  );
+  const prof = profRes.ok ? ((await profRes.json())[0] ?? {}) : {};
+  /* The same floor the in-app card keeps: with details off, that they
+     trained and nothing about what. */
+  let workout = "";
+  if (prof.share_workout_details !== false) {
+    const planRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/ai_workouts?select=focus&email=eq.${encodeURIComponent(from)}&entry_date=eq.${date}` +
+        `&completed_at=not.is.null&order=completed_at.desc&limit=1`,
+      { headers: svc },
+    );
+    const focus = planRes.ok ? String((await planRes.json())[0]?.focus ?? "").trim() : "";
+    if (!PLACEHOLDER_FOCUS.has(focus.toLowerCase())) workout = focus;
+  }
+
+  const d = decideEvent({
+    kind: "finish",
+    fromName: clamp(prof.user_name, 60),
+    workout,
+    message: caption,
+    off: who.off,
+    localHour: localHour(who.tz),
+    nowSec: Date.now() / 1000,
+  });
+  if (!d.send) return;
+  const res = await deliver(to, d);
+  console.log("finish", to, JSON.stringify(res));
+}
+
+Deno.serve(async (req) => {
+  const auth = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
+  if (!secretOk(auth, CRON_SECRET)) return json({ error: "forbidden" }, 403);
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return json({ error: "VAPID keys not configured" }, 500);
+
+  let body: any;
+  try { body = await req.json(); } catch { return json({ error: "bad json" }, 400); }
+  if (!body || typeof body !== "object") return json({ error: "bad json" }, 400);
+  const to = clamp(body.to_email, 254).toLowerCase();
+  if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return json({ error: "to_email required" }, 400);
+
+  /* Answered now and done in the background: see the note at the top. */
+  if (clamp(body.kind, 20) === "finish") {
+    const job = finishJob(body, to).catch((e) => console.error("finish job failed", e));
+    // deno-lint-ignore no-explicit-any
+    const rt = (globalThis as any).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(job); else await job;
+    return json({ ok: true, started: true }, 202);
+  }
+
+  const who = await recipient(to);
+  const d = decideEvent({
+    kind: clamp(body.kind, 20),
+    fromName: clamp(body.from_name, 60),
+    message: clamp(body.message, 140),
+    request: body.request === true,
+    sessionId: clamp(body.session_id, 64),
+    off: who.off,
+    localHour: localHour(who.tz),
+    nowSec: Date.now() / 1000,
+  });
+  if (!d.send) return json({ ok: true, sent: 0, reason: d.why });
+
+  const res = await deliver(to, d);
+  return json(res, "error" in res ? 500 : 200);
 });

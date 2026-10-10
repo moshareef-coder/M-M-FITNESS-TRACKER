@@ -35,7 +35,7 @@ export const SCHEDULED_KINDS = ["streak", "recap", "progress", "evening"] as con
 /* Every kind a person can switch off in Setup. The event kinds are here too so
    that the app, this file and the notify functions spell them the same way. */
 export const ALL_KINDS = [
-  "evening", "started", "video", "cheer", "invite", "streak", "recap", "progress",
+  "evening", "started", "finish", "video", "cheer", "invite", "streak", "recap", "progress",
 ] as const;
 
 export const STREAK_MIN = 3;

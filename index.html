@@ -53649,6 +53649,19 @@ async function registerPushHandlers() {
         });
         return;
       }
+      /* "Mell just finished". Her finished card is the thing to see, and it
+         shows itself at the end of a load when armed (maybeShowPartnerDone),
+         so this arms it and reloads: fit_entries has no realtime feed, and the
+         app may have been asleep since before she finished. Already seen on
+         this phone or another, and the reload simply lands on Home. */
+      if (url.startsWith("/finished")) {
+        whenSignedIn(() => {
+          try { switchTab("home"); } catch {}
+          PF_ARMED = true;
+          loadAll().catch((err) => console.warn("reload for the finished card", err));
+        });
+        return;
+      }
       /* A cheer is read on Home, in the banner, so Home and a fresh look at
          the banner rather than whatever it showed before the push arrived. */
       if (url.startsWith("/cheer")) {
@@ -53839,6 +53852,7 @@ async function renderPushToggle() {
 const NOTIFY_KINDS = [
   { id: "evening", name: "Your partner trained", why: "6 PM, when they have trained today and you have not." },
   { id: "started", name: "Your partner started a workout", why: "The moment they start." },
+  { id: "finish", name: "Your partner finished a workout", why: "When they finish, with their caption. Silent overnight." },
   { id: "video", name: "Videos from your partner", why: "A clip plays once, so you hear about it straight away." },
   { id: "cheer", name: "Cheers", why: "When your partner cheers you on. Silent overnight." },
   { id: "invite", name: "Train together invites", why: "When your partner asks you to train with them." },

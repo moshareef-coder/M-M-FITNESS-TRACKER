@@ -174,6 +174,16 @@ expect("invite copy", [o.title, o.body, o.category], ["Mell wants to train toget
 ev("invite at 23:00 (not quietened)", { kind: "invite", sessionId: "abc-123", localHour: 23 });
 ev("ask to join her workout", { kind: "invite", request: true, sessionId: "abc-123" });
 ev("invite switched off", { kind: "invite", off: new Set(["invite"]) });
+o = ev("finish with a caption", { kind: "finish", workout: "Full body A", message: "Legs done. Your turn." });
+expect("finish copy", [o.title, o.body, o.url], ["Mell just finished Full body A", "“Legs done. Your turn.”", "/finished"]);
+o = ev("finish, no caption", { kind: "finish", workout: "Full body A", message: "" });
+expect("finish without a caption says Your turn.", o.body, "Your turn.");
+o = ev("finish, details private", { kind: "finish", workout: "", message: "" });
+expect("private finish names no workout", o.title, "Mell just finished a workout");
+o = ev("finish at 23:00", { kind: "finish", workout: "Legs", localHour: 23 });
+expect("finish overnight is passive", o.interruptionLevel, "passive");
+o = ev("finish switched off", { kind: "finish", workout: "Legs", off: new Set(["finish"]) });
+expect("finish respects notify_off", o.send, false);
 
 console.log("\nno dashes in any copy");
 const src = (await import("node:fs")).readFileSync;
