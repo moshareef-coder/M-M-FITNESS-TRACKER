@@ -8917,9 +8917,15 @@
   /* A text action inside a row header: Skip today / Put it back on the plan's
      stretch blocks. A button so it is keyboard reachable, styled as a link so
      it does not compete with the real buttons on the screen. */
-  /* The locked Done: still a button, still says Done, visibly not ready. */
-  .proof-locked { opacity: .42; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-  .link-btn.proof-skip { align-self: center; margin-top: 2px; color: var(--muted); }
+  /* The way out without a photo. Quiet on purpose, and a real thumb-sized
+     target even though it reads as a line of text. */
+  .link-btn.proof-skip { align-self: center; margin-top: 2px; padding: 8px 14px; color: var(--muted); }
+  /* One line under the proof thumbnail, saved into the day's note: what the
+     partner's "finished" pop-up shows in quotes. */
+  .proof-caption { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font: inherit; font-size: 15.5px; }
+  .proof-caption::placeholder { color: var(--muted); }
+  .proof-caption:focus { outline: none; border-color: var(--accent); }
   @keyframes proofNudge { 0%,100% { transform: none } 25% { transform: translateX(-5px) } 75% { transform: translateX(5px) } }
   .proof-nudge { animation: proofNudge .28s ease 2; }
   .link-btn {
@@ -28127,31 +28133,70 @@ function refreshAfterProofChange() {
   }
 }
 
-/* Mo, 2026-10-09: a workout is finished when there is a photo of it. Done
-   stays locked until one is added, and the way out without one is spelled
-   out ("No photo today") rather than hidden behind a close button. The
-   workout is already banked by now either way: losing a streak because a
-   gym bans phones would teach people to stop logging, not to take photos.
-   The lock is the nudge; the photo is what the partner and the widget see. */
+/* Mo, 2026-10-09: a workout is finished when there is a photo of it. The
+   way out without one is spelled out ("No photo today") rather than hidden
+   behind a close button. The workout is already banked by now either way:
+   losing a streak because a gym bans phones would teach people to stop
+   logging, not to take photos.
+
+   Mo, 2026-10-10: "all the green is competing with each other." The screen
+   used to stack a lime Add proof photo, an outlined Say something and a
+   dark locked Done, three buttons for one decision. Now there is one
+   primary at a time: before the photo it is Add proof photo with the quiet
+   skip under it and no Done at all, and once the photo is in, Done takes
+   its place. Say something went; the photo's caption is the note now. */
 function proofDoneHTML(id, unlocked) {
   if (unlocked) return `<button type="button" class="btn-primary" id="${id}">Done</button>`;
-  return `<button type="button" class="btn-primary proof-locked" id="${id}" aria-disabled="true">${icon("lock", 15)} Done</button>
-    <button type="button" class="link-btn proof-skip" id="${id}Skip">No photo today</button>`;
+  return `<button type="button" class="link-btn proof-skip" id="${id}Skip">No photo today</button>`;
 }
 function wireProofDone(id, unlocked, leave) {
-  const btn = $(id);
-  if (!btn) return;
-  if (unlocked) { btn.onclick = leave; return; }
-  btn.onclick = () => proofGateHolds(btn.closest(".session-complete, .csn-foot")?.querySelector("#sessionProofBtn, #csnProofBtn")?.id);
+  if (unlocked) { const btn = $(id); if (btn) btn.onclick = leave; return; }
   const skip = $(`${id}Skip`);
   if (skip) skip.onclick = leave;
+}
+/* The caption field under a proof photo. One line, filled with whatever the
+   day's note already says, so reopening the screen shows what was written. */
+function proofCaptionHTML(id, entry) {
+  return `<input type="text" class="proof-caption" id="${id}" maxlength="140" autocomplete="off"
+    enterkeyhint="done" placeholder="Add a caption (optional)" value="${escapeHtml(entry?.note || "")}" />`;
+}
+/* Saved into fit_entries.note, the column the "Say something" composer on
+   this screen used to write and that the partner's Home card, the timeline
+   and the finished pop-up already read. Copies every other column through,
+   because only markGymDayDone may touch gym or sessions. Quiet when nothing
+   changed, which is the usual case on Done. */
+async function saveProofCaption(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const text = input.value.trim().slice(0, 140) || null;
+  const e = sessionEntryFor(MY_EMAIL);
+  if ((e?.note || null) === text) return;
+  const payload = {
+    user_name: ME, email: MY_EMAIL, entry_date: sessionDate(), note: text,
+    gym: e?.gym ?? false, sessions: e?.sessions ?? 0,
+    proof_path: e?.proof_path ?? null, rest_day: e?.rest_day ?? false,
+    workout_at: e?.workout_at ?? null,
+  };
+  /* Stamped before the write rather than after, so the blur that a tap on
+     Done causes and Done itself do not both send the same line. */
+  if (e) e.note = text;
+  const landed = await safeWrite("fit_entries", "upsert", payload, { onConflict: "email,entry_date" });
+  if (!landed) applyLocally("fit_entries", payload);
+}
+/* Saved on blur as well as on Done: Change photo reloads and repaints this
+   screen, and a caption typed just before it should survive that. */
+function wireProofCaption(id) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  input.onchange = () => saveProofCaption(id);
+  input.onkeydown = (ev) => { if (ev.key === "Enter") input.blur(); };
 }
 /* True when the screen is still waiting on a photo, after pointing at the
    button that adds one. The close chevron asks this too, or the lock would
    be one tap away from not being a lock. */
 function proofGateHolds(proofBtnId) {
   const b = proofBtnId && document.getElementById(proofBtnId);
-  if (!b || !document.querySelector(".proof-locked")) return false;
+  if (!b || !document.querySelector(".proof-skip")) return false;
   b.scrollIntoView({ block: "center", behavior: "smooth" });
   b.classList.remove("proof-nudge"); void b.offsetWidth; b.classList.add("proof-nudge");
   buzz(30);
@@ -31948,10 +31993,10 @@ function renderCardioSaved(stage) {
                <p class="sc-proof-ttl">Deletes automatically after 30 days. Progress photos in your Body tab do not.</p>
                <button type="button" class="link-btn" id="csnProofChange">Change photo</button>
              </div>
-           </div>`
+           </div>
+           ${proofCaptionHTML("csnCaption", entry)}`
         : `<p class="muted-note">Add a photo to finish this one.</p>
            <button type="button" class="btn-primary" id="csnProofBtn">${icon("camera", 16)} Add proof photo</button>`}
-      ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="csnNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
       ${proofDoneHTML("csnDoneBtn", hasProof)}
     </div>`;
   csnPaintRing(stage);
@@ -31964,12 +32009,12 @@ function renderCardioSaved(stage) {
       if (url && box) box.innerHTML = `<img src="${url}" alt="Your proof photo" />`;
     }).catch((e) => console.warn("could not sign the proof photo", e));
     $("csnProofChange").onclick = () => $("proofInput").click();
+    wireProofCaption("csnCaption");
   } else {
     $("csnProofBtn").onclick = () => $("proofInput").click();
   }
-  if (PARTNER_EMAIL) $("csnNoteBtn").onclick = () => openNoteComposer("workout");
   $("csnRingBtn").onclick = () => openRecap(MY_EMAIL, ME, CSN_DONE.date);
-  const leave = () => { CSN_DONE = null; closeCardioSession(); };
+  const leave = async () => { await saveProofCaption("csnCaption"); CSN_DONE = null; closeCardioSession(); };
   $("csnX").onclick = () => { if (!proofGateHolds("csnProofBtn")) leave(); };
   wireProofDone("csnDoneBtn", hasProof, leave);
 }
@@ -40687,7 +40732,8 @@ async function renderSessionComplete() {
                <p class="sc-proof-ttl">Deletes automatically after 30 days. Progress photos in your Body tab do not.</p>
                <button type="button" class="link-btn" id="sessionProofChangeBtn">Change photo</button>
              </div>
-           </div>`
+           </div>
+           ${proofCaptionHTML("sessionCaption", proofEntry)}`
         /* Nothing to prove. Offering to "lock this in" directly under a line
            saying this one does not count is the screen arguing with itself,
            and a proof photo on a day fit_entries never banked would be the
@@ -40695,7 +40741,6 @@ async function renderSessionComplete() {
         : !recorded ? ""
         : `<p class="muted-note">Add a photo to finish this one.</p>
            <button type="button" class="btn-primary" id="sessionProofBtn">${icon("camera", 16)} Add proof photo</button>`}
-      ${PARTNER_EMAIL ? `<button type="button" class="btn-secondary" id="sessionNoteBtn">Say something to ${escapeHtml(partnerName())}</button>` : ""}
       ${proofDoneHTML("sessionDoneBtn", hasProof || !recorded)}
     </div>`;
 
@@ -40722,15 +40767,15 @@ async function renderSessionComplete() {
      there would take the whole wrap-up screen down with it. */
   if (hasProof) {
     $("sessionProofChangeBtn").onclick = () => $("proofInput").click();
+    wireProofCaption("sessionCaption");
   } else if ($("sessionProofBtn")) {
     $("sessionProofBtn").onclick = () => $("proofInput").click();
   }
-  if (PARTNER_EMAIL) $("sessionNoteBtn").onclick = () => openNoteComposer("workout");
   /* The mark opens what was logged. sessionDate() rather than todayStr() for
      the reason every other reader of this screen uses it: a session that ran
      past midnight still belongs to the day it started on. */
   $("scRingBtn").onclick = () => openRecap(MY_EMAIL, ME, sessionDate());
-  wireProofDone("sessionDoneBtn", hasProof || !recorded, sessionDone);
+  wireProofDone("sessionDoneBtn", hasProof || !recorded, async () => { await saveProofCaption("sessionCaption"); sessionDone(); });
 }
 
 /* Leaving the completion screen. Also what the chevron does there, so the two
@@ -41268,7 +41313,7 @@ function openSessionUI() {
 function minimiseSession() {
   // On a finished workout the chevron is the way out, so it means the same as
   // Done rather than re-presenting a banked workout as in progress.
-  if (SESSION?.finished) { if (proofGateHolds("sessionProofBtn")) return; sessionDone(); return; }
+  if (SESSION?.finished) { if (proofGateHolds("sessionProofBtn")) return; saveProofCaption("sessionCaption").finally(sessionDone); return; }
   /* Same for a stretch: there is no clock worth keeping alive underneath and
      no paused screen that would make sense for it, so the chevron ends it. */
   if (SESSION?.standaloneStretch) { endStretchSession(); return; }
