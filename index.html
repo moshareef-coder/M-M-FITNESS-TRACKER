@@ -8848,20 +8848,35 @@
 
   /* The little square Mo asked for: proof the photo landed, still on screen
      after the toast that said the same thing has faded. */
+  /* Mo, 2026-10-10, on the card with the caption under it: "the padding
+     looks weird." The caption field sat flush under the card with no gap,
+     and three lines of small print were pressed against the thumbnail. Now
+     it is one block: the photo row on top, the caption field inside the same
+     card under it, one --sp-stack between them, and --sp-action before Done,
+     the same two numbers every other screen uses. */
   .sc-proof {
-    display: flex; align-items: center; gap: 12px; text-align: left;
-    margin: 14px 0 0; padding: 10px 12px; border-radius: 14px;
+    display: grid; gap: var(--sp-stack); text-align: left;
+    margin: 0; padding: 12px; border-radius: var(--radius);
     background: var(--panel-2); border: 1px solid var(--border);
   }
+  .sc-proof-row { display: flex; align-items: center; gap: 14px; }
   .sc-proof-thumb {
-    width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0; overflow: hidden;
+    width: 56px; height: 56px; border-radius: 12px; flex-shrink: 0; overflow: hidden;
     background: var(--panel); display: flex; align-items: center; justify-content: center; color: var(--muted);
   }
   .sc-proof-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .sc-proof-body { min-width: 0; }
-  .sc-proof-body .muted-note { margin: 0; }
-  .sc-proof-ttl { margin: 3px 0 0; font-size: 11.5px; color: var(--muted); line-height: 1.35; }
-  .sc-proof-body .link-btn { margin-top: 3px; }
+  .sc-proof-body { min-width: 0; display: grid; gap: 2px; justify-items: start; }
+  .sc-proof .sc-proof-h { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--text); }
+  .sc-proof-h svg { color: var(--accent-ink); }
+  .sc-proof .sc-proof-ttl { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+  /* A line of text to look at, a thumb-sized target to hit. */
+  .sc-proof-body .link-btn { position: relative; margin-top: 2px; }
+  .sc-proof-body .link-btn::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 100%; height: 100%; min-width: 44px; min-height: 44px; }
+  .sc-proof .proof-caption { background: var(--panel); }
+  .session-complete .sc-proof { margin-top: 0; }
+  .session-complete .sc-proof + .btn-primary { margin-top: var(--sp-action); }
+  .csn-foot .sc-proof + .btn-primary { margin-top: calc(var(--sp-action) - 10px); }
 
   /* The strength card's lift picker: tap a pill and the chart above switches
      to it, the same "tap to re-focus" idea the Body tab already uses. It was a
@@ -28421,8 +28436,31 @@ function wireProofDone(id, unlocked, leave) {
 /* The caption field under a proof photo. One line, filled with whatever the
    day's note already says, so reopening the screen shows what was written. */
 function proofCaptionHTML(id, entry) {
+  const who = PARTNER_EMAIL ? ` for ${partnerName()}` : "";
   return `<input type="text" class="proof-caption" id="${id}" maxlength="140" autocomplete="off"
-    enterkeyhint="done" placeholder="Add a caption (optional)" value="${escapeHtml(entry?.note || "")}" />`;
+    enterkeyhint="done" placeholder="Add a caption${escapeHtml(who)} (optional)" aria-label="Caption"
+    value="${escapeHtml(entry?.note || "")}" />`;
+}
+/* The saved proof, one block for both finish screens: the thumbnail and two
+   short lines on top, the caption inside the same card under them.
+
+   Mo, 2026-09-21, kept: a proof photo deletes itself 30 days later, and that
+   is said once, quietly, where the photo is. Mo, 2026-10-10: three lines of
+   small print were too many. "Progress photos in your Body tab do not" went;
+   the Body tab is where that question gets asked, not here. */
+function proofSavedHTML({ thumbId = "", thumb, changeId, captionId, entry }) {
+  const seen = PARTNER_EMAIL ? `${escapeHtml(partnerName())} can see it. ` : "";
+  return `<div class="sc-proof">
+      <div class="sc-proof-row">
+        <div class="sc-proof-thumb"${thumbId ? ` id="${thumbId}"` : ""}>${thumb}</div>
+        <div class="sc-proof-body">
+          <p class="sc-proof-h">${icon("check", 15)} Proof saved</p>
+          <p class="sc-proof-ttl">${seen}Deletes after 30 days.</p>
+          <button type="button" class="link-btn" id="${changeId}">Change photo</button>
+        </div>
+      </div>
+      ${proofCaptionHTML(captionId, entry)}
+    </div>`;
 }
 /* Saved into fit_entries.note, the column the "Say something" composer on
    this screen used to write and that the partner's Home card, the timeline
@@ -32250,15 +32288,7 @@ function renderCardioSaved(stage) {
     ${csnCompleteHTML(a, CSN_DONE.mins, CSN_DONE)}
     <div class="csn-foot">
       ${hasProof
-        ? `<div class="sc-proof">
-             <div class="sc-proof-thumb" id="csnProofThumb">${icon("camera", 22)}</div>
-             <div class="sc-proof-body">
-               <p class="muted-note">${icon("check", 14)} Proof saved.${PARTNER_EMAIL ? ` ${escapeHtml(partnerName())} can see it.` : ""}</p>
-               <p class="sc-proof-ttl">Deletes automatically after 30 days. Progress photos in your Body tab do not.</p>
-               <button type="button" class="link-btn" id="csnProofChange">Change photo</button>
-             </div>
-           </div>
-           ${proofCaptionHTML("csnCaption", entry)}`
+        ? proofSavedHTML({ thumbId: "csnProofThumb", thumb: icon("camera", 22), changeId: "csnProofChange", captionId: "csnCaption", entry })
         : `<p class="muted-note">Add a photo to finish this one.</p>
            <button type="button" class="btn-primary" id="csnProofBtn">${icon("camera", 16)} Add proof photo</button>`}
       ${proofDoneHTML("csnDoneBtn", hasProof)}
@@ -40980,24 +41010,9 @@ async function renderSessionComplete() {
            thing a moment earlier had already faded. A square thumbnail is
            still there after the toast is gone, and it is the actual photo,
            not a promise that one exists. */
-        ? `<div class="sc-proof">
-             <div class="sc-proof-thumb">${proofUrl ? `<img src="${proofUrl}" alt="Your proof photo" />` : icon("camera", 22)}</div>
-             <div class="sc-proof-body">
-               <p class="muted-note">${icon("check", 14)} Proof saved. ${escapeHtml(partnerName())} can see it.</p>
-               ${/* Mo, 2026-09-21: "let's just warn them that images do delete
-                     after a certain while, every day, but the initial image
-                     does stay." A proof photo genuinely does delete itself,
-                     30 days later, and privacy.html has said so all along; it
-                     is just not somewhere anyone reading this line would ever
-                     find it. Said once, quietly, where the photo actually is,
-                     not as a popup: this is a fact about it, not a warning
-                     that needs a response. A progress photo, the other kind
-                     this app takes, is never on this timer. */ ""}
-               <p class="sc-proof-ttl">Deletes automatically after 30 days. Progress photos in your Body tab do not.</p>
-               <button type="button" class="link-btn" id="sessionProofChangeBtn">Change photo</button>
-             </div>
-           </div>
-           ${proofCaptionHTML("sessionCaption", proofEntry)}`
+        ? proofSavedHTML({
+            thumb: proofUrl ? `<img src="${proofUrl}" alt="Your proof photo" />` : icon("camera", 22),
+            changeId: "sessionProofChangeBtn", captionId: "sessionCaption", entry: proofEntry })
         /* Nothing to prove. Offering to "lock this in" directly under a line
            saying this one does not count is the screen arguing with itself,
            and a proof photo on a day fit_entries never banked would be the

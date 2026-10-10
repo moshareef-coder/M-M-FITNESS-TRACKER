@@ -372,7 +372,7 @@
 
       { t: "Finishing, photo added", scenario: "finished",
         s: "One button: Done",
-        note: "The same finish screen after the proof photo goes in (the sandbox draws one rather than opening the camera). Before it, the only button is Add proof photo with No photo today under it. After it, the thumbnail shows, a one line caption field sits under it, and the single green button is Done. The caption is what Mell sees in quotes on her Mell finished card.",
+        note: "The same finish screen after the proof photo goes in (the sandbox draws one rather than opening the camera). Before it, the only button is Add proof photo with No photo today under it. After it, one card holds the thumbnail, two short lines (Proof saved; Mell can see it, deletes after 30 days) and the caption field, and the single green button is Done, a full action gap below. The caption is what Mell sees in quotes on her Mell finished card.",
         run: (w) => { w.switchTab("workout"); w.startWorkout();
           setTimeout(() => w.eval(`(async () => {
             const c = document.createElement("canvas"); c.width = 600; c.height = 750;
