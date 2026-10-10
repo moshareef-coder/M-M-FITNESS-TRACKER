@@ -9474,9 +9474,9 @@
   .scr-back { border-color: transparent; background: none; justify-content: flex-start; margin-left: -8px; padding-left: 4px; }
   .scr-back:active { opacity: .55; }
   /* Sheets: the X goes first in its header, whatever order the markup has
-     it in, and the words take the rest of the row. A header that already has
-     a back link on its left (the exercise picker's detail step) keeps its X
-     on the right: two controls side by side in one corner read as one. */
+     it in, and the words take the rest of the row. One control top left per
+     step: the X on a sheet's first step, a back link on any step deeper in
+     (the exercise picker's detail step has no X at all since build 48). */
   .ds-top > .ds-x, .si-pop-top > .ds-x, .ps-head > .ds-x, .cb-sheet-head:not(:has(.cb-back)) > .ds-x { order: -1; }
   .ds-top:has(> .ds-x), .si-pop-top:has(> .ds-x), .cb-sheet-head:not(:has(.cb-back)):has(> .ds-x) { justify-content: flex-start; gap: 12px; }
   .ds-top:has(> .ds-x) > :not(.ds-x), .si-pop-top:has(> .ds-x) > :not(.ds-x), .cb-sheet-head:not(:has(.cb-back)):has(> .ds-x) > :not(.ds-x) { flex: 1; min-width: 0; }
@@ -46009,6 +46009,7 @@ function cbRenderPicker() {
   $("cbPickSheet").innerHTML = `
     <div class="ds-grip"></div>
     <div class="cb-sheet-head">
+      <button type="button" class="ds-x" id="cbPickX" aria-label="Close">&times;</button>
       <div>
         <div class="cb-sheet-title">${CB_TARGET === "swap" ? `Swap ${escapeHtml(swapTarget()?.name || "")}` : "Add an exercise"}</div>
         <div class="cb-sheet-count">${CB_TARGET === "swap" ? "Pick one to put in its place" : n ? `${n} in your workout so far` : "Nothing added yet"}</div>
@@ -46019,7 +46020,6 @@ function cbRenderPicker() {
         <div class="ex-search-wrap">
           <input type="text" id="cbSearch" placeholder="Search exercises" autocomplete="off" />
         </div>
-        <button type="button" class="ds-x" id="cbPickX" aria-label="Close">&times;</button>
       </div>
       <div class="cb-chips" id="cbChips">
         ${CB_GROUPS.map((g) => `<button type="button" class="cb-chip${g.key === CB_GROUP ? " on" : ""}" data-group="${g.key}">${escapeHtml(g.label)}</button>`).join("")}
@@ -46132,7 +46132,10 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
       <div class="cb-sheet-head">
         ${editing ? `<button type="button" class="cb-back" id="cbBackBtn">${icon("chevronLeft", 14)} Your workout</button>`
           : `<button type="button" class="cb-back" id="cbBackBtn">${icon("chevronLeft", 14)} All exercises</button>`}
-        <button type="button" class="ds-x" id="cbPickX" aria-label="Close">&times;</button>
+        ${/* One control, top left, and it is the back link. Mo, build 47: a
+              back on the left and an X on the right of the same header was
+              disorienting. The sheet still closes by swiping down, or by going
+              back to the list, whose X is top left like every other sheet. */ ""}
       </div>
       <div class="cb-confirm">
         <div class="cb-confirm-fig" data-fig="${escapeHtml(CB_PENDING.name)}"></div>
@@ -46169,7 +46172,6 @@ function cbConfirmStep(ex, { editIndex = null } = {}) {
         <p class="ef-note" style="margin-bottom:12px">You can change these mid workout. Nothing here is locked in.</p>
         <button type="button" class="btn-primary" id="cbConfirmBtn">${editing ? "Save changes" : "Add to workout"}</button>
       </div>`;
-    $("cbPickX").onclick = cbClosePicker;
     $("cbBackBtn").onclick = editing ? cbClosePicker : cbRenderPicker;
     mountMotionFigures($("cbPickSheet"));
     $("cbPickSheet").querySelectorAll("[data-d]").forEach((b) => {
