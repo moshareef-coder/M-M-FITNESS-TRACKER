@@ -109,10 +109,11 @@ const ALIASES = {
    Studio review: the ones flagged there come out until they are redone, and the
    exercise shows its old icon meanwhile (a miss is quiet, see hasMove). Their
    data stays in the move files, so the studio and the validator still see
-   them, and putting one back is deleting its name here. */
+   them, and putting one back is deleting its name here. Brisk Walk came back
+   on 2026-10-09 as a new walk (moves/cardio.mjs WALK), not the flagged one. */
 export const REMOVED_MOVES = new Set([
   "90/90 Hip Switch", "Archer Pull-Up", "Arm Circles", "Band Shoulder External Rotation",
-  "Brisk Walk", "Clamshell", "Diamond Push-Up", "One-Arm Pull-Up", "Revolved Chair Pose",
+  "Clamshell", "Diamond Push-Up", "One-Arm Pull-Up", "Revolved Chair Pose",
   "Russian Twist", "Suitcase Carry", "Upper Trap Stretch",
 ]);
 export const moveFor = (name, trainingId = null) => {

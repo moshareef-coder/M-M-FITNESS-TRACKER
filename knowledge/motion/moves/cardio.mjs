@@ -114,76 +114,67 @@ export const RUN = {
 
 /* Walking, side on, and it is not a slow run.
  *
- * What the real movement looks like: one foot is always down, the heel strikes
- * ahead of the body with an almost straight knee, the body rolls over it, and
- * the arms swing from the shoulder with the elbows nearly straight.
+ * What the real movement looks like: an everyday brisk walk. Upright, one foot
+ * always down, the heel arrives first ahead of the body with the knee nearly
+ * straight, the body rolls over that foot, the back heel peels up and the toes
+ * push off, and the swinging knee folds just enough to clear the floor. The
+ * arms hang from the shoulder and swing opposite the legs, elbows a little
+ * bent, more bent on the way forward.
  *
- * The one thing that MUST be visible: the stance leg is straight and a foot is
- * always on the floor. Take the float out and shrink the angles and a run does
- * not become a walk, it becomes a jog; what makes it read as walking is the
- * long straight stance leg and the heel arriving first.
+ * The one thing that MUST be visible: the stride, with opposition. Right leg
+ * forward means right arm back. A foot that slides, floats or sinks while it
+ * is supposed to be planted is the other tell, so it is measured, not judged.
+ *
+ * REDONE 2026-10-09. The first walk was flagged in the Animation Studio review
+ * and taken out (REMOVED_MOVES, 2026-10-07). The copy the studio showed and
+ * saved had both legs and both arms identical on every key (the studio's
+ * mirror bug, fixed in studio v12), so what was flagged was a figure hopping
+ * with its feet together, and the four walks it still fed (Long, Recovery,
+ * Hike, Incline) kept the old in-app keys. This one replaces it for all of
+ * them. Different from the first one:
+ *   - sixteen keys from normal gait curves (hip, knee, ankle over the cycle)
+ *     instead of four, so the loading knee bend, the heel rise and the swing
+ *     knee fold are all in it rather than tweened past;
+ *   - the planted foot travels back at ONE speed through the whole stance
+ *     (the thigh angle is solved per key for it), so it reads as walking on
+ *     the spot rather than skating; the first one sped up late in stance;
+ *   - the pelvis height is solved per key so the lowest foot is on the floor
+ *     line, within 0.5 units over 200 samples, and the body rises over the
+ *     standing leg and drops into the double support, about 2.6 units;
+ *   - arms swing 22 degrees each way (was 20) with the elbow at 22 to 40 (was
+ *     a near straight 14 to 18), which is how a brisk walk carries its arms;
+ *   - dur 1.0, about 120 steps a minute, brisk rather than strolling (was 1.25).
+ * The keys are plain numbers so the studio can open and edit them like any
+ * other move. The generator is not kept: change the numbers, not a formula.
  *
  * Five walking sessions ride on this, including the Recovery Walk and the
  * Incline Walk, which the app offers more often than anything else to somebody
- * who has just started.
+ * who has just started, and onboarding's "On my feet some".
  */
 export const WALK = {
   view: "side",
   loop: "cycle",
-  dur: 1.25,
-  breath: 0.3,
+  dur: 1.0,
+  breath: 0.2,
   fit: { k: 0.98, dy: 2 },
   keys: [
-    { // right heel strike, that leg straight, the left still behind with the heel up
-      t: 0,
-      root: { x: 62, y: 62, rot: 2 },
-      joints: {
-        spine: 3, neck: -5,
-        hipR: 22, kneeR: 4, ankleR: 8,
-        hipL: -18, kneeL: 22, ankleL: -14,
-        shoulderR: -20, elbowR: 16, shoulderL: 20, elbowL: 18,
-      },
-    },
-    { // mid-stance: the body passes over a straight right leg, the left swings through underneath
-      t: 0.25,
-      root: { x: 62, y: 60.5, rot: 2 },
-      joints: {
-        spine: 3, neck: -5,
-        hipR: -2, kneeR: 6, ankleR: 0,
-        hipL: 12, kneeL: 44, ankleL: 4,
-        shoulderR: -4, elbowR: 14, shoulderL: 4, elbowL: 14,
-      },
-    },
-    { // left heel strike, the mirror
-      t: 0.5,
-      root: { x: 62, y: 62, rot: 2 },
-      joints: {
-        spine: 3, neck: -5,
-        hipL: 22, kneeL: 4, ankleL: 8,
-        hipR: -18, kneeR: 22, ankleR: -14,
-        shoulderL: -20, elbowL: 16, shoulderR: 20, elbowR: 18,
-      },
-    },
-    { // mid-stance over the left
-      t: 0.75,
-      root: { x: 62, y: 60.5, rot: 2 },
-      joints: {
-        spine: 3, neck: -5,
-        hipL: -2, kneeL: 6, ankleL: 0,
-        hipR: 12, kneeR: 44, ankleR: 4,
-        shoulderL: -4, elbowL: 14, shoulderR: 4, elbowR: 14,
-      },
-    },
-    { // back to the right heel strike
-      t: 1,
-      root: { x: 62, y: 62, rot: 2 },
-      joints: {
-        spine: 3, neck: -5,
-        hipR: 22, kneeR: 4, ankleR: 8,
-        hipL: -18, kneeL: 22, ankleL: -14,
-        shoulderR: -20, elbowR: 16, shoulderL: 20, elbowL: 18,
-      },
-    },
+    { t: 0, root: { x: 62, y: 63.9, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 20, kneeR: 3, ankleR: 2, hipL: -8.8, kneeL: 40, ankleL: 9.2, shoulderR: -22, elbowR: 22, shoulderL: 22, elbowL: 40 } },
+    { t: 0.0625, root: { x: 62, y: 63.2, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 14.4, kneeR: 3.5, ankleR: -4, hipL: -13.9, kneeL: 37, ankleL: 3.8, shoulderR: -20.8, elbowR: 22.4, shoulderL: 20.8, elbowL: 39 } },
+    { t: 0.125, root: { x: 62, y: 62.1, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 9.1, kneeR: 4, ankleR: -2.6, hipL: -8, kneeL: 41.4, ankleL: 0.2, shoulderR: -16.2, elbowR: 23.8, shoulderL: 16.3, elbowL: 36.3 } },
+    { t: 0.1875, root: { x: 62, y: 61.5, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 3.2, kneeR: 3.3, ankleR: 0.4, hipL: 2.1, kneeL: 60.6, ankleL: 9.3, shoulderR: -10.1, elbowR: 25.8, shoulderL: 10.1, elbowL: 32.9 } },
+    { t: 0.25, root: { x: 62, y: 61.3, rot: 3 }, joints: { spine: 2, neck: -4, hipR: -2.8, kneeR: 2.2, ankleR: 3.8, hipL: 11.7, kneeL: 57, ankleL: 6.6, shoulderR: -4, elbowR: 28, shoulderL: 4, elbowL: 30 } },
+    { t: 0.3125, root: { x: 62, y: 61.6, rot: 3 }, joints: { spine: 2, neck: -4, hipR: -7.9, kneeR: 2.9, ankleR: 6.7, hipL: 19, kneeL: 41.7, ankleL: 1.7, shoulderR: 3, elbowR: 31.1, shoulderL: -3, elbowL: 27.5 } },
+    { t: 0.375, root: { x: 62, y: 62.6, rot: 3 }, joints: { spine: 2, neck: -4, hipR: -10.4, kneeR: 9.3, ankleR: 10.1, hipL: 21.7, kneeL: 21.5, ankleL: 1.6, shoulderR: 11.3, elbowR: 35, shoulderL: -11.2, elbowL: 25 } },
+    { t: 0.4375, root: { x: 62, y: 62.9, rot: 3 }, joints: { spine: 2, neck: -4, hipR: -8.3, kneeR: 26.5, ankleR: 12, hipL: 21.7, kneeL: 6.7, ankleL: 2.1, shoulderR: 18.4, elbowR: 38.4, shoulderL: -18.4, elbowL: 23 } },
+    { t: 0.5, root: { x: 62, y: 63.6, rot: 3 }, joints: { spine: 2, neck: -4, hipR: -8.8, kneeR: 40, ankleR: 9.2, hipL: 20, kneeL: 3, ankleL: 2, shoulderR: 22, elbowR: 40, shoulderL: -22, elbowL: 22 } },
+    { t: 0.5625, root: { x: 62, y: 63.5, rot: 3 }, joints: { spine: 2, neck: -4, hipR: -13.9, kneeR: 37, ankleR: 3.8, hipL: 14.4, kneeL: 3.5, ankleL: -4, shoulderR: 20.8, elbowR: 39, shoulderL: -20.8, elbowL: 22.4 } },
+    { t: 0.625, root: { x: 62, y: 62.3, rot: 3 }, joints: { spine: 2, neck: -4, hipR: -8, kneeR: 41.4, ankleR: 0.2, hipL: 9.1, kneeL: 4, ankleL: -2.6, shoulderR: 16.3, elbowR: 36.3, shoulderL: -16.2, elbowL: 23.8 } },
+    { t: 0.6875, root: { x: 62, y: 61.7, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 2.1, kneeR: 60.6, ankleR: 9.3, hipL: 3.2, kneeL: 3.3, ankleL: 0.4, shoulderR: 10.1, elbowR: 32.9, shoulderL: -10.1, elbowL: 25.8 } },
+    { t: 0.75, root: { x: 62, y: 61.5, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 11.7, kneeR: 57, ankleR: 6.6, hipL: -2.8, kneeL: 2.2, ankleL: 3.8, shoulderR: 4, elbowR: 30, shoulderL: -4, elbowL: 28 } },
+    { t: 0.8125, root: { x: 62, y: 61.8, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 19, kneeR: 41.7, ankleR: 1.7, hipL: -7.9, kneeL: 2.9, ankleL: 6.7, shoulderR: -3, elbowR: 27.5, shoulderL: 3, elbowL: 31.1 } },
+    { t: 0.875, root: { x: 62, y: 62.8, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 21.7, kneeR: 21.5, ankleR: 1.6, hipL: -10.4, kneeL: 9.3, ankleL: 10.1, shoulderR: -11.2, elbowR: 25, shoulderL: 11.3, elbowL: 35 } },
+    { t: 0.9375, root: { x: 62, y: 63.1, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 21.7, kneeR: 6.7, ankleR: 2.1, hipL: -8.3, kneeL: 26.5, ankleL: 12, shoulderR: -18.4, elbowR: 23, shoulderL: 18.4, elbowL: 38.4 } },
+    { t: 1, root: { x: 62, y: 63.9, rot: 3 }, joints: { spine: 2, neck: -4, hipR: 20, kneeR: 3, ankleR: 2, hipL: -8.8, kneeL: 40, ankleL: 9.2, shoulderR: -22, elbowR: 22, shoulderL: 22, elbowL: 40 } },
   ],
 };
 

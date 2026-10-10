@@ -89,3 +89,25 @@ Only when **Mo** says the animations are ready (not on Yahya's word alone):
 
 `~/unio-animations` on its own branch, so it never collides with app work. Push
 the branch for a preview link; Mo merges.
+
+## Change log
+
+**2026-10-09, Brisk Walk redone (Claude, for Mo, build 48).** Yahya, this one
+touched your area, so here is what changed:
+
+- `WALK` in `moves/cardio.mjs` has new keys: sixteen of them, from normal gait
+  curves, side view, `cycle` loop, `dur` 1.0 (about 120 steps a minute).
+  Upright, heel lands first, the back heel peels up and pushes off, arms swing
+  opposite the legs with soft elbows. The planted foot moves back at one even
+  speed and the lowest foot stays on the floor line (within 0.3 units over 200
+  samples).
+- "Brisk Walk" is out of `REMOVED_MOVES` again, because the walk it draws is
+  new. The same object also draws Long Walk, Recovery Walk, Hike and (on the
+  treadmill) Incline Walk, so all five changed together.
+- Why it was flagged: the studio's saved copy of Brisk Walk had both legs and
+  both arms identical on every key (the old mirror bug, fixed in studio v12),
+  so the figure in the review was hopping with its feet together. The studio
+  doc `brisk-walk` is still `flagged` with those old mirrored keys. Do not ship
+  that doc; if you open Brisk Walk in the studio, hit Reset first so it loads
+  the new keys from the app once the studio's file copy is republished.
+- Onboarding's "On my feet some" draws this walk.
