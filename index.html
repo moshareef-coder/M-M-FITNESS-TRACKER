@@ -11595,7 +11595,9 @@ function renderSignInScreen(state = {}) {
     if (isNativeApp()) {
       const { data, error } = await sb.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: AUTH_DEEP_LINK, skipBrowserRedirect: true },
+        /* select_account: Google otherwise signs straight back into the
+           last account used, with no way to pick another (Mo, 2026-10-09). */
+        options: { redirectTo: AUTH_DEEP_LINK, skipBrowserRedirect: true, queryParams: { prompt: "select_account" } },
       });
       if (error || !data || !data.url) {
         console.error("google sign-in failed", error);
@@ -11610,7 +11612,7 @@ function renderSignInScreen(state = {}) {
 
     const { error } = await sb.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: window.location.origin, queryParams: { prompt: "select_account" } },
     });
     /* A failure here used to be silent: the button did nothing and the person
        had no idea whether it was them or us. */
@@ -13507,8 +13509,11 @@ function initGoalTiles(grid, { selected = {}, onPick, onSelect, confirmLabel = "
     for (const [bubble, list] of Object.entries(lines)) {
       const el = grid.querySelector(`[data-effect="${bubble}"]`);
       if (!el) continue;
-      el.textContent = list.map((l) => l.text).join(" ");
-      el.classList.toggle("flat", list.every((l) => l.flat));
+      /* Mo, 2026-10-09: no subtext under the extra goals ("Changes nothing
+         alongside Bulk up" read as a scolding). The engine still decides; the
+         tile just does not narrate it. */
+      el.textContent = "";
+      el.hidden = true;
     }
   }
 
