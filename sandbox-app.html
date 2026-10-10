@@ -2057,15 +2057,9 @@
     flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 6px;
     padding: 10px 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border);
   }
-  #scaleWeightInput {
-    width: 100%; max-width: 150px; min-width: 0; text-align: right; padding: 0;
-    background: none; border: none; color: var(--text);
-    font-size: 28px; font-weight: 800; font-family: inherit; letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums; -moz-appearance: textfield;
-  }
-  #scaleWeightInput::-webkit-outer-spin-button,
-  #scaleWeightInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  #scaleWeightInput:focus { outline: none; }
+  /* The weigh-in's number is the ruler's now (.logruler below). Its old id
+     rules sized it as a small right-aligned field and, being an id, beat the
+     ruler's, so they are gone. */
   .weigh-field:focus-within { border-color: var(--accent); }
   .weigh-unit { font-size: 14px; font-weight: 600; color: var(--muted); }
 
@@ -4751,6 +4745,25 @@
   .ob-row:last-child { border-bottom: none; }
   .ob-row b { font-weight: 700; }
 
+  /* The onboarding ruler (from onboarding/v2-2026-10-04, same rules), here for
+     logging weight and the tape. Only its base rules: the full-screen sizes
+     stay with onboarding. */
+  .ob2-ruler { position: relative; height: 96px; }
+  .ob2-ruler-sc { height: 100%; display: flex; align-items: flex-start; overflow-x: auto; overscroll-behavior: contain; scroll-snap-type: x mandatory;
+    scrollbar-width: none; touch-action: pan-x; outline: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 22%, #000 78%, transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 22%, #000 78%, transparent 100%); }
+  .ob2-ruler-sc::-webkit-scrollbar { display: none; }
+  .ob2-rpad { flex: none; width: calc(50% - 6px); }
+  .ob2-tick { flex: none; width: 12px; height: 100%; position: relative; scroll-snap-align: center; }
+  .ob2-tick::before { content: ""; position: absolute; left: 50%; top: 0; width: 2px; margin-left: -1px; height: 22px; border-radius: 1px; background: color-mix(in srgb, var(--muted) 38%, transparent); }
+  .ob2-tick.mid::before { height: 32px; background: color-mix(in srgb, var(--muted) 55%, var(--border)); }
+  .ob2-tick.maj::before { height: 44px; background: var(--muted); }
+  .ob2-tick em { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ob2-ruler-mid { position: absolute; left: 50%; top: -6px; width: 4px; margin-left: -2px; height: 58px; border-radius: 2px; background: var(--accent); pointer-events: none; box-shadow: var(--glow-accent); }
+  .ob2-ruler-sc { position: relative; }
+  .ob2-ruler-shade { position: absolute; top: 0; height: 44px; background: color-mix(in srgb, var(--accent) 22%, transparent); border-radius: 4px; pointer-events: none; }
+
   /* Hero: this week, together */
   .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   .hero-kicker { font-size: 11px; font-weight: 700; letter-spacing: .09em; color: var(--muted); text-transform: uppercase; }
@@ -6407,7 +6420,25 @@
   .prog-tile-chev { position: absolute; top: 12px; right: 9px; color: var(--muted); display: flex; }
   /* Four steppers stacked in the measurements sheet, each the weigh-in's
      geometry (round button, field, round button) under its own small label. */
-  .meas-item + .meas-item { margin-top: 18px; }
+  .logruler { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+  .logruler-val { display: flex; align-items: baseline; justify-content: center; gap: 8px; cursor: text; }
+  /* Two classes, so this beats the generic input[type="number"] rule further
+     down, which would otherwise make the big number a small grey field. */
+  .logruler .logruler-val input { width: 4.2ch; field-sizing: content; min-width: 2ch; padding: 0; border: 0; background: none; color: var(--text); text-align: center;
+    font-family: var(--font-display); font-size: 56px; font-weight: 800; letter-spacing: -.04em; line-height: 1;
+    font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+  .logruler-val input::-webkit-outer-spin-button, .logruler-val input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .logruler .logruler-val input:focus { outline: none; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 8px; }
+  .logruler .logruler-val input::placeholder { color: var(--muted); opacity: .55; }
+  .logruler-val span { font-size: 18px; font-weight: 700; color: var(--muted); }
+  .meas-tabs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+  .meas-tabs::-webkit-scrollbar { display: none; }
+  .meas-tab { flex: 1 0 auto; min-width: 64px; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    padding: 8px 12px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--panel); color: var(--muted); font: inherit; cursor: pointer; }
+  .meas-tab span { font-size: 12px; font-weight: 700; }
+  .meas-tab b { font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .meas-tab.on { border-color: var(--accent); }
+  .meas-tab.on span { color: var(--accent-ink); }
   .waist-input {
     width: 100%; max-width: 150px; min-width: 0; text-align: right; padding: 0;
     background: none; border: none; color: var(--text);
@@ -8555,14 +8586,12 @@
       <div class="wt-log" id="weightLogBlock">
         <div class="wt-log-head">Log today's weight</div>
         <p class="muted-note" id="scaleGoalNote" style="margin-top:-4px;"></p>
-        <div class="weigh-row">
-          <button type="button" class="round-btn" id="scaleMinus" aria-label="Down 0.5">&minus;</button>
-          <div class="weigh-field">
-            <input type="number" id="scaleWeightInput" inputmode="decimal" step="0.1" min="0"
-                   placeholder="0.0" autocomplete="off" aria-label="Weight" />
-            <span class="weigh-unit">lbs</span>
-          </div>
-          <button type="button" class="round-btn" id="scalePlus" aria-label="Up 0.5">+</button>
+        <!-- The onboarding ruler, Mo's pick (2026-10-07): a big number you can
+             still tap to type, and the ruler under it to drag. -->
+        <div class="logruler" id="scaleRuler">
+          <label class="logruler-val"><input type="number" id="scaleWeightInput" inputmode="decimal" step="0.1" min="0"
+                   placeholder="0.0" autocomplete="off" aria-label="Weight" /><span>lbs</span></label>
+          <div class="ob2-ruler logruler-r"></div>
         </div>
         <button type="button" class="btn-primary" id="scaleSaveBtn" style="margin-top:12px;">Save weigh-in</button>
       </div>
@@ -14573,6 +14602,122 @@ function obDaysText(data, days) {
 /* Called at the end of every step that draws chrome. Kept separate from
    obChrome because that returns a string and this touches the DOM it produced. */
 function afterObChrome() { setTimeout(paintObBot, 0); }
+
+/* The onboarding ruler, carried over from onboarding/v2-2026-10-04 with the
+   same names and text so the two branches meet in one place when they merge.
+   Here it logs weight and the tape. OB2_ROW is the wheel's row height, which
+   ob2MouseDrag needs for its vertical case. */
+const OB2_ROW = 44;
+/* A mouse drag for the sandbox and the web. Touch never comes here: a
+   finger scrolls the element natively, momentum and all. Snapping is off
+   while the mouse holds it, then the nearest stop is eased to. */
+function ob2MouseDrag(sc, axis) {
+  sc.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    const start = axis === "y" ? e.clientY : e.clientX;
+    const from = axis === "y" ? sc.scrollTop : sc.scrollLeft;
+    let moved = false;
+    sc.style.scrollSnapType = "none";
+    const move = (ev) => {
+      const dv = (axis === "y" ? ev.clientY : ev.clientX) - start;
+      if (Math.abs(dv) > 3) moved = true;
+      if (axis === "y") sc.scrollTop = from - dv; else sc.scrollLeft = from - dv;
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      sc.style.scrollSnapType = "";
+      if (moved) {
+        const step = axis === "y" ? OB2_ROW : OB2_TICK;
+        const pos = axis === "y" ? sc.scrollTop : sc.scrollLeft;
+        sc.scrollTo({ [axis === "y" ? "top" : "left"]: Math.round(pos / step) * step, behavior: "smooth" });
+        sc.addEventListener("click", (c) => { c.stopPropagation(); c.preventDefault(); }, { capture: true, once: true });
+      }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  });
+}
+/* The ruler: the same idea sideways. One snap point per tick, a whole
+   number labelled every ten (every five in kilograms), the accent line fixed
+   in the middle. */
+const OB2_TICK = 12;
+function ob2Ruler(el, { min, max, step, label }, value, { onLive, onChange, anchor = null } = {}) {
+  const n = Math.round((max - min) / step) + 1;
+  const ticks = Array.from({ length: n }, (_, i) => {
+    const v = +(min + i * step).toFixed(1);
+    const major = Math.abs(v / label - Math.round(v / label)) < 1e-6;
+    const mid = !major && Math.abs(v / (label / 2) - Math.round(v / (label / 2))) < 1e-6;
+    return `<span class="ob2-tick${major ? " maj" : mid ? " mid" : ""}">${major ? `<em>${v}</em>` : ""}</span>`;
+  }).join("");
+  el.innerHTML = `<div class="ob2-ruler-sc" tabindex="0"><span class="ob2-rpad"></span>${ticks}<span class="ob2-rpad"></span>${anchor != null ? `<i class="ob2-ruler-shade" aria-hidden="true"></i>` : ""}</div><i class="ob2-ruler-mid" aria-hidden="true"></i>`;
+  const sc = el.firstElementChild;
+  if (!sc) return { get: () => value };   // no real DOM (boot-check's stub elements)
+  const idxOf = (v) => Math.max(0, Math.min(n - 1, Math.round((v - min) / step)));
+  /* The stretch between where they are and where they are headed, shaded,
+     drawn in the scroller's own coordinates so it moves with the ticks. */
+  const shade = sc.querySelector(".ob2-ruler-shade");
+  const paintShade = (i) => {
+    if (!shade) return;
+    const pad = sc.querySelector(".ob2-rpad").offsetWidth;
+    const x = (k) => pad + k * OB2_TICK + OB2_TICK / 2;
+    const a = x(idxOf(anchor)), b = x(i);
+    shade.style.left = `${Math.min(a, b)}px`;
+    shade.style.width = `${Math.abs(b - a)}px`;
+  };
+  const at = () => Math.max(0, Math.min(n - 1, Math.round(sc.scrollLeft / OB2_TICK)));
+  let cur = idxOf(value), shown = -1, raf = 0, settle = 0;
+  const val = (i) => +(min + i * step).toFixed(1);
+  const mark = () => { const i = at(); paintShade(i); if (i !== shown) { shown = i; onLive?.(val(i)); } };
+  sc.addEventListener("scroll", () => {
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(mark);
+    clearTimeout(settle); settle = setTimeout(() => { const i = at(); if (i !== cur) { cur = i; onChange?.(val(i)); } }, 150);
+  }, { passive: true });
+  sc.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    sc.scrollTo({ left: (at() + (e.key === "ArrowRight" ? 1 : -1)) * OB2_TICK, behavior: "smooth" });
+  });
+  ob2MouseDrag(sc, "x");
+  sc.scrollLeft = cur * OB2_TICK;
+  requestAnimationFrame(() => { sc.scrollLeft = cur * OB2_TICK; mark(); });
+  mark();
+  return { get: () => val(cur) };
+}
+/* The ruler outside onboarding: logging weight and the tape. `input` is the
+   big number and stays the value of record (the save paths read it), so it
+   can still be typed into; a typed number re-centres the ruler on blur. The
+   ruler spans `span` either side of the value, so a weigh-in is a few hundred
+   ticks rather than every half pound from 70 to 500. */
+function mountLogRuler(host, input, { step, label, span, floor = 0, fallback, onPick }) {
+  const r = host?.querySelector?.(".logruler-r");
+  if (!r || !input) return;
+  /* The ruler only writes once a finger (or wheel, or arrow key) has moved
+     it. With no reading on file it starts on `fallback`, and that number is
+     a hint, shown as the placeholder, never a value nobody measured. */
+  let moved = false;
+  const go = () => { moved = true; };
+  ["pointerdown", "touchstart", "wheel", "keydown"].forEach((t) => r.addEventListener(t, go, { passive: true }));
+  const fmt = (x) => x.toFixed(step < 1 ? 1 : 0);
+  const mount = () => {
+    const v = parseFloat(input.value);
+    const at = Number.isFinite(v) && v > 0 ? v : fallback;
+    input.placeholder = fmt(at);
+    const min = Math.max(floor, Math.floor((at - span) / label) * label);
+    const max = Math.ceil((at + span) / label) * label;
+    ob2Ruler(r, { min, max, step, label }, at, {
+      onLive: (x) => { if (moved && document.activeElement !== input) input.value = fmt(x); },
+      onChange: (x) => { if (!moved) return; input.value = fmt(x); onPick?.(x); },
+    });
+  };
+  input.onblur = () => { mount(); onPick?.(parseFloat(input.value) || 0); };
+  /* Not while hidden: with no width the ruler cannot centre, sits at one
+     end, and its first reading would be written into the number. Mounted the
+     first time it gets a size instead. */
+  if (r.offsetWidth || typeof ResizeObserver === "undefined") { mount(); return; }
+  const ro = new ResizeObserver(() => { if (r.offsetWidth) { ro.disconnect(); mount(); } });
+  ro.observe(r);
+}
 
 /* Where a draft saved by an older build lands. Keyed by the id that build
    wrote, valued at the step standing in the same place in this one. */
@@ -23282,16 +23427,13 @@ function renderScaleCheck() {
     ? "Logged today. Change it if you need to."
     : lastWeight != null
       ? `Last logged ${lastWeight.toFixed(1)} lbs.`
-      : "First weigh-in. Type it in.";
+      : "First weigh-in. Slide to it, or tap the number to type.";
 
   input.oninput = () => { SCALE_STATE.weight = parseFloat(input.value) || 0; };
-  const nudge = (delta) => {
-    const next = Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10);
-    input.value = String(next);
-    SCALE_STATE.weight = next;
-  };
-  $("scaleMinus").onclick = () => nudge(-0.5);
-  $("scalePlus").onclick = () => nudge(0.5);
+  if (document.activeElement !== input) {
+    mountLogRuler($("scaleRuler"), input, { step: 0.5, label: 5, span: 60, floor: 50, fallback: 170,
+      onPick: (x) => { SCALE_STATE.weight = x; } });
+  }
 
 }
 
@@ -47304,37 +47446,49 @@ function renderMeasurementsSheet() {
       <div class="spacer"></div>
     </div>
     <p class="muted-note" style="margin:-6px 0 14px;">Taken today. Only the ones you change are saved.</p>
-    ${measRowsToShow().map((m) => {
+    ${/* One measurement at a time on the ruler (Mo, 2026-10-07): a tab per
+          measurement with its number under it, the picked one big with the
+          ruler below. Each still has its own input, which is what Save reads. */ ""}
+    <div class="meas-tabs" role="tablist">${measRowsToShow().map((m, i) => {
       const last = lastMeasurement(m.key);
-      return `<div class="meas-item" data-key="${m.key}">
-        <div class="wt-log-head">${m.label}</div>
-        <div class="weigh-row">
-          <button type="button" class="round-btn" data-nudge="-0.5" aria-label="${m.label} down 0.5">&minus;</button>
-          <div class="weigh-field">
-            <input type="number" class="waist-input" inputmode="decimal" step="0.5" min="0"
+      return `<button type="button" role="tab" class="meas-tab${i ? "" : " on"}" data-tab="${m.key}">
+        <span>${escapeHtml(m.label)}</span><b data-show="${m.key}">${last === null ? "-" : last.toFixed(1)}</b></button>`;
+    }).join("")}</div>
+    ${measRowsToShow().map((m, i) => {
+      const last = lastMeasurement(m.key);
+      return `<div class="meas-item logruler${i ? " hidden" : ""}" data-key="${m.key}">
+        <label class="logruler-val"><input type="number" inputmode="decimal" step="0.25" min="0"
                    placeholder="0.0" autocomplete="off" aria-label="${m.label}"
-                   value="${last === null ? "" : last.toFixed(1)}" />
-            <span class="weigh-unit">${escapeHtml(m.unit || "in")}</span>
-          </div>
-          <button type="button" class="round-btn" data-nudge="0.5" aria-label="${m.label} up 0.5">+</button>
-        </div>
+                   value="${last === null ? "" : last.toFixed(1)}" /><span>${escapeHtml(m.unit || "in")}</span></label>
+        <div class="ob2-ruler logruler-r"></div>
       </div>`;
     }).join("")}
     <button type="button" class="btn-primary" id="measSaveBtn" style="margin-top:18px;">Save</button>`;
 
   $("measClose").onclick = closeMeasurementsSheet;
-  $("measureSheet").querySelectorAll(".meas-item").forEach((item) => {
-    const key = item.dataset.key;
+  const sheet = $("measureSheet");
+  /* A ruler is mounted when its tab is first opened: a hidden one has no width
+     to centre itself on. */
+  const mounted = new Set();
+  const open = (key) => {
+    sheet.querySelectorAll(".meas-tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === key));
+    sheet.querySelectorAll(".meas-item").forEach((it) => it.classList.toggle("hidden", it.dataset.key !== key));
+    if (mounted.has(key)) return;
+    mounted.add(key);
+    const item = sheet.querySelector(`.meas-item[data-key="${key}"]`);
     const input = item.querySelector("input");
-    input.oninput = () => MEAS_TOUCHED.add(key);
-    item.querySelectorAll("[data-nudge]").forEach((b) => {
-      b.onclick = () => {
-        const delta = Number(b.dataset.nudge);
-        input.value = String(Math.max(0, Math.round(((parseFloat(input.value) || 0) + delta) * 10) / 10));
-        MEAS_TOUCHED.add(key);
-      };
-    });
-  });
+    const show = () => { const b = sheet.querySelector(`[data-show="${key}"]`); if (b) b.textContent = input.value || "-"; };
+    input.oninput = () => { MEAS_TOUCHED.add(key); show(); };
+    /* Weight rides the same sheet on the check-in (CHECKIN_ROWS), and needs
+       the scale's ruler, not the tape's: half-pound steps over 60 lb. */
+    const spec = key === "weight"
+      ? { step: 0.5, label: 5, span: 60, floor: 50, fallback: (typeof currentWeightLb === "function" && currentWeightLb(ME)) || 170 }
+      : { step: 0.25, label: 1, span: 12, fallback: key === "waist_in" ? 32 : key === "hips_in" ? 38 : key === "chest_in" ? 40 : key === "thigh_in" ? 22 : 13 };
+    mountLogRuler(item, input, { ...spec, onPick: () => { MEAS_TOUCHED.add(key); show(); } });
+  };
+  sheet.querySelectorAll(".meas-tab").forEach((t) => { t.onclick = () => open(t.dataset.tab); });
+  const first = sheet.querySelector(".meas-tab");
+  if (first) open(first.dataset.tab);
   $("measSaveBtn").onclick = saveMeasurements;
 }
 
