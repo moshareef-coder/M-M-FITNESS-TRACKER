@@ -138,6 +138,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // looking for. The web layer ends the ones it knows about; this is the
         // backstop for the ones it cannot know about.
         LiveWorkout.sweepStaleActivities()
+        lockSidewaysScroll()
+    }
+
+    // Mo, build 46: "I can scroll right and left, it still acts as if it's a
+    // web app." The page clips its own overflow (body overflow-x: clip), and
+    // this is the native half: the web view never offers a sideways bounce,
+    // and a diagonal drag locks to whichever direction it started in, as a
+    // native scroll view does. Vertical scrolling and its bounce are untouched.
+    private func lockSidewaysScroll() {
+        guard let bridgeVC = window?.rootViewController as? CAPBridgeViewController,
+              let scroll = bridgeVC.webView?.scrollView else { return }
+        scroll.alwaysBounceHorizontal = false
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.isDirectionalLockEnabled = true
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
