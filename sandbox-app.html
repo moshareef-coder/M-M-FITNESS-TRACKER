@@ -1082,6 +1082,10 @@
      same weight the typed code is: at 21px with that tracking, CODE OR LINK
      fills the field edge to edge and reads as a value somebody already
      entered. */
+  .pair-row { display: flex; gap: 8px; align-items: stretch; }
+  /* By id, to beat #onboard input's margin, which made the row taller than the field. */
+  .pair-row > #partnerCodeInput.code-input { flex: 1; min-width: 0; margin: 0; }
+  .pair-row .pair-paste { flex: none; width: auto; margin: 0; padding: 0 14px; min-height: 0; height: auto; white-space: nowrap; font-size: 14px; color: var(--text); }
   .code-input::placeholder { font-size: 14px !important; letter-spacing: 0.06em; font-weight: 600; opacity: .6; }
   /* The line under a control that says what pressing it does, and doubles as
      where that control reports back. Sits tight to the thing above it, which
@@ -5620,6 +5624,9 @@
      two 10px gaps. 216 was 20px short, so on Setup's Session, where the effort
      dial takes the room, the last row hung out of its box onto Save. */
   .ob2 .ob2-body .ob2-fill:has(> .ob2-minchips) { min-height: 240px; }
+  /* The partner-covers-you screen also carries the beta line (2026-10-10);
+     the robot gives up 30px of floor so it all fits on a 390x844. */
+  .ob2 .ob2-body:has(> .ob2-betanote) .ob2-fill-bot { min-height: 120px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-daysfill) { min-height: 210px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-duo) { min-height: 280px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-kitgrid) { min-height: 230px; }
@@ -5761,10 +5768,24 @@
   .ob2-sign-type::placeholder { color: color-mix(in srgb, var(--muted) 60%, transparent); }
   .ob2-sign-pad:focus-within { border-color: var(--accent-ink); }
   .ob2-sign-row { display: flex; justify-content: space-between; align-items: center; }
+  /* The main goal, pinned over the extras on goal2. Drawn as a chosen card
+     (the accent edge every picked card has) but not a button: Change is. */
+  .ob2-maingoal { display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 14px; border-radius: 16px;
+    border: 1.5px solid var(--accent-ink, var(--accent)); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .ob2-maingoal .ob2-ico { flex: none; color: var(--accent-ink, var(--accent)); }
+  .ob2-maingoal-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ob2-maingoal-t small { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ob2-maingoal-t b { font-size: 16px; font-weight: 700; color: var(--text); }
+  .ob2-maingoal .ob2-link { padding: 10px 10px; color: var(--accent-ink, var(--accent)); }
+  .ob2-extras-k { margin: 14px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .ob2-link { font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: none; border: 0; padding: 10px 2px; min-height: 44px; cursor: pointer; }
   .ob2-link:disabled { opacity: .4; cursor: default; }
   .ob2-link:not(:disabled):active { color: var(--text); }
   .ob2-link:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 6px; }
+  .ob2-sign-kept { position: absolute; left: 16px; right: 16px; bottom: 7px; text-align: center; font-size: 11.5px; line-height: 1.2;
+    color: var(--muted); pointer-events: none; }
+  .ob2-betanote { margin: 0; padding: 10px 4px 0; display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: var(--muted); }
+  .ob2-betanote svg { flex: none; margin-top: 1px; color: var(--accent-ink, var(--accent)); }
   .ob2-sign-seat { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
   @media (prefers-reduced-motion: reduce) { .ob2-sign-pad { transition: none; } }
   /* MacroFactor's pickers: wheels, a ruler, a unit switch. */
@@ -10795,13 +10816,14 @@
 /* Where the public site lives: the privacy policy, the support page, and the
    link that goes out when somebody shares a session.
 
-   One constant because it was three, and because it is going to change. The
-   app is called Unio and this says m-m-fitness-tracker, which people see when a
-   session is shared and which an App Store reviewer sees on the privacy link
-   from the sign in screen. Both of those uses need a URL that actually
-   resolves, so this stays until there is a real domain, and then it is one line
-   rather than a hunt. */
-const PUBLIC_SITE = "https://m-m-fitness-tracker.vercel.app";
+   One constant because it was three. It said m-m-fitness-tracker until
+   2026-10-10, which is what people saw on every invite link; Mo: "looks
+   weird". trainwithunio.com is the real domain now and serves /privacy,
+   /terms and /support itself (the .html names redirect there, and the
+   policy text was checked identical to the old host's on 2026-10-10).
+   The old host stays in the associated domains entitlement, so invite links
+   already sent from it still open the app. */
+const PUBLIC_SITE = "https://trainwithunio.com";
 const APP_STORE_URL = "https://apps.apple.com/app/id6812201708";
 
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
@@ -10955,6 +10977,17 @@ let PENDING_TOKEN = (() => {
   } catch { /* private mode, or no history API */ }
   return tok;
 })();
+
+/* A ?invite=CODE link on one of our own hosts, for appUrlOpen. Any other host
+   is somebody else's link and not ours to read. */
+function ob2InviteCodeFrom(url) {
+  try {
+    const u = new URL(url);
+    if (!/^(www\.)?trainwithunio\.com$|^m-m-fitness-tracker\.vercel\.app$/.test(u.hostname)) return null;
+    const q = (u.searchParams.get("invite") || "").trim();
+    return /^[A-Z0-9]{6}$/i.test(q) ? q.toUpperCase() : null;
+  } catch { return null; }
+}
 
 function holdInviteToken(tok) {
   if (!tok) return false;
@@ -11295,6 +11328,17 @@ function registerAuthDeepLink() {
        it is the whole job: the sign in screen is what comes next and
        checkPartnershipThenEnter claims it on the way through. */
     const invite = url && inviteTokenFrom(url);
+    /* The six character code as a link, trainwithunio.com/?invite=CODE (or
+       the old host). It cannot pair anybody by itself, the same as on the
+       web: it is held and waits, filled in, in the code box. */
+    const codeIn = !invite && ob2InviteCodeFrom(url);
+    if (codeIn) {
+      PENDING_INVITE = codeIn;
+      try { sessionStorage.setItem(PENDING_INVITE_KEY, codeIn); } catch { /* private mode */ }
+      const box = $("partnerCodeInput") || $("setupPartnerCode");
+      if (box && !box.value) box.value = codeIn;
+      return;
+    }
     if (invite) {
       holdInviteToken(invite);
       const { data } = await sb.auth.getSession();
@@ -11515,6 +11559,7 @@ function renderSignInScreen(state = {}) {
       <div class="si-start">
         <button type="button" class="btn-primary" id="siStart">Get started</button>
         <button type="button" class="btn-ghost si-have" id="siHave">I already have an account</button>
+        ${PENDING_TOKEN ? "" : `<button type="button" class="si-forgot" id="siPasteInvite">Got an invite link? Paste it</button>`}
       </div>
       <div class="si-scrim" id="siScrim"></div>
       <div class="si-sheet si-pop" id="siSheet" role="dialog" aria-modal="true" aria-labelledby="siSheetH">
@@ -11574,6 +11619,32 @@ function renderSignInScreen(state = {}) {
     $("siSheet").setAttribute("aria-hidden", "false");
   };
   const closeSheet = () => { screen.classList.remove("sheet-open"); $("siSheet").setAttribute("aria-hidden", "true"); };
+  /* Somebody whose partner invited them, who installed from the App Store
+     rather than through the link, so nothing about the link survived the
+     install. The website copied it to the clipboard on the way; this holds
+     it, the same as tapping the link before signing in would, and signing in
+     then takes them to the accept step (path B). */
+  if ($("siPasteInvite")) $("siPasteInvite").onclick = async () => {
+    let text = "";
+    try { text = (await navigator.clipboard.readText()).trim(); } catch { /* refused */ }
+    const tok = inviteTokenFrom(text);
+    if (tok) {
+      holdInviteToken(tok);
+      $("siPasteInvite").remove();
+      openSheet("start");
+      msg("Invite saved. Sign in and you'll be paired.", "ok");
+      return;
+    }
+    const code = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length === 6) {
+      PENDING_INVITE = code;
+      try { sessionStorage.setItem(PENDING_INVITE_KEY, code); } catch { /* private mode */ }
+      openSheet("start");
+      msg(`Code ${code} saved. Sign in, and it's filled in when you get to your partner.`, "ok");
+      return;
+    }
+    toast(text ? "That's not an invite link. Ask them to send it again." : "Nothing to paste. Copy their invite link first.");
+  };
   $("siStart").onclick = () => openSheet("start");
   $("siHave").onclick = () => openSheet("signin");
   $("siClose").onclick = closeSheet;
@@ -12440,9 +12511,12 @@ function pairEntryHtml(myCode) {
 
       <div class="code-divider"><span>or</span></div>
 
-      <input id="partnerCodeInput" type="text" placeholder="CODE OR LINK"
-             autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
-             value="${escapeHtml(PENDING_INVITE || "")}" />
+      <div class="pair-row">
+        <input id="partnerCodeInput" type="text" placeholder="CODE OR LINK"
+               autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
+               value="${escapeHtml(PENDING_INVITE || "")}" />
+        <button type="button" class="btn-ghost pair-paste" id="pairPasteBtn">Paste invite</button>
+      </div>
       <p class="ob-hint" id="pairHint">Their six characters, or paste the whole link.</p>
 
       <p class="ob-mine" id="myCodeLine"${myCode ? "" : " hidden"}>Your code is <strong id="myInviteCode">${escapeHtml(myCode || "")}</strong></p>`;
@@ -12539,6 +12613,21 @@ function wirePairEntry({ onPaired, onPending, onShared }) {
   /* Enter is still honoured for anyone on a keyboard, and for the case where
      six characters were already in the box when the screen was drawn. */
   input.onkeydown = (e) => { if (e.key === "Enter") submit(input.value); };
+  /* One tap instead of a long press and Paste in a small box. The website
+     copies the whole trainwithunio.com/j/ link before it sends somebody to
+     the App Store, so after the install this is the link, and a link pairs
+     straight away (it was made for them, which is the consent). A code goes
+     the same way a typed one does. */
+  const paste = $("pairPasteBtn");
+  if (paste) paste.onclick = async () => {
+    let text = "";
+    try { text = (await navigator.clipboard.readText()).trim(); } catch { /* refused */ }
+    if (!text) { say("Nothing to paste. Long press the box and paste, or type their code.", true); return; }
+    if (inviteTokenFrom(text)) { input.value = text; submit(text); return; }
+    const code = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length === 6) { input.value = code; submit(code); return; }
+    say("That's not an invite link or a code. Ask them to send it again.", true);
+  };
 }
 
 /* Onboarding, rebuilt to one rule: ask the goal, then TELL them the plan.
@@ -12809,8 +12898,8 @@ async function shareInviteLink(btn) {
        the code is what they still have in their hand afterwards. */
     const code = MY_PROFILE?.invite_code;
     const text = code
-      ? `${who} wants to train with you on Unio.\n\nTap the link. If you do not have the app yet it will take you to the App Store, and you can pair with the code ${code} once you are in.`
-      : `${who} wants to train with you on Unio. This link is for you and works once.`;
+      ? `${who} wants to train with you on Unio.\n\nTap the link to pair up. No app yet? It takes you to the App Store, and once you're in, pair with the code ${code}.`
+      : `${who} wants to train with you on Unio. This link is just for you and works once.`;
 
     try {
       if (navigator.share) { await navigator.share({ title: "Unio", text, url }); return true; }
@@ -15692,7 +15781,13 @@ const OB2_PATH_A = [
   { id: "taste3", off: "Mo cut the live invite demo for now (2026-10-08). Back in 1.2." },
   "build", "preview",
   { id: "account", off: "Sign-in already happened before onboarding started." },
-  "beta", "commit", "pay2", "invite", "notify", "home",
+  /* Mo, 2026-10-10: the commitment comes after payment, not before it, so
+     the signature is the first thing they do as a member rather than a hoop
+     before the price. And the beta screen folded into the paywall (its one
+     line is ob2BetaNote), so the price no longer arrives two screens after
+     a screen about being new. */
+  { id: "beta", off: "Folded into the pay screen, Mo, 2026-10-10. See ob2BetaNote." },
+  "pay2", "commit", "invite", "notify", "home",
 ];
 const OB2_PATH_B = [
   "accept", "hello", "theme", "name", "goal", "goal2", "stop", "two",
@@ -15700,7 +15795,9 @@ const OB2_PATH_B = [
   { id: "taste2", off: "Mo cut the sample set (2026-10-07). He did not like it." },
   "styles", "equip", "focus", "hurts", "warmup", "days", "freq", "minutes",
   { id: "taste3", off: "Mo cut the live invite demo for now (2026-10-08). Back in 1.2." },
-  "build", "preview", "beta", "commit", "pay", "notify",
+  "build", "preview",
+  { id: "beta", off: "Folded into the pay screen, Mo, 2026-10-10. See ob2BetaNote." },
+  "pay", "commit", "notify",
 ];
 
 const ob2Path = (d) => (d.path === "b" ? OB2_PATH_B : OB2_PATH_A);
@@ -15816,6 +15913,14 @@ const OB2_REACT = {
 
 /* Called by renderOnboardStep for any "v2:" step. */
 function renderObV2(id, d) {
+  /* A draft saved on a screen this build has switched off (beta, after
+     2026-10-10) resumes on the next screen that is still on, rather than at
+     the very start with every answer already given. */
+  if (!ob2Ids(d).includes(id)) {
+    const path = ob2Path(d), at = path.findIndex((e) => e?.id === id);
+    const on = at < 0 ? null : path.slice(at + 1).find((e) => typeof e === "string");
+    if (on) id = on;
+  }
   if (!ob2Ids(d).includes(id) || !OB2[id]) id = ob2Ids(d)[0];
   /* A Setup editor left open (signed out from under it) must not keep these
      screens painting into Setup. */
@@ -16027,7 +16132,7 @@ function ob2PaintSet(d, o) {
         ${/* Back from the first screen leaves for Setup, so it says Setup; from
               a later one it is a step back inside this edit (S.back). */ ""}
         <button type="button" class="nav-back" id="ob2Back" aria-label="${first ? "Back to Setup" : "Back"}">${icon("chevronLeft", 20)}${first ? "Setup" : "Back"}</button>
-        <div class="scr-title">${escapeHtml(S.title)}</div>
+        <div class="scr-title">${escapeHtml(o.setTitle || S.title)}</div>
         <div class="spacer"></div>
       </div>
       <div class="home-quip done ob2-host">
@@ -16910,6 +17015,12 @@ function ob2WireSign(ui, { onSigned } = {}) {
    Trial." So under the buttons, in this order: the price and auto-renew
    line, when the charge happens, then Terms, Privacy and Restore. Every line
    Apple reviews for (guideline 3.1.2) is still on the screen. */
+/* What is left of the beta screen, Mo, 2026-10-10: one quiet line on the
+   pay screen. His headline already says "We're in beta" whether or not there
+   is a free month, so this is only the half the headline cannot say. */
+function ob2BetaNote() {
+  return `<p class="ob2-betanote">${icon("star", 16)}<span>Unio's just starting out. Things will change, and you get a say in what.</span></p>`;
+}
 function ob2PayHead() {
   const t = ob2Terms();
   return `<div class="ob2-payhead">
@@ -16960,9 +17071,13 @@ function ob2WirePrice(ui, d) {
   OB2_PAY_D = d;
   /* Repainted when the offering lands, so a store with no free trial never
      shows a trial it will not give. */
+  /* Previous from the commitment lands back here after paying. Buying again
+     would put Apple's "already subscribed" sheet in their way, so the button
+     just goes on. */
+  const paid = !!d.started_trial;
   const paint = () => {
     const t = ob2Terms();
-    if ($("ob2Next")) $("ob2Next").textContent = t.cta;
+    if ($("ob2Next")) $("ob2Next").textContent = paid ? "Continue" : t.cta;
     if ($("ob2Fine")) $("ob2Fine").innerHTML = ob2FineHTML(t);
     if ($("ob2PcH")) $("ob2PcH").textContent = t.free ? t.trial : "Unio Plus";
     if ($("ob2Tl")) $("ob2Tl").outerHTML = ob2PayHTML(OB2_PAY_D || {});
@@ -16971,6 +17086,7 @@ function ob2WirePrice(ui, d) {
   primeOfferings()?.then((o) => { OB2_OFFER = o; paint(); }).catch(() => {});
   paint();
   $("ob2Next").onclick = async () => {
+    if (paid) { ui.next(); return; }
     $("ob2Next").disabled = true;
     let bought = false;
     if (purchasesPlugin()) {
@@ -17716,7 +17832,11 @@ const OB2 = {
   goal: { ch: 1, render(d, ui) {
     let pick = d.goal_bubble && goalTileFor(d.goal_bubble) ? d.goal_bubble : null;
     ui.paint({
-      title: `Right${ob2Name(d) ? `, ${ob2Name(d)}` : ""}. What are we actually doing here?`,
+      /* Mo, 2026-10-10: people did not realise the first pick is the main
+         one, and wanted more than three. So he says it: one, and it is the
+         main one. The extras get their own screen next. */
+      title: `Right${ob2Name(d) ? `, ${ob2Name(d)}` : ""}. What's your main goal? Pick one.`,
+      setTitle: "Main goal",
       body: ob2ChoiceHTML(GOAL_TILES.map((t) => ({ id: t.id, label: t.title, sub: t.sub, ico: t.ico })), pick, { attr: "goal" }),
       cta: "That's the goal", ctaOff: !pick,
       onNext: () => {
@@ -17745,14 +17865,27 @@ const OB2 = {
        and cannot be tapped, with the reason on it. */
     const claim = (b) => goalTileFor(b)?.claim || null;
     const clashes = (b) => [d.goal_bubble, ...picked.filter((x) => x !== b)].some((h) => claim(h) && claim(b) && claim(h) !== claim(b));
+    /* A tile dimmed because two are already picked says so on itself, so the
+       dimming never looks like a bug. */
+    const full = (b) => !picked.includes(b) && picked.length >= MAX;
     const opts = () => GOAL_TILES.filter((t) => t.id !== d.goal_bubble && t.id !== "consistent").map((t) => ({
       id: t.id, label: t.title, ico: t.ico,
-      sub: clashes(t.id) ? `Pulls against ${ob2GoalTitle(d.goal_bubble).toLowerCase()}` : t.sub,
-      off: clashes(t.id) || (!picked.includes(t.id) && picked.length >= MAX),
+      sub: clashes(t.id) ? `Pulls against ${ob2GoalTitle(d.goal_bubble).toLowerCase()}` : full(t.id) ? "Two picked. Untick one to swap." : t.sub,
+      off: clashes(t.id) || full(t.id),
     }));
+    /* The main goal, pinned above the extras and already chosen, so the
+       order of the two screens is visible on this one: one main goal, then
+       up to two on the side. Change goes back to the main goal screen. */
+    const main = goalTileFor(d.goal_bubble);
+    const pin = main ? `<div class="ob2-maingoal">
+        <span class="ob2-ico">${icon(main.ico, 18)}</span>
+        <span class="ob2-maingoal-t"><small>Main goal</small><b>${escapeHtml(main.title)}</b></span>
+        <button type="button" class="ob2-link" id="ob2MainChange">Change</button>
+      </div><p class="ob2-extras-k">Extras, up to ${MAX}</p>` : "";
     ui.paint({
-      title: "Anything else while we're at it? Two more, max. I have limits.",
-      body: `<div id="ob2Goal2">${ob2ChoiceHTML(opts(), picked, { multi: true, attr: "g2" })}</div>`,
+      title: "Anything else on the side? Up to two.",
+      setTitle: "Extras",
+      body: `${pin}<div id="ob2Goal2">${ob2ChoiceHTML(opts(), picked, { multi: true, attr: "g2" })}</div>`,
       cta: "Continue", skip: true,
       onSkip: () => ui.skip({ goal_secondary: [] }),
       onNext: () => ui.next({ goal_secondary: picked.map((b) => ({ bubble: b, child: null })) }),
@@ -17778,9 +17911,10 @@ const OB2 = {
       const id = b.dataset.g2;
       const adding = !picked.includes(id);
       picked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id].slice(0, MAX);
-      if (adding) ob2Type($("ob2Q"), picked.length >= MAX ? "That's two. I'm a robot, not a miracle worker." : "Greedy. I like it.");
+      if (adding) ob2Type($("ob2Q"), picked.length >= MAX ? "That's two, the most I can plan well. Untick one to swap." : "Greedy. I like it.");
       sync();
     });
+    if ($("ob2MainChange")) $("ob2MainChange").onclick = () => ui.back();
   } },
 
   /* Chapter 2. Him asking, the answers, and nothing under them: Mo, round 9,
@@ -19056,7 +19190,10 @@ build: { ch: 5, render(d, ui) {
 
   /* Round 3: said plainly, before the promise and the price. Unio is new,
      and an early member gets the free month. Nothing here is a countdown or
-     a "limited" anything; it is the truth about where the app is. */
+     a "limited" anything; it is the truth about where the app is.
+     Switched off in both paths, Mo, 2026-10-10: it said the same thing as
+     the paywall right after it, so its one line moved onto that screen
+     (ob2BetaNote). Kept so it can come back by flipping the path entry. */
   beta: { ch: 5, render(d, ui) {
     const covered = d.path === "b" && d.covered === true;
     ui.paint({
@@ -19122,6 +19259,7 @@ build: { ch: 5, render(d, ui) {
           <div class="ob2-sign-pad" id="ob2SignPad">
             <span class="ob2-sign-hint" id="ob2SignHint" aria-hidden="true">Sign here with your finger</span>
             <div class="ob2-sign-line" aria-hidden="true"><span>X</span></div>
+            ${/* True, see ob2WireSign: the canvas is never read back and the typed name never leaves the input. */ ""}<small class="ob2-sign-kept">Your signature stays on this screen. We don't save it.</small>
             <canvas id="ob2SignCv" role="img" aria-label="Signature pad. Sign with your finger, or choose Type your name instead."></canvas>
             <input type="text" class="ob2-sign-type" id="ob2SignType" autocomplete="name" spellcheck="false"
               placeholder="${escapeHtml(me || "Your name")}" aria-label="Type your name to sign" hidden>
@@ -19139,11 +19277,13 @@ build: { ch: 5, render(d, ui) {
     ob2WireSign(ui, { onSigned: () => { if (!said && $("ob2Q")) { said = true; ob2Type($("ob2Q"), "Signed. I'm holding you to it."); } } });
   } },
 
-  /* The paywall, one page: see ob2WirePrice. */
+  /* The paywall, one page: see ob2WirePrice. Since 2026-10-10 it also
+     carries the beta screen's message (ob2BetaNote), and the commitment
+     comes right after it. */
   pay2: { ch: 5, render(d, ui) {
     ui.paint({
-      title: ob2Terms().free ? "We're in beta. Your first month's on me." : "One plan. Covers you and your partner. Bargain.",
-      body: ob2PayHTML(d) + ob2PayHead(),
+      title: ob2Terms().free ? "We're in beta. Your first month's on me." : "We're in beta. One plan covers you and your partner. Bargain.",
+      body: ob2PayHTML(d) + ob2BetaNote() + ob2PayHead(),
       cta: ob2Terms().cta,
       foot: ob2PayFoot(),
     });
@@ -19156,21 +19296,27 @@ build: { ch: 5, render(d, ui) {
   /* B26. One subscription covers both (is_premium() answers for a partner's
      purchase). `covered` was measured on Accept, before this account had a
      profile row, which is the one moment is_premium() cannot be answering
-     for this person's own free month; see ob2LoadPartner. */
+     for this person's own free month; see ob2LoadPartner.
+
+     TODO, an idea Mo wants to think about later (2026-10-10), not built: for
+     somebody who arrived by invite, ask "Do you have a partner? Got a code?"
+     right before this screen, so a partner who already pays is found (and
+     the covered branch below shown) before anybody is asked for money. */
   pay: { ch: 5, render(d, ui) {
     if (d.covered === true) {
       ui.paint({
         title: `${ob2Partner(d)}'s plan covers you both. Nothing to pay. I checked twice.`,
         body: `${ob2HeroBot(150)}${ob2PairHTML(ob2Name(d) || "You", ob2Partner(d), { joined: true })}
           ${ob2Card("Open for both of you", `<div class="ob2-rows">${PREMIUM_UNLOCKS.slice(0, 4).map(([, ico, tint, t]) =>
-          `<div class="ob2-row-i"><span style="color:${tint}">${icon(ico, 18)}</span><p><b>${escapeHtml(t)}</b></p></div>`).join("")}</div>`)}`,
+          `<div class="ob2-row-i"><span style="color:${tint}">${icon(ico, 18)}</span><p><b>${escapeHtml(t)}</b></p></div>`).join("")}</div>`)}
+          ${ob2BetaNote()}`,
         cta: "Start training", onNext: () => ui.next(),
       });
       return;
     }
     ui.paint({
-      title: ob2Terms().free ? "We're in beta. Your first month's on me." : `One plan. Covers you and ${ob2Partner(d)}. Bargain.`,
-      body: ob2PayHTML(d) + ob2PayHead(),
+      title: ob2Terms().free ? "We're in beta. Your first month's on me." : `We're in beta. One plan covers you and ${ob2Partner(d)}. Bargain.`,
+      body: ob2PayHTML(d) + ob2BetaNote() + ob2PayHead(),
       cta: ob2Terms().cta,
       foot: ob2PayFoot(),
     });
