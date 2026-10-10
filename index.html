@@ -89,6 +89,20 @@
        buttons take a deeper red than the trend and alert text colour. */
     --up-fill: #c93c52;
     --radius: 16px;
+    /* Spacing, set 2026-10-09 for build 47. Mo, on build 46: "the Save, it's
+       too close to the buttons. We need to just space out everything." Four
+       numbers instead of one per screen, so the next screen inherits them:
+       --sp-stack   between cards and controls stacked in one column
+       --sp-action  from the last control to the button that acts on it
+       --page-x     the page's side margin, the same on every tab and page
+       --end-gap    how far the last thing on a page clears the centre button
+       --nav-lift   how high the docked bar reaches: 68px of bar plus the
+                    10px the centre button rises above its hairline */
+    --sp-stack: 12px;
+    --sp-action: 24px;
+    --page-x: 18px;
+    --end-gap: 24px;
+    --nav-lift: 78px;
     /* One family, not two. DM Sans reads warmer and more human than IBM Plex
        (which leans technical/enterprise) and is strong enough at large sizes
        to also carry the numbers, so display doesn't need a second typeface.
@@ -317,13 +331,15 @@
   }
   /* viewport-fit=cover + black-translucent puts content under the status bar,
      so the top padding must clear the notch / Dynamic Island. */
-  /* The bottom padding is the docked tab bar's height (68px, measured) plus
-     22px of breathing room, so the last card on every tab scrolls clear of the
-     bar instead of stopping under it. Keep it in step with .tabs. The safe
-     area is added on top of both, since the bar eats it too. */
+  /* The bottom padding is where a page stops scrolling: the bar's reach
+     (--nav-lift) plus --end-gap, so the last card clears the centre button by
+     exactly that and the page scrolls no further. Less 10px, because nearly
+     every page ends on a card whose own 10px margin-bottom already counts
+     towards the gap. Keep --nav-lift in step with .tabs and .fab. The safe
+     area is added on top, since the bar eats it too. */
   #app {
     max-width: 480px; margin: 0 auto; min-height: 100dvh;
-    padding: calc(22px + env(safe-area-inset-top, 0px)) 18px calc(90px + env(safe-area-inset-bottom, 0px));
+    padding: calc(22px + env(safe-area-inset-top, 0px)) var(--page-x) calc(var(--nav-lift) + var(--end-gap) - 10px + env(safe-area-inset-bottom, 0px));
   }
   .hidden { display: none !important; }
 
@@ -5308,9 +5324,9 @@
      starts right under him and the spare height sits above the button, where
      a thumb expects air. A screen whose one visual wants the space still
      takes it, through ob2Fill. */
-  .ob2 > .ob2-body { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; margin-top: 12px; }
+  .ob2 > .ob2-body { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-start; gap: var(--sp-stack); margin-top: var(--sp-stack); }
   .ob2 > .ob2-body > * { margin-top: 0; margin-bottom: 0; }
-  .ob2 > .ob2-foot { margin-top: 0; padding-top: 16px; }
+  .ob2 > .ob2-foot { margin-top: 0; padding-top: var(--sp-action); }
   .ob2-herobot { display: flex; justify-content: center; }
   .ob2-rowcard { background: var(--card-fill); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-card); padding: 16px 15px; }
   .ob2 .ob2-pair { margin: 4px 0; }
@@ -5600,7 +5616,10 @@
   /* Floors for the blocks whose parts cannot shrink past a point. On a short
      phone the box stops here and the page scrolls, rather than the block
      spilling over the button. */
-  .ob2 .ob2-body .ob2-fill:has(> .ob2-minchips) { min-height: 216px; }
+  /* Three rows of chips at their smallest (34px figure, 72px a chip) and the
+     two 10px gaps. 216 was 20px short, so on Setup's Session, where the effort
+     dial takes the room, the last row hung out of its box onto Save. */
+  .ob2 .ob2-body .ob2-fill:has(> .ob2-minchips) { min-height: 240px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-daysfill) { min-height: 210px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-duo) { min-height: 280px; }
   .ob2 .ob2-body .ob2-fill:has(> .ob2-kitgrid) { min-height: 230px; }
@@ -9395,24 +9414,97 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   /* Setup's plan editors (openPlanEditor): an onboarding screen in Setup's
-     own frame. The column is the height the tab leaves between its header
-     and the floating nav, so a screen's one visual fills the gap exactly as
-     it does in onboarding (ob2Fill), and Save sits just above the nav. */
+     own frame. The column is exactly the height #app leaves between the app
+     header and its bottom padding, so a screen's one visual fills the gap as it
+     does in onboarding (ob2Fill) and a short screen does not scroll at all.
+     It used to add 88px of its own under Save on top of #app's 90, which is
+     the "scrolling too far" Mo found on build 46: Save stopped 100px above
+     the centre button. Now the 10px here is the same trailing 10px a card
+     carries, so Save ends --end-gap above the button like every other page. */
   #planEdit .ob-step.ob2.ob2-set {
     max-width: none; margin: 0; animation: none;
-    min-height: calc(100dvh - 170px - env(safe-area-inset-top, 0px));
-    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    /* 80px is #app's 22px top padding plus the app header above every tab
+       (44px and its 14px margin); the rest is #app's bottom padding. */
+    min-height: calc(100dvh - 80px - var(--nav-lift) - var(--end-gap) + 10px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    padding-bottom: 10px;
   }
-  #planEdit .ob2-set > .scr-head { margin-bottom: 4px; }
   #planEdit .ob2 > .ob2-body { margin-top: 0; }
   /* Hidden, not removed, so the page does not jump when Save arrives. */
   #planEdit .ob2-foot .btn-primary.ob2-set-wait { visibility: hidden; }
   #planEdit .ob2-foot .btn-primary:not(.ob2-set-wait) { animation: savebar-in .18s ease both; }
-  #planEdit .ob2-hurtnote { margin: 4px 0 0; text-align: left; }
   #planEdit .ob2-setfocus .card-bare { padding: 0; }
   /* He says the ranking back on each tap (SET_SCREENS.setFocus). */
   #planEdit .ob2-setfocus .focus-pick-summary { display: none; }
   @media (prefers-reduced-motion: reduce) { #planEdit .ob2-foot .btn-primary { animation: none; } }
+
+  /* ---- Back and close, one pattern (build 47) ----
+     Mo, on build 46: the back button "needs to be better", and on Add
+     activity, "the back button is on the right side top, it's weird ... the X
+     to the left, everything there should just make sense." So there are two
+     controls and they always sit top left:
+       a page you were PUSHED to goes back with a chevron and the name of
+       where it goes ("< Setup"), plain text, no bordered circle;
+       a SHEET closes with its X, which keeps its small circle.
+     Both are at least 44px to hit. The title sits in the middle column of a
+     three column grid, so it stays centred whatever the back label says, and
+     shrinks to an ellipsis before it ever pushes the back button off. */
+  .nav-head {
+    display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, max-content) 1fr;
+    align-items: center; column-gap: 8px; min-height: 44px;
+  }
+  .nav-head > .scr-title, .nav-head > h2 {
+    grid-column: 2; min-width: 0; margin: 0; text-align: center;
+    font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -.02em; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); text-transform: none;
+  }
+  .nav-head > .spacer { display: none; }
+  .nav-head > :first-child { grid-column: 1; justify-self: start; }
+  .nav-back {
+    display: inline-flex; align-items: center; gap: 2px; min-height: 44px; min-width: 44px;
+    margin-left: -8px; padding: 0 8px 0 2px; border: 0; border-radius: 12px; background: none;
+    color: var(--text); font: inherit; font-size: 15.5px; font-weight: 600; letter-spacing: -.01em; line-height: 1.2;
+    cursor: pointer; white-space: nowrap;
+  }
+  .nav-back svg { flex-shrink: 0; stroke-width: 2.4; }
+  .nav-back > [data-ico] { display: inline-flex; }
+  .nav-back:active { opacity: .55; transform: none; }
+  /* Every other full-screen page already put its back arrow top left, inside
+     a bordered 44px circle. Same place, the plain chevron now, so a back
+     arrow looks like one thing across the app. */
+  .scr-back { border-color: transparent; background: none; justify-content: flex-start; margin-left: -8px; padding-left: 4px; }
+  .scr-back:active { opacity: .55; }
+  /* Sheets: the X goes first in its header, whatever order the markup has
+     it in, and the words take the rest of the row. A header that already has
+     a back link on its left (the exercise picker's detail step) keeps its X
+     on the right: two controls side by side in one corner read as one. */
+  .ds-top > .ds-x, .si-pop-top > .ds-x, .ps-head > .ds-x, .cb-sheet-head:not(:has(.cb-back)) > .ds-x { order: -1; }
+  .ds-top:has(> .ds-x), .si-pop-top:has(> .ds-x), .cb-sheet-head:not(:has(.cb-back)):has(> .ds-x) { justify-content: flex-start; gap: 12px; }
+  .ds-top:has(> .ds-x) > :not(.ds-x), .si-pop-top:has(> .ds-x) > :not(.ds-x), .cb-sheet-head:not(:has(.cb-back)):has(> .ds-x) > :not(.ds-x) { flex: 1; min-width: 0; }
+  .ps-head { justify-content: flex-start; }
+  .cb-back { min-height: 44px; margin: -6px 0 -6px -2px; }
+  .gen-x { right: auto; left: 14px; }
+  .tg-x { right: auto; left: 12px; }
+  /* The activity screens: the first screen is the sheet (an X), the rest are
+     pushed onto it (a back chevron). */
+  .csn-head.nav-head { margin-bottom: 20px; }
+  .csn-head.nav-head > .csn-x { grid-column: 1; justify-self: start; }
+
+  /* Setup ends on its own list, which has no trailing card margin, so it
+     carries the 10px #app's padding assumes. */
+  #setupRoot { margin-bottom: 10px; }
+  #tab-setup .scr-head { margin-bottom: 16px; }
+  /* The one button inside a card that sat 8px under the rows above it. */
+  #setupShareCodeBtn { margin-top: var(--sp-stack); }
+
+  /* Nothing sideways. html already hides it; a clip on body as well takes any
+     overflow out of layout so there is no wider document for a finger to pan
+     to. clip, NOT hidden: hidden would make body a scroll container of its
+     own, which is the trap that once killed every scroll in the app (see the
+     html rule above). */
+  body { overflow-x: clip; }
+  html.native button, html.native [role="button"], html.native .card, html.native .tab-btn {
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
 </style>
 </head>
 <body>
@@ -10197,8 +10289,8 @@
     </div>
 
     <div class="settings-page hidden" id="page-profile">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Profile</div>
         <div class="spacer"></div>
       </div>
@@ -10236,8 +10328,8 @@
 
     </div>
     <div class="settings-page hidden" id="page-partner">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Partner</div>
         <div class="spacer"></div>
       </div>
@@ -10295,8 +10387,8 @@
       <div id="planEdit"></div>
     </div>
     <div class="settings-page hidden" id="page-training">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">During a workout</div>
         <div class="spacer"></div>
       </div>
@@ -10324,8 +10416,8 @@
     </div>
     </div>
     <div class="settings-page hidden" id="page-milestones">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Milestones</div>
         <div class="spacer"></div>
       </div>
@@ -10336,8 +10428,8 @@
     </div>
     </div>
     <div class="settings-page hidden" id="page-stats">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Your body</div>
         <div class="spacer"></div>
       </div>
@@ -10366,8 +10458,8 @@
     </div>
     </div>
     <div class="settings-page hidden" id="page-notify">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Notifications</div>
         <div class="spacer"></div>
       </div>
@@ -10393,8 +10485,8 @@
     </div>
     </div>
     <div class="settings-page hidden" id="page-theme">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Appearance</div>
         <div class="spacer"></div>
       </div>
@@ -10408,8 +10500,8 @@
     </div>
     </div>
     <div class="settings-page hidden" id="page-about">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">About</div>
         <div class="spacer"></div>
       </div>
@@ -10434,8 +10526,8 @@
          obvious word rather than by opening Account and reading past two
          buttons that erase their data. -->
     <div class="settings-page hidden" id="page-safety">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Safety</div>
         <div class="spacer"></div>
       </div>
@@ -10473,8 +10565,8 @@
       </div>
     </div>
     <div class="settings-page hidden" id="page-account">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Account</div>
         <div class="spacer"></div>
       </div>
@@ -10538,8 +10630,8 @@
       <button type="button" class="btn-primary" id="setSaveBtn">Save changes</button>
     </div>
     <div class="settings-page hidden" id="page-admin">
-      <div class="scr-head">
-        <button type="button" class="scr-back" data-setback aria-label="Back" data-ico="chevronLeft"></button>
+      <div class="scr-head nav-head">
+        <button type="button" class="nav-back" data-setback aria-label="Back to Setup"><span data-ico="chevronLeft" data-ico-size="20"></span>Setup</button>
         <div class="scr-title">Admin</div>
         <div class="spacer"></div>
       </div>
@@ -15927,10 +16019,13 @@ function ob2PaintSet(d, o) {
   const S = OB2_SET;
   const react = o.react === undefined ? d._said : o.react;
   const last = S.isLast(d);
+  const first = S.live(d).indexOf(S.at) <= 0;
   S.root.innerHTML = `
     <div class="ob-step ob2 ob2-set">
-      <div class="scr-head">
-        <button type="button" class="scr-back" id="ob2Back" aria-label="Back">${icon("chevronLeft", 18)}</button>
+      <div class="scr-head nav-head">
+        ${/* Back from the first screen leaves for Setup, so it says Setup; from
+              a later one it is a step back inside this edit (S.back). */ ""}
+        <button type="button" class="nav-back" id="ob2Back" aria-label="${first ? "Back to Setup" : "Back"}">${icon("chevronLeft", 20)}${first ? "Setup" : "Back"}</button>
         <div class="scr-title">${escapeHtml(S.title)}</div>
         <div class="spacer"></div>
       </div>
@@ -18465,14 +18560,14 @@ hurts: { ch: 3, render(d, ui) {
           <div class="bi-fig"><canvas class="bi-canvas" id="ob2HurtFront"></canvas></div>
           <div class="bi-fig"><canvas class="bi-canvas" id="ob2HurtBack"></canvas></div>
         </div>
-        <div class="limit-chips" id="ob2Hurts"><p class="muted-note">Loading the options...</p></div>
-        ${/* Setup has always kept a one line note beside these, and an
-              editor that dropped it would wipe it on the next save. */ ""}
-        ${OB2_SET ? `<input type="text" class="ob2-hurtnote" id="ob2HurtNote" maxlength="120" placeholder="A note to yourself" value="${escapeHtml(d.limits_note || "")}" />` : ""}`,
+        <div class="limit-chips" id="ob2Hurts"><p class="muted-note">Loading the options...</p></div>`,
+      /* Setup's "note to yourself" field is gone (Mo, build 47). The note
+         itself is not: limits_note rides through the draft untouched from
+         planDraftFromProfile to savePlanEdit, so a note somebody already
+         wrote stays in profiles.limits; nothing shows or edits it now. */
       cta: "Nothing hurts",
       onNext: () => ui.next({
         hurts: areas.filter((a) => chosen.has(a.key)).map((a) => a.key),
-        ...($("ob2HurtNote") ? { limits_note: $("ob2HurtNote").value.trim().slice(0, 120) || null } : {}),
       }),
     });
     /* The limits page's own figure rule: a joint lights the muscle groups
@@ -18533,9 +18628,16 @@ hurts: { ch: 3, render(d, ui) {
      to six (CONTRACT.md, the session clock). */
   warmup: { ch: 3, render(d, ui) {
     let pick = d.skip_stretching === true ? "skip" : d.skip_stretching === false ? "keep" : null;
+    /* "Yes" was Arm Circles, which Mo took out of the app on 2026-10-07 after
+       the Animation Studio review (REMOVED_MOVES in knowledge/motion), so
+       moveFor answered null and the stage drew nothing: the blank figure he
+       saw on build 46, in onboarding and Setup alike. Cross-Body Arm Swings
+       is the closest move still in: the same standing shoulder warm-up,
+       drawn from the front so both arms opening and crossing are visible. */
+    const fig = (v) => (v === "skip" ? "Push-Up" : "Cross-Body Arm Swings");
     ui.paint({
       title: "Warm-up and stretching every session, or are you one of those people?",
-      body: ob2FigHTML(pick === "skip" ? "Push-Up" : "Arm Circles") + ob2ChoiceHTML([
+      body: ob2FigHTML(fig(pick)) + ob2ChoiceHTML([
         { id: "keep", label: "Yes, build it in", sub: "About 12 minutes of each session" },
         { id: "skip", label: "Skip it, I do my own", sub: "The lifts stay exactly the same" },
       ], pick, { attr: "wu" }),
@@ -18545,7 +18647,7 @@ hurts: { ch: 3, render(d, ui) {
     });
     mountMotionFigures(ob2Root());
     const SAY = { keep: "Warm-ups. My joints thank you. Yours will too.", skip: "One of those people. Fine. I'll pretend I didn't see that." };
-    ob2WireOne("wu", (v) => { pick = v; $("ob2Next").disabled = false; ob2SetFig("ob2Fig", v === "skip" ? "Push-Up" : "Arm Circles"); ob2Type($("ob2Q"), SAY[v]); });
+    ob2WireOne("wu", (v) => { pick = v; $("ob2Next").disabled = false; ob2SetFig("ob2Fig", fig(v)); ob2Type($("ob2Q"), SAY[v]); });
   } },
 
   /* Chapter 4. challenge_target. Only the counts this goal actually builds
@@ -20321,7 +20423,10 @@ function showApp() {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     const label = btn.textContent;
     btn.innerHTML = `${icon(btn.dataset.icon, 20)}<span>${label}</span>`;
-    btn.onclick = () => switchTab(btn.dataset.tab);
+    btn.onclick = () => {
+      if (btn.classList.contains("active")) tabToRoot(btn.dataset.tab);
+      else switchTab(btn.dataset.tab);
+    };
   });
   pinTabBar();
   wirePageLock();
@@ -20673,6 +20778,22 @@ function switchTab(tab) {
      change he was complaining about: leaving the workout tab is exactly when
      a running session stops being on screen anywhere. */
   renderSessionBar();
+}
+
+/* Tapping the tab you are already on (Mo, build 47: "if I go to Setup and I
+   click on Setup again at the bottom toolbar ... take me to the Setup
+   homepage"), the way every native tab bar behaves. Whatever was opened
+   inside the tab closes the way its own Back closes it, so an unsaved edit
+   is dropped, not saved; then the tab goes to the top. At the root already,
+   it only goes to the top. Sheets need nothing here: their scrim covers the
+   bar, so the bar cannot be tapped while one is up. */
+function tabToRoot(tab) {
+  if (tab === "setup" && (OB2_SET || openSettingsPageId())) closeSettingsPage();
+  /* A goal lens is "went for a look", never persisted (PROGRESS_GOAL_LENS);
+     the tab's root is your own goal's view. */
+  if (tab === "progress" && PROGRESS_GOAL_LENS) { PROGRESS_GOAL_LENS = null; renderProgressTab(); }
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
 }
 
 /* ---------- Offline write queue ----------
@@ -30347,6 +30468,7 @@ async function csnGenerate() {
   /* The session's own length wins over the stepper. The library wrote 25 minutes
      on an interval run because that is what the intervals add up to. */
   CARDIO_SES.minutes = Number(plan?.minutes || card?.minutes) || CARDIO_SES.minutes;
+  CARDIO_SES.revealBack = null;
   CARDIO_SES.state = "reveal";
   csnSave();
   renderCardioStage();
@@ -31002,12 +31124,13 @@ function renderCardioStage() {
        it. */
     const groupActs = gridActs;
     stage.innerHTML = `
-      <div class="csn-head">
+      <div class="csn-head nav-head">
         ${/* "Add a session" is for a day that already has one. Arriving here
               off a planned activity is not adding anything: it IS that day's
-              session, still choosing how long it runs for. */ ""}
-        <h2>${CARDIO_SES.fromPlan ? "Today’s session" : todaySessions().length ? "Add a session" : "Start an activity"}</h2>
+              session, still choosing how long it runs for. The first screen
+              of the flow, so it closes (an X); every later one goes back. */ ""}
         <button type="button" class="csn-x" id="csnX" aria-label="Close">${icon("close", 18)}</button>
+        <h2>${CARDIO_SES.fromPlan ? "Today’s session" : todaySessions().length ? "Add a session" : "Start an activity"}</h2>
       </div>
       ${/* The same card the workout tab opens on, and for the same reason. An
             eyebrow, what it is, one line about why, his face, and the two
@@ -31254,9 +31377,9 @@ function renderCardioStage() {
             </button>`;
     };
     stage.innerHTML = `
-      <div class="csn-head">
+      <div class="csn-head nav-head">
+        <button type="button" class="nav-back" id="csnX" aria-label="Back">${icon("chevronLeft", 20)}Back</button>
         <h2>${editing ? "Edit the" : "Pick your"} ${escapeHtml(word)}</h2>
-        <button type="button" class="csn-x" id="csnX" aria-label="Back">${icon("chevronLeft", 18)}</button>
       </div>
       <p class="csn-guided">${icon("info", 15)} <span>${editing
         ? `Tap a numbered one to take it out, tap another to add it. The class runs in the order of the numbers${CARDIO_SES.pickBudget
@@ -31303,7 +31426,10 @@ function renderCardioStage() {
         renderCardioStage();
       };
     });
-    $("csnPickGo").onclick = () => { if (csnApplyPicks()) sfx.play("set"); };
+    /* Back from the class goes to the screen that built it: this picker when
+       somebody picked the poses, the activity screen when he generated them.
+       An edit is a detour inside the reveal, so it leaves that answer alone. */
+    $("csnPickGo").onclick = () => { if (!editing) CARDIO_SES.revealBack = "pick"; if (csnApplyPicks()) sfx.play("set"); };
     /* The reveal and the live screen both mount their figures at the bottom
        of renderCardioStage; this state returns before that call, same as
        reveal does, so it mounts its own. */
@@ -31345,9 +31471,9 @@ function renderCardioStage() {
       ? [["Minutes", `${card.minutes}`], ["Effort", `${card.effort} of 10`], ["Type", named(card.kind)]]
       : [["Minutes", `${plan.minutes}`], ["Moves", `${seq.length}`], ["Level", named(plan.level)]];
     stage.innerHTML = `
-      <div class="csn-head">
+      <div class="csn-head nav-head">
+        <button type="button" class="nav-back" id="csnX" aria-label="Back">${icon("chevronLeft", 20)}Back</button>
         <h2>Your session</h2>
-        <button type="button" class="csn-x" id="csnX" aria-label="Back">${icon("chevronLeft", 18)}</button>
       </div>
       <section class="act-hero">
         <div class="act-hero-words">
@@ -31387,7 +31513,7 @@ function renderCardioStage() {
           ${editable && seq.length > 1 ? `<button type="button" class="wp-chip" data-remove="${escapeHtml(m.name)}" aria-label="Take out ${escapeHtml(m.name)}">${icon("close", 15)}</button>` : ""}
         </div>`).join("")}
       </div>` : ""}`;
-    const back = () => { CARDIO_SES.state = "setup"; csnSave(); renderCardioStage(); };
+    const back = () => { CARDIO_SES.state = CARDIO_SES.revealBack === "pick" ? "pick" : "setup"; csnSave(); renderCardioStage(); };
     $("csnX").onclick = back;
     $("csnRevealBack").onclick = back;
     $("csnRevealGo").onclick = csnStart;
@@ -31422,9 +31548,9 @@ function renderCardioStage() {
      asked for at the start: somebody who set 30 and ran 22 ran 22. */
   const mins = Math.max(1, Math.round(csnElapsedMs() / 60000));
   stage.innerHTML = `
-    <div class="csn-head">
+    <div class="csn-head nav-head">
+      <button type="button" class="nav-back" id="csnX" aria-label="Back">${icon("chevronLeft", 20)}Back</button>
       <h2>Nice work</h2>
-      <button type="button" class="csn-x" id="csnX" aria-label="Back">${icon("chevronLeft", 18)}</button>
     </div>
     ${csnCompleteHTML(a, mins, null)}
     ${a.dist ? `<div class="csn-field">
@@ -31658,9 +31784,9 @@ function renderCardioSaved(stage) {
   const entry = ALL_ENTRIES.find((e) => e.email === MY_EMAIL && e.entry_date === sessionDate()) || null;
   const hasProof = !!entry?.proof_path;
   stage.innerHTML = `
-    <div class="csn-head">
-      <h2>Nice work</h2>
+    <div class="csn-head nav-head">
       <button type="button" class="csn-x" id="csnX" aria-label="Close">${icon("close", 18)}</button>
+      <h2>Nice work</h2>
     </div>
     ${csnCompleteHTML(a, CSN_DONE.mins, CSN_DONE)}
     <div class="csn-foot">
