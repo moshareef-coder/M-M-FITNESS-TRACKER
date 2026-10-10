@@ -109,8 +109,20 @@ fi
 
 # ---------------------------------------------------------------- upload
 say "Upload"
-xcrun altool --upload-app -f "$EXPORT/App.ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID" 2>&1 \
-  | grep -E "No errors|ERROR" | head -3
+# altool's exit status and its last line both lie: a refused upload (a
+# permission check, a duplicate build) still exits 0 under the old grep pipe,
+# and the script then printed "Done" for a build Apple never accepted. So keep
+# the whole output, show it, and only call it uploaded when altool says so in
+# words and says no ERROR anywhere.
+ALOG="/tmp/unio$NEXT-altool.log"
+set +e
+xcrun altool --upload-app -f "$EXPORT/App.ipa" -t ios --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID" >"$ALOG" 2>&1
+ARC=$?
+set -e
+grep -E "No errors|UPLOAD SUCCEEDED|ERROR|error|denied|not permitted" "$ALOG" | head -8 || true
+(( ARC == 0 )) || die "altool exited $ARC, the upload was refused (full output in $ALOG)"
+grep -qE "ERROR|[Dd]enied|not permitted" "$ALOG" && die "altool reported an error, the upload was refused (full output in $ALOG)"
+grep -qE "No errors|UPLOAD SUCCEEDED" "$ALOG" || die "altool never said the upload succeeded (full output in $ALOG)"
 say "Done: build $NEXT ($APPV_NEW) uploaded"
 echo "  It needs 5 to 15 minutes to process before it can be attached or tested."
 echo "  Commit the bump: git add $PBX sw.js, and stage only the APP_VERSION hunk of index.html."
