@@ -5778,6 +5778,7 @@
   .ob2-maingoal-t b { font-size: 16px; font-weight: 700; color: var(--text); }
   .ob2-maingoal .ob2-link { padding: 10px 10px; color: var(--accent-ink, var(--accent)); }
   .ob2-extras-k { margin: 14px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ob2-top .ob2-signout { min-height: 44px; padding: 10px 4px; font-size: 15px; }
   .ob2-link { font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: none; border: 0; padding: 10px 2px; min-height: 44px; cursor: pointer; }
   .ob2-link:disabled { opacity: .4; cursor: default; }
   .ob2-link:not(:disabled):active { color: var(--text); }
@@ -16045,7 +16046,6 @@ function ob2Paint(id, d, o) {
   const react = o.react === undefined ? d._said : o.react;
   /* No Skip anywhere, Mo, 2026-10-04. A question with no answer to give has
      its own way on in the screen (Nothing hurts, Keep it balanced, and so on). */
-  const skipBtn = "<span></span>";
   const back = !(first || o.noBack);
   const topBack = back && !o.cta;
   ob.innerHTML = `
@@ -16060,7 +16060,10 @@ function ob2Paint(id, d, o) {
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M20 10v4M2 12h2M20 12h2M6 8v8M18 8v8M9 12h6"/></svg>
               <span>UNIO</span>
             </div>
-            <div class="ob2-head-r">${skipBtn}</div>
+            ${/* Mo, 2026-10-10: once signed in, the start of onboarding needs a
+                  way out, for the wrong account or a second one. Chapter 0
+                  only (hello, theme, name, accept); after that the Previous
+                  button walks back here. */ ""}<div class="ob2-head-r"><button type="button" class="ob2-link ob2-signout" id="ob2SignOut">Sign out</button></div>
           </header>`
         : `${/* Mo, 2026-10-07: Back lives at the bottom beside Continue, so the
               header is the chapter name alone, truly centred (the back button
@@ -16097,6 +16100,7 @@ function ob2Paint(id, d, o) {
     </div>`;
   if ($("ob2Back")) $("ob2Back").onclick = () => { ob2Cleanup(); closeBodyRegionPicker(); ob2Step(id, { ...d, _said: null }, -1); };
   if ($("ob2Next") && o.onNext) $("ob2Next").onclick = () => o.onNext();
+  if ($("ob2SignOut")) $("ob2SignOut").onclick = () => { ob2Cleanup(); clearLocalAccountState(); sb.auth.signOut(); };
   if (o.host !== false && o.title) {
     ob2Type($("ob2Q"), o.title);
   }
