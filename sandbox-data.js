@@ -261,6 +261,48 @@
     };
   }
 
+  function mellFinished(db, { photo, note }) {
+    /* 7:22 this morning, or a few minutes ago when the sandbox is opened
+       before that: a finish stamped in the future would read as unseen
+       however recently it was seen. */
+    const start = new Date(day(0) + "T00:01:00").getTime();
+    const doneAt = new Date(Math.max(start, Math.min(Date.now() - 5 * 60000, new Date(day(0) + "T07:22:00").getTime()))).toISOString();
+    const moves = ["Goblet Squat", "Romanian Deadlift", "Dumbbell Bench Press", "Seated Cable Row", "Walking Lunge", "Plank"];
+    db.ai_workouts.push({ id: "mfin", email: THEM, user_name: "Mell", entry_date: day(0), archived: true, slot: 0,
+      focus: "Full body A", created_at: day(0) + "T05:00:00Z", completed_at: doneAt, duration_sec: 42 * 60,
+      exercises: moves.map((name) => ({ name, sets: 3, reps: 10, targetWeight: null })) });
+    db.exercise_logs = db.exercise_logs.filter((l) => l.email !== THEM || l.entry_date !== day(0));
+    moves.forEach((exercise_name, i) => db.exercise_logs.push({ id: "mf" + i, email: THEM, user_name: "Mell", entry_date: day(0),
+      exercise_name, sets: 3, reps: 10, weight: exercise_name === "Plank" ? null : 25 + i * 10, created_at: day(0) + "T07:0" + i + ":00Z" }));
+    db.fit_entries = db.fit_entries.filter((e) => e.email !== THEM || e.entry_date !== day(0));
+    db.fit_entries.push({ id: "f3", email: THEM, user_name: "Mell", entry_date: day(0), weight: 145.1, gym: true, sessions: 1,
+      workout_at: doneAt, proof_path: photo ? THEM + "/" + day(0) + "-sandbox.jpg" : null, note });
+  }
+
+  /* A proof photo the sandbox can show: drawn, not shipped, so the repo holds
+     no image and the card still has a real picture in it. */
+  let proofPhoto = null;
+  function demoProofPhoto() {
+    if (proofPhoto) return proofPhoto;
+    try {
+      const c = document.createElement("canvas"); c.width = 600; c.height = 750;
+      const g = c.getContext("2d");
+      const bg = g.createLinearGradient(0, 0, 0, 750);
+      bg.addColorStop(0, "#3a4a5e"); bg.addColorStop(1, "#151a22");
+      g.fillStyle = bg; g.fillRect(0, 0, 600, 750);
+      g.fillStyle = "rgba(255,255,255,.06)";
+      for (let i = 0; i < 6; i++) g.fillRect(40 + i * 95, 80, 60, 360);
+      g.fillStyle = "#cfd6df"; g.fillRect(70, 470, 460, 16);
+      g.fillStyle = "#1f2630";
+      [[70, 420, 34, 116], [112, 436, 24, 84], [496, 420, 34, 116], [464, 436, 24, 84]].forEach(([x, y, w, h]) => g.fillRect(x, y, w, h));
+      g.fillStyle = "#e8805f"; g.beginPath(); g.arc(300, 300, 70, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "rgba(255,255,255,.55)"; g.font = "600 22px -apple-system, system-ui, sans-serif"; g.textAlign = "center";
+      g.fillText("sandbox photo", 300, 700);
+      proofPhoto = c.toDataURL("image/jpeg", 0.82);
+    } catch { proofPhoto = ""; }
+    return proofPhoto;
+  }
+
   const liveRow = (extra = {}) => ({
     email: THEM, user_name: "Mell", focus: "Leg Day", exercise_name: "Barbell Back Squat",
     exercise_index: 0, exercise_count: 5, set_done: 2, set_total: 4,
@@ -611,6 +653,30 @@
       },
     },
 
+    /* Mell finished a workout you have not seen: the full screen card that
+       opens the app. Three of them, one per look. Full body A, six moves, 42
+       minutes, logged this morning; the note is the caption she put under
+       her proof photo. `partnerDone` is what makes the card come up (see the
+       seen list below), every other world opens straight to Home. */
+    partnerDone: {
+      label: "Mell finished, photo and caption",
+      partnerDone: true,
+      apply: (db) => mellFinished(db, { photo: true, note: "Legs are jelly. Your turn." }),
+    },
+    partnerDoneNoPhoto: {
+      label: "Mell finished, no photo",
+      partnerDone: true,
+      apply: (db) => mellFinished(db, { photo: false, note: null }),
+    },
+    partnerDonePrivate: {
+      label: "Mell finished, details hidden",
+      partnerDone: true,
+      apply: (db) => {
+        mellFinished(db, { photo: false, note: null });
+        db.profiles = db.profiles.map((p) => p.email === THEM ? { ...p, share_workout_details: false } : p);
+      },
+    },
+
     livePrivate: {
       label: "Partner keeps it private",
       apply: (db) => {
@@ -817,6 +883,18 @@
   const DB = baseWorld();
   (SCENARIOS[SCENARIO] || SCENARIOS.paired).apply(DB);
   splitBodyReadings(DB);
+
+  /* The partner-finished card shows once per workout, remembered per phone
+     under this key as well as on the row. Every world has Mell training
+     today, so without this every world would open on the card. The three
+     partnerDone worlds clear the list instead, so they show it on every
+     load, which is what a review needs. */
+  try {
+    const seenKey = "unio.partnerDoneSeen:" + ME;
+    if ((SCENARIOS[SCENARIO] || {}).partnerDone) localStorage.removeItem(seenKey);
+    else localStorage.setItem(seenKey, JSON.stringify(DB.fit_entries
+      .filter((e) => e.email === THEM && e.gym).map((e) => THEM + "|" + e.entry_date + "|" + (e.workout_at || ""))));
+  } catch { /* private mode: the card may show, which is the real behaviour */ }
 
   window.__SANDBOX = { scenario: SCENARIO, scenarios: SCENARIOS, db: DB, me: ME, them: THEM, paid: PAID };
 
@@ -1091,12 +1169,18 @@
             return { data: { ok: true, invite_code: fresh }, error: null };
           }
           if (name === "is_premium") return { data: PAID, error: null };
+          /* The partner's row for that day, stamped seen, which is what the
+             Home card's dismiss and the finished card both ask for. */
+          if (name === "mark_partner_entry_seen") {
+            DB.fit_entries.forEach((e) => { if (e.email === THEM && e.entry_date === a.p_entry_date) e.seen_by_partner_at = new Date().toISOString(); });
+            return { data: null, error: null };
+          }
           return { data: null, error: null };
         },
         channel, removeChannel: () => {},
         functions: { invoke: async () => ({ data: null, error: { message: "not available in the sandbox" } }) },
-        storage: { from: () => ({
-          createSignedUrl: async () => ({ data: { signedUrl: await demoClip() }, error: null }),
+        storage: { from: (bucket) => ({
+          createSignedUrl: async () => ({ data: { signedUrl: bucket === "workout-proof" ? demoProofPhoto() : await demoClip() }, error: null }),
           upload: async () => ({ error: null }),
           remove: async () => ({ error: null }),
         }) },

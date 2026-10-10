@@ -6448,6 +6448,34 @@
   .pc-later { background: none; border: 0; color: var(--muted); font: inherit; font-size: 15px; padding: 10px; cursor: pointer; }
   @keyframes pcUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
 
+  /* ---- Your partner finished ----
+     The pair card's scrim, ring, robot and confetti, one step on: their ring
+     closes alone round a big check, or their proof photo takes the stage
+     with their face on its edge. The photo version skips the ring's long
+     build, since the photo is the moment and nothing needs to assemble. */
+  .pdn-scrim { gap: 18px; }
+  .pc-ring .arc.pdn-arc { stroke-dasharray: 277; stroke-dashoffset: 277; }
+  .pdn-check { position: relative; z-index: 2; color: var(--partner); display: grid; place-items: center;
+    animation: pdnPop .5s .9s both cubic-bezier(.34,1.56,.64,1); }
+  .pc-ring .pdn-check svg { position: static; width: 64px; height: 64px; stroke-width: 2.6; vertical-align: 0; }
+  .pdn-ring-av { position: absolute; right: 8px; bottom: 8px; z-index: 3; animation: pdnPop .45s 1.05s both cubic-bezier(.34,1.56,.64,1); }
+  .pdn-ring-av .av, .pdn-photo-av .av { width: 48px; height: 48px; font-size: 17px; margin: 0; border: 3px solid var(--bg); cursor: default; }
+  .pdn-photo { position: relative; width: min(264px, 100%); aspect-ratio: 4 / 5; max-height: 44vh; flex-shrink: 1;
+    animation: pdnPop .5s .05s both cubic-bezier(.22,1,.36,1); }
+  .pdn-photo img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 22px;
+    box-shadow: 0 0 0 3px var(--partner), 0 18px 40px -22px rgba(0,0,0,.45); }
+  .pdn-photo-av { position: absolute; left: 50%; bottom: -20px; transform: translateX(-50%); }
+  .pdn-photo ~ .pc-copy { margin-top: 14px; animation-delay: .25s; }
+  .pdn-photo ~ .pc-actions { animation-delay: .4s; }
+  .pdn-when { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .pdn-h { font-size: 28px; max-width: 16ch; }
+  .pdn-note { margin: 0; font-size: 15.5px; line-height: 1.45; color: var(--text); max-width: 30ch; text-wrap: balance; }
+  .pdn-stats { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: 14px; color: var(--muted); }
+  .pdn-stats span { display: inline-flex; align-items: center; gap: 5px; }
+  .pdn-stats svg { vertical-align: 0; }
+  @keyframes pdnPop { from { opacity: 0; transform: scale(.6) } to { opacity: 1; transform: none } }
+  .pdn-photo-av .av, .pc-ring .pdn-ring-av .av.them { animation: none; margin: 0; }
+
   /* ---- The partner tour ----
      One step, once. Everything dims except the partner's face in the top
      corner, which pulses, and the only thing that works is tapping it (or
@@ -11319,6 +11347,7 @@ function registerResumeDrain() {
   if (!isNativeApp()) return;
   window.Capacitor.Plugins.App.addListener("appStateChange", ({ isActive }) => {
     if (isActive) reconcileNativeSurfaces();
+    partnerDoneOnVisible(!isActive);
   });
 }
 
@@ -21436,6 +21465,10 @@ async function loadAll() {
   // Never blocks the paint above: a badge earned a moment ago can announce
   // itself a beat late without anyone noticing.
   checkNewMilestoneBadges().catch((e) => console.warn("badge check", e));
+  /* Last, once everything it reads is fresh: the partner's rows, their plans
+     and their profile's sharing switch. It only acts when armed (opening or
+     coming back to the app), so the reload after every write is free. */
+  maybeShowPartnerDone().catch((e) => console.warn("partner finished check", e));
 }
 
 /* The muscle tables, so a session screen has the words ready before it is
@@ -22783,6 +22816,237 @@ async function showPairCelebration() {
   };
   $("pcGo").focus({ preventScroll: true });
 }
+
+/* ---------- Your partner finished ----------
+   Mo, 2026-10-10: when somebody opens the app and their partner has finished
+   a workout they have not seen yet, that is the first thing on screen. Full
+   screen, in the pair celebration's own look (same scrim, same ring, same
+   robot, same confetti), because it is the same feeling one step further on:
+   the two of you, and one of you just showed up.
+
+   Once per workout per viewer. The server already has a seen mark, the
+   fit_entries.seen_by_partner_at that the Home card's dismiss writes through
+   mark_partner_entry_seen, but it is one per DAY and a partner can finish two
+   sessions in one. So a workout counts as seen when that mark is newer than
+   its workout_at (which doMarkGymDayDone restamps on every finish), or when
+   this phone has the workout in its own list. The list is the belt and the
+   column is the braces: the column is what tells the partner it was seen and
+   what keeps a second phone quiet; the list is what stops a repeat if the
+   rpc ever keeps the first stamp of the day instead of the newest one.
+
+   Only on opening or coming back to the app, never in the middle of using
+   it, never over onboarding, a workout or another full screen card, and one
+   at a time: if several are waiting, the newest shows and the rest are
+   marked seen with it. */
+const PF_SEEN_PREFIX = "unio.partnerDoneSeen:";
+/* Three days back is "since you last looked" for anybody who opens the app
+   at all. Older than that is history, which the timeline already holds. */
+const PF_WINDOW_DAYS = 3;
+let PF_ARMED = true;      // app open counts as an arrival
+let PF_SHOWING = false;
+let PF_HIDDEN_AT = 0;
+
+function partnerDoneSeenKey() { return PF_SEEN_PREFIX + (MY_EMAIL || ""); }
+function partnerDoneSeenList() {
+  try { const v = JSON.parse(localStorage.getItem(partnerDoneSeenKey()) || "[]"); return Array.isArray(v) ? v : []; }
+  catch { return []; }
+}
+function partnerDoneWorkoutKey(e) { return `${(e.email || "").toLowerCase()}|${e.entry_date}|${e.workout_at || ""}`; }
+function partnerDoneSeenByServer(e) {
+  if (!e.seen_by_partner_at) return false;
+  if (!e.workout_at) return true;
+  return Date.parse(e.seen_by_partner_at) >= Date.parse(e.workout_at);
+}
+/* A session the two of you finished together is not news to either of you. */
+function partnerDoneTogetherOn(date) {
+  return (TG_HISTORY || []).some((r) => r.status === "done" && r.host_done_at && r.guest_done_at
+    && (tgSame(r.host_email, MY_EMAIL) || tgSame(r.guest_email, MY_EMAIL))
+    && (tgSame(r.host_email, PARTNER_EMAIL) || tgSame(r.guest_email, PARTNER_EMAIL))
+    && tgLocalDay(r.started_at || r.created_at) === date);
+}
+function unseenPartnerWorkouts() {
+  if (!PARTNER_EMAIL) return [];
+  const from = new Date(todayStr() + "T00:00:00");
+  from.setDate(from.getDate() - (PF_WINDOW_DAYS - 1));
+  const fromStr = isoDate(from), today = todayStr();
+  const seen = new Set(partnerDoneSeenList());
+  const at = (e) => e.workout_at || `${e.entry_date}T12:00:00`;
+  return ALL_ENTRIES
+    .filter((e) => tgSame(e.email, PARTNER_EMAIL) && e.gym && e.entry_date >= fromStr && e.entry_date <= today
+      && !partnerDoneSeenByServer(e) && !seen.has(partnerDoneWorkoutKey(e)))
+    .sort((a, b) => (at(a) < at(b) ? 1 : -1));
+}
+
+/* Why not now, or null. Anything here leaves it armed, so the next reload
+   (the end of the workout, the pair card closing) gets another go. */
+function partnerDoneBlockedBy() {
+  if ($("app")?.classList.contains("hidden") || !$("onboard")?.classList.contains("hidden")) return "onboarding";
+  if (SESSION || CARDIO_SES || TG || document.body.classList.contains("session-open")) return "in a workout";
+  if (document.querySelector(".pdn-scrim, .pc-scrim, .cm-scrim, .tg-scrim, .paywall-scrim")) return "another card is up";
+  return null;
+}
+
+async function maybeShowPartnerDone() {
+  if (!PF_ARMED || PF_SHOWING) return;
+  if (!PARTNER_EMAIL || !MY_EMAIL) { PF_ARMED = false; return; }
+  if (partnerDoneBlockedBy()) return;
+  PF_ARMED = false;
+  const waiting = unseenPartnerWorkouts();
+  if (!waiting.length) return;
+  const latest = waiting[0];
+  markPartnerDoneSeen(waiting);
+  if (partnerDoneTogetherOn(latest.entry_date)) return;
+  PF_SHOWING = true;
+  try { await showPartnerDone(latest); }
+  catch (err) { console.error("could not show the partner's finished workout", err); PF_SHOWING = false; }
+}
+
+/* Marked as soon as it is on screen rather than on Close, so a phone that is
+   locked with the card up does not show it again tomorrow. */
+function markPartnerDoneSeen(entries) {
+  const list = partnerDoneSeenList();
+  for (const e of entries) {
+    const k = partnerDoneWorkoutKey(e);
+    if (!list.includes(k)) list.push(k);
+  }
+  try { localStorage.setItem(partnerDoneSeenKey(), JSON.stringify(list.slice(-40))); } catch { /* private mode: the column still holds */ }
+  const stamp = new Date().toISOString();
+  const today = todayStr();
+  for (const date of new Set(entries.map((e) => e.entry_date))) {
+    for (const e of entries) if (e.entry_date === date) e.seen_by_partner_at = stamp;
+    /* The Home card says the same sentence smaller; it stands down too. */
+    if (date === today) NOTICE_DISMISSED.add(today);
+    Promise.resolve(sb.rpc("mark_partner_entry_seen", { p_entry_date: date }))
+      .then((res) => { if (res?.error) console.error("could not mark the workout seen", res.error); })
+      .catch((err) => console.error("could not mark the workout seen", err));
+  }
+}
+
+/* What the pop-up says about the workout. The plan that finished that day
+   names it; the logs count it. Details follow the same switch the timeline
+   and the live sheet read, and with it off the floor is the same floor they
+   keep: that she trained, and the effort score. */
+function partnerDoneFacts(e) {
+  const name = partnerName();
+  const date = e.entry_date;
+  const sharing = partnerSharesDetails();
+  const plan = sharing
+    ? (ALL_PLANS || []).filter((w) => tgSame(w.email, PARTNER_EMAIL) && w.entry_date === date && w.completed_at)
+        .sort((a, b) => (a.completed_at < b.completed_at ? 1 : -1))[0] || null
+    : null;
+  const sum = workoutSummary(name, date);
+  const focus = !sharing ? null : plan ? displayFocus(plan.focus, plan.exercises) : (sum.names.length ? deriveFocus(sum.names) : null);
+  const exercises = !sharing ? 0 : (sum.names.length || plan?.exercises?.length || 0);
+  const mins = !sharing ? 0 : plan?.duration_sec ? Math.round(plan.duration_sec / 60) : sum.mins;
+  const xp = effortXPBetween(name, date, date);
+  const at = e.workout_at ? new Date(e.workout_at) : null;
+  const when = relDayLabel(date) + (at && isoDate(at) === date
+    ? ", " + at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
+  return { sharing, focus, exercises, mins, xp, when };
+}
+
+async function showPartnerDone(e) {
+  document.querySelector(".pdn-scrim")?.remove();
+  const name = partnerName();
+  const first = (name || "Your partner").split(" ")[0];
+  const f = partnerDoneFacts(e);
+  /* Proof photos are not behind the details switch anywhere in the app: the
+     finish screen tells the person taking one that their partner can see it,
+     and the timeline and the Home card show it whatever the switch says. */
+  const photo = e.proof_path ? await signedProofUrl(e.proof_path) : null;
+  const theirs = await avatarHTML(PARTNER_EMAIL, name, "them", "div");
+
+  const stats = [];
+  if (f.sharing && f.exercises) stats.push(`<span>${icon("dumbbell", 15)} ${f.exercises} ${f.exercises === 1 ? "exercise" : "exercises"}</span>`);
+  if (f.sharing && f.mins) stats.push(`<span>${icon("clock", 15)} ${f.mins} min</span>`);
+  if (f.xp) stats.push(`<span>${icon("bolt", 15)} ${f.xp} XP</span>`);
+
+  /* With a photo, the photo is the hero and their face sits on its corner.
+     Without one, the stage is the pair card's: their ring closes round a big
+     check and the robot pops up over it, so it is never an empty box. */
+  const hero = photo
+    ? `<div class="pdn-photo">
+         <img src="${photo}" alt="${escapeHtml(first)}'s proof photo" />
+         <div class="pdn-photo-av">${theirs}</div>
+       </div>`
+    : `<div class="pc-stage pdn-stage">
+         <div class="pc-bot">${robotFaceSVG(104, "", { bust: true })}</div>
+         <div class="pc-ring">
+           <svg viewBox="0 0 100 100" aria-hidden="true">
+             <circle class="glow" cx="50" cy="50" r="44"/>
+             <circle class="arc them pdn-arc" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"/>
+           </svg>
+           <div class="pdn-check">${icon("check", 64)}</div>
+           <div class="pdn-ring-av">${theirs}</div>
+         </div>
+       </div>`;
+
+  const el = document.createElement("div");
+  el.className = "pc-scrim pdn-scrim";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  const title = f.focus ? `${first} finished ${f.focus}` : `${first} finished a workout`;
+  el.setAttribute("aria-label", title);
+  el.innerHTML = `
+    ${hero}
+    <div class="pc-copy pdn-copy">
+      <p class="pdn-when">${escapeHtml(f.when)}</p>
+      <h2 class="pc-h pdn-h">${escapeHtml(title)}</h2>
+      ${e.note ? `<p class="pdn-note">“${escapeHtml(e.note)}”</p>` : ""}
+      ${stats.length ? `<p class="pdn-stats">${stats.join("")}</p>` : ""}
+    </div>
+    <div class="pc-actions pdn-actions">
+      <button type="button" class="btn-primary" id="pdnCheer">Cheer ${escapeHtml(first)} on</button>
+      <button type="button" class="pc-later" id="pdnClose">Close</button>
+    </div>`;
+  document.body.appendChild(el);
+
+  sfxPlay("paired");
+  buzz([18, 60, 28]);
+  setTimeout(() => {
+    const from = el.querySelector(".pdn-photo, .pdn-check");
+    if (from && el.isConnected) confettiBurst(from, 40);
+  }, photo ? 450 : 1100);
+
+  const close = () => {
+    el.remove();
+    PF_SHOWING = false;
+    renderPartnerNotice();
+    renderMoments();
+  };
+  $("pdnClose").onclick = close;
+  /* The same row the notification's Cheer button and the Home card's flame
+     write, so it reaches their phone as "cheered you on" like every other. */
+  $("pdnCheer").onclick = async () => {
+    const btn = $("pdnCheer");
+    btn.disabled = true;
+    const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "Proud of you!" });
+    if (error) {
+      console.error("could not send the cheer", error);
+      btn.disabled = false;
+      toast("Couldn't send it. Try again.");
+      return;
+    }
+    btn.textContent = "Sent";
+    sfxPlay("set");
+    await new Promise((r) => setTimeout(r, 450));
+    close();
+  };
+  $("pdnCheer").focus({ preventScroll: true });
+}
+
+/* Coming back to the app is the other arrival. Away for a minute or more,
+   the partner may have trained meanwhile, and fit_entries has no realtime
+   feed, so it is reloaded once and the check rides on the end of that. */
+function partnerDoneOnVisible(hidden = document.hidden) {
+  if (hidden) { PF_HIDDEN_AT = Date.now(); return; }
+  if (!PF_HIDDEN_AT || Date.now() - PF_HIDDEN_AT < 60000) return;
+  PF_HIDDEN_AT = 0;
+  if (!PARTNER_EMAIL || !MY_EMAIL || partnerDoneBlockedBy()) return;
+  PF_ARMED = true;
+  loadAll().catch((err) => console.warn("reload on return", err));
+}
+document.addEventListener("visibilitychange", () => partnerDoneOnVisible());
 
 /* ---------- The partner tour ----------
    Shown once, the first time someone with a partner is on Progress: their

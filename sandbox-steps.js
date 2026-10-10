@@ -370,6 +370,18 @@
         note: "Every exercise on today's plan already logged, so the app's own route lands here: the ring fills, time and volume land under it, then the XP card reveals each move of the day one row at a time, counting its points into the total. The bars beside a move are its library level: 5 XP for a beginner move, 7 intermediate, 10 advanced, plus 10 for showing up, 25 for a record and the together bonus when there is one. The total is exactly what the day banks. The bar underneath fills toward the next level, and says Level up when today crosses one. End a workout early instead and the confetti stays off, because that is not the same event.",
         run: (w) => { w.switchTab("workout"); w.startWorkout(); } },
 
+      { t: "Finishing, photo added", scenario: "finished",
+        s: "One button: Done",
+        note: "The same finish screen after the proof photo goes in (the sandbox draws one rather than opening the camera). Before it, the only button is Add proof photo with No photo today under it. After it, the thumbnail shows, a one line caption field sits under it, and the single green button is Done. The caption is what Mell sees in quotes on her Mell finished card.",
+        run: (w) => { w.switchTab("workout"); w.startWorkout();
+          setTimeout(() => w.eval(`(async () => {
+            const c = document.createElement("canvas"); c.width = 600; c.height = 750;
+            const g = c.getContext("2d"); g.fillStyle = "#2b3846"; g.fillRect(0, 0, 600, 750);
+            g.fillStyle = "#5a8fd8"; g.beginPath(); g.arc(300, 330, 90, 0, Math.PI * 2); g.fill();
+            const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", .8));
+            await uploadProof(new File([blob], "proof.jpg", { type: "image/jpeg" }));
+          })()`), 900); } },
+
       { t: "Still recovering", scenario: "finished",
         s: "Adding a lift for a red muscle",
         note: "Today's push day is logged, so chest, shoulders and arms are red on the Body tab. This opens Plan my own and adds Barbell Bench Press, which asks first: Add it anyway, or Pick something else. It asks once per area a day, so add a second chest move after Add it anyway and it goes straight in. Try a back or core move: no warning, those are rested.",
@@ -464,6 +476,33 @@
         s: "Rings close, robot pops up, once ever",
         note: "What both of you see the moment you become a pair, once. Your two faces glide together, your blue arc and their orange arc close into one ring, then the robot pops up on top with confetti in your two colours. Turn sound on in the phone frame to hear it. Congratulate Mell sends Mell a 'We're a team now' note and takes you to Progress, where the tour below starts. Later skips the note and goes to the same place.",
         run: (w) => { try { w.localStorage.removeItem("unio.tourPartnerFace"); } catch {} w.showPairCelebration(); } },
+
+      { t: "Mell finished, with a photo", scenario: "partnerDone",
+        s: "The first thing you see on opening",
+        note: "Mell finished a workout you have not seen, so it opens the app: her proof photo as the hero with her face on its edge, what she did, her caption in quotes, then exercises, minutes and XP. One button, Cheer Mell on, which sends her the same cheer the notification button does. Close is the quiet way out. It shows once per workout: Close it and reopen the app and it stays gone, and her card on Home stands down with it. If several are waiting, only the newest shows.",
+        run: (w) => { w.switchTab("home"); w.eval(`if (!document.querySelector(".pdn-scrim")) {
+          try { localStorage.removeItem("unio.partnerDoneSeen:" + MY_EMAIL); } catch {}
+          ALL_ENTRIES.forEach((e) => { if (e.email === PARTNER_EMAIL) e.seen_by_partner_at = null; });
+          PF_ARMED = true; maybeShowPartnerDone();
+        }`); } },
+
+      { t: "Mell finished, no photo", scenario: "partnerDoneNoPhoto",
+        s: "Her ring and a big check",
+        note: "Same card when she skipped the photo: her ring closes round a big check and the robot pops up over it, the pair card's own moves, so it never looks like an empty frame.",
+        run: (w) => { w.switchTab("home"); w.eval(`if (!document.querySelector(".pdn-scrim")) {
+          try { localStorage.removeItem("unio.partnerDoneSeen:" + MY_EMAIL); } catch {}
+          ALL_ENTRIES.forEach((e) => { if (e.email === PARTNER_EMAIL) e.seen_by_partner_at = null; });
+          PF_ARMED = true; maybeShowPartnerDone();
+        }`); } },
+
+      { t: "Mell finished, details hidden", scenario: "partnerDonePrivate",
+        s: "Mell finished a workout",
+        note: "Mell has Share workout details off. The card says only that she finished a workout. Exercises and minutes are gone; the XP stays, because the effort score is the one number the privacy switch never hides anywhere in the app. A proof photo would still show, because proof photos are shared whatever the switch says (the finish screen tells her so).",
+        run: (w) => { w.switchTab("home"); w.eval(`if (!document.querySelector(".pdn-scrim")) {
+          try { localStorage.removeItem("unio.partnerDoneSeen:" + MY_EMAIL); } catch {}
+          ALL_ENTRIES.forEach((e) => { if (e.email === PARTNER_EMAIL) e.seen_by_partner_at = null; });
+          PF_ARMED = true; maybeShowPartnerDone();
+        }`); } },
 
       { t: "Progress tour: tap your partner", scenario: "paired",
         s: "Dim, spotlight their name, one tap",
