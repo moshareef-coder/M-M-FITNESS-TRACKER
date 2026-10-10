@@ -5768,6 +5768,16 @@
   .ob2-sign-type::placeholder { color: color-mix(in srgb, var(--muted) 60%, transparent); }
   .ob2-sign-pad:focus-within { border-color: var(--accent-ink); }
   .ob2-sign-row { display: flex; justify-content: space-between; align-items: center; }
+  /* The main goal, pinned over the extras on goal2. Drawn as a chosen card
+     (the accent edge every picked card has) but not a button: Change is. */
+  .ob2-maingoal { display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 14px; border-radius: 16px;
+    border: 1.5px solid var(--accent-ink, var(--accent)); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+  .ob2-maingoal .ob2-ico { flex: none; color: var(--accent-ink, var(--accent)); }
+  .ob2-maingoal-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ob2-maingoal-t small { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ob2-maingoal-t b { font-size: 16px; font-weight: 700; color: var(--text); }
+  .ob2-maingoal .ob2-link { padding: 10px 10px; color: var(--accent-ink, var(--accent)); }
+  .ob2-extras-k { margin: 14px 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .ob2-link { font: inherit; font-size: 14px; font-weight: 600; color: var(--muted); background: none; border: 0; padding: 10px 2px; min-height: 44px; cursor: pointer; }
   .ob2-link:disabled { opacity: .4; cursor: default; }
   .ob2-link:not(:disabled):active { color: var(--text); }
@@ -16121,7 +16131,7 @@ function ob2PaintSet(d, o) {
         ${/* Back from the first screen leaves for Setup, so it says Setup; from
               a later one it is a step back inside this edit (S.back). */ ""}
         <button type="button" class="nav-back" id="ob2Back" aria-label="${first ? "Back to Setup" : "Back"}">${icon("chevronLeft", 20)}${first ? "Setup" : "Back"}</button>
-        <div class="scr-title">${escapeHtml(S.title)}</div>
+        <div class="scr-title">${escapeHtml(o.setTitle || S.title)}</div>
         <div class="spacer"></div>
       </div>
       <div class="home-quip done ob2-host">
@@ -17821,7 +17831,11 @@ const OB2 = {
   goal: { ch: 1, render(d, ui) {
     let pick = d.goal_bubble && goalTileFor(d.goal_bubble) ? d.goal_bubble : null;
     ui.paint({
-      title: `Right${ob2Name(d) ? `, ${ob2Name(d)}` : ""}. What are we actually doing here?`,
+      /* Mo, 2026-10-10: people did not realise the first pick is the main
+         one, and wanted more than three. So he says it: one, and it is the
+         main one. The extras get their own screen next. */
+      title: `Right${ob2Name(d) ? `, ${ob2Name(d)}` : ""}. What's your main goal? Pick one.`,
+      setTitle: "Main goal",
       body: ob2ChoiceHTML(GOAL_TILES.map((t) => ({ id: t.id, label: t.title, sub: t.sub, ico: t.ico })), pick, { attr: "goal" }),
       cta: "That's the goal", ctaOff: !pick,
       onNext: () => {
@@ -17850,14 +17864,27 @@ const OB2 = {
        and cannot be tapped, with the reason on it. */
     const claim = (b) => goalTileFor(b)?.claim || null;
     const clashes = (b) => [d.goal_bubble, ...picked.filter((x) => x !== b)].some((h) => claim(h) && claim(b) && claim(h) !== claim(b));
+    /* A tile dimmed because two are already picked says so on itself, so the
+       dimming never looks like a bug. */
+    const full = (b) => !picked.includes(b) && picked.length >= MAX;
     const opts = () => GOAL_TILES.filter((t) => t.id !== d.goal_bubble && t.id !== "consistent").map((t) => ({
       id: t.id, label: t.title, ico: t.ico,
-      sub: clashes(t.id) ? `Pulls against ${ob2GoalTitle(d.goal_bubble).toLowerCase()}` : t.sub,
-      off: clashes(t.id) || (!picked.includes(t.id) && picked.length >= MAX),
+      sub: clashes(t.id) ? `Pulls against ${ob2GoalTitle(d.goal_bubble).toLowerCase()}` : full(t.id) ? "Two picked. Untick one to swap." : t.sub,
+      off: clashes(t.id) || full(t.id),
     }));
+    /* The main goal, pinned above the extras and already chosen, so the
+       order of the two screens is visible on this one: one main goal, then
+       up to two on the side. Change goes back to the main goal screen. */
+    const main = goalTileFor(d.goal_bubble);
+    const pin = main ? `<div class="ob2-maingoal">
+        <span class="ob2-ico">${icon(main.ico, 18)}</span>
+        <span class="ob2-maingoal-t"><small>Main goal</small><b>${escapeHtml(main.title)}</b></span>
+        <button type="button" class="ob2-link" id="ob2MainChange">Change</button>
+      </div><p class="ob2-extras-k">Extras, up to ${MAX}</p>` : "";
     ui.paint({
-      title: "Anything else while we're at it? Two more, max. I have limits.",
-      body: `<div id="ob2Goal2">${ob2ChoiceHTML(opts(), picked, { multi: true, attr: "g2" })}</div>`,
+      title: "Anything else on the side? Up to two.",
+      setTitle: "Extras",
+      body: `${pin}<div id="ob2Goal2">${ob2ChoiceHTML(opts(), picked, { multi: true, attr: "g2" })}</div>`,
       cta: "Continue", skip: true,
       onSkip: () => ui.skip({ goal_secondary: [] }),
       onNext: () => ui.next({ goal_secondary: picked.map((b) => ({ bubble: b, child: null })) }),
@@ -17883,9 +17910,10 @@ const OB2 = {
       const id = b.dataset.g2;
       const adding = !picked.includes(id);
       picked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id].slice(0, MAX);
-      if (adding) ob2Type($("ob2Q"), picked.length >= MAX ? "That's two. I'm a robot, not a miracle worker." : "Greedy. I like it.");
+      if (adding) ob2Type($("ob2Q"), picked.length >= MAX ? "That's two, the most I can plan well. Untick one to swap." : "Greedy. I like it.");
       sync();
     });
+    if ($("ob2MainChange")) $("ob2MainChange").onclick = () => ui.back();
   } },
 
   /* Chapter 2. Him asking, the answers, and nothing under them: Mo, round 9,
