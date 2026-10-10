@@ -106,6 +106,58 @@ const PHONE = {
   ],
 };
 
+// ---------------------------------------------------- phone, seated ----
+// Sitting upright on a desk chair, feet flat, thighs level, the phone held
+// in both hands in front of the chest and the head bowed to it, the near
+// thumb slowly pushing the feed up. Not a gym habit: this is the picture for
+// the onboarding answer "Mostly sitting", which "Rest: Phone" (standing)
+// answered with the one posture that answer is not. That is also why it is
+// NOT in index.html's REST_ANTICS; nobody pulls a desk chair up between sets.
+// Must be visible: the bent hip and the bent knee over a seat, because
+// without them it is the standing phone again. Three quarters, sagittal and
+// only just off side on (yaw 14): far enough that the phone face and both
+// hands show, near enough that the thigh still runs level across the screen
+// and the chair, which is screen-space scenery, still lines up under it.
+const SIT = { x: 52, y: 89, rot: -3 };
+// Ankles straight under the knees: thigh 27 level, shin 25 plumb, which is
+// the 90 degree knee. Slightly staggered so the two shins do not merge.
+const SIT_FEET = {
+  ankleR: { x: 80, y: FLOOR, bend: -1 },
+  ankleL: { x: 76, y: FLOOR, bend: -1 },
+};
+const PHONE_SEATED = {
+  view: { yaw: 14, plane: "sagittal" },
+  loop: "pingpong",
+  dur: 3.6,
+  breath: 0.35,
+  props: [
+    { type: "chair", x: 43, y: 96, w: 25 },
+    { type: "phone", side: "L", point: "hand", along: 3, rot: -52, k: 1.0 },
+  ],
+  keys: [
+    { // thumb at the bottom of the screen, head bowed over it
+      t: 0,
+      root: SIT,
+      joints: { spine: 6, neck: 35, wristR: -10, wristL: -6 },
+      ik: {
+        wristL: { rel: "chest", x: 16, y: 17, bend: 1 },
+        wristR: { rel: "chest", x: 14, y: 16.5, bend: 1 },
+        ...SIT_FEET,
+      },
+    },
+    { // the thumb pushes the feed up, the head dips a touch further with it
+      t: 1,
+      root: SIT,
+      joints: { spine: 7, neck: 39, wristR: 8, wristL: -6 },
+      ik: {
+        wristL: { rel: "chest", x: 16, y: 17, bend: 1 },
+        wristR: { rel: "chest", x: 15, y: 14, bend: 1 },
+        ...SIT_FEET,
+      },
+    },
+  ],
+};
+
 // ------------------------------------------------------------- towel ----
 // Standing, a towel in the near hand pressed to the brow and dragged back
 // across it to the temple, then down to the back of the neck, the head dipping
@@ -225,6 +277,7 @@ const WATCH = {
 export const MOVES = {
   "Rest: Water": WATER,
   "Rest: Phone": PHONE,
+  "Rest: Phone (Seated)": PHONE_SEATED,
   "Rest: Towel": TOWEL,
   "Rest: Shake-out": SHAKE_OUT,
   "Rest: Watch": WATCH,

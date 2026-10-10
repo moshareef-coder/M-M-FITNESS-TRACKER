@@ -1930,7 +1930,7 @@ function anchor(spec, S) {
 export const PROP_TYPES = [
   "mat", "wall", "doorway", "doorframe", "bench", "box", "roller", "pullupBar",
   "dipBars", "machine", "cable", "band", "barbell", "dumbbell", "kettlebell",
-  "artwork", "lever",
+  "artwork", "lever", "chair",
   // The rest-time props: what the figure fiddles with between sets. Hand held
   // and drawn small, so they read as a thing in a hand and not as equipment.
   "bottle", "phone", "towel", "watch",
@@ -2311,6 +2311,56 @@ const PROPS = {
     // corner guards
     ctx.fillStyle = C.steelLo;
     roundRect(ctx, p.x, GROUND - 2.4, p.w, 2.4, 1); ctx.fill();
+  },
+  /* A desk chair, side on: a padded seat on a gas lift, a back pad on a
+     curved steel arm off the rear of the seat, and a five star base on
+     casters. Added for the onboarding answer "Mostly sitting", where a
+     figure standing over a phone read as standing, which is the one thing
+     that answer is not. Drawn from the same parts as the bench (vinyl pad,
+     box-section steel, chrome) so it sits in the same catalogue.
+     `x` is the rear edge of the seat, `y` its TOP surface (where the seat
+     of the trousers goes; a seated pelvis root sits about 7 above it), `w`
+     the seat depth. The back pad stands at the low-x end by default, behind
+     a figure facing +x; `back: "R"` puts it at the other end. */
+  chair(ctx, C, p) {
+    const w = p.w || 26, top = p.y, T = 4.6;
+    const flip = p.back === "R";
+    // u runs from the back of the seat (0) to the front edge (1)
+    const at = (u) => flip ? p.x + w - u * w : p.x + u * w;
+    const mid = at(0.5);
+    const hubY = GROUND - 5.2;
+    // the base: a five star seen side on is two splayed legs and the stub of
+    // a third coming at the camera, each on a twin-wheel caster
+    const caster = (cx) => {
+      ctx.beginPath(); ctx.arc(cx, GROUND - 1.9, 1.9, 0, Math.PI * 2);
+      ctx.fillStyle = C.rubber; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, GROUND - 1.9, 0.7, 0, Math.PI * 2);
+      ctx.fillStyle = C.chromeLo; ctx.fill();
+    };
+    const span = w * 0.62;
+    for (const s of [-1, 1]) {
+      steelTube(ctx, C, V(mid, hubY), V(mid + s * span, GROUND - 4.4), 1.25);
+      caster(mid + s * span);
+    }
+    caster(mid + 2.2);
+    // the gas lift: a steel sleeve in the hub, the chrome piston above it
+    steelPost(ctx, C, mid, hubY - 7, hubY + 1.4, 3.6, false, false);
+    chromeBar(ctx, C, V(mid, top + T), V(mid, hubY - 6.5), 1.05);
+    // the tilt mechanism under the seat
+    ctx.fillStyle = C.steelLo;
+    roundRect(ctx, mid - 5, top + T - 0.6, 10, 2.8, 1); ctx.fill();
+    // the back: a curved steel arm from under the rear of the seat up to the
+    // back pad, which leans back a few degrees like every office chair does
+    const lean = flip ? 1 : -1;
+    const armFoot = V(at(0.2), top + T + 0.8);
+    const armTurn = V(at(-0.08), top + T - 0.4);
+    const padLo = V(at(-0.06) + lean * 0.4, top - 7);
+    const padHi = V(at(-0.06) + lean * 2.8, top - 24);
+    boxTube(ctx, C, armFoot, armTurn, 2.6);
+    boxTube(ctx, C, armTurn, V(padLo.x + lean * 1.6, padLo.y + 2), 2.6);
+    padSlab(ctx, C, padHi, padLo, 5.2);
+    // the seat pad last, over the tops of the arm and the mechanism
+    padSlab(ctx, C, V(at(0), top + T / 2), V(at(1), top + T / 2), T);
   },
   /* A roller seen end on. On the floor (or `foam: true`) it is a foam roller:
      a dense EVA cylinder with a flat moulded end and a hollow core, no axle.

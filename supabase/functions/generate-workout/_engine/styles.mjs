@@ -112,7 +112,8 @@ const ALLOWED = new Set(STYLE_KEYS);
 /* ---- how often ----
 
    profiles.style_frequency, written beside train_styles since 2026-09-21: a
-   map from style id to one of four words. Mo's dial, in his order: "every day
+   map from style id to one of four words, or (since 2026-10-08) to an exact
+   count of days, which is what onboarding now writes. Mo's dial, in his order: "every day
    / most days / sometimes / rarely". The numbers are what each word is worth
    in days of a seven day week, and they are deliberately coarse. A person
    asked "how often" answers in words, not integers, and a dial with seven
@@ -134,6 +135,33 @@ export const FREQUENCY_DAYS = Object.freeze({ daily: 7, most: 5, some: 3, rare: 
    days_per_week back into the dial. Not the inverse of FREQUENCY_DAYS, and it
    cannot be: four days is neither three nor five, and "most days" is the
    word a person would use for it. */
+/* What one entry of the map is worth in days of a seven day week, whichever
+   way it was written. Since 2026-10-08 an entry may be an exact count as well
+   as a word: onboarding now asks "you train five days, how many of those for
+   running?" and stores the 2 they tapped, because Mo, on the four word tiles:
+   "you cannot do something daily... if I pick five, it's five days." A count
+   is already the answer and is read as itself; a word is read off the table.
+   Anything else is worth nothing, the same as a word this module does not
+   know. */
+export function frequencyDaysOf(v) {
+  if (typeof v === "number") return Number.isInteger(v) && v >= 1 && v <= 7 ? v : 0;
+  return FREQUENCY_DAYS[v] || 0;
+}
+
+/* One entry, cleaned: a word from FREQUENCY_LEVELS, or a whole count from one
+   to seven (a digit string too, because a jsonb value round tripped through a
+   form arrives as one), or null for anything else. Zero is null and not
+   "never": a style somebody ticked is a style they do, and unticking is how
+   they say they do not. */
+export function frequencyValue(v) {
+  if (typeof v === "number") return Number.isInteger(v) && v >= 1 && v <= 7 ? v : null;
+  if (typeof v !== "string") return null;
+  const t = v.trim().toLowerCase();
+  if (FREQUENCY_LEVELS.includes(t)) return t;
+  if (/^[1-7]$/.test(t)) return Number(t);
+  return null;
+}
+
 export function frequencyForDays(n) {
   const d = Number(n);
   if (!Number.isFinite(d)) return null;
@@ -158,8 +186,13 @@ export function frequencyForDays(n) {
    the difference between "never asked" and "asked, and said sometimes" is a
    recorded answer rather than a guess made here.
 
+   An entry is a word or, since 2026-10-08, an exact count of days from one
+   to seven (frequencyValue), and a count is kept as the number it is: a
+   person who said two runs a week was not asked for a word and should not
+   be rounded into one.
+
    `asked` is true only when the map named at least one picked style with a
-   word this module knows. A typo, an empty object and null all read as never
+   word or a count this module knows. A typo, an empty object and null all read as never
    asked, the same rule normalizeStyles keeps for the list itself. */
 export function normalizeFrequency(raw, styles) {
   const list = Array.isArray(styles) ? styles : [];
@@ -168,8 +201,8 @@ export function normalizeFrequency(raw, styles) {
   const out = {};
   let asked = false;
   list.forEach((s, i) => {
-    const word = typeof given[s] === "string" ? given[s].trim().toLowerCase() : null;
-    if (word && FREQUENCY_LEVELS.includes(word)) { out[s] = word; asked = true; return; }
+    const v = frequencyValue(given[s]);
+    if (v !== null) { out[s] = v; asked = true; return; }
     const main = resistance ? STYLE_KIND[s]?.kind === "resistance" : i === 0;
     out[s] = main ? "most" : "rare";
   });
@@ -598,7 +631,7 @@ export function styleDayFor(styles, { today = new Date(), minutes = null, askedM
     for (const s of styles.styles || []) {
       const k = STYLE_KIND[s];
       const hit = kind === "cardio" ? k?.kind === "cardio" : k?.kind === "flow" && k.training === kind;
-      if (hit) best = Math.max(best, FREQUENCY_DAYS[freq[s]] || 0);
+      if (hit) best = Math.max(best, frequencyDaysOf(freq[s]));
     }
     return Math.max(1, best);
   };
@@ -657,7 +690,88 @@ export function styleDayFor(styles, { today = new Date(), minutes = null, askedM
      more than one of a style is spread evenly, not stacked at the front
    Ties break on the seed, which is the week's start date, so the same week
    asked twice is the same week and next week is a different one. */
-export function composeWeek(styles, days, { liftCount = null, window = 7, seed = 0 } = {}) {
+/* ---- a week they laid out themselves ----
+
+   Mo, 2026-10-09: "make them see the whole week, because sometimes they can
+   do yoga or something in a different day. And make them be able to drag and
+   drop everything and adjust the way they want to." Onboarding now lets them
+   move every block, and stores where each landed as profiles.week_layout: a
+   weekday (0 is Monday, the week runs Monday to Sunday everywhere in the app)
+   to the list of style ids on it. This is the one place that decides whether
+   such a layout is still the truth, and composeWeek honours it when it is.
+
+   The rules are composeWeek's own, written down once so the screen that lets
+   them drag and the engine that builds the week cannot disagree about them:
+   one session of each kind on a day, so three at most. */
+export const MAX_SESSIONS_PER_DAY = 3;
+
+/* resistance, cardio or flow, or null for a word this module does not know. */
+export function styleKind(id) {
+  return STYLE_KIND[id]?.kind || null;
+}
+
+/* Why a day's list breaks the rules, or null when it does not. `full` is
+   more than three, `kind` is two of a kind (and names it), `unknown` is a
+   word outside STYLE_KEYS. Said as a reason rather than a boolean because the
+   screen tells the person which rule they hit. */
+export function dayLayoutProblem(list) {
+  const ids = Array.isArray(list) ? list : [];
+  if (ids.length > MAX_SESSIONS_PER_DAY) return { why: "full" };
+  const seen = new Set();
+  for (const id of ids) {
+    const kind = styleKind(id);
+    if (!kind) return { why: "unknown", style: id };
+    if (seen.has(kind)) return { why: "kind", kind, style: id };
+    seen.add(kind);
+  }
+  return null;
+}
+
+/* The layout cleaned, or null when it is not one this week can use as it
+   stands. Null is not an error: it means "place it yourself", which is what
+   composeWeek did before layouts existed, so a stale layout costs nothing
+   worse than the week they would have had anyway.
+
+   Stale is the case that matters. The layout is saved once, at the end of
+   onboarding, and Setup can change the styles or the counts any time after.
+   A layout holding a style they have since unticked, or two runs when the dial
+   now says three, describes a week they no longer asked for, and building it
+   would quietly overrule the newer answer. So a layout is only used while it
+   agrees with the answers it was built from:
+     every style on it is one they still train
+     every day keeps the rules (dayLayoutProblem)
+     a style counted in days (a number in the frequency map) appears exactly
+       that many times; a word is coarser than any layout and is not checked
+     the days holding resistance are `liftCount` of them when that is given,
+       which is days_per_week, the number the app's lifting week is built to */
+export function readLayout(raw, styles, { liftCount = null } = {}) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || !styles?.asked) return null;
+  const picked = new Set(styles.styles || []);
+  const out = {};
+  const counts = {};
+  let liftDays = 0;
+  for (let wd = 0; wd < 7; wd++) {
+    const v = raw[wd] ?? raw[String(wd)] ?? [];
+    if (!Array.isArray(v)) return null;
+    const ids = v.map((x) => (typeof x === "string" ? x.trim().toLowerCase() : null));
+    if (ids.some((id) => !id || !picked.has(id))) return null;
+    if (dayLayoutProblem(ids)) return null;
+    if (ids.some((id) => styleKind(id) === "resistance")) liftDays++;
+    for (const id of ids) counts[id] = (counts[id] || 0) + 1;
+    out[wd] = ids;
+  }
+  for (const k of Object.keys(raw)) if (!/^[0-6]$/.test(String(k))) return null;
+  const freq = styles.frequency || {};
+  for (const s of picked) {
+    if (styleKind(s) === "resistance") continue;
+    if (typeof freq[s] === "number" && (counts[s] || 0) !== freq[s]) return null;
+  }
+  if (liftCount != null && Number.isFinite(Number(liftCount)) && [...picked].some((s) => styleKind(s) === "resistance")
+    && liftDays !== Math.round(Number(liftCount))) return null;
+  return out;
+}
+
+export function composeWeek(styles, days, { liftCount = null, window = 7, seed = 0, layout = null } = {}) {
   const list = (Array.isArray(days) ? days : []).map((d, i) => ({
     i,
     key: d && d.key !== undefined ? d.key : i,
@@ -674,6 +788,45 @@ export function composeWeek(styles, days, { liftCount = null, window = 7, seed =
     dropped,
   });
   if (!n || !styles?.asked) return answer();
+
+  /* A layout they made themselves, when it still holds (readLayout), is the
+     placement, as it stands: nothing is spread, moved or re-counted. Each day
+     names its weekday as `wd`, because the caller's keys are dates and the
+     layout's are weekdays. A day the caller has already decided carries the
+     day: `lift: false` takes no lift whatever the layout says, `lift: true`
+     keeps its lift though the layout has none, and a kind a kept plan already
+     holds is not doubled. Each of those is said in `dropped`, never swallowed.
+     `layout` comes back "used", or "ignored" when one was handed in and could
+     not be, so the app can tell the person their week was re-placed. */
+  const laid = layout ? readLayout(layout, styles, { liftCount }) : null;
+  if (laid && list.every((d) => Number.isInteger(days[d.i]?.wd) && days[d.i].wd >= 0 && days[d.i].wd <= 6)) {
+    for (const d of list) {
+      const wd = days[d.i].wd;
+      let lifted = false;
+      for (const s of laid[wd]) {
+        const kind = STYLE_KIND[s].kind;
+        if (kind === "resistance" && d.lift === false) {
+          dropped.push({ style: s, count: 1, key: d.key, why: "the day was already decided without a lift" });
+          continue;
+        }
+        if (d.has.has(kind)) {
+          dropped.push({ style: s, count: 1, key: d.key, why: `the day already holds a ${kind} session` });
+          continue;
+        }
+        const k = STYLE_KIND[s];
+        d.sessions.push(kind === "cardio" ? { kind, style: s, mode: k.mode }
+          : kind === "flow" ? { kind, style: s, training: k.training }
+          : { kind, style: s });
+        if (kind === "resistance") lifted = true;
+      }
+      if (d.lift === true && !lifted && !d.has.has("resistance")) {
+        const res = (styles.styles || []).find((s) => STYLE_KIND[s]?.kind === "resistance");
+        if (res) d.sessions.unshift({ kind: "resistance", style: res });
+      }
+    }
+    return { ...answer(), layout: "used" };
+  }
+  const ignored = layout ? "ignored" : null;
   const picked = styles.styles || [];
   const freq = styles.frequency || {};
   const resStyles = picked.filter((s) => STYLE_KIND[s]?.kind === "resistance");
@@ -697,10 +850,13 @@ export function composeWeek(styles, days, { liftCount = null, window = 7, seed =
      mistake this file keeps warning against elsewhere. */
   const liftDays = liftCount != null && Number.isFinite(Number(liftCount))
     ? Math.max(0, Math.round(Number(liftCount)))
-    : resStyles.length ? Math.max(...resStyles.map((s) => FREQUENCY_DAYS[freq[s]] || 0)) : null;
+    : resStyles.length ? Math.max(...resStyles.map((s) => frequencyDaysOf(freq[s]))) : null;
+  /* A count is exact and is not capped here: the screen that asks for it
+     already offers nothing above the training days, and an old word is what
+     the cap above exists for. */
   const daysOf = (s) => {
     if (freq[s] === "daily" && liftDays != null && STYLE_KIND[s]?.kind !== "resistance") return liftDays;
-    return FREQUENCY_DAYS[freq[s]] || 0;
+    return frequencyDaysOf(freq[s]);
   };
   const owed = (per) => {
     if (per <= 0) return 0;
@@ -759,7 +915,7 @@ export function composeWeek(styles, days, { liftCount = null, window = 7, seed =
   };
   placeKind("cardio", (d) => d.legs && count(d, "resistance") > 0, null);
   placeKind("flow", null, afterHeavy);
-  return answer();
+  return ignored ? { ...answer(), layout: ignored } : answer();
 }
 
 /* `n` of `list`, evenly spaced, starting a seeded step in so that the same
