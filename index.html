@@ -1082,6 +1082,10 @@
      same weight the typed code is: at 21px with that tracking, CODE OR LINK
      fills the field edge to edge and reads as a value somebody already
      entered. */
+  .pair-row { display: flex; gap: 8px; align-items: stretch; }
+  /* By id, to beat #onboard input's margin, which made the row taller than the field. */
+  .pair-row > #partnerCodeInput.code-input { flex: 1; min-width: 0; margin: 0; }
+  .pair-row .pair-paste { flex: none; width: auto; margin: 0; padding: 0 14px; min-height: 0; height: auto; white-space: nowrap; font-size: 14px; color: var(--text); }
   .code-input::placeholder { font-size: 14px !important; letter-spacing: 0.06em; font-weight: 600; opacity: .6; }
   /* The line under a control that says what pressing it does, and doubles as
      where that control reports back. Sits tight to the thing above it, which
@@ -10801,13 +10805,14 @@
 /* Where the public site lives: the privacy policy, the support page, and the
    link that goes out when somebody shares a session.
 
-   One constant because it was three, and because it is going to change. The
-   app is called Unio and this says m-m-fitness-tracker, which people see when a
-   session is shared and which an App Store reviewer sees on the privacy link
-   from the sign in screen. Both of those uses need a URL that actually
-   resolves, so this stays until there is a real domain, and then it is one line
-   rather than a hunt. */
-const PUBLIC_SITE = "https://m-m-fitness-tracker.vercel.app";
+   One constant because it was three. It said m-m-fitness-tracker until
+   2026-10-10, which is what people saw on every invite link; Mo: "looks
+   weird". trainwithunio.com is the real domain now and serves /privacy,
+   /terms and /support itself (the .html names redirect there, and the
+   policy text was checked identical to the old host's on 2026-10-10).
+   The old host stays in the associated domains entitlement, so invite links
+   already sent from it still open the app. */
+const PUBLIC_SITE = "https://trainwithunio.com";
 const APP_STORE_URL = "https://apps.apple.com/app/id6812201708";
 
 const SUPABASE_URL = "https://stcpiovpjismhltklfdw.supabase.co";
@@ -10961,6 +10966,17 @@ let PENDING_TOKEN = (() => {
   } catch { /* private mode, or no history API */ }
   return tok;
 })();
+
+/* A ?invite=CODE link on one of our own hosts, for appUrlOpen. Any other host
+   is somebody else's link and not ours to read. */
+function ob2InviteCodeFrom(url) {
+  try {
+    const u = new URL(url);
+    if (!/^(www\.)?trainwithunio\.com$|^m-m-fitness-tracker\.vercel\.app$/.test(u.hostname)) return null;
+    const q = (u.searchParams.get("invite") || "").trim();
+    return /^[A-Z0-9]{6}$/i.test(q) ? q.toUpperCase() : null;
+  } catch { return null; }
+}
 
 function holdInviteToken(tok) {
   if (!tok) return false;
@@ -11301,6 +11317,17 @@ function registerAuthDeepLink() {
        it is the whole job: the sign in screen is what comes next and
        checkPartnershipThenEnter claims it on the way through. */
     const invite = url && inviteTokenFrom(url);
+    /* The six character code as a link, trainwithunio.com/?invite=CODE (or
+       the old host). It cannot pair anybody by itself, the same as on the
+       web: it is held and waits, filled in, in the code box. */
+    const codeIn = !invite && ob2InviteCodeFrom(url);
+    if (codeIn) {
+      PENDING_INVITE = codeIn;
+      try { sessionStorage.setItem(PENDING_INVITE_KEY, codeIn); } catch { /* private mode */ }
+      const box = $("partnerCodeInput") || $("setupPartnerCode");
+      if (box && !box.value) box.value = codeIn;
+      return;
+    }
     if (invite) {
       holdInviteToken(invite);
       const { data } = await sb.auth.getSession();
@@ -11521,6 +11548,7 @@ function renderSignInScreen(state = {}) {
       <div class="si-start">
         <button type="button" class="btn-primary" id="siStart">Get started</button>
         <button type="button" class="btn-ghost si-have" id="siHave">I already have an account</button>
+        ${PENDING_TOKEN ? "" : `<button type="button" class="si-forgot" id="siPasteInvite">Got an invite link? Paste it</button>`}
       </div>
       <div class="si-scrim" id="siScrim"></div>
       <div class="si-sheet si-pop" id="siSheet" role="dialog" aria-modal="true" aria-labelledby="siSheetH">
@@ -11580,6 +11608,32 @@ function renderSignInScreen(state = {}) {
     $("siSheet").setAttribute("aria-hidden", "false");
   };
   const closeSheet = () => { screen.classList.remove("sheet-open"); $("siSheet").setAttribute("aria-hidden", "true"); };
+  /* Somebody whose partner invited them, who installed from the App Store
+     rather than through the link, so nothing about the link survived the
+     install. The website copied it to the clipboard on the way; this holds
+     it, the same as tapping the link before signing in would, and signing in
+     then takes them to the accept step (path B). */
+  if ($("siPasteInvite")) $("siPasteInvite").onclick = async () => {
+    let text = "";
+    try { text = (await navigator.clipboard.readText()).trim(); } catch { /* refused */ }
+    const tok = inviteTokenFrom(text);
+    if (tok) {
+      holdInviteToken(tok);
+      $("siPasteInvite").remove();
+      openSheet("start");
+      msg("Invite saved. Sign in and you'll be paired.", "ok");
+      return;
+    }
+    const code = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length === 6) {
+      PENDING_INVITE = code;
+      try { sessionStorage.setItem(PENDING_INVITE_KEY, code); } catch { /* private mode */ }
+      openSheet("start");
+      msg(`Code ${code} saved. Sign in, and it's filled in when you get to your partner.`, "ok");
+      return;
+    }
+    toast(text ? "That's not an invite link. Ask them to send it again." : "Nothing to paste. Copy their invite link first.");
+  };
   $("siStart").onclick = () => openSheet("start");
   $("siHave").onclick = () => openSheet("signin");
   $("siClose").onclick = closeSheet;
@@ -12446,9 +12500,12 @@ function pairEntryHtml(myCode) {
 
       <div class="code-divider"><span>or</span></div>
 
-      <input id="partnerCodeInput" type="text" placeholder="CODE OR LINK"
-             autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
-             value="${escapeHtml(PENDING_INVITE || "")}" />
+      <div class="pair-row">
+        <input id="partnerCodeInput" type="text" placeholder="CODE OR LINK"
+               autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
+               value="${escapeHtml(PENDING_INVITE || "")}" />
+        <button type="button" class="btn-ghost pair-paste" id="pairPasteBtn">Paste invite</button>
+      </div>
       <p class="ob-hint" id="pairHint">Their six characters, or paste the whole link.</p>
 
       <p class="ob-mine" id="myCodeLine"${myCode ? "" : " hidden"}>Your code is <strong id="myInviteCode">${escapeHtml(myCode || "")}</strong></p>`;
@@ -12545,6 +12602,21 @@ function wirePairEntry({ onPaired, onPending, onShared }) {
   /* Enter is still honoured for anyone on a keyboard, and for the case where
      six characters were already in the box when the screen was drawn. */
   input.onkeydown = (e) => { if (e.key === "Enter") submit(input.value); };
+  /* One tap instead of a long press and Paste in a small box. The website
+     copies the whole trainwithunio.com/j/ link before it sends somebody to
+     the App Store, so after the install this is the link, and a link pairs
+     straight away (it was made for them, which is the consent). A code goes
+     the same way a typed one does. */
+  const paste = $("pairPasteBtn");
+  if (paste) paste.onclick = async () => {
+    let text = "";
+    try { text = (await navigator.clipboard.readText()).trim(); } catch { /* refused */ }
+    if (!text) { say("Nothing to paste. Long press the box and paste, or type their code.", true); return; }
+    if (inviteTokenFrom(text)) { input.value = text; submit(text); return; }
+    const code = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length === 6) { input.value = code; submit(code); return; }
+    say("That's not an invite link or a code. Ask them to send it again.", true);
+  };
 }
 
 /* Onboarding, rebuilt to one rule: ask the goal, then TELL them the plan.
@@ -12815,8 +12887,8 @@ async function shareInviteLink(btn) {
        the code is what they still have in their hand afterwards. */
     const code = MY_PROFILE?.invite_code;
     const text = code
-      ? `${who} wants to train with you on Unio.\n\nTap the link. If you do not have the app yet it will take you to the App Store, and you can pair with the code ${code} once you are in.`
-      : `${who} wants to train with you on Unio. This link is for you and works once.`;
+      ? `${who} wants to train with you on Unio.\n\nTap the link to pair up. No app yet? It takes you to the App Store, and once you're in, pair with the code ${code}.`
+      : `${who} wants to train with you on Unio. This link is just for you and works once.`;
 
     try {
       if (navigator.share) { await navigator.share({ title: "Unio", text, url }); return true; }
