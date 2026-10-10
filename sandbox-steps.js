@@ -479,7 +479,7 @@
 
       { t: "Mell finished, with a photo", scenario: "partnerDone",
         s: "The first thing you see on opening",
-        note: "Mell finished a workout you have not seen, so it opens the app: her proof photo as the hero with her face on its edge, what she did, her caption in quotes, then exercises, minutes and XP. One button, Cheer Mell on, which sends her the same cheer the notification button does. Close is the quiet way out. It shows once per workout: Close it and reopen the app and it stays gone, and her card on Home stands down with it. If several are waiting, only the newest shows.",
+        note: "Mell finished a workout you have not seen, so it opens the app: her proof photo as the hero with her face on its edge, what she did, her caption in quotes, then exercises, minutes and XP. The only control is the X top left, where every sheet keeps it (Cheer Mell on was removed, 2026-10-10). It shows once per workout: Close it and reopen the app and it stays gone, and her card on Home stands down with it. If several are waiting, only the newest shows.",
         run: (w) => { w.switchTab("home"); w.eval(`if (!document.querySelector(".pdn-scrim")) {
           try { localStorage.removeItem("unio.partnerDoneSeen:" + MY_EMAIL); } catch {}
           ALL_ENTRIES.forEach((e) => { if (e.email === PARTNER_EMAIL) e.seen_by_partner_at = null; });
@@ -488,7 +488,7 @@
 
       { t: "Mell finished, no photo", scenario: "partnerDoneNoPhoto",
         s: "Her ring and a big check",
-        note: "Same card when she skipped the photo: her ring closes round a big check and the robot pops up over it, the pair card's own moves, so it never looks like an empty frame.",
+        note: "Same card when she skipped the photo: her ring closes round a solid disc in her colour with a big check, the robot pops up over it, and the day's numbers sit under the title as three tiles (exercises, minutes, XP), so it reads as a result rather than an empty frame.",
         run: (w) => { w.switchTab("home"); w.eval(`if (!document.querySelector(".pdn-scrim")) {
           try { localStorage.removeItem("unio.partnerDoneSeen:" + MY_EMAIL); } catch {}
           ALL_ENTRIES.forEach((e) => { if (e.email === PARTNER_EMAIL) e.seen_by_partner_at = null; });

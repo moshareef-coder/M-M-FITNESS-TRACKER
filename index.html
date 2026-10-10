@@ -6455,9 +6455,21 @@
      build, since the photo is the moment and nothing needs to assemble. */
   .pdn-scrim { gap: 18px; }
   .pc-ring .arc.pdn-arc { stroke-dasharray: 277; stroke-dashoffset: 277; }
-  .pdn-check { position: relative; z-index: 2; color: var(--partner); display: grid; place-items: center;
+  /* A solid disc in her colour with the tick knocked out of it: a finished
+     thing, not an outline floating in an empty ring. */
+  .pdn-check { position: relative; z-index: 2; width: 116px; height: 116px; border-radius: 50%;
+    background: var(--partner); color: #fff; display: grid; place-items: center;
+    box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--partner) 80%, transparent);
     animation: pdnPop .5s .9s both cubic-bezier(.34,1.56,.64,1); }
-  .pc-ring .pdn-check svg { position: static; width: 64px; height: 64px; stroke-width: 2.6; vertical-align: 0; }
+  .pc-ring .pdn-check svg { position: static; width: 56px; height: 56px; stroke-width: 3; vertical-align: 0; }
+  /* The one control, top left where every sheet keeps its X, clear of the
+     notch and the Dynamic Island. */
+  .pdn-scrim > .pdn-x { position: absolute; z-index: 4; top: calc(12px + env(safe-area-inset-top, 0px)); left: 16px; }
+  .pdn-tiles { display: flex; justify-content: center; gap: 10px; margin-top: 8px; }
+  .pdn-tile { min-width: 84px; padding: 12px 10px 10px; border-radius: 14px; display: grid; gap: 2px; justify-items: center;
+    background: var(--panel); border: 1px solid var(--border); }
+  .pdn-tile b { font-size: 24px; font-weight: 800; line-height: 1.1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .pdn-tile span { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .pdn-ring-av { position: absolute; right: 8px; bottom: 8px; z-index: 3; animation: pdnPop .45s 1.05s both cubic-bezier(.34,1.56,.64,1); }
   .pdn-ring-av .av, .pdn-photo-av .av { width: 48px; height: 48px; font-size: 17px; margin: 0; border: 3px solid var(--bg); cursor: default; }
   .pdn-photo { position: relative; width: min(264px, 100%); aspect-ratio: 4 / 5; max-height: 44vh; flex-shrink: 1;
@@ -6466,7 +6478,6 @@
     box-shadow: 0 0 0 3px var(--partner), 0 18px 40px -22px rgba(0,0,0,.45); }
   .pdn-photo-av { position: absolute; left: 50%; bottom: -20px; transform: translateX(-50%); }
   .pdn-photo ~ .pc-copy { margin-top: 14px; animation-delay: .25s; }
-  .pdn-photo ~ .pc-actions { animation-delay: .4s; }
   .pdn-when { margin: 0; font-size: 12.5px; color: var(--muted); }
   .pdn-h { font-size: 28px; max-width: 16ch; }
   .pdn-note { margin: 0; font-size: 15.5px; line-height: 1.45; color: var(--text); max-width: 30ch; text-wrap: balance; }
@@ -22971,10 +22982,19 @@ async function showPartnerDone(e) {
   const photo = e.proof_path ? await signedProofUrl(e.proof_path) : null;
   const theirs = await avatarHTML(PARTNER_EMAIL, name, "them", "div");
 
-  const stats = [];
-  if (f.sharing && f.exercises) stats.push(`<span>${icon("dumbbell", 15)} ${f.exercises} ${f.exercises === 1 ? "exercise" : "exercises"}</span>`);
-  if (f.sharing && f.mins) stats.push(`<span>${icon("clock", 15)} ${f.mins} min</span>`);
-  if (f.xp) stats.push(`<span>${icon("bolt", 15)} ${f.xp} XP</span>`);
+  /* Mo, 2026-10-10: the no-photo version looked empty. So without a photo
+     the day's numbers are part of the hero, three tiles under the title the
+     way the finish screen counts them, and the check inside her ring is a
+     solid disc in her colour rather than a thin tick floating in a hole.
+     With a photo, the photo is the hero and the numbers stay one quiet line. */
+  const facts = [];
+  if (f.sharing && f.exercises) facts.push({ ico: "dumbbell", n: f.exercises, unit: f.exercises === 1 ? "exercise" : "exercises" });
+  if (f.sharing && f.mins) facts.push({ ico: "clock", n: f.mins, unit: "min" });
+  if (f.xp) facts.push({ ico: "bolt", n: f.xp, unit: "XP" });
+  const statsHTML = !facts.length ? ""
+    : photo
+      ? `<p class="pdn-stats">${facts.map((x) => `<span>${icon(x.ico, 15)} ${x.n} ${x.unit}</span>`).join("")}</p>`
+      : `<div class="pdn-tiles">${facts.map((x) => `<div class="pdn-tile"><b>${x.n}</b><span>${escapeHtml(x.unit)}</span></div>`).join("")}</div>`;
 
   /* With a photo, the photo is the hero and their face sits on its corner.
      Without one, the stage is the pair card's: their ring closes round a big
@@ -22991,28 +23011,29 @@ async function showPartnerDone(e) {
              <circle class="glow" cx="50" cy="50" r="44"/>
              <circle class="arc them pdn-arc" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"/>
            </svg>
-           <div class="pdn-check">${icon("check", 64)}</div>
+           <div class="pdn-check">${icon("check", 56)}</div>
            <div class="pdn-ring-av">${theirs}</div>
          </div>
        </div>`;
 
   const el = document.createElement("div");
-  el.className = "pc-scrim pdn-scrim";
+  el.className = "pc-scrim pdn-scrim" + (photo ? " pdn-has-photo" : "");
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-modal", "true");
   const title = f.focus ? `${first} finished ${f.focus}` : `${first} finished a workout`;
   el.setAttribute("aria-label", title);
+  /* Mo, 2026-10-10: Cheer Mell on is gone. The card is news, not a request,
+     and the one control is the way out: an X top left, where every sheet in
+     the app keeps it. Cheering still lives on her Home card and her live
+     sheet. */
   el.innerHTML = `
+    <button type="button" class="ds-x pdn-x" id="pdnClose" aria-label="Close">&times;</button>
     ${hero}
     <div class="pc-copy pdn-copy">
       <p class="pdn-when">${escapeHtml(f.when)}</p>
       <h2 class="pc-h pdn-h">${escapeHtml(title)}</h2>
       ${e.note ? `<p class="pdn-note">“${escapeHtml(e.note)}”</p>` : ""}
-      ${stats.length ? `<p class="pdn-stats">${stats.join("")}</p>` : ""}
-    </div>
-    <div class="pc-actions pdn-actions">
-      <button type="button" class="btn-primary" id="pdnCheer">Cheer ${escapeHtml(first)} on</button>
-      <button type="button" class="pc-later" id="pdnClose">Close</button>
+      ${statsHTML}
     </div>`;
   document.body.appendChild(el);
 
@@ -23030,24 +23051,7 @@ async function showPartnerDone(e) {
     renderMoments();
   };
   $("pdnClose").onclick = close;
-  /* The same row the notification's Cheer button and the Home card's flame
-     write, so it reaches their phone as "cheered you on" like every other. */
-  $("pdnCheer").onclick = async () => {
-    const btn = $("pdnCheer");
-    btn.disabled = true;
-    const { error } = await sb.from("encouragements").insert({ from_email: MY_EMAIL, to_email: PARTNER_EMAIL, message: "Proud of you!" });
-    if (error) {
-      console.error("could not send the cheer", error);
-      btn.disabled = false;
-      toast("Couldn't send it. Try again.");
-      return;
-    }
-    btn.textContent = "Sent";
-    sfxPlay("set");
-    await new Promise((r) => setTimeout(r, 450));
-    close();
-  };
-  $("pdnCheer").focus({ preventScroll: true });
+  $("pdnClose").focus({ preventScroll: true });
 }
 
 /* Coming back to the app is the other arrival. Away for a minute or more,
