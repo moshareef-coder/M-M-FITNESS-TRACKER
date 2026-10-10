@@ -181,6 +181,16 @@
         note: "Near the end of setup, after the workouts are picked. The same pairing that has always been here, asked as a step rather than as a separate screen once setup is over: one button that mints a one time link and hands it to the share sheet, one field that takes either their six characters or a link they pasted, and your own code underneath for the case where they have to install the app first. Training on your own is a real answer and it is the last word on the screen, not a greyed-out afterthought. Send an invite and watch the screen change: the link is spent, so it says what a second tap would cost, and the way out becomes the way on.",
         run: (w) => w.renderOnboardStep("partner", { name: "Mo", goal_bubble: "build-muscle" }) },
 
+      { t: "Got a partner's code? On the pay screen", scenario: "fresh",
+        s: "Training with someone? Enter their code",
+        note: "The pay screen of the long onboarding, as somebody who is not paired yet. Under the beta line: Training with someone? Enter their code. It opens a small card with the invite screen's own field (CODE OR LINK, Paste invite, Pair). Turn Paid off first to see it as a brand new account would. Then paste Mell's link, trainwithunio.com/j/sandboxinvitefrommell1: it pairs at once and, because Mell pays in this world, the screen turns into Mell's plan covers you both, nothing to pay, and the invite screen drops out of the rest of the run. Reload and type Mell's code MELLXX instead: that is a request, so the paywall stays with its trial and the line reads Sent. Once Mell accepts, their plan covers you. Already paired (path B), the line is not there at all.",
+        run: (w) => w.ob2Go("pay2", { path: "a", name: "Mo", goal_bubble: "build-muscle", train_styles: ["lifting"], days_per_week: 3, session_minutes: 45 }) },
+
+      { t: "Got a partner's code? On the app's paywall", scenario: "solo",
+        s: "The same line under Not now",
+        note: "The app's own paywall for somebody training alone. The last line, under Not now, is Training with someone? Enter their code. With Paid off, pasting Mell's link pairs you, closes the paywall (Mell's plan already covers you. Nothing to pay.) and loads Mell in as your partner. A typed code leaves the paywall up with Sent under it. Paired accounts never see the line.",
+        run: (w) => { w.eval("IS_PREMIUM = false"); w.document.getElementById("popScrim")?.classList.add("hidden"); w.showPaywall(); } },
+
       { t: "First look at an empty app", scenario: "fresh",
         s: "No workouts, no partner, no history",
         note: "What a stranger sees on day one. Skip past onboarding first if it is still on screen. This is the state that has never been walked properly end to end, so look hard at the empty cards.",
