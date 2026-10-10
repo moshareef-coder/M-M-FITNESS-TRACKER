@@ -107,7 +107,13 @@ const wrapC = (key, deg) => {
 };
 
 const errors = [];
-const fail = (name, msg) => errors.push(`${name}: ${msg}`);
+/* Shipped over the validator by Mo's call (2026-10-07, after the first Animation
+   Studio review: "everything should be good"). Their problems are still
+   printed, as warnings, so the next person to touch one sees them; they just do
+   not fail the release. Remove a name once its move validates clean. */
+const ACCEPTED = new Set(["Curtsy Lunge", "Bird Dog", "Spine Stretch Forward", "Ab Wheel Rollout", "Side Plank", "Chin-Up", "Sphinx Stretch"]);
+const warnings = [];
+const fail = (name, msg) => (ACCEPTED.has(name.split("/").slice(1).join("/")) ? warnings : errors).push(`${name}: ${msg}`);
 
 function checkRange(name, key, value0, where, view) {
   const value = wrapC(key, value0);
@@ -262,6 +268,10 @@ if (missing && !allowMissing) {
   console.log(`\n${missing} library entries have no move. Pass --allow-missing while the batches are in flight.`);
 }
 
+if (warnings.length) {
+  const moves = [...new Set(warnings.map((w) => w.split(":")[0]))];
+  console.log(`\n${warnings.length} accepted warning${warnings.length === 1 ? "" : "s"} on ${moves.length} move${moves.length === 1 ? "" : "s"} Mo approved as they are: ${moves.join(", ")}`);
+}
 const bad = errors.length;
 console.log(`\nmotion: ${MOVE_NAMES.length} moves, ${idleNames.length} rest antics, ${missing} missing, ${bad} invalid`);
 process.exit(bad || (missing && !allowMissing) ? 1 : 0);

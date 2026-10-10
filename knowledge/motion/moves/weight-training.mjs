@@ -42,24 +42,8 @@ const GOBLET_SQUAT = {
   fit: { k: 1.1, dy: 2 },
   props: [{ type: "dumbbell", hold: "upright", side: "R", point: "wrist", dx: 3, dy: 1, k: 0.95, front: true }],
   keys: [
-    { // standing tall, bell racked at the chest
-      t: 0,
-      root: { x: 64, y: 61.4, rot: 2 },
-      joints: { spine: 5, neck: -3 },
-      ik: {
-        ankleR: { x: 64, y: 113.4, bend: -1 }, ankleL: { x: 61, y: 113.4, bend: -1 },
-        wristR: { rel: "chest", x: 14, y: 6, bend: 1 }, wristL: { rel: "chest", x: 11, y: 7, bend: 1 },
-      },
-    },
-    { // bottom, hips back, thighs about parallel, knee just past the toe
-      t: 1,
-      root: { x: 52, y: 89, rot: 10 },
-      joints: { spine: 12, neck: -6 },
-      ik: {
-        ankleR: { x: 64, y: 113.4, bend: -1 }, ankleL: { x: 61, y: 113.4, bend: -1 },
-        wristR: { rel: "chest", x: 14, y: 6, bend: 1 }, wristL: { rel: "chest", x: 11, y: 7, bend: 1 },
-      },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":61,"y":113.4},"ankleR":{"bend":-1,"x":64,"y":113.4},"wristL":{"bend":1,"rel":"chest","x":11,"y":7},"wristR":{"bend":1,"rel":"chest","x":14,"y":6}},"joints":{"neck":-3,"spine":5},"root":{"rot":2,"x":64,"y":61.4},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":61,"y":113.4},"ankleR":{"bend":-1,"x":64,"y":113.4},"wristL":{"bend":1,"rel":"chest","x":11,"y":7},"wristR":{"bend":1,"rel":"chest","x":14,"y":6}},"joints":{"neck":-6,"spine":12},"root":{"rot":10,"x":49.7,"y":93.4},"t":1},
   ],
 };
 
@@ -175,21 +159,8 @@ const STEP_UP = {
     { type: "dumbbell", hold: "follow", side: "L", point: "hand", dx: -1, dy: 5, k: 0.8 },
   ],
   keys: [
-    { // bottom, lead foot on the box, trail foot on the floor
-      t: 0,
-      root: { x: 58, y: 61.4, rot: 4 },
-      joints: { spine: 8, neck: -4, shoulderR: -4, elbowR: 6, shoulderL: -2, elbowL: 8 },
-      ik: {
-        ankleR: { x: 86, y: 95.4, bend: -1 }, ankleL: { x: 52, y: 113.4, bend: -1 },
-      },
-    },
-    { // top, standing on the box, trail leg hanging behind
-      t: 1,
-      root: { x: 82, y: 43.4, rot: 2 },
-      joints: { spine: 4, neck: -2, shoulderR: -4, elbowR: 6,
-                hipL: -18, kneeL: 34, ankleL: -12 },
-      ik: { ankleR: { x: 86, y: 95.4, bend: -1 } },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":55.1,"y":112.7},"ankleR":{"bend":-1,"x":86,"y":95.4}},"joints":{"elbowL":8,"elbowR":6,"neck":-4,"shoulderL":-2,"shoulderR":-4,"spine":8},"root":{"rot":4,"x":58,"y":61.4},"t":0},
+    {"ik":{"ankleR":{"bend":-1,"x":86,"y":95.4}},"joints":{"ankleL":-12,"elbowR":6,"hipL":-18,"kneeL":34,"neck":-2,"shoulderR":-4,"spine":4},"root":{"rot":2,"x":82,"y":43.4},"t":1},
   ],
 };
 

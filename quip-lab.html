@@ -246,6 +246,13 @@ const BATTERY = [
   ctx("Logged a weight", { weight: 185 }),
   ctx("Already hit the week's target", { weekDone: 5, weekTarget: 5 }),
   ctx("Short of the week's target", { weekDone: 3, weekTarget: 5 }),
+  /* The exercise-aware banks read library rows, not just the name. Two real
+     rows, so the page shows what he says on a showpiece and on a plain lift. */
+  ctx("On the Human Flag, Lat Pulldown next, sets left", {
+    name: "Human Flag", lift: "human flag", setsLeft: 2,
+    ex: { name: "Human Flag", primary: ["obliques"], secondary: ["shoulders", "lats"], equipment: "bodyweight", level: "advanced", training: "calisthenics", category: "advanced-statics" },
+    nextEx: { name: "Lat Pulldown", primary: ["lats"], secondary: ["biceps", "forearms"], equipment: "cable", level: "beginner", training: "weight-training", category: "lats" },
+  }),
 ];
 
 /* For a function line: the first battery context that makes it fire, and
@@ -254,6 +261,9 @@ function resolve(fn) {
   for (const c of BATTERY) {
     let out;
     try { out = fn(c); } catch (e) { return { error: String(e.message || e) }; }
+    /* An exercise-aware entry returns every line it has at once. Shown
+       joined, so the page lists them all rather than one at random. */
+    if (Array.isArray(out)) { if (out.length) return { label: c.label, text: out.join(" / ") }; continue; }
     if (out) return { label: c.label, text: out };
   }
   return null;

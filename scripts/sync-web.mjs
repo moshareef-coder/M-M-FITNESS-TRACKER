@@ -113,7 +113,10 @@ const KNOWLEDGE_FILES = [
    the machine moves draw had never been in the list at all. A directory copy
    cannot drift when the next move file lands. body3d/ stays out (BODY3D is
    false and it pulls three.js in) and reference/ is 9.6 MB of concept art. */
-const DIRS = ["vendor", "badges", "knowledge/motion"];
+/* mo-knowledge/motion is our own rest antics (rest.mjs), imported lazily by
+   index.html and importing knowledge/motion/rig.mjs in turn. A directory for
+   the same reason as above: the next antic file lands without a list edit. */
+const DIRS = ["vendor", "badges", "knowledge/motion", "mo-knowledge/motion"];
 const DIR_SKIP = /\/(body3d|reference)(\/|$)|\.md$/;
 
 rmSync(out, { recursive: true, force: true });

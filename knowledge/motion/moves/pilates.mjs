@@ -463,22 +463,8 @@ const BRIDGE = {
   breath: 0.22,
   props: [MAT],
   keys: [
-    { // hips down
-      t: 0,
-      root: { x: 62, y: 106, rot: -90 },
-      // The arms are angles rather than pins on purpose: pinned to the mat they
-      // sit closer to the shoulder than an arm's length, and the IK answers that
-      // by bowing the elbow straight down through the floor.
-      joints: { spine: 0, neck: 4, shoulderR: 168, shoulderL: 171, elbowR: 4, elbowL: 4 },
-      ik: { ankleR: { x: 93, y: 113.4, bend: -1 }, ankleL: { x: 89, y: 113.4, bend: -1 } },
-    },
-    { // hips up, weight through the shoulder blades and the feet, and the
-      // shoulder, hip and knee on one line
-      t: 1,
-      root: { x: 62, y: 96, rot: -105 },
-      joints: { spine: 0, neck: 14, shoulderR: 184, shoulderL: 187, elbowR: 4, elbowL: 4 },
-      ik: { ankleR: { x: 93, y: 113.4, bend: -1 }, ankleL: { x: 89, y: 113.4, bend: -1 } },
-    },
+    {"ik":{"ankleL":{"bend":-1,"x":89,"y":113.4},"ankleR":{"bend":-1,"x":93,"y":113.4}},"joints":{"elbowL":4,"elbowR":4,"neck":4,"shoulderL":171,"shoulderR":168,"spine":0},"root":{"rot":-90,"x":60.1,"y":106.4},"t":0},
+    {"ik":{"ankleL":{"bend":-1,"x":89,"y":113.4},"ankleR":{"bend":-1,"x":93,"y":113.4}},"joints":{"elbowL":4,"elbowR":4,"neck":14,"shoulderL":187,"shoulderR":184,"spine":0},"root":{"rot":-105,"x":62,"y":96},"t":1},
   ],
 };
 
@@ -655,20 +641,8 @@ const SPINE_STRETCH_FORWARD = {
   fit: { k: 0.92, dy: 2 },
   props: [MAT],
   keys: [
-    { // sitting tall, arms level
-      t: 0,
-      root: { x: 56, y: 107, rot: 0 },
-      joints: { spine: 0, neck: -2, hipR: 87, hipL: 86, kneeR: 2, kneeL: 2,
-                ankleR: 4, ankleL: 4 },
-      ik: { wristR: { x: 94.2, y: 79.1, bend: 1 }, wristL: { x: 90.5, y: 82.2, bend: 1 } },
-    },
-    { // curled forward, hands travelling past the feet
-      t: 1,
-      root: { x: 56, y: 107, rot: 8 },
-      joints: { spine: 34, neck: 25, hipR: 79, hipL: 78, kneeR: 2, kneeL: 2,
-                ankleR: 4, ankleL: 4 },
-      ik: { wristR: { x: 111.9, y: 98.4, bend: 1 }, wristL: { x: 107.3, y: 100.8, bend: 1 } },
-    },
+    {"ik":{"wristL":{"bend":1,"x":90.5,"y":82.2},"wristR":{"bend":1,"x":94.2,"y":79.1}},"joints":{"ankleL":4,"ankleR":4,"hipAbdL":0,"hipL":81,"hipR":82,"kneeL":0,"kneeR":0,"neck":-2,"spine":0},"root":{"rot":0,"x":56,"y":107},"t":0},
+    {"ik":{"wristL":{"bend":1,"x":107.1,"y":105.4},"wristR":{"bend":1,"x":110.2,"y":106.4}},"joints":{"ankleL":4,"ankleR":4,"hipL":73,"hipR":79,"kneeL":2,"kneeR":2,"neck":25,"spine":34},"root":{"rot":8,"x":56,"y":107},"t":1},
   ],
 };
 

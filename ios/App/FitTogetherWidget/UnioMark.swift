@@ -18,6 +18,20 @@ enum Unio {
     /// actually true of: you see it from across the room without unlocking.
     /// The hex must match --stretch in index.html or the two surfaces drift.
     static let stretch = Color(red: 0.180, green: 0.659, blue: 1.0)  // #2ea8ff
+
+    // The Home Screen widget is dark whatever the phone is set to, because the
+    // app is, and a light card would be the one place Unio is not itself.
+    // These are the app's own --panel, --text and --muted.
+    static let ground = Color(red: 0.078, green: 0.090, blue: 0.114)   // #14171d
+    static let text = Color(red: 0.957, green: 0.965, blue: 0.973)     // #f4f6f8
+    static let muted = Color(red: 0.545, green: 0.580, blue: 0.639)    // #8b94a3
+    /// An empty day in the week strip: present, but nothing in it.
+    static let dotOff = Color(red: 0.149, green: 0.169, blue: 0.204)   // #262b34
+    /// Initials sit inside a ring of their own colour, so they take the lighter
+    /// ink Home uses for text on the dark ground; the ring colour itself is
+    /// too dark to read at 13 points.
+    static let meInk = Color(red: 0.361, green: 0.553, blue: 1.0)      // #5c8dff
+    static let partnerInk = Color(red: 1.0, green: 0.510, blue: 0.384) // #ff8262
 }
 
 /// Degrees, clockwise, zero at twelve o'clock, which is how the mark is

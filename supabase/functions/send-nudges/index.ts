@@ -1,16 +1,27 @@
-// Sends at most one nudge per person per day, at a sensible hour in their own
-// timezone. Invoked hourly by pg_cron; the hour filter is what makes that safe.
+// Sends at most one scheduled notification per person per day, at a sensible
+// hour in their own timezone. Invoked hourly by pg_cron; the hour filter is
+// what makes that safe.
 //
-// Two kinds, deliberately few. A notification people learn to ignore is worse
-// than no notification at all.
-//   evening  (local 18:00) you have not trained today and your partner has
-//   digest   (local 08:00) a coach's summary of who trained yesterday
+// Deliberately few kinds. A notification people learn to ignore is worse than
+// no notification at all.
+//   evening   (local 18:00) you have not trained today and your partner has
+//   streak    (local 20:00) your together streak of 3+ ends tonight
+//   recap     (Sunday 19:00) the week, both of you, in one line
+//   progress  (Monday 08:00) weigh in or take a photo, only when one is due
+//   digest    (local 08:00) a coach's summary of who trained yesterday
 //
-// Safe to call by hand. It will still refuse to send a nudge twice in a day,
-// because nudge_log has a unique index doing that job rather than this code.
+// Who gets which, the priority between them and the reasons are in plan.ts,
+// which is pure so it can be tested without a network. This file only fetches
+// rows, asks plan.ts, and delivers.
+//
+// Safe to call by hand. It will still refuse to send twice in a day, because
+// nudge_log's unique indexes do that job rather than this code. POST
+// {"dry_run": true} to see what it would send right now without sending, and
+// add "now": "2026-10-11T19:05:00-07:00" to ask about another moment.
 
 import webpush from "npm:web-push@3.6.7";
 import { apnsConfigured, sendApns } from "./apns.ts";
+import { localParts, offSet, planFor, shift, trackedKeys, type Day, type Planned } from "./plan.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -44,40 +55,55 @@ async function q(path: string) {
   return r.json();
 }
 
-/* The local date and hour for a person, which is the whole point of storing a
-   timezone. An unknown or bad zone falls back to UTC rather than throwing and
-   taking the entire run down with it. */
-function localParts(tz: string | null) {
-  try {
-    const f = new Intl.DateTimeFormat("en-CA", {
-      timeZone: tz || "UTC",
-      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false,
+/* Every page of a select. PostgREST stops at its max-rows (1000 here by
+   default) without saying so, and a streak read off a silently truncated
+   history is a streak that breaks for no reason anybody can find. */
+async function qAll(path: string) {
+  const out: any[] = [];
+  const size = 1000;
+  for (let from = 0; ; from += size) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: { ...svc, "Range-Unit": "items", Range: `${from}-${from + size - 1}` },
     });
-    const p = Object.fromEntries(f.formatToParts(new Date()).map((x) => [x.type, x.value]));
-    return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) % 24 };
-  } catch {
-    const now = new Date();
-    return { date: now.toISOString().slice(0, 10), hour: now.getUTCHours() };
+    if (!r.ok) throw new Error(`${path} -> ${r.status} ${await r.text()}`);
+    const rows = await r.json();
+    out.push(...rows);
+    if (rows.length < size) return out;
   }
 }
 
-const shift = (d: string, days: number) =>
-  new Date(new Date(`${d}T00:00:00Z`).getTime() + days * 86400_000).toISOString().slice(0, 10);
+/* profiles.notify_off is behind 20261009_notify_prefs_and_cheer.sql, written
+   and not applied. Until it is, asking for it fails the whole select, so a
+   missing column is retried without it and reads as nothing switched off,
+   which is exactly today's behaviour. */
+const PROFILE_COLS = "email,user_name,timezone,created_at,challenge_target,goal_bubble,goal_secondary,tracked_by_goal,tracked_metrics";
+async function loadProfiles() {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=${PROFILE_COLS},notify_off`, { headers: svc });
+  if (r.ok) return r.json();
+  const text = await r.text();
+  if (!/notify_off/.test(text)) throw new Error(`profiles -> ${r.status} ${text}`);
+  return q(`profiles?select=${PROFILE_COLS}`);
+}
 
 Deno.serve(async (req) => {
   const auth = (req.headers.get("Authorization") ?? "").replace("Bearer ", "").trim();
   if (!secretOk(auth, CRON_SECRET)) return json({ error: "forbidden" }, 403);
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return json({ error: "VAPID keys not configured" }, 500);
 
+  let opts: any = {};
+  try { opts = await req.json(); } catch { /* cron sends {} and a hand call may send nothing */ }
+  const dryRun = opts?.dry_run === true;
+  const now = typeof opts?.now === "string" && !Number.isNaN(Date.parse(opts.now)) ? new Date(opts.now) : new Date();
+
   webpush.setVapidDetails(CONTACT, VAPID_PUBLIC, VAPID_PRIVATE);
 
   // Small data set, so one pass over everything beats a query per person.
   // Revisit when a single run stops fitting comfortably in memory.
   const [profiles, subs, apns, partnerships, members, groups] = await Promise.all([
-    q("profiles?select=email,user_name,timezone"),
+    loadProfiles(),
     q("push_subscriptions?select=*&failures=lt.5"),
     apnsConfigured() ? q("apns_tokens?select=*&failures=lt.5") : Promise.resolve([]),
-    q("partnerships?select=inviter_email,invitee_email&status=eq.accepted"),
+    q("partnerships?select=inviter_email,invitee_email,created_at,responded_at&status=eq.accepted"),
     q("group_members?select=email,role,group_id&left_at=is.null"),
     q("groups?select=id,owner_email,kind&kind=eq.coach"),
   ]);
@@ -100,11 +126,14 @@ Deno.serve(async (req) => {
   const reachable = (email: string) => subsFor.has(email) || apnsFor.has(email);
 
   const partnerOf = new Map<string, string>();
+  const partnerSince = new Map<string, string>();
   for (const p of partnerships) {
     const a = (p.inviter_email || "").toLowerCase();
     const b = (p.invitee_email || "").toLowerCase();
     partnerOf.set(a, b);
     partnerOf.set(b, a);
+    const since = p.responded_at || p.created_at || null;
+    if (since) { partnerSince.set(a, since); partnerSince.set(b, since); }
   }
 
   /* Clamped because user_name is free text the person types and it goes
@@ -116,48 +145,77 @@ Deno.serve(async (req) => {
       String(p.user_name || "Your partner").slice(0, 60),
     ]),
   );
+  const profileOf = new Map<string, any>(profiles.map((p: any) => [(p.email || "").toLowerCase(), p]));
 
-  // Only the dates anyone is actually standing in right now.
-  const dates = new Set<string>();
+  /* A whole year of days for the streak, because the app counts up to 365 and
+     a warning that quotes a smaller number than the Home pill is a lie. Only
+     days that can matter are fetched: trained or rested. Anything else is the
+     same as no row, which is what the app's rule says too. */
+  let earliest = localParts(null, now).date;
   for (const p of profiles) {
-    const { date } = localParts(p.timezone);
-    dates.add(date);
-    dates.add(shift(date, -1));
+    const { date } = localParts(p.timezone, now);
+    if (date < earliest) earliest = date;
   }
-  const trained = new Set<string>();
-  if (dates.size) {
-    const list = [...dates].map((d) => `"${d}"`).join(",");
-    const rows = await q(`fit_entries?select=email,entry_date,sessions&entry_date=in.(${list})&sessions=gt.0`);
-    for (const r of rows) trained.add(`${(r.email || "").toLowerCase()}|${r.entry_date}`);
+  const since = shift(earliest, -370);
+  const days = new Map<string, Day>();
+  const entries = await qAll(
+    `fit_entries?select=email,entry_date,gym,rest_day&entry_date=gte.${since}&or=(gym.eq.true,rest_day.eq.true)&order=entry_date.asc`,
+  );
+  for (const r of entries) {
+    const k = `${(r.email || "").toLowerCase()}|${r.entry_date}`;
+    const d = days.get(k) || { gym: false, rest: false };
+    days.set(k, { gym: d.gym || !!r.gym, rest: d.rest || !!r.rest_day });
+  }
+  const NONE: Day = { gym: false, rest: false };
+  const dayOf = (email: string, date: string) => days.get(`${email}|${date}`) || NONE;
+
+  /* The newest weigh-in and the newest photo per person, which is what the
+     Progress weight chart and photo card read. */
+  const lastWeight = new Map<string, { date: string; weight: number }>();
+  for (const r of await qAll("body_measurements?select=email,entry_date,weight&weight=not.is.null&order=entry_date.desc")) {
+    const k = (r.email || "").toLowerCase();
+    if (!lastWeight.has(k) && Number(r.weight) > 0) lastWeight.set(k, { date: r.entry_date, weight: Number(r.weight) });
+  }
+  const lastPhoto = new Map<string, string>();
+  for (const r of await qAll("body_photos?select=email,taken_on&order=taken_on.desc")) {
+    const k = (r.email || "").toLowerCase();
+    if (!lastPhoto.has(k) && r.taken_on) lastPhoto.set(k, r.taken_on);
+  }
+  const progressSent = new Map<string, string[]>();
+  for (const r of await q(`nudge_log?select=email,sent_on&kind=eq.progress&sent_on=gte.${shift(earliest, -10)}`)) {
+    const k = (r.email || "").toLowerCase();
+    if (!progressSent.has(k)) progressSent.set(k, []);
+    progressSent.get(k)!.push(r.sent_on);
   }
 
-  const planned: {
-    email: string; kind: string; title: string; body: string; url: string;
-    subtitle?: string; category?: string; threadId?: string;
-  }[] = [];
+  // For the coach digest: did they show up yesterday. Rest days do not count.
+  const trained = (email: string, date: string) => dayOf(email, date).gym;
+
+  const planned: Planned[] = [];
+  const reasons: { email: string; why: string }[] = [];
 
   for (const p of profiles) {
     const me = (p.email || "").toLowerCase();
     if (!me || !reachable(me)) continue;
-    const { date, hour } = localParts(p.timezone);
-    const didTrain = trained.has(`${me}|${date}`);
+    const { date, hour, weekday } = localParts(p.timezone, now);
+    const partner = partnerOf.get(me) || null;
 
-    if (hour === 18 && !didTrain) {
-      const partner = partnerOf.get(me);
-      if (partner && trained.has(`${partner}|${date}`)) {
-        planned.push({
-          email: me, kind: "evening",
-          // Title names the person, subtitle names the ask, body gives the out.
-          // Three sizes reading as one sentence beats two competing lines.
-          title: `${nameOf.get(partner)} trained today`,
-          subtitle: "Your turn",
-          body: "There is still time.",
-          category: "EVENING_NUDGE",
-          threadId: "partner",
-          url: "/",
-        });
-      }
-    }
+    const decision = planFor({
+      email: me, date, hour, weekday,
+      off: offSet(p.notify_off),
+      partner,
+      partnerName: partner ? (nameOf.get(partner) || "Your partner") : "Your partner",
+      partnerSince: partnerSince.get(me) || null,
+      dayOf,
+      targetOf: (e) => Number(profileOf.get(e)?.challenge_target) || 4,
+      accountCreated: p.created_at || null,
+      tracked: trackedKeys(p),
+      lastWeight: lastWeight.get(me) || null,
+      lastPhoto: lastPhoto.get(me) || null,
+      progressSentSince: (d) => (progressSent.get(me) || []).some((s) => s >= d),
+    });
+    if (decision.planned) planned.push(decision.planned);
+    reasons.push({ email: me, why: decision.why });
 
     if (hour === 8) {
       const mine = groups.find((g: any) => (g.owner_email || "").toLowerCase() === me);
@@ -166,7 +224,7 @@ Deno.serve(async (req) => {
           m.group_id === mine.id && (m.email || "").toLowerCase() !== me);
         if (roster.length) {
           const y = shift(date, -1);
-          const did = roster.filter((m: any) => trained.has(`${(m.email || "").toLowerCase()}|${y}`)).length;
+          const did = roster.filter((m: any) => trained((m.email || "").toLowerCase(), y)).length;
           planned.push({
             email: me, kind: "digest",
             title: `${did} of ${roster.length} trained yesterday`,
@@ -177,21 +235,31 @@ Deno.serve(async (req) => {
             category: "COACH_DIGEST",
             threadId: "coach",
             url: "/coach/",
+            // Outside the one-a-day cap on purpose: it is a coach's work
+            // summary about other people, not a nudge about their own day,
+            // and the cap index does not list it.
+            sentOn: date,
           });
         }
       }
     }
   }
 
+  if (dryRun) return json({ ok: true, dry_run: true, at: now.toISOString(), planned, reasons });
+
   let sent = 0, skipped = 0, dropped = 0;
 
   for (const n of planned) {
-    // Claim the nudge before sending it. The unique index is what guarantees
-    // once a day, so a retry or an overlapping run cannot double up.
+    // Claim the nudge before sending it. The unique indexes are what
+    // guarantee once a day, and one scheduled kind a day, so a retry or an
+    // overlapping run cannot double up. A refused claim is the cap working.
     const claim = await fetch(`${SUPABASE_URL}/rest/v1/nudge_log`, {
       method: "POST",
       headers: svc,
-      body: JSON.stringify({ email: n.email, kind: n.kind }),
+      /* sent_on is the person's own date, not the database's. The cap is
+         "one a day where you are", and current_date is UTC, which for
+         somebody in California turns 18:00 and 20:00 into two different days. */
+      body: JSON.stringify({ email: n.email, kind: n.kind, sent_on: n.sentOn }),
     });
     if (!claim.ok) { skipped++; continue; }
 
