@@ -2497,6 +2497,15 @@
     background: transparent; border: 1px solid rgba(255,255,255,.18); color: rgba(244,246,248,.85);
   }
   .paywall-fine { margin: 12px 0 0; font-size: 11px; line-height: 1.45; color: rgba(244,246,248,.42); }
+  /* "Training with someone? Enter their code": a line of text, not a third
+     button competing with Hire me, at a full thumb's height. */
+  .paywall-code { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 44px; margin: 4px 0 0;
+    padding: 10px 4px; background: none; border: 0; font: inherit; font-size: 14px; font-weight: 600; color: rgba(244,246,248,.78); cursor: pointer; }
+  .paywall-code:active { color: #fff; }
+  .paywall-code svg { flex: none; }
+  .paywall-code b { font-weight: 700; color: var(--accent); }
+  .paywall-code.pce-sent { cursor: default; font-weight: 500; color: rgba(244,246,248,.7); text-align: left; }
+  .paywall-code.pce-sent svg, .ob2-codelink.pce-sent svg { flex: none; color: var(--accent); }
   .paywall-legal { margin: 6px 0 0; font-size: 11px; }
   .paywall-legal a { color: var(--accent); text-decoration: none; }
 
@@ -5783,6 +5792,18 @@
   .ob2-link:disabled { opacity: .4; cursor: default; }
   .ob2-link:not(:disabled):active { color: var(--text); }
   .ob2-link:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 6px; }
+  /* Set like the beta line above it: an icon, then muted text, with the
+     action in the accent so it reads as tappable without being a button. */
+  .ob2-codelink { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; margin: 0; padding: 10px 4px;
+    font-size: 13px; font-weight: 500; color: var(--muted); line-height: 1.45; text-align: left; }
+  .ob2-codelink svg { flex: none; color: var(--accent-ink, var(--accent)); }
+  .ob2-codelink b { font-weight: 700; color: var(--accent-ink, var(--accent)); }
+  /* The code sheet: the invite screen's field, its own small card. */
+  .pce-pop { max-width: 380px; }
+  .pce-pop .ds-top { align-items: center; margin-bottom: 6px; }
+  .pce-why { margin: 0 0 var(--sp-stack); font-size: 14px; line-height: 1.45; color: var(--muted); }
+  .pce-pop .ob-hint { margin: 9px 0 var(--sp-action); }
+  .pce-pop #pairGoBtn { width: 100%; }
   .ob2-sign-kept { position: absolute; left: 16px; right: 16px; bottom: 7px; text-align: center; font-size: 11.5px; line-height: 1.2;
     color: var(--muted); pointer-events: none; }
   .ob2-betanote { margin: 0; padding: 10px 4px 0; display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: var(--muted); }
@@ -12571,16 +12592,23 @@ function pairEntryHtml(myCode) {
       <p class="ob-hint" id="shareHint">They get a link and your code. It works once, and only for them.</p>
 
       <div class="code-divider"><span>or</span></div>
+${pairCodeFieldHtml()}
 
+      <p class="ob-mine" id="myCodeLine"${myCode ? "" : " hidden"}>Your code is <strong id="myInviteCode">${escapeHtml(myCode || "")}</strong></p>`;
+}
+
+/* The half of it that takes THEIR code or link: also the whole of the
+   "Got a partner's code?" sheet on the paywalls, so the field, its paste
+   button and every word under it are the same in both places. */
+function pairCodeFieldHtml() {
+  return `
       <div class="pair-row">
         <input id="partnerCodeInput" type="text" placeholder="CODE OR LINK"
                autocapitalize="characters" autocomplete="off" spellcheck="false" class="code-input"
                value="${escapeHtml(PENDING_INVITE || "")}" />
         <button type="button" class="btn-ghost pair-paste" id="pairPasteBtn">Paste invite</button>
       </div>
-      <p class="ob-hint" id="pairHint">Their six characters, or paste the whole link.</p>
-
-      <p class="ob-mine" id="myCodeLine"${myCode ? "" : " hidden"}>Your code is <strong id="myInviteCode">${escapeHtml(myCode || "")}</strong></p>`;
+      <p class="ob-hint" id="pairHint">Their six characters, or paste the whole link.</p>`;
 }
 
 /* onShared fires only when an invite actually went somewhere, so a caller can
@@ -12588,7 +12616,8 @@ function pairEntryHtml(myCode) {
    and not yet answered, which is not a pairing and must never be treated as
    one. */
 function wirePairEntry({ onPaired, onPending, onShared }) {
-  $("shareLinkBtn").onclick = async (e) => {
+  /* Absent on the code sheet, which only takes their code. */
+  if ($("shareLinkBtn")) $("shareLinkBtn").onclick = async (e) => {
     const sent = await shareInviteLink(e.currentTarget);
     /* onPaired already clears solo and finishes the step; nothing extra to do
        here beyond saying why the button just changed nothing on screen. */
@@ -12642,10 +12671,10 @@ function wirePairEntry({ onPaired, onPending, onShared }) {
       if (tok) {
         holdInviteToken(tok);
         const ok = await claimHeldInviteToken();
-        /* No argument: claiming already said the partner's name in a toast, so
-           a caller that toasted again off a name passed here would say it
-           twice. */
-        if (ok) { await onPaired(); return; }
+        /* No first argument, so the callers that toast a name off it stay as
+           they were. The claim's own answer rides second, for the paywall's
+           code sheet, which has to know who it just paired with. */
+        if (ok) { await onPaired(undefined, typeof ok === "object" ? ok : null); return; }
         say("That link is not active any more. Ask for a new one.", true);
         input.value = "";
         return;
@@ -12679,6 +12708,15 @@ function wirePairEntry({ onPaired, onPending, onShared }) {
      the App Store, so after the install this is the link, and a link pairs
      straight away (it was made for them, which is the consent). A code goes
      the same way a typed one does. */
+  /* The code sheet's Pair button. Six characters and a pasted link already
+     go on their own; this is for whoever reaches for a button anyway, and it
+     says what is missing rather than doing nothing. */
+  const go = $("pairGoBtn");
+  if (go) go.onclick = () => {
+    const v = input.value;
+    if (!inviteTokenFrom(v) && v.trim().length !== 6) { say("Their six characters, or paste the whole link.", true); input.focus(); return; }
+    submit(v);
+  };
   const paste = $("pairPasteBtn");
   if (paste) paste.onclick = async () => {
     let text = "";
@@ -12689,6 +12727,78 @@ function wirePairEntry({ onPaired, onPending, onShared }) {
     if (code.length === 6) { input.value = code; submit(code); return; }
     say("That's not an invite link or a code. Ask them to send it again.", true);
   };
+}
+
+/* ---------- "Got a partner's code?" on every paywall ----------
+   Mo, 2026-10-10. One plan covers two, so somebody looking at a price may
+   already be covered and not know it: their partner pays. Every paywall
+   (onboarding's pay screens and the app's own) carries one quiet line for
+   that, while they are not paired, and it opens this: the same code field
+   the invite screen has, through the same wirePairEntry, so a pasted link
+   and a typed code mean exactly what they mean there.
+
+   A link pairs straight away (the partner made it for them, which is the
+   consent). Whether the partner's plan then covers them is is_premium()
+   flipping from false to true across the pairing: it answers for a
+   partner's subscription, and also for your own first 30 days, so true
+   before AND after says nothing about the partner and is not called
+   covered. A typed code is a request the partner still has to accept, so
+   nothing is covered yet and the paywall stays, trial and all.
+
+   No new server logic: claim_invite_link, redeem_invite_code and
+   is_premium, as they are. */
+const partnerCodeEntryShown = (d) => !PARTNER_EMAIL && !d?.partner?.email && !d?.paired_in_onboarding;
+function partnerCodeEntryHTML(d, cls) {
+  if (!partnerCodeEntryShown(d)) return "";
+  if (d?.partner_request) return partnerCodeSentHTML(d.partner_request, cls);
+  return `<button type="button" class="${cls} pce-open" id="pceOpen">${icon("people", 16)}<span>Training with someone? <b>Enter their code</b></span></button>`;
+}
+function partnerCodeSentHTML(name, cls) {
+  return `<p class="${cls} pce-sent" id="pceSent">${icon("check", 15)}<span>Sent. Once ${escapeHtml(name || "they")} accepts, their plan covers you.</span></p>`;
+}
+async function premiumNow() {
+  const { data, error } = await sb.rpc("is_premium");
+  return error ? null : data === true;
+}
+/* onPaired({ name, email, covered }) and onPending({ name }). */
+async function openPartnerCodeSheet({ onPaired, onPending }) {
+  if (document.querySelector(".pce-scrim")) return;
+  const before = premiumNow().catch(() => null);
+  const scrim = document.createElement("div");
+  scrim.className = "pop-scrim pce-scrim";
+  scrim.innerHTML = `
+    <div class="pop pce-pop" role="dialog" aria-modal="true" aria-labelledby="pceTitle">
+      <div class="pop-body">
+        <div class="ds-top">
+          <button type="button" class="ds-x" id="pceX" aria-label="Close">&times;</button>
+          <div><div class="sv-name" id="pceTitle">Their code</div></div>
+        </div>
+        <p class="pce-why">If your partner already pays, one plan covers you both.</p>
+        ${pairCodeFieldHtml()}
+        <button type="button" class="btn-primary" id="pairGoBtn">Pair</button>
+      </div>
+    </div>`;
+  /* wirePairEntry finds its field by id, and a pairing screen drawn earlier
+     can still be sitting in the hidden onboarding layer with the same ids.
+     Those are dead DOM; they lose the ids so this sheet's are the ones found. */
+  for (const id of ["partnerCodeInput", "pairPasteBtn", "pairHint", "pairGoBtn", "shareLinkBtn"]) {
+    document.querySelectorAll(`#${id}`).forEach((el) => el.removeAttribute("id"));
+  }
+  document.body.appendChild(scrim);
+  const close = () => scrim.remove();
+  $("pceX").onclick = close;
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+  wirePairEntry({
+    onPaired: async (res, linkRes) => {
+      const r = res || linkRes || {};
+      const was = await before;
+      const now = await premiumNow().catch(() => null);
+      close();
+      await onPaired({ name: r.partner_name || "Your partner", email: r.partner_email || null, covered: was === false && now === true });
+    },
+    onPending: async (res) => { close(); await onPending({ name: res?.partner_name || null }); },
+  });
+  $("partnerCodeInput").focus({ preventScroll: true });
 }
 
 /* Onboarding, rebuilt to one rule: ask the goal, then TELL them the plan.
@@ -13010,7 +13120,10 @@ async function claimHeldInviteToken() {
      in. Recorded as "none" so even a phone that has never run 1.1 before
      treats the partner who is about to appear as news. */
   pairSeenSet("none");
-  return true;
+  /* The answer itself rather than true: still truthy for every caller that
+     only asks whether it worked, and it carries the partner's name and email
+     for the one that needs them (the paywall's code sheet). */
+  return res;
 }
 
 /* The deferred case, which is the one iOS gives no clean answer to.
@@ -17172,6 +17285,44 @@ function ob2WirePrice(ui, d) {
   $("ob2Restore").onclick = (e) => { e.preventDefault(); restorePurchase(); };
 }
 
+/* The covered screen, shared by path B (covered measured on Accept) and by
+   either pay screen once "Enter their code" has paired somebody whose
+   partner pays. */
+function ob2PaintCovered(d, ui) {
+  ui.paint({
+    title: `${ob2Partner(d)}'s plan covers you both. Nothing to pay. I checked twice.`,
+    body: `${ob2HeroBot(150)}${ob2PairHTML(ob2Name(d) || "You", ob2Partner(d), { joined: true })}
+      ${ob2Card("Open for both of you", `<div class="ob2-rows">${PREMIUM_UNLOCKS.slice(0, 4).map(([, ico, tint, t]) =>
+      `<div class="ob2-row-i"><span style="color:${tint}">${icon(ico, 18)}</span><p><b>${escapeHtml(t)}</b></p></div>`).join("")}</div>`)}
+      ${ob2BetaNote()}`,
+    cta: "Start training", onNext: () => ui.next(),
+  });
+}
+/* The pay screens' "Enter their code". Paired: the same screen again with
+   the partner known, as the covered version when their plan covers this
+   account. A request: the line under the button says so and the paywall
+   stays as it is, trial and all. paired_at_pay takes the invite screen out
+   of the rest of the run, since there is nobody left to invite. */
+function ob2WirePartnerCode(id, d) {
+  const btn = $("pceOpen");
+  if (!btn) return;
+  btn.onclick = () => openPartnerCodeSheet({
+    onPaired: ({ name, email, covered }) => {
+      /* Covered says so in his own headline on the next paint; a toast
+         saying the same thing over it would be the screen talking twice. */
+      if (!covered) toast(`Paired with ${name}`);
+      ob2Go(id, { ...d, partner: { ...(d.partner || {}), name, email }, paired_in_onboarding: true,
+        paired_at_pay: true, train_with: "partner", partner_request: null, covered: covered ? true : d.covered });
+    },
+    onPending: ({ name }) => {
+      d.partner_request = name || "they";
+      d.train_with = "partner";
+      const b = $("pceOpen");
+      if (b) b.outerHTML = partnerCodeSentHTML(d.partner_request, "ob2-link ob2-codelink");
+    },
+  });
+}
+
 /* The week strip and the time of day, shared by A29 and B25. Kept on the
    device only: no column holds training days or a time yet, and the only
    reminder the server sends is the 6 pm one when your partner trained and
@@ -19203,7 +19354,7 @@ build: { ch: 5, render(d, ui) {
      app's own pairing entry (pairEntryHtml and wirePairEntry, the ones Setup >
      Partner uses): Send an invite mints the one time link, the box takes
      their code or a link they sent, and their own code sits underneath. */
-  invite: { ch: 5, render(d, ui) {
+  invite: { ch: 5, when: (d) => !d.paired_at_pay, render(d, ui) {
     const who = ob2Name(d) || "You";
     ui.paint({
       title: "Bring your partner in. Training's better with someone watching. Ask me how I know.",
@@ -19345,13 +19496,18 @@ build: { ch: 5, render(d, ui) {
      carries the beta screen's message (ob2BetaNote), and the commitment
      comes right after it. */
   pay2: { ch: 5, render(d, ui) {
+    /* Paired from this screen's own "Enter their code" with a partner whose
+       plan covers them: the same screen path B shows, nothing to pay. */
+    if (d.covered === true) { ob2PaintCovered(d, ui); return; }
+    const them = d.partner?.name ? ob2Partner(d) : "your partner";
     ui.paint({
-      title: ob2Terms().free ? "We're in beta. Your first month's on me." : "We're in beta. One plan covers you and your partner. Bargain.",
-      body: ob2PayHTML(d) + ob2BetaNote() + ob2PayHead(),
+      title: ob2Terms().free ? "We're in beta. Your first month's on me." : `We're in beta. One plan covers you and ${them}. Bargain.`,
+      body: ob2PayHTML(d) + ob2BetaNote() + partnerCodeEntryHTML(d, "ob2-link ob2-codelink") + ob2PayHead(),
       cta: ob2Terms().cta,
       foot: ob2PayFoot(),
     });
     ob2WirePrice(ui, d);
+    ob2WirePartnerCode("pay2", d);
   } },
 
   /* A34, the hand-off, not a screen: it writes everything and lands on Home. */
@@ -19362,29 +19518,22 @@ build: { ch: 5, render(d, ui) {
      profile row, which is the one moment is_premium() cannot be answering
      for this person's own free month; see ob2LoadPartner.
 
-     TODO, an idea Mo wants to think about later (2026-10-10), not built: for
-     somebody who arrived by invite, ask "Do you have a partner? Got a code?"
-     right before this screen, so a partner who already pays is found (and
-     the covered branch below shown) before anybody is asked for money. */
+     Somebody whose partner already pays but who is not paired yet finds it
+     out from "Training with someone? Enter their code" on this screen and
+     on pay2 (partnerCodeEntryHTML), which pairs them and lands on the
+     covered branch below. */
   pay: { ch: 5, render(d, ui) {
-    if (d.covered === true) {
-      ui.paint({
-        title: `${ob2Partner(d)}'s plan covers you both. Nothing to pay. I checked twice.`,
-        body: `${ob2HeroBot(150)}${ob2PairHTML(ob2Name(d) || "You", ob2Partner(d), { joined: true })}
-          ${ob2Card("Open for both of you", `<div class="ob2-rows">${PREMIUM_UNLOCKS.slice(0, 4).map(([, ico, tint, t]) =>
-          `<div class="ob2-row-i"><span style="color:${tint}">${icon(ico, 18)}</span><p><b>${escapeHtml(t)}</b></p></div>`).join("")}</div>`)}
-          ${ob2BetaNote()}`,
-        cta: "Start training", onNext: () => ui.next(),
-      });
-      return;
-    }
+    if (d.covered === true) { ob2PaintCovered(d, ui); return; }
     ui.paint({
       title: ob2Terms().free ? "We're in beta. Your first month's on me." : `We're in beta. One plan covers you and ${ob2Partner(d)}. Bargain.`,
-      body: ob2PayHTML(d) + ob2BetaNote() + ob2PayHead(),
+      /* Path B arrives paired, so the code line hides itself here; it is
+         drawn anyway for the run that somehow reaches this screen alone. */
+      body: ob2PayHTML(d) + ob2BetaNote() + partnerCodeEntryHTML(d, "ob2-link ob2-codelink") + ob2PayHead(),
       cta: ob2Terms().cta,
       foot: ob2PayFoot(),
     });
     ob2WirePrice(ui, d);
+    ob2WirePartnerCode("pay", d);
   } },
 };
 
@@ -27053,6 +27202,7 @@ function showPaywall({ skipLabel = "Not now" } = {}) {
             <button type="button" class="btn-primary paywall-cta" data-pay="1">Hire me, ${escapeHtml(PREMIUM_PRICE)} a month</button>
             <button type="button" class="btn-ghost paywall-ghost" data-pay="restore">Restore purchase</button>
             <button type="button" class="btn-ghost paywall-ghost" data-pay="0">${escapeHtml(skipLabel)}</button>
+            ${partnerCodeEntryHTML(null, "paywall-code")}
             <p class="paywall-fine">
               Renews every month until you cancel. Cancel any time in your iPhone's
               Settings, under your name then Subscriptions.
@@ -27115,6 +27265,22 @@ function showPaywall({ skipLabel = "Not now" } = {}) {
            the one place that says so is the function they both call. */
         await startHire();
       };
+    });
+    /* Training with someone who already pays: pair here. Covered, and the
+       paywall has nothing left to ask, so it closes; otherwise it stays, and
+       the app underneath picks the partner up the way Setup's Pair up does. */
+    const code = scrim.querySelector("#pceOpen");
+    if (code) code.onclick = () => openPartnerCodeSheet({
+      onPaired: async ({ name, covered }) => {
+        await refreshPremium();
+        if (covered) { toast(`${name}'s plan already covers you. Nothing to pay.`); close(true); }
+        else { toast(`Paired with ${name}`); scrim.querySelector("#pceOpen")?.remove(); }
+        await checkPartnershipThenEnter();
+      },
+      onPending: ({ name }) => {
+        const b = scrim.querySelector("#pceOpen");
+        if (b) b.outerHTML = partnerCodeSentHTML(name, "paywall-code");
+      },
     });
     /* No tap-outside-to-close: on a full screen there is no outside, and the
        X is the only thing that should dismiss this. */

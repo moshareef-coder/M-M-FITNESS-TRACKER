@@ -1042,6 +1042,7 @@
       && low(r.inviter_email) === low(target.email) && low(r.invitee_email) === low(ME));
     if (theirs) {
       theirs.status = "accepted";
+      theirs.__new = true;
       theirs.responded_at = new Date().toISOString();
       return { ok: true, partner_name: target.user_name, partner_email: low(target.email) };
     }
@@ -1107,7 +1108,7 @@
     link.claimed_at = Date.now();
     link.claimed_by = ME;
     pRows().push({ id: "s-" + Math.random().toString(36).slice(2, 9), inviter_email: low(link.owner_email),
-      invitee_email: ME, status: "accepted",
+      invitee_email: ME, status: "accepted", __new: true,
       created_at: new Date().toISOString(), responded_at: new Date().toISOString() });
     const owner = DB.profiles.find((p) => low(p.email) === low(link.owner_email));
     return { ok: true, partner_name: (owner && owner.user_name) || "Your partner",
@@ -1168,7 +1169,19 @@
             me.invite_code = fresh;
             return { data: { ok: true, invite_code: fresh }, error: null };
           }
-          if (name === "is_premium") return { data: PAID, error: null };
+          /* Mell pays, in this world. So a pairing made in this tab (the
+             paywall's "Enter their code", Accept, the invite screen) answers
+             the way the real is_premium() does for a partner's subscription:
+             covered. Only pairings made here, so a world that loads already
+             paired on ?paid=0 still shows its paywall. ?mellPays=0 turns it off.
+             Off by default on ?onboard=b, whose paid=0 run is the unpaid
+             paywall on purpose (paid=1 is already its covered screen). */
+          if (name === "is_premium") {
+            const mellPays = qs.get("mellPays") ? qs.get("mellPays") !== "0" : OB !== "b";
+            const covered = mellPays
+              && pRows().some((r) => r.__new && r.status === "accepted" && party(r, ME) && party(r, THEM));
+            return { data: PAID || covered, error: null };
+          }
           /* The partner's row for that day, stamped seen, which is what the
              Home card's dismiss and the finished card both ask for. */
           if (name === "mark_partner_entry_seen") {
