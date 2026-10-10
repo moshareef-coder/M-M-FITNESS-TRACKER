@@ -5765,6 +5765,10 @@
   .ob2-link:disabled { opacity: .4; cursor: default; }
   .ob2-link:not(:disabled):active { color: var(--text); }
   .ob2-link:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 6px; }
+  .ob2-sign-kept { position: absolute; left: 16px; right: 16px; bottom: 7px; text-align: center; font-size: 11.5px; line-height: 1.2;
+    color: var(--muted); pointer-events: none; }
+  .ob2-betanote { margin: 0; padding: 10px 4px 0; display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: var(--muted); }
+  .ob2-betanote svg { flex: none; margin-top: 1px; color: var(--accent-ink, var(--accent)); }
   .ob2-sign-seat { margin: 0; font-size: 13px; color: var(--muted); text-align: center; }
   @media (prefers-reduced-motion: reduce) { .ob2-sign-pad { transition: none; } }
   /* MacroFactor's pickers: wheels, a ruler, a unit switch. */
@@ -15691,7 +15695,13 @@ const OB2_PATH_A = [
   { id: "taste3", off: "Mo cut the live invite demo for now (2026-10-08). Back in 1.2." },
   "build", "preview",
   { id: "account", off: "Sign-in already happened before onboarding started." },
-  "beta", "commit", "pay2", "invite", "notify", "home",
+  /* Mo, 2026-10-10: the commitment comes after payment, not before it, so
+     the signature is the first thing they do as a member rather than a hoop
+     before the price. And the beta screen folded into the paywall (its one
+     line is ob2BetaNote), so the price no longer arrives two screens after
+     a screen about being new. */
+  { id: "beta", off: "Folded into the pay screen, Mo, 2026-10-10. See ob2BetaNote." },
+  "pay2", "commit", "invite", "notify", "home",
 ];
 const OB2_PATH_B = [
   "accept", "hello", "theme", "name", "goal", "goal2", "stop", "two",
@@ -15699,7 +15709,9 @@ const OB2_PATH_B = [
   { id: "taste2", off: "Mo cut the sample set (2026-10-07). He did not like it." },
   "styles", "equip", "focus", "hurts", "warmup", "days", "freq", "minutes",
   { id: "taste3", off: "Mo cut the live invite demo for now (2026-10-08). Back in 1.2." },
-  "build", "preview", "beta", "commit", "pay", "notify",
+  "build", "preview",
+  { id: "beta", off: "Folded into the pay screen, Mo, 2026-10-10. See ob2BetaNote." },
+  "pay", "commit", "notify",
 ];
 
 const ob2Path = (d) => (d.path === "b" ? OB2_PATH_B : OB2_PATH_A);
@@ -15815,6 +15827,14 @@ const OB2_REACT = {
 
 /* Called by renderOnboardStep for any "v2:" step. */
 function renderObV2(id, d) {
+  /* A draft saved on a screen this build has switched off (beta, after
+     2026-10-10) resumes on the next screen that is still on, rather than at
+     the very start with every answer already given. */
+  if (!ob2Ids(d).includes(id)) {
+    const path = ob2Path(d), at = path.findIndex((e) => e?.id === id);
+    const on = at < 0 ? null : path.slice(at + 1).find((e) => typeof e === "string");
+    if (on) id = on;
+  }
   if (!ob2Ids(d).includes(id) || !OB2[id]) id = ob2Ids(d)[0];
   /* A Setup editor left open (signed out from under it) must not keep these
      screens painting into Setup. */
@@ -16909,6 +16929,12 @@ function ob2WireSign(ui, { onSigned } = {}) {
    Trial." So under the buttons, in this order: the price and auto-renew
    line, when the charge happens, then Terms, Privacy and Restore. Every line
    Apple reviews for (guideline 3.1.2) is still on the screen. */
+/* What is left of the beta screen, Mo, 2026-10-10: one quiet line on the
+   pay screen. His headline already says "We're in beta" whether or not there
+   is a free month, so this is only the half the headline cannot say. */
+function ob2BetaNote() {
+  return `<p class="ob2-betanote">${icon("star", 16)}<span>Unio's just starting out. Things will change, and you get a say in what.</span></p>`;
+}
 function ob2PayHead() {
   const t = ob2Terms();
   return `<div class="ob2-payhead">
@@ -16959,9 +16985,13 @@ function ob2WirePrice(ui, d) {
   OB2_PAY_D = d;
   /* Repainted when the offering lands, so a store with no free trial never
      shows a trial it will not give. */
+  /* Previous from the commitment lands back here after paying. Buying again
+     would put Apple's "already subscribed" sheet in their way, so the button
+     just goes on. */
+  const paid = !!d.started_trial;
   const paint = () => {
     const t = ob2Terms();
-    if ($("ob2Next")) $("ob2Next").textContent = t.cta;
+    if ($("ob2Next")) $("ob2Next").textContent = paid ? "Continue" : t.cta;
     if ($("ob2Fine")) $("ob2Fine").innerHTML = ob2FineHTML(t);
     if ($("ob2PcH")) $("ob2PcH").textContent = t.free ? t.trial : "Unio Plus";
     if ($("ob2Tl")) $("ob2Tl").outerHTML = ob2PayHTML(OB2_PAY_D || {});
@@ -16970,6 +17000,7 @@ function ob2WirePrice(ui, d) {
   primeOfferings()?.then((o) => { OB2_OFFER = o; paint(); }).catch(() => {});
   paint();
   $("ob2Next").onclick = async () => {
+    if (paid) { ui.next(); return; }
     $("ob2Next").disabled = true;
     let bought = false;
     if (purchasesPlugin()) {
@@ -19055,7 +19086,10 @@ build: { ch: 5, render(d, ui) {
 
   /* Round 3: said plainly, before the promise and the price. Unio is new,
      and an early member gets the free month. Nothing here is a countdown or
-     a "limited" anything; it is the truth about where the app is. */
+     a "limited" anything; it is the truth about where the app is.
+     Switched off in both paths, Mo, 2026-10-10: it said the same thing as
+     the paywall right after it, so its one line moved onto that screen
+     (ob2BetaNote). Kept so it can come back by flipping the path entry. */
   beta: { ch: 5, render(d, ui) {
     const covered = d.path === "b" && d.covered === true;
     ui.paint({
@@ -19121,6 +19155,7 @@ build: { ch: 5, render(d, ui) {
           <div class="ob2-sign-pad" id="ob2SignPad">
             <span class="ob2-sign-hint" id="ob2SignHint" aria-hidden="true">Sign here with your finger</span>
             <div class="ob2-sign-line" aria-hidden="true"><span>X</span></div>
+            ${/* True, see ob2WireSign: the canvas is never read back and the typed name never leaves the input. */ ""}<small class="ob2-sign-kept">Your signature stays on this screen. We don't save it.</small>
             <canvas id="ob2SignCv" role="img" aria-label="Signature pad. Sign with your finger, or choose Type your name instead."></canvas>
             <input type="text" class="ob2-sign-type" id="ob2SignType" autocomplete="name" spellcheck="false"
               placeholder="${escapeHtml(me || "Your name")}" aria-label="Type your name to sign" hidden>
@@ -19138,11 +19173,13 @@ build: { ch: 5, render(d, ui) {
     ob2WireSign(ui, { onSigned: () => { if (!said && $("ob2Q")) { said = true; ob2Type($("ob2Q"), "Signed. I'm holding you to it."); } } });
   } },
 
-  /* The paywall, one page: see ob2WirePrice. */
+  /* The paywall, one page: see ob2WirePrice. Since 2026-10-10 it also
+     carries the beta screen's message (ob2BetaNote), and the commitment
+     comes right after it. */
   pay2: { ch: 5, render(d, ui) {
     ui.paint({
-      title: ob2Terms().free ? "We're in beta. Your first month's on me." : "One plan. Covers you and your partner. Bargain.",
-      body: ob2PayHTML(d) + ob2PayHead(),
+      title: ob2Terms().free ? "We're in beta. Your first month's on me." : "We're in beta. One plan covers you and your partner. Bargain.",
+      body: ob2PayHTML(d) + ob2BetaNote() + ob2PayHead(),
       cta: ob2Terms().cta,
       foot: ob2PayFoot(),
     });
@@ -19155,21 +19192,28 @@ build: { ch: 5, render(d, ui) {
   /* B26. One subscription covers both (is_premium() answers for a partner's
      purchase). `covered` was measured on Accept, before this account had a
      profile row, which is the one moment is_premium() cannot be answering
-     for this person's own free month; see ob2LoadPartner. */
+     for this person's own free month; see ob2LoadPartner.
+
+     TODO, an idea Mo wants to think about later (2026-10-10), not built: for
+     somebody who arrived by invite, ask "Do you have a partner? Got a code?"
+     right before this screen, so a partner who already pays is found (and
+     the covered branch below shown) before anybody is asked for money. */
   pay: { ch: 5, render(d, ui) {
     if (d.covered === true) {
       ui.paint({
         title: `${ob2Partner(d)}'s plan covers you both. Nothing to pay. I checked twice.`,
-        body: `${ob2HeroBot(150)}${ob2PairHTML(ob2Name(d) || "You", ob2Partner(d), { joined: true })}
+        /* 124, not 150, so the beta line fits under the card on a 390x844. */
+        body: `${ob2HeroBot(124)}${ob2PairHTML(ob2Name(d) || "You", ob2Partner(d), { joined: true })}
           ${ob2Card("Open for both of you", `<div class="ob2-rows">${PREMIUM_UNLOCKS.slice(0, 4).map(([, ico, tint, t]) =>
-          `<div class="ob2-row-i"><span style="color:${tint}">${icon(ico, 18)}</span><p><b>${escapeHtml(t)}</b></p></div>`).join("")}</div>`)}`,
+          `<div class="ob2-row-i"><span style="color:${tint}">${icon(ico, 18)}</span><p><b>${escapeHtml(t)}</b></p></div>`).join("")}</div>`)}
+          ${ob2BetaNote()}`,
         cta: "Start training", onNext: () => ui.next(),
       });
       return;
     }
     ui.paint({
-      title: ob2Terms().free ? "We're in beta. Your first month's on me." : `One plan. Covers you and ${ob2Partner(d)}. Bargain.`,
-      body: ob2PayHTML(d) + ob2PayHead(),
+      title: ob2Terms().free ? "We're in beta. Your first month's on me." : `We're in beta. One plan covers you and ${ob2Partner(d)}. Bargain.`,
+      body: ob2PayHTML(d) + ob2BetaNote() + ob2PayHead(),
       cta: ob2Terms().cta,
       foot: ob2PayFoot(),
     });
