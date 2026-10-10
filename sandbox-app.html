@@ -16113,7 +16113,7 @@ const OB2_REACT = {
   name: (d) => `${ob2Name(d)}. Great name. Easy to yell across the gym.`,
   goal: (d) => OB2_GOAL_SAY[d.goal_bubble] || null,
   goal2: (d) => ((d.goal_secondary || []).length ? "Ambitious. I'll pretend I'm not impressed." : "One goal. Focused. Very efficient of you."),
-  sex: () => "Drawing you now. Hold still.",
+  sex: () => "Got it. Your figure's ready to work.",
   age: (d) => (d.age ? `${d.age}. Same as me in robot years. Probably.` : null),
   height: () => "Got it. Your figure has been updated. It's thrilled.",
   weight: () => "Noted. Moving on before either of us makes it weird.",
@@ -19475,6 +19475,7 @@ async function ob2LoadPartner(d) {
 /* The write, through the old run's own writer, so every column lands where
    it always has. The week strip is kept on the device only (see ob2WeekHTML). */
 function obV2Finish(d) {
+  if (d.partner?.email && d.partner?.name) PAIR_NAME_HINT = { email: String(d.partner.email).toLowerCase(), name: d.partner.name };
   try {
     if (Array.isArray(d.week_days)) localStorage.setItem(`ft_ob_week_${MY_EMAIL}`, JSON.stringify({ days: d.week_days, time: d.week_time || null }));
   } catch { /* private browsing */ }
@@ -22753,7 +22754,20 @@ const PAIR_SEEN_KEY = "unio.pairSeen";
 function pairSeenGet() { try { return localStorage.getItem(PAIR_SEEN_KEY); } catch { return null; } }
 function pairSeenSet(v) { try { localStorage.setItem(PAIR_SEEN_KEY, v); } catch { /* private mode: it shows again, which is harmless */ } }
 
-function maybeCelebratePair() {
+/* The partner's name as onboarding already knew it. Path B reads the
+   inviter's profile in ob2LoadPartner, then showApp() runs this before loadAll
+   has filled PARTNER_PROFILE, so the celebration used to say "You and
+   Partner." Kept with its email so it can only ever name that person. */
+let PAIR_NAME_HINT = null;
+let PAIR_CELEBRATE_WAIT = null;
+
+function pairCelebrationName() {
+  if (PARTNER_PROFILE?.user_name) return PARTNER_PROFILE.user_name;
+  if (PAIR_NAME_HINT && PAIR_NAME_HINT.email === PARTNER_EMAIL) return PAIR_NAME_HINT.name;
+  return null;
+}
+
+function maybeCelebratePair(waited = false) {
   const now = PARTNER_EMAIL || "none";
   const seen = pairSeenGet();
   if (seen === null) { pairSeenSet(now); return; }
@@ -22762,14 +22776,24 @@ function maybeCelebratePair() {
   /* Not over a workout in progress. Nothing is recorded, so the next redraw
      after the session ends picks it up. */
   if (SESSION || document.querySelector(".pc-scrim")) return;
+  /* Wait for the partner's profile (loadAll redraws the avatars, which calls
+     this again) so the name and photo are real. Only if it never arrives does
+     it go ahead with whatever name is known, or "your partner". */
+  if (!PARTNER_PROFILE && !waited) {
+    if (!PAIR_CELEBRATE_WAIT) PAIR_CELEBRATE_WAIT = setTimeout(() => { PAIR_CELEBRATE_WAIT = null; maybeCelebratePair(true); }, 4000);
+    return;
+  }
+  clearTimeout(PAIR_CELEBRATE_WAIT);
+  PAIR_CELEBRATE_WAIT = null;
   pairSeenSet(now);
   showPairCelebration();
 }
 
 async function showPairCelebration() {
   document.querySelector(".pc-scrim")?.remove();
-  const name = partnerName() || "Your partner";
-  const first = name.split(" ")[0];
+  const known = pairCelebrationName();
+  const name = known || "your partner";
+  const first = known ? known.split(" ")[0] : name;
   const mine = await avatarHTML(MY_EMAIL, ME, "me", "div");
   const theirs = await avatarHTML(PARTNER_EMAIL, name, "them", "div");
 
@@ -22777,7 +22801,7 @@ async function showPairCelebration() {
   el.className = "pc-scrim";
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-modal", "true");
-  el.setAttribute("aria-label", `${name} joined you on Unio`);
+  el.setAttribute("aria-label", `${known || "Your partner"} joined you on Unio`);
   el.innerHTML = `
     <div class="pc-stage">
       <div class="pc-bot">${robotFaceSVG(104, "", { bust: true })}</div>
